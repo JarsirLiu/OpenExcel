@@ -176,7 +176,8 @@ export async function workbookRoutes(app: FastifyInstance) {
         merges: JSON.parse(s.merges) as { row: [number, number]; col: [number, number] }[],
       }));
 
-      const buf = templateToExcel({ id: "export", name: wb.name, groups: [], sheets });
+      const ab = templateToExcel({ id: "export", name: wb.name, groups: [], sheets });
+      const buf = Buffer.from(ab);
       reply.header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       reply.header("Content-Disposition", `attachment; filename="${wb.name}.xlsx"`);
       return reply.send(buf);
