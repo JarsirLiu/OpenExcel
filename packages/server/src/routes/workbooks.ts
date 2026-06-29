@@ -13,6 +13,25 @@ interface SheetJson {
 }
 
 export async function workbookRoutes(app: FastifyInstance) {
+  const parseJson = <T,>(value: string, fallback: T): T => {
+    try {
+      return JSON.parse(value) as T;
+    } catch {
+      return fallback;
+    }
+  };
+
+  const cloneSheetSchema = (sheet: { columns: string; merges: string; rows: string }) => {
+    const columns = parseJson<{ label: string; width?: number }[]>(sheet.columns, []);
+    const merges = parseJson<{ row: [number, number]; col: [number, number] }[]>(sheet.merges, []);
+    const rows = parseJson<string[][]>(sheet.rows, []);
+
+    return {
+      columns: JSON.stringify(columns),
+      merges: JSON.stringify(merges),
+      rows: JSON.stringify(rows.map((row) => row.map(() => ""))),
+    };
+  };
 
   app.get("/api/workbooks", async () => {
     const wbs = await prisma.workbook.findMany({ orderBy: { order: "asc" } });
@@ -68,6 +87,77 @@ export async function workbookRoutes(app: FastifyInstance) {
       return { success: true, sheets: sheets.length };
     }
   );
+
+  app.post<{
+    Params: { id: string };
+    Body: { name?: string; sourceSheetId?: number };
+  }>("/api/workbooks/:id/sheets", async (req, reply) => {
+    const workbookId = Number(req.params.id);
+    const workbook = await prisma.workbook.findUnique({
+      where: { id: workbookId },
+      include: { sheets: { orderBy: { order: "asc" } } },
+    });
+
+    if (!workbook) return reply.status(404).send({ error: "Workbook not found" });
+
+    const sourceSheet = req.body.sourceSheetId
+      ? workbook.sheets.find((sheet) => sheet.id === req.body.sourceSheetId)
+      : workbook.sheets[workbook.sheets.length - 1];
+
+    const nextOrder = workbook.sheets.length;
+    const nextName = req.body.name?.trim() || `Sheet${nextOrder + 1}`;
+    const schema = sourceSheet
+      ? cloneSheetSchema(sourceSheet)
+      : {
+          columns: JSON.stringify([{ label: "A" }]),
+          merges: JSON.stringify([]),
+          rows: JSON.stringify([[]]),
+        };
+
+    const sheet = await prisma.sheet.create({
+      data: {
+        workbookId,
+        name: nextName,
+        order: nextOrder,
+        columns: schema.columns,
+        merges: schema.merges,
+        rows: schema.rows,
+      },
+    });
+
+    return reply.status(201).send({ id: sheet.id, name: sheet.name, order: sheet.order });
+  });
+
+  app.delete<{ Params: { id: string } }>("/api/sheets/:id", async (req, reply) => {
+    const sheetId = Number(req.params.id);
+    const sheet = await prisma.sheet.findUnique({
+      where: { id: sheetId },
+      include: { workbook: { include: { sheets: { orderBy: { order: "asc" } } } } },
+    });
+
+    if (!sheet) return reply.status(404).send({ error: "Sheet not found" });
+    if (sheet.workbook.sheets.length <= 1) {
+      return reply.status(400).send({ error: "Workbook must keep at least one sheet" });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.sheet.delete({ where: { id: sheetId } });
+
+      const remaining = await tx.sheet.findMany({
+        where: { workbookId: sheet.workbookId },
+        orderBy: { order: "asc" },
+      });
+
+      for (let index = 0; index < remaining.length; index++) {
+        await tx.sheet.update({
+          where: { id: remaining[index].id },
+          data: { order: index },
+        });
+      }
+    });
+
+    return { success: true, workbookId: sheet.workbookId };
+  });
 
   app.get<{ Params: { id: string } }>(
     "/api/workbooks/:id/template",

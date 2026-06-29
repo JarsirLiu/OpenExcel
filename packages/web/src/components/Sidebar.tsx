@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import type { SheetSchema } from "../api/client";
 
 interface UploadedFile {
   name: string;
@@ -11,9 +12,18 @@ interface Props {
   fileList: UploadedFile[];
   onUpload: (file: File) => void;
   onClearData: () => void;
+  currentSheet?: SheetSchema;
+  onSheetChange?: (index: number) => void;
 }
 
-function DataPanel({ fileList, onUpload, onClearData }: Props) {
+interface DataPanelProps {
+  fileList: UploadedFile[];
+  onUpload: (file: File) => void;
+  onClearData: () => void;
+  currentSheet?: SheetSchema;
+}
+
+function DataPanel({ fileList, onUpload, onClearData, currentSheet }: DataPanelProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   return (
@@ -27,6 +37,18 @@ function DataPanel({ fileList, onUpload, onClearData }: Props) {
         </button>
         <input ref={inputRef} type="file" accept=".xlsx,.xls" multiple style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; if (f) { onUpload(f); e.target.value = ""; } }} />
       </div>
+
+      {currentSheet && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontWeight: 600, marginBottom: 6, color: "#333" }}>当前 Sheet</div>
+          <div style={{ padding: "6px 10px", background: "#f5f5f5", borderRadius: 4 }}>
+            <div style={{ fontWeight: 500 }}>{currentSheet.name}</div>
+            <div style={{ color: "#666", fontSize: 12, marginTop: 4 }}>
+              {currentSheet.columns.length} 列 × {(currentSheet.uploadedData?.length ?? currentSheet.rows.length)} 行
+            </div>
+          </div>
+        </div>
+      )}
 
       {fileList.length > 0 && (
         <div style={{ marginBottom: 12 }}>
@@ -99,8 +121,7 @@ function ChatPanel() {
 
 type TabKey = "data" | "chat";
 
-export function Sidebar({ fileList, onUpload, onClearData }: Props) {
-  const [tab, setTab] = useState<TabKey>("data");
+export function Sidebar({ fileList, onUpload, onClearData, currentSheet }: Props) {
   const [collapsed, setCollapsed] = useState(false);
 
   if (collapsed) {
@@ -112,35 +133,19 @@ export function Sidebar({ fileList, onUpload, onClearData }: Props) {
   }
 
   return (
-    <div style={{ width: 320, borderLeft: "1px solid #d0d0d0", display: "flex", flexDirection: "column", background: "#fafafa" }}>
-      <div style={{ display: "flex", borderBottom: "1px solid #d0d0d0" }}>
-        {[
-          { key: "data" as const, label: "数据" },
-          { key: "chat" as const, label: "对话" },
-        ].map((t) => (
-          <div
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            style={{
-              flex: 1, padding: "8px 0", textAlign: "center", cursor: "pointer", fontSize: 13,
-              background: tab === t.key ? "#fff" : "#e8e8e8",
-              fontWeight: tab === t.key ? 600 : 400,
-              borderBottom: tab === t.key ? "2px solid #1a73e8" : "2px solid transparent",
-            }}
-          >
-            {t.label}
-          </div>
-        ))}
+    <div style={{ width: 280, borderLeft: "1px solid #d0d0d0", display: "flex", flexDirection: "column", background: "#fafafa" }}>
+      <div style={{ padding: "10px 12px", borderBottom: "1px solid #d0d0d0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <span style={{ fontWeight: 600, fontSize: 13 }}>数据</span>
         <div
           onClick={() => setCollapsed(true)}
-          style={{ padding: "6px 10px", cursor: "pointer", color: "#888", fontSize: 16, borderLeft: "1px solid #d0d0d0" }}
+          style={{ padding: "4px 8px", cursor: "pointer", color: "#888", fontSize: 14, border: "1px solid #d0d0d0", borderRadius: 4 }}
           title="收起"
         >
-          ▶
+          ◀
         </div>
       </div>
       <div style={{ flex: 1, overflow: "auto" }}>
-        {tab === "data" ? <DataPanel fileList={fileList} onUpload={onUpload} onClearData={onClearData} /> : <ChatPanel />}
+        <DataPanel fileList={fileList} onUpload={onUpload} onClearData={onClearData} currentSheet={currentSheet} />
       </div>
     </div>
   );

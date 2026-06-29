@@ -12,15 +12,21 @@ export function useWorkbench() {
   useEffect(() => {
     fetchWorkbooks()
       .then((list) => {
-        setWorkbooks(list);
-        if (list.length > 0) return fetchWorkbook(list[0].id);
+        const safeList = Array.isArray(list) ? list : [];
+        setWorkbooks(safeList);
+        if (safeList.length > 0) return fetchWorkbook(safeList[0].id);
         return null;
       })
       .then((wb) => {
         setCurrentWorkbook(wb);
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch(() => {
+        setWorkbooks([]);
+        setCurrentWorkbook(null);
+        setStatus("加载失败");
+        setLoading(false);
+      });
   }, []);
 
   const switchWorkbook = useCallback(async (idx: number) => {
@@ -56,9 +62,17 @@ export function useWorkbench() {
     setStatus("");
   }, []);
 
+  const refreshWorkbook = useCallback(async () => {
+    if (!currentWorkbook) return;
+    const full = await fetchWorkbook(currentWorkbook.id);
+    setCurrentWorkbook(full);
+    return full;
+  }, [currentWorkbook]);
+
   return {
     workbooks, workbookIdx, switchWorkbook,
     currentWorkbook, uploadExcel: handleUpload,
     downloadTemplate, status, clearData, loading,
+    refreshWorkbook,
   };
 }

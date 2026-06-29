@@ -1,55 +1,45 @@
-import { useRef, useState, useCallback, useEffect } from "react";
+import { useRef, useState } from "react";
 import { useWorkbench } from "../hooks/useWorkbench";
 import { ExcelGrid } from "./ExcelGrid";
-import { Sidebar } from "./Sidebar";
-
-const workbookTabStyle = (active: boolean): React.CSSProperties => ({
-  padding: "6px 20px",
-  cursor: "pointer",
-  borderRight: "1px solid #c0c0c0",
-  background: active ? "#fff" : "#e8e8e8",
-  fontWeight: active ? 600 : 400,
-  borderTop: active ? "2px solid #1a73e8" : "2px solid transparent",
-  marginTop: active ? -2 : 0,
-  fontSize: 13,
-  userSelect: "none",
-});
-
-interface FileRecord {
-  name: string;
-  size: number;
-  status: "parsing" | "done" | "error";
-  message?: string;
-}
+import { ChatInterface } from "./ChatInterface";
+import { createSheet, deleteSheet } from "../api/client";
 
 export function Workbench() {
   const inputRef = useRef<HTMLInputElement>(null);
   const {
     workbooks, workbookIdx, switchWorkbook,
     currentWorkbook, uploadExcel,
-    downloadTemplate, status, clearData, loading,
+    downloadTemplate, status, loading, refreshWorkbook,
   } = useWorkbench();
 
-  const [fileList, setFileList] = useState<FileRecord[]>([]);
+  const [currentSheetIndex, setCurrentSheetIndex] = useState(0);
 
-  useEffect(() => {
-    setFileList([]);
-  }, [workbookIdx]);
-
-  const handleUpload = useCallback(async (file: File) => {
-    setFileList((prev) => [...prev, { name: file.name, size: file.size, status: "parsing" }]);
-    try {
-      await uploadExcel(file);
-      setFileList((prev) => prev.map((f) => f.name === file.name ? { ...f, status: "done" } : f));
-    } catch (err: any) {
-      setFileList((prev) => prev.map((f) => f.name === file.name ? { ...f, status: "error", message: err.message } : f));
+  const handleCreateSheet = async () => {
+    if (!currentWorkbook) return;
+    const created = await createSheet(currentWorkbook.id, currentWorkbook.sheets[currentSheetIndex]?.id);
+    const refreshed = await refreshWorkbook();
+    if (refreshed) {
+      const nextIndex = refreshed.sheets.findIndex((sheet) => sheet.id === created.id);
+      setCurrentSheetIndex(nextIndex >= 0 ? nextIndex : refreshed.sheets.length - 1);
     }
-  }, [uploadExcel]);
+  };
 
-  const handleClear = useCallback(() => {
-    setFileList([]);
-    clearData();
-  }, [clearData]);
+  const handleDeleteSheet = async () => {
+    if (!currentWorkbook) return;
+    const currentSheet = currentWorkbook.sheets[currentSheetIndex];
+    if (!currentSheet) return;
+    await deleteSheet(currentSheet.id);
+    const nextIndex = Math.max(0, currentSheetIndex - 1);
+    const refreshed = await refreshWorkbook();
+    if (refreshed) {
+      setCurrentSheetIndex(Math.min(nextIndex, refreshed.sheets.length - 1));
+    }
+  };
+
+  const handleSwitchWorkbook = async (index: number) => {
+    await switchWorkbook(index);
+    setCurrentSheetIndex(0);
+  };
 
   if (loading) {
     return <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "#666" }}>加载中...</div>;
@@ -57,26 +47,54 @@ export function Workbench() {
 
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
-      <div style={{ display: "flex", background: "#f0f0f0", borderBottom: "2px solid #1a73e8", alignItems: "flex-end" }}>
-        {workbooks.map((wb, i) => (
-          <div key={wb.id} style={workbookTabStyle(i === workbookIdx)} onClick={() => switchWorkbook(i)}>
-            {wb.name}
-          </div>
-        ))}
-        <div style={{ marginLeft: "auto", padding: "4px 12px", display: "flex", gap: 8, alignItems: "center" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 12px 0", background: "linear-gradient(180deg, #f6f7fb 0%, #eceff5 100%)", borderBottom: "1px solid #cfd6e4" }}>
+        <div style={{ display: "flex", gap: 6, flex: 1, alignItems: "stretch", overflowX: "auto", paddingBottom: 6 }}>
+          {workbooks.map((wb, i) => (
+            <div
+              key={wb.id}
+              onClick={() => handleSwitchWorkbook(i)}
+              style={{
+                padding: "8px 14px",
+                cursor: "pointer",
+                border: "1px solid",
+                borderColor: i === workbookIdx ? "#c6d4ea #c6d4ea #fff" : "#d8dee9 #d8dee9 #c7cedb",
+                borderBottom: i === workbookIdx ? "1px solid #fff" : "1px solid #c7cedb",
+                borderRadius: "8px 8px 0 0",
+                background: i === workbookIdx ? "#fff" : "linear-gradient(180deg, #f4f6f9 0%, #e4e9f1 100%)",
+                boxShadow: i === workbookIdx ? "0 -1px 0 #fff inset" : "none",
+                fontWeight: i === workbookIdx ? 600 : 500,
+                color: i === workbookIdx ? "#1f2a37" : "#5b6473",
+                fontSize: 13,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {wb.name}
+            </div>
+          ))}
+        </div>
+        <div style={{ display: "flex", gap: 8, paddingBottom: 6 }}>
           <button onClick={downloadTemplate} style={{ fontSize: 12 }}>下载模板</button>
           <button onClick={() => inputRef.current?.click()} style={{ fontSize: 12 }}>上传 Excel</button>
-          {status && <span style={{ fontSize: 12, color: status.includes("失败") ? "#d32f2f" : "#2e7d32" }}>{status}</span>}
+          <button onClick={handleCreateSheet} style={{ fontSize: 12 }}>新建 Sheet</button>
+          <button onClick={handleDeleteSheet} style={{ fontSize: 12 }}>删除当前 Sheet</button>
         </div>
+        {status && <span style={{ fontSize: 12, color: status.includes("失败") ? "#d32f2f" : "#2e7d32" }}>{status}</span>}
       </div>
 
-      <input ref={inputRef} type="file" accept=".xlsx,.xls" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUpload(f); e.target.value = ""; }} />
+      <input ref={inputRef} type="file" accept=".xlsx,.xls" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadExcel(f); e.target.value = ""; }} />
 
       <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
         <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
-          <ExcelGrid workbook={currentWorkbook} />
+          <ExcelGrid 
+            workbook={currentWorkbook} 
+            currentSheetIndex={currentSheetIndex}
+            onSheetIndexChange={setCurrentSheetIndex}
+          />
         </div>
-        <Sidebar fileList={fileList} onUpload={handleUpload} onClearData={handleClear} />
+        <ChatInterface 
+          sheets={currentWorkbook?.sheets ?? []}
+          currentSheetId={currentWorkbook?.sheets[currentSheetIndex]?.id}
+        />
       </div>
     </div>
   );

@@ -4,12 +4,14 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "prisma db push && tsx prisma/seed.ts",
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "db:init": "prisma db push && tsx prisma/seed.ts"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.2",

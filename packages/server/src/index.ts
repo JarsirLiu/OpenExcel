@@ -2,12 +2,16 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
 import { workbookRoutes } from "./routes/workbooks.js";
+import { sheetRoutes } from "./routes/sheets.js";
+import { chatRoutes } from "./routes/chat.js";
 
 const app = Fastify({ logger: true });
 
 await app.register(cors, { origin: true });
 await app.register(multipart);
 await app.register(workbookRoutes);
+await app.register(sheetRoutes);
+await app.register(chatRoutes);
 
 const port = Number(process.env.PORT ?? 4000);
 try {
