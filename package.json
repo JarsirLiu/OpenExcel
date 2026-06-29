@@ -1,0 +1,13 @@
+{
+  "name": "openexcel",
+  "private": true,
+  "version": "0.1.0",
+  "description": "OpenExcel - JSON driven multi-sheet Excel workbench",
+  "scripts": {
+    "dev": "pnpm run --recursive --parallel --filter @openexcel/web --filter @openexcel/server dev",
+    "build": "pnpm --filter @openexcel/web build",
+    "preview": "pnpm --filter @openexcel/web preview",
+    "db:push": "pnpm --filter @openexcel/server db:push",
+    "db:seed": "pnpm --filter @openexcel/server db:seed"
+  }
+}
