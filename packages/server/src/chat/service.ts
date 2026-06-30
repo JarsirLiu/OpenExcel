@@ -65,7 +65,6 @@ export async function chat(
     abortSignal,
     onChunk: rollout.onChunk(ctx),
     onFinish: rollout.onFinish(ctx),
-    onAbort: rollout.onAbort(ctx),
   });
 
   push("run.started", { runId: ctx.runId });
@@ -102,6 +101,12 @@ export async function chat(
         push("step.delta", { runId: ctx.runId, stepType: "final", text: chunk.text });
         continue;
       }
+    }
+
+    if (abortSignal?.aborted) {
+      await rollout.markAborted(ctx);
+      push("run.aborted", { runId: ctx.runId });
+      return;
     }
 
     if (finalStarted) {
