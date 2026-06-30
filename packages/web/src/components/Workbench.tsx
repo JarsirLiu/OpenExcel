@@ -91,10 +91,13 @@ export function Workbench() {
             onSheetIndexChange={setCurrentSheetIndex}
           />
         </div>
-        <ChatInterface 
-          sheets={currentWorkbook?.sheets ?? []}
-          currentSheetId={currentWorkbook?.sheets[currentSheetIndex]?.id}
-        />
+        {currentWorkbook?.sheets[currentSheetIndex]?.id && (
+          <ChatInterface 
+            key={currentWorkbook.sheets[currentSheetIndex].id}
+            sheets={currentWorkbook.sheets}
+            currentSheetId={currentWorkbook.sheets[currentSheetIndex].id}
+          />
+        )}
       </div>
     </div>
   );

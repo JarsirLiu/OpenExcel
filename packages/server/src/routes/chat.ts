@@ -1,5 +1,8 @@
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../db.js";
+import { loadModelConfig } from "../config.js";
+import { createOpenAI } from "@ai-sdk/openai";
+import { streamText } from "ai";
 
 interface Ref {
   type: "sheet";
@@ -17,6 +20,21 @@ function parseRefs(content: string): Ref[] {
   return refs;
 }
 
+function stripRefs(content: string): string {
+  return content.replace(/\[ref:\w+:\d+\]/g, "");
+}
+
+function getMessageText(msg: any): string {
+  if (msg.content) return msg.content;
+  if (msg.parts && Array.isArray(msg.parts)) {
+    return msg.parts
+      .filter((p: any) => p.type === "text")
+      .map((p: any) => p.text)
+      .join("");
+  }
+  return "";
+}
+
 export async function chatRoutes(app: FastifyInstance) {
   app.get<{ Params: { sheetId: string } }>("/api/sheets/:sheetId/messages", async (req, reply) => {
     const sheetId = Number(req.params.sheetId);
@@ -25,52 +43,19 @@ export async function chatRoutes(app: FastifyInstance) {
       orderBy: { createdAt: "asc" },
     });
     return messages.map((m) => ({
-      id: m.id,
+      id: String(m.id),
       role: m.role,
       content: m.content,
-      changes: m.changes ? JSON.parse(m.changes) : null,
-      createdAt: m.createdAt,
     }));
   });
 
   app.post<{
     Params: { sheetId: string };
-    Body: { role: string; content: string; changes?: any[][] };
-  }>("/api/sheets/:sheetId/messages", async (req, reply) => {
-    const sheetId = Number(req.params.sheetId);
-    const { role, content, changes } = req.body;
-
-    const message = await prisma.message.create({
-      data: {
-        sheetId,
-        role,
-        content,
-        changes: changes ? JSON.stringify(changes) : null,
-      },
-    });
-
-    if (changes && Array.isArray(changes)) {
-      await prisma.sheet.update({
-        where: { id: sheetId },
-        data: { uploadedData: JSON.stringify(changes) },
-      });
-    }
-
-    return {
-      id: message.id,
-      role: message.role,
-      content: message.content,
-      changes: changes || null,
-      createdAt: message.createdAt,
-    };
-  });
-
-  app.post<{
-    Params: { sheetId: string };
-    Body: { prompt: string };
+    Body: { messages: any[] };
   }>("/api/sheets/:sheetId/chat", async (req, reply) => {
     const sheetId = Number(req.params.sheetId);
-    const { prompt } = req.body;
+    const { messages: incomingMessages } = req.body;
+    console.log("[chat] Received request for sheet", sheetId, "messages:", incomingMessages?.length);
 
     const sheet = await prisma.sheet.findUnique({
       where: { id: sheetId },
@@ -79,23 +64,11 @@ export async function chatRoutes(app: FastifyInstance) {
       return reply.status(404).send({ error: "Sheet not found" });
     }
 
-    const messages = await prisma.message.findMany({
-      where: { sheetId },
-      orderBy: { createdAt: "asc" },
-      take: 20,
-    });
-
-    const userMessage = await prisma.message.create({
-      data: {
-        sheetId,
-        role: "user",
-        content: prompt,
-      },
-    });
-
     const celldata = sheet.uploadedData ? JSON.parse(sheet.uploadedData) : JSON.parse(sheet.rows);
+    const lastUserMsg = [...incomingMessages].reverse().find((m) => m.role === "user");
+    const userText = lastUserMsg ? getMessageText(lastUserMsg) : "";
+    const refs = parseRefs(userText);
 
-    const refs = parseRefs(prompt);
     let context = `当前 Sheet "${sheet.name}" 数据 (${celldata.length} 行):\n${JSON.stringify(celldata.slice(0, 10))}`;
 
     if (refs.length > 0) {
@@ -111,22 +84,69 @@ export async function chatRoutes(app: FastifyInstance) {
       }
     }
 
-    const mockResponse = `[AI] 收到你的请求："${prompt}"\n\n${context}\n\n（此处应调用真实 AI API，基于以上数据回答）`;
+    const systemPrompt = `你是一个专业的 Excel 数据分析助手。你可以读取、分析、总结 Excel 表格中的数据。
 
-    const aiMessage = await prisma.message.create({
+${context}
+
+请基于以上数据回答用户的问题。如果数据不足以回答，请说明需要哪些额外信息。`;
+
+    await prisma.message.create({
       data: {
         sheetId,
-        role: "assistant",
-        content: mockResponse,
+        role: "user",
+        content: userText,
       },
     });
 
-    return {
-      id: aiMessage.id,
-      role: aiMessage.role,
-      content: aiMessage.content,
-      changes: null,
-      createdAt: aiMessage.createdAt,
-    };
+    try {
+      const config = loadModelConfig();
+      console.log("[chat] Config loaded:", config.modelName, config.baseUrl);
+
+      const customOpenAI = createOpenAI({
+        baseURL: config.baseUrl,
+        apiKey: config.apiKey,
+      });
+
+      const cleanedMessages = incomingMessages.map((m: any) => ({
+        role: m.role as "user" | "assistant",
+        content: stripRefs(getMessageText(m)),
+      }));
+
+      console.log("[chat] Calling streamText with", cleanedMessages.length, "messages");
+      const result = streamText({
+        model: customOpenAI.chat(config.modelName),
+        system: systemPrompt,
+        messages: cleanedMessages,
+        onFinish: async ({ text }) => {
+          console.log("[chat] Stream finished, saving", text.length, "chars");
+          await prisma.message.create({
+            data: {
+              sheetId,
+              role: "assistant",
+              content: text,
+            },
+          });
+        },
+      });
+      console.log("[chat] streamText started, writing response");
+
+      reply.raw.writeHead(200, {
+        "Content-Type": "text/plain",
+        "Transfer-Encoding": "chunked",
+      });
+
+      for await (const chunk of result.textStream) {
+        reply.raw.write(chunk);
+      }
+      reply.raw.end();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("AI 调用失败:", msg);
+      if (!reply.raw.headersSent) {
+        reply.status(500).send({ error: `AI 调用失败: ${msg}` });
+      } else {
+        reply.raw.end();
+      }
+    }
   });
 }

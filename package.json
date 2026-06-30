@@ -7,6 +7,10 @@
     "dev": "pnpm run --recursive --parallel --filter @openexcel/web --filter @openexcel/server dev",
     "build": "pnpm --filter @openexcel/web build",
     "preview": "pnpm --filter @openexcel/web preview",
+    "test": "pnpm --recursive --filter @openexcel/core --filter @openexcel/server --filter @openexcel/web test",
+    "test:core": "pnpm --filter @openexcel/core test",
+    "test:server": "pnpm --filter @openexcel/server test",
+    "test:web": "pnpm --filter @openexcel/web test",
     "db:push": "pnpm --filter @openexcel/server db:push",
     "db:seed": "pnpm --filter @openexcel/server db:seed"
   }

@@ -52,7 +52,6 @@ export interface Message {
   id: number;
   role: "user" | "assistant" | "system";
   content: string;
-  changes: any[][] | null;
   createdAt: string;
 }
 
@@ -85,30 +84,5 @@ export async function deleteSheet(sheetId: number): Promise<void> {
 export async function fetchMessages(sheetId: number): Promise<Message[]> {
   const res = await fetch(`${BASE}/sheets/${sheetId}/messages`);
   if (!res.ok) throw new Error("加载消息失败");
-  return res.json();
-}
-
-export async function sendMessage(
-  sheetId: number,
-  role: string,
-  content: string,
-  changes?: any[][]
-): Promise<Message> {
-  const res = await fetch(`${BASE}/sheets/${sheetId}/messages`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ role, content, changes }),
-  });
-  if (!res.ok) throw new Error("发送消息失败");
-  return res.json();
-}
-
-export async function chatWithAI(sheetId: number, prompt: string): Promise<Message> {
-  const res = await fetch(`${BASE}/sheets/${sheetId}/chat`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt }),
-  });
-  if (!res.ok) throw new Error("AI 对话失败");
   return res.json();
 }
