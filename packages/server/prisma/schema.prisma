@@ -36,16 +36,35 @@ model Session {
   sheetId   Int
   name      String
   sheet     Sheet     @relation(fields: [sheetId], references: [id], onDelete: Cascade)
-  messages  Message[]
+  runs      AgentRun[]
   createdAt DateTime  @default(now())
 }
 
-model Message {
+model AgentRun {
   id        Int      @id @default(autoincrement())
   sessionId Int
-  role      String
-  content   String
-  changes   String?
+  status    String
+  model     String?
+  systemPrompt String?
+  inputText String?
+  outputText String?
+  errorMessage String?
   session   Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  steps     AgentStep[]
+  startedAt DateTime @default(now())
+  endedAt   DateTime?
+}
+
+model AgentStep {
+  id        Int      @id @default(autoincrement())
+  runId     Int
+  type      String
+  status    String
+  content   String?
+  toolName  String?
+  input     String?
+  output    String?
+  order     Int
+  run       AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
 }

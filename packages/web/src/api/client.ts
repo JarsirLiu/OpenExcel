@@ -49,10 +49,14 @@ export function downloadTemplateUrl(workbookId: number): string {
 }
 
 export interface Message {
-  id: number;
+  id: string;
   role: "user" | "assistant" | "system";
   content: string;
-  createdAt: string;
+}
+
+export interface AgentRunEvent {
+  event: "run.started" | "step.started" | "step.completed" | "step.delta" | "run.completed" | "run.failed" | "run.aborted";
+  data: any;
 }
 
 export async function updateSheetData(sheetId: number, celldata: any[][]): Promise<void> {
@@ -104,4 +108,49 @@ export async function fetchMessages(sessionId: number): Promise<Message[]> {
   const res = await fetch(`${BASE}/sessions/${sessionId}/messages`);
   if (!res.ok) throw new Error("加载消息失败");
   return res.json();
+}
+
+export async function streamChat(
+  sessionId: number,
+  input: string,
+  onEvent: (event: AgentRunEvent) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  const res = await fetch(`${BASE}/sessions/${sessionId}/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ input }),
+    signal,
+  });
+  if (!res.ok || !res.body) {
+    throw new Error("聊天流启动失败");
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  const flush = () => {
+    const parts = buffer.split("\n\n");
+    buffer = parts.pop() ?? "";
+    for (const part of parts) {
+      const lines = part.split("\n");
+      const eventLine = lines.find((line) => line.startsWith("event: "));
+      const dataLine = lines.find((line) => line.startsWith("data: "));
+      if (!eventLine || !dataLine) continue;
+      const event = eventLine.slice(7).trim() as AgentRunEvent["event"];
+      const data = JSON.parse(dataLine.slice(6));
+      onEvent({ event, data });
+    }
+  };
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    flush();
+  }
+
+  buffer += decoder.decode();
+  flush();
 }

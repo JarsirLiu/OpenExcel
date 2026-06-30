@@ -82,7 +82,7 @@ describe("deleteSheet", () => {
 
 describe("fetchMessages", () => {
   it("returns parsed messages", async () => {
-    const msgs = [{ id: 1, role: "user", content: "hi", createdAt: "2024-01-01" }];
+    const msgs = [{ id: "1", role: "user", content: "hi" }];
     mockFetch.mockResolvedValue(new Response(JSON.stringify(msgs), { status: 200 }));
 
     const result = await fetchMessages(3);

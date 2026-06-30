@@ -1,8 +1,8 @@
 import type { FastifyInstance } from "fastify";
 import * as service from "./service.js";
+import { createPush } from "./stream.js";
 
 export async function chatRoutes(app: FastifyInstance) {
-  // Sessions
   app.get<{ Params: { sheetId: string } }>("/api/sheets/:sheetId/sessions", async (req) => {
     return service.getSessions(Number(req.params.sheetId));
   });
@@ -17,44 +17,36 @@ export async function chatRoutes(app: FastifyInstance) {
     return { success: true };
   });
 
-  // Messages
   app.get<{ Params: { sessionId: string } }>("/api/sessions/:sessionId/messages", async (req) => {
     return service.getMessages(Number(req.params.sessionId));
   });
 
-  // Chat
-  app.post<{
-    Params: { sessionId: string };
-    Body: { messages: any[] };
-  }>("/api/sessions/:sessionId/chat", async (req, reply) => {
+  app.post<{ Params: { sessionId: string }; Body: { input: string } }>("/api/sessions/:sessionId/chat", async (req, reply) => {
     const sessionId = Number(req.params.sessionId);
-    const { messages: incomingMessages } = req.body;
-
-    const resultObj = await service.chat(sessionId, incomingMessages);
-    if ("error" in resultObj) {
-      return reply.status(404).send({ error: resultObj.error });
-    }
-
-    const { result } = resultObj;
+    const { input } = req.body;
+    const controller = new AbortController();
+    const push = createPush(reply);
 
     reply.raw.writeHead(200, {
-      "Content-Type": "text/plain",
-      "Transfer-Encoding": "chunked",
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
+    });
+
+    reply.raw.on("close", () => {
+      if (!reply.raw.writableEnded) {
+        controller.abort();
+      }
     });
 
     try {
-      for await (const chunk of result.textStream) {
-        reply.raw.write(chunk);
-      }
+      await service.chat(sessionId, input, controller.signal, push);
       reply.raw.end();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error("AI 流式输出失败:", msg);
-      if (!reply.raw.headersSent) {
-        reply.status(500).send({ error: `AI 调用失败: ${msg}` });
-      } else {
-        reply.raw.end();
-      }
+      push("run.failed", { error: msg, runId: undefined });
+      reply.raw.end();
     }
   });
 }

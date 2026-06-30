@@ -1,6 +1,4 @@
-import { useState, useEffect, useRef } from "react";
-import { useChat } from "@ai-sdk/react";
-import { TextStreamChatTransport } from "ai";
+import { useEffect, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
@@ -12,7 +10,7 @@ import {
 } from "@chatscope/chat-ui-kit-react";
 import "@chatscope/chat-ui-kit-styles/dist/default/styles.min.css";
 import type { Message as Msg, Session } from "../api/client";
-import { fetchMessages, fetchSessions, createSession } from "../api/client";
+import { fetchMessages, fetchSessions, createSession, streamChat } from "../api/client";
 import type { SheetSchema } from "../api/client";
 
 const blinkStyle = `
@@ -33,103 +31,265 @@ interface Props {
   currentSheetId?: number;
 }
 
-/** 消息列表 + 输入框，key={sessionId} 确保 useChat 随会话重建 */
 function ChatPanel({ sessionId }: { sessionId: number }) {
-  const { messages, sendMessage, status, setMessages } = useChat({
-    transport: new TextStreamChatTransport({
-      api: `/api/sessions/${sessionId}/chat`,
-    }),
-    onError: (err) => {
-      console.error("AI 对话失败:", err);
-    },
-  });
+  const [messages, setMessages] = useState<Msg[]>([]);
+  const [draft, setDraft] = useState("");
+  const [isStreaming, setIsStreaming] = useState(false);
+  const assistantIndexRef = useRef<number | null>(null);
+  const [stepsByRun, setStepsByRun] = useState<Record<string, any[]>>({});
+  const stepContentRef = useRef<Record<string, string>>({});
+  const abortRef = useRef<AbortController | null>(null);
 
-  const hasLoadedRef = useRef(false);
-  useEffect(() => {
-    hasLoadedRef.current = false;
-  }, [sessionId]);
-
-  useEffect(() => {
-    if (hasLoadedRef.current) return;
-    hasLoadedRef.current = true;
-    fetchMessages(sessionId).then((msgs: Msg[]) => {
-      setMessages(
-        msgs.map((m) => ({
-          id: String(m.id),
-          role: m.role as "user" | "assistant",
-          parts: [{ type: "text" as const, text: m.content }],
-        })),
-      );
-    });
-  }, [sessionId, setMessages]);
-
-  const getText = (msg: (typeof messages)[0]): string => {
-    if (!msg.parts) return "";
-    return msg.parts
-      .filter((p: any) => p.type === "text")
-      .map((p: any) => p.text)
-      .join("");
+  const stepMeta = (step: any) => {
+    if (step.stepType === "reasoning" || step.type === "reasoning") {
+      return {
+        label: "推理",
+        bg: "#f6f7ff",
+        border: "#cfd6ff",
+        color: "#3f4c9a",
+      };
+    }
+    if (step.stepType === "tool_call" || step.type === "tool_call") {
+      return {
+        label: "工具调用",
+        bg: "#fff8ec",
+        border: "#f4d28a",
+        color: "#8a5b00",
+      };
+    }
+    if (step.stepType === "tool_result" || step.type === "tool_result") {
+      return {
+        label: "工具结果",
+        bg: "#eefaf1",
+        border: "#a6dfb0",
+        color: "#1d6b36",
+      };
+    }
+    return {
+      label: "最终回答",
+      bg: "#ffffff",
+      border: "#d9d9d9",
+      color: "#1f1f1f",
+    };
   };
 
-  const isStreaming = status === "streaming";
+  useEffect(() => {
+    fetchMessages(sessionId).then(setMessages);
+    assistantIndexRef.current = null;
+    setDraft("");
+    setStepsByRun({});
+  }, [sessionId]);
+
+  const renderText = (msg: Msg) => msg.content || "";
+
+  const handleSend = async (text: string) => {
+    const input = text.trim();
+    if (!input || isStreaming) return;
+
+    const nextMessages: Msg[] = [...messages, { id: `local-user-${Date.now()}`, role: "user", content: input }];
+    nextMessages.push({ id: `local-assistant-${Date.now()}`, role: "assistant", content: "正在思考..." });
+    assistantIndexRef.current = nextMessages.length - 1;
+    setMessages(nextMessages);
+    setDraft("");
+    setIsStreaming(true);
+    abortRef.current = new AbortController();
+
+    try {
+      await streamChat(sessionId, input, (evt) => {
+        if (evt.event === "run.started") {
+          setStepsByRun((current) => ({ ...current, [String(evt.data.runId)]: [] }));
+        }
+        if (evt.event === "step.started") {
+          const runId = String(evt.data.runId ?? "0");
+          const stepType = evt.data.stepType ?? "unknown";
+          setStepsByRun((current) => {
+            const list = current[runId] ? [...current[runId]] : [];
+            const key = `${runId}-${stepType}`;
+            const existing = list.find((s) => s._key === key);
+            if (!existing) {
+              list.push({ _key: key, stepType, content: "", status: "streaming" });
+            }
+            return { ...current, [runId]: list };
+          });
+        }
+        if (evt.event === "step.delta") {
+          const stepType = evt.data.stepType ?? "";
+          const runId = String(evt.data.runId ?? "0");
+          const key = `${runId}-${stepType}`;
+          stepContentRef.current[key] = (stepContentRef.current[key] ?? "") + (evt.data.text ?? "");
+          setStepsByRun((current) => {
+            const list = current[runId] ? [...current[runId]] : [];
+            const step = list.find((s) => s._key === key);
+            if (step) {
+              step.content = stepContentRef.current[key];
+            }
+            return { ...current, [runId]: list };
+          });
+          if (stepType === "final") {
+            setMessages((current) => {
+              const idx = assistantIndexRef.current ?? current.length - 1;
+              if (idx < 0 || !current[idx]) return current;
+              const updated = [...current];
+              const prefix = updated[idx].content === "正在思考..." ? "" : updated[idx].content ?? "";
+              updated[idx] = { ...updated[idx], content: `${prefix}${evt.data.text ?? ""}` };
+              return updated;
+            });
+          }
+        }
+        if (evt.event === "step.completed") {
+          const runId = String(evt.data.runId ?? "0");
+          const stepType = evt.data.stepType ?? "";
+          const key = `${runId}-${stepType}`;
+          setStepsByRun((current) => {
+            const list = current[runId] ? [...current[runId]] : [];
+            const step = list.find((s) => s._key === key);
+            if (step) {
+              step.status = "completed";
+              step.content = step.content || evt.data.output || evt.data.text || "";
+              if (evt.data.toolName) step.toolName = evt.data.toolName;
+            } else if (stepType === "tool_result") {
+              list.push({ _key: key, stepType, toolName: evt.data.toolName, content: evt.data.output ?? "", status: "completed" });
+            }
+            return { ...current, [runId]: list };
+          });
+        }
+        if (evt.event === "run.completed" || evt.event === "run.failed" || evt.event === "run.aborted") {
+          setIsStreaming(false);
+          abortRef.current = null;
+        }
+      }, abortRef.current.signal);
+    } catch (err) {
+      setIsStreaming(false);
+      abortRef.current = null;
+      setMessages((current) => {
+        const idx = assistantIndexRef.current ?? current.length - 1;
+        if (idx < 0 || !current[idx]) return current;
+        const updated = [...current];
+        updated[idx] = {
+          ...updated[idx],
+          content: `请求失败：${err instanceof Error ? err.message : String(err)}`,
+        };
+        return updated;
+      });
+    } finally {
+      setIsStreaming(false);
+      abortRef.current = null;
+    }
+  };
+
+  const handleStop = () => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setIsStreaming(false);
+  };
 
   return (
-      <MainContainer style={{ flex: 1, height: "100%" }}>
-        <ChatContainer>
-          <MessageList autoScrollToBottom={true}>
-            {messages.map((msg, idx) => (
-              <Message
-                key={msg.id}
-                model={{
-                  message: "",
-                  direction: msg.role === "user" ? "outgoing" : "incoming",
-                  position: "single",
-                }}
-              >
-                {msg.role === "user" ? (
-                  <Message.CustomContent>
-                    <div style={{ whiteSpace: "pre-wrap" }}>{getText(msg)}</div>
-                  </Message.CustomContent>
-                ) : (
-                  <Message.CustomContent>
-                    <div className="md-content">
-                      <Markdown remarkPlugins={[remarkGfm]}>{getText(msg)}</Markdown>
-                    </div>
-                    {isStreaming && idx === messages.length - 1 && (
-                      <span
-                        style={{
-                          display: "inline-block",
-                          width: 6,
-                          height: 12,
-                          backgroundColor: "#999",
-                          marginLeft: 2,
-                          verticalAlign: "middle",
-                          animation: "blink 1s infinite",
-                        }}
-                      />
-                    )}
-                  </Message.CustomContent>
-                )}
-              </Message>
-            ))
-          }
-        </MessageList>
+    <MainContainer style={{ flex: 1, height: "100%" }}>
+      <ChatContainer>
+        <MessageList autoScrollToBottom={true}>
+          {messages.map((msg, idx) => (
+            <Message
+              key={msg.id}
+              model={{
+                message: "",
+                direction: msg.role === "user" ? "outgoing" : "incoming",
+                position: "single",
+              }}
+            >
+              {msg.role === "user" ? (
+                <Message.CustomContent>
+                  <div style={{ whiteSpace: "pre-wrap" }}>{renderText(msg)}</div>
+                </Message.CustomContent>
+              ) : (
+                <Message.CustomContent>
+                  <div className="md-content">
+                    <Markdown remarkPlugins={[remarkGfm]}>{renderText(msg)}</Markdown>
+                  </div>
+                  {isStreaming && idx === messages.length - 1 && (
+                    <span
+                      style={{
+                        display: "inline-block",
+                        width: 6,
+                        height: 12,
+                        backgroundColor: "#999",
+                        marginLeft: 2,
+                        verticalAlign: "middle",
+                        animation: "blink 1s infinite",
+                      }}
+                    />
+                  )}
+                </Message.CustomContent>
+              )}
+            </Message>
+          ))}
+          </MessageList>
         <MessageInput
           placeholder="输入消息..."
+          value={draft}
+          onChange={(val) => setDraft(String(val))}
           onSend={(_, text) => {
-            if (!text.trim() || isStreaming) return;
-            sendMessage({ text });
+            void handleSend(text);
           }}
           attachButton={false}
           autoFocus
           disabled={isStreaming}
+          sendButton={!isStreaming}
         />
+        {isStreaming && (
+          <div style={{ position: "absolute", right: 8, bottom: 8, zIndex: 10 }}>
+            <button
+              onClick={handleStop}
+              style={{
+                background: "#ff5252",
+                border: "none",
+                borderRadius: 4,
+                color: "#fff",
+                cursor: "pointer",
+                fontSize: 12,
+                fontWeight: 600,
+                padding: "6px 12px",
+                lineHeight: "16px",
+              }}
+            >
+              停止
+            </button>
+          </div>
+        )}
       </ChatContainer>
+      {Object.entries(stepsByRun).length > 0 && (
+        <div style={{ borderTop: "1px solid #e5e5e5", padding: 8, fontSize: 11, color: "#666", overflowY: "auto" }}>
+          {Object.entries(stepsByRun).map(([runId, steps]) => (
+            <div key={runId} style={{ marginBottom: 6 }}>
+              <div style={{ fontWeight: 600, marginBottom: 6 }}>Run {runId}</div>
+              {steps.map((step: any) => (
+                <div
+                  key={step._key}
+                  style={{
+                    marginLeft: 8,
+                    marginBottom: 6,
+                    padding: "6px 8px",
+                    borderRadius: 8,
+                    background: stepMeta(step).bg,
+                    border: `1px solid ${stepMeta(step).border}`,
+                    color: stepMeta(step).color,
+                  }}
+                >
+                  <div style={{ fontWeight: 700, marginBottom: 2 }}>{stepMeta(step).label}</div>
+                  <div style={{ whiteSpace: "pre-wrap" }}>
+                    {step.toolName ? `${step.toolName} ` : ""}
+                    {step.content ?? step.output ?? step.input ?? step.reasoning ?? step.text ?? ""}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
     </MainContainer>
   );
 }
 
-export function ChatInterface({ sheets, currentSheetId = 0 }: Props) {
+export function ChatInterface({ currentSheetId = 0 }: Props) {
   const [collapsed, setCollapsed] = useState(false);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<number | null>(null);
@@ -188,7 +348,6 @@ export function ChatInterface({ sheets, currentSheetId = 0 }: Props) {
     >
       <style>{blinkStyle}</style>
 
-      {/* Header */}
       <div
         style={{
           padding: "8px 12px",
@@ -222,7 +381,6 @@ export function ChatInterface({ sheets, currentSheetId = 0 }: Props) {
         </div>
       </div>
 
-      {/* Session tabs */}
       {sessions.length > 0 && (
         <div
           style={{
@@ -256,7 +414,6 @@ export function ChatInterface({ sheets, currentSheetId = 0 }: Props) {
         </div>
       )}
 
-      {/* Chat area - keyed by sessionId to rebuild useChat */}
       {currentSessionId ? (
         <ChatPanel key={currentSessionId} sessionId={currentSessionId} />
       ) : (
