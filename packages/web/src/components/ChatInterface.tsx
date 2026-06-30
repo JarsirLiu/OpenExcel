@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { Message as Msg } from "../api/client";
-import { fetchMessages, fetchSessions, streamChat } from "../api/client";
+import type { Message as Msg, Session } from "../api/client";
+import { createSession, fetchMessages, fetchSessions, streamChat } from "../api/client";
 
 /* ============ Icons ============ */
 const SendIcon = ({ size = 14 }: { size?: number }) => (
@@ -364,20 +364,31 @@ function ChatPanel({ sessionId }: { sessionId: number }) {
 
 export function ChatInterface({}: Props) {
   const [collapsed, setCollapsed] = useState(false);
+  const [sessions, setSessions] = useState<Session[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<number | null>(null);
 
-  useEffect(() => {
-    let alive = true;
+  const loadSessions = useCallback(() => {
     fetchSessions().then((list) => {
-      if (!alive) return;
-      if (list.length > 0) {
+      setSessions(list);
+      if (list.length > 0 && !currentSessionId) {
         setCurrentSessionId(list[0].id);
       }
     });
-    return () => {
-      alive = false;
-    };
-  }, []);
+  }, [currentSessionId]);
+
+  useEffect(() => {
+    loadSessions();
+  }, [loadSessions]);
+
+  const handleNewSession = async () => {
+    const s = await createSession();
+    setSessions((prev) => [s, ...prev]);
+    setCurrentSessionId(s.id);
+  };
+
+  const handleSelectSession = (id: number) => {
+    setCurrentSessionId(id);
+  };
 
   if (collapsed) {
     return (
@@ -425,6 +436,22 @@ export function ChatInterface({}: Props) {
         <span style={{ fontWeight: 600, fontSize: 14, color: "#1f1f1f" }}>AI 对话</span>
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           <div
+            onClick={handleNewSession}
+            style={{
+              padding: "4px 8px",
+              cursor: "pointer",
+              color: "#888",
+              fontSize: 16,
+              border: "1px solid #e0e0e0",
+              borderRadius: 6,
+              background: "#fff",
+              lineHeight: 1,
+            }}
+            title="新建对话"
+          >
+            +
+          </div>
+          <div
             onClick={() => setCollapsed(true)}
             style={{
               padding: "4px 8px",
@@ -441,6 +468,41 @@ export function ChatInterface({}: Props) {
           </div>
         </div>
       </div>
+
+      {/* Session tabs */}
+      {sessions.length > 1 && (
+        <div
+          style={{
+            display: "flex",
+            gap: 4,
+            padding: "6px 12px",
+            borderBottom: "1px solid #f0f0f0",
+            overflowX: "auto",
+            flexShrink: 0,
+          }}
+        >
+          {sessions.map((s) => (
+            <div
+              key={s.id}
+              onClick={() => handleSelectSession(s.id)}
+              style={{
+                padding: "4px 10px",
+                borderRadius: 12,
+                fontSize: 12,
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+                background: s.id === currentSessionId ? "#e8e8e8" : "#f5f5f5",
+                color: s.id === currentSessionId ? "#1f1f1f" : "#666",
+                fontWeight: s.id === currentSessionId ? 600 : 400,
+                transition: "background 0.15s",
+                userSelect: "none",
+              }}
+            >
+              {s.name}
+            </div>
+          ))}
+        </div>
+      )}
 
       {currentSessionId ? (
         <ChatPanel key={currentSessionId} sessionId={currentSessionId} />
