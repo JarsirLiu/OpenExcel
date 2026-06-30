@@ -113,6 +113,7 @@ export async function chat(
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (abortSignal?.aborted) {
+      await rollout.markAborted(ctx);
       push("run.aborted", { runId: ctx.runId });
       return;
     }

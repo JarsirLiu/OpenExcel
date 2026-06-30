@@ -123,6 +123,16 @@ export function onAbort(ctx: RolloutContext) {
   };
 }
 
+export async function markAborted(ctx: RolloutContext): Promise<void> {
+  if (ctx.state.reasoningText) {
+    await repo.updateStep(ctx.reasoningStepId, { content: ctx.state.reasoningText, status: "completed" });
+  }
+  if (ctx.state.finalText) {
+    await repo.updateStep(ctx.finalStepId, { content: ctx.state.finalText, status: "completed" });
+  }
+  await repo.updateRun(ctx.runId, { status: "aborted", endedAt: new Date() });
+}
+
 export async function markFailed(ctx: RolloutContext, msg: string): Promise<void> {
   if (ctx.state.reasoningText) {
     await repo.updateStep(ctx.reasoningStepId, { content: ctx.state.reasoningText, status: "completed" });
