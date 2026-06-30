@@ -1,6 +1,5 @@
-import { prisma } from "../../db.js";
-import * as repo from "./repository.js";
-import { deserializeSheet } from "../../utils/sheetSerialization.js";
+import { prisma } from "../db.js";
+import { deserializeSheet } from "../utils/sheetSerialization.js";
 
 export async function getSheet(sheetId: number) {
   const sheet = await prisma.sheet.findUnique({ where: { id: sheetId } });
@@ -13,6 +12,9 @@ export async function updateSheetData(sheetId: number, celldata: any[][]) {
     return { error: "Invalid data format" };
   }
 
-  await repo.updateSheetUploadedData(sheetId, JSON.stringify(celldata));
+  await prisma.sheet.update({
+    where: { id: sheetId },
+    data: { uploadedData: JSON.stringify(celldata) },
+  });
   return { success: true };
 }

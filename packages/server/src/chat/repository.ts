@@ -1,4 +1,4 @@
-import { prisma } from "../../db.js";
+import { prisma } from "../db.js";
 
 export async function findMessagesBySheet(sheetId: number) {
   return prisma.message.findMany({

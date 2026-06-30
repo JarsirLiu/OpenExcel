@@ -1,8 +1,8 @@
 import * as XLSX from "xlsx";
 import { templateToExcel, excelToGrid } from "@openexcel/core";
-import { prisma } from "../../db.js";
+import { prisma } from "../db.js";
 import * as repo from "./repository.js";
-import { deserializeSheet, cloneSheetSchema } from "../../utils/sheetSerialization.js";
+import { deserializeSheet, cloneSheetSchema } from "../utils/sheetSerialization.js";
 
 export async function getWorkbooks() {
   return repo.findWorkbooks();

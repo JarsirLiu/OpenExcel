@@ -1,7 +1,7 @@
-import { prisma } from "../../db.js";
+import { prisma } from "../db.js";
 import type { Prisma } from "@prisma/client";
-import { deserializeSheet } from "../../utils/sheetSerialization.js";
-import type { SheetJson } from "../../utils/sheetSerialization.js";
+import { deserializeSheet } from "../utils/sheetSerialization.js";
+import type { SheetJson } from "../utils/sheetSerialization.js";
 
 export async function findWorkbooks(): Promise<Prisma.WorkbookGetPayload<{}>[]> {
   return prisma.workbook.findMany({ orderBy: { order: "asc" } });
