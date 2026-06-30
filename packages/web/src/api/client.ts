@@ -87,19 +87,19 @@ export async function deleteSheet(sheetId: number): Promise<void> {
 
 export interface Session {
   id: number;
-  sheetId: number;
+  sheetId: number | null;
   name: string;
   createdAt: string;
 }
 
-export async function fetchSessions(sheetId: number): Promise<Session[]> {
-  const res = await fetch(`${BASE}/sheets/${sheetId}/sessions`);
+export async function fetchSessions(): Promise<Session[]> {
+  const res = await fetch(`${BASE}/chat/sessions`);
   if (!res.ok) throw new Error("加载会话失败");
   return res.json();
 }
 
-export async function createSession(sheetId: number): Promise<Session> {
-  const res = await fetch(`${BASE}/sheets/${sheetId}/sessions`, { method: "POST" });
+export async function createSession(): Promise<Session> {
+  const res = await fetch(`${BASE}/chat/sessions`, { method: "POST" });
   if (!res.ok) throw new Error("创建会话失败");
   return res.json();
 }

@@ -12,8 +12,6 @@
   },
   "dependencies": {
     "@ai-sdk/react": "^4.0.5",
-    "@chatscope/chat-ui-kit-react": "^2.1.1",
-    "@chatscope/chat-ui-kit-styles": "^1.4.0",
     "@fortune-sheet/react": "^1.0.4",
     "@openexcel/core": "workspace:*",
     "ai": "^7.0.4",

@@ -33,9 +33,9 @@ model Sheet {
 
 model Session {
   id        Int       @id @default(autoincrement())
-  sheetId   Int
+  sheetId   Int?
   name      String
-  sheet     Sheet     @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  sheet     Sheet?    @relation(fields: [sheetId], references: [id], onDelete: Cascade)
   runs      AgentRun[]
   createdAt DateTime  @default(now())
 }

@@ -1,12 +1,11 @@
 import { loadModelConfig } from "../config.js";
 import { createOpenAI } from "@ai-sdk/openai";
 import { streamText } from "ai";
-import type { ToolSet } from "./tools.js";
 
 export function streamChat(input: {
   systemPrompt: string;
   messages: { role: "user" | "assistant"; content: string }[];
-  tools: ToolSet;
+  tools: Record<string, any>;
   abortSignal?: AbortSignal;
   onChunk?: (chunk: any) => Promise<void> | void;
   onFinish?: (result: any) => Promise<void> | void;

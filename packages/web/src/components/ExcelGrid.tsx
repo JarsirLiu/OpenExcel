@@ -97,7 +97,7 @@ export function ExcelGrid({ workbook, currentSheetIndex, onSheetIndexChange, onS
   if (!workbook) return null;
 
   return (
-    <div style={{ flex: 1, position: "relative" }}>
+    <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0, position: "relative" }}>
       <Workbook
         key={workbook.name}
         data={sheetData as any}

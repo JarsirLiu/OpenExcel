@@ -1,14 +1,19 @@
 import { prisma } from "../db.js";
 
-export async function findSessionsBySheet(sheetId: number) {
+export async function findGlobalSessions() {
   return prisma.session.findMany({
-    where: { sheetId },
     orderBy: { createdAt: "desc" },
   });
 }
 
-export async function createSession(sheetId: number, name: string) {
-  return prisma.session.create({ data: { sheetId, name } });
+export async function createSession(name: string) {
+  return prisma.session.create({ data: { name, sheetId: null } });
+}
+
+export async function ensureGlobalSession() {
+  const existing = await prisma.session.findFirst({ orderBy: { createdAt: "asc" } });
+  if (existing) return existing;
+  return createSession("全局对话");
 }
 
 export async function deleteSession(id: number) {
