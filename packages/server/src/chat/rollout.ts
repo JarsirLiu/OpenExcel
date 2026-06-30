@@ -48,19 +48,17 @@ export function onChunk(ctx: RolloutContext) {
   return async (chunk: any): Promise<void> => {
     if (chunk.type === "reasoning-delta") {
       ctx.state.reasoningText += chunk.text;
-      await repo.updateStep(ctx.reasoningStepId, { content: ctx.state.reasoningText, status: "streaming" });
     }
 
     if (chunk.type === "text-delta") {
       ctx.state.finalText += chunk.text;
-      await repo.updateStep(ctx.finalStepId, { content: ctx.state.finalText, status: "streaming" });
     }
 
     if (chunk.type === "tool-call") {
       const step = await repo.createStep({
         runId: ctx.runId,
         type: "tool_call",
-        status: "streaming",
+        status: "completed",
         toolName: chunk.toolName,
         input: JSON.stringify(chunk.input),
         order: 2 + ctx.state.toolCallSteps.size * 2,
@@ -88,8 +86,8 @@ export function onChunk(ctx: RolloutContext) {
 export function onFinish(ctx: RolloutContext) {
   return async (result: any): Promise<void> => {
     const finalText = result.text ?? ctx.state.finalText;
-    await repo.updateStep(ctx.finalStepId, { content: finalText, status: "completed" });
     await repo.updateStep(ctx.reasoningStepId, { content: ctx.state.reasoningText, status: "completed" });
+    await repo.updateStep(ctx.finalStepId, { content: finalText, status: "completed" });
     await repo.updateRun(ctx.runId, { outputText: finalText, status: "completed", endedAt: new Date() });
   };
 }
