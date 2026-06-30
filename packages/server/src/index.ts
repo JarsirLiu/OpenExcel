@@ -1,9 +1,9 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
-import { workbookRoutes } from "./routes/workbooks.js";
-import { sheetRoutes } from "./routes/sheets.js";
-import { chatRoutes } from "./routes/chat.js";
+import { workbookRoutes } from "./workbook/routes.js";
+import { sheetRoutes } from "./sheet/routes.js";
+import { chatRoutes } from "./chat/routes.js";
 
 const app = Fastify({ logger: true });
 

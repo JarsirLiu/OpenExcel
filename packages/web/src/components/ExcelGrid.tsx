@@ -3,52 +3,13 @@ import { Workbook } from "@fortune-sheet/react";
 import "@fortune-sheet/react/dist/index.css";
 import type { WorkbookFull } from "../api/client";
 import { updateSheetData } from "../api/client";
+import { buildCelldata, celldataTo2DArray, toFortuneSheetData } from "../adapters/fortuneSheet";
 
 interface Props {
   workbook: WorkbookFull | null;
   currentSheetIndex: number;
   onSheetIndexChange?: (sheetIndex: number) => void;
   onSheetDataChange?: (sheetId: number, celldata: any[][]) => void;
-}
-
-function buildCelldata(
-  columns: { label: string; width?: number }[],
-  templateRows: string[][],
-  uploadedData?: string[][] | null,
-) {
-  const cells: { r: number; c: number; v: { v: any; m: string } }[] = [];
-
-  columns.forEach((col, ci) => {
-    cells.push({ r: 0, c: ci, v: { v: col.label, m: col.label } });
-  });
-
-  const rows = uploadedData ?? templateRows;
-
-  rows.forEach((row, ri) => {
-    const r = ri + 1;
-    columns.forEach((_col, ci) => {
-      const val = row[ci] ?? "";
-      cells.push({ r, c: ci, v: { v: val, m: String(val) } });
-    });
-  });
-
-  return cells;
-}
-
-function celldataTo2DArray(
-  celldata: { r: number; c: number; v: { v: any } }[],
-  columns: number,
-): any[][] {
-  const maxRow = Math.max(...celldata.map((c) => c.r), 0);
-  const array: any[][] = Array.from({ length: maxRow + 1 }, () =>
-    Array(columns).fill("")
-  );
-  celldata.forEach((cell) => {
-    if (cell.r > 0) {
-      array[cell.r][cell.c] = cell.v?.v ?? "";
-    }
-  });
-  return array;
 }
 
 export function ExcelGrid({ workbook, currentSheetIndex, onSheetIndexChange, onSheetDataChange }: Props) {
@@ -118,19 +79,7 @@ export function ExcelGrid({ workbook, currentSheetIndex, onSheetIndexChange, onS
 
   const sheetData = useMemo(() => {
     if (!workbook) return [];
-    return workbook.sheets.map((sheet) => ({
-      id: String(sheet.id),
-      name: sheet.name,
-      celldata: buildCelldata(sheet.columns, sheet.rows, sheet.uploadedData),
-      columnWidths: sheet.columns.reduce((acc: any, col, i) => {
-        if (col.width) acc[i] = col.width;
-        return acc;
-      }, {}),
-      merges: (sheet.merges || []).map((m) => ({
-        row: [m.row[0] + 1, m.row[1] + 1],
-        col: [m.col[0], m.col[1]],
-      })),
-    }));
+    return workbook.sheets.map((sheet) => toFortuneSheetData(sheet));
   }, [workbook]);
 
   const handleActivateSheet = useCallback((sheetId: string) => {
@@ -156,6 +105,7 @@ export function ExcelGrid({ workbook, currentSheetIndex, onSheetIndexChange, onS
         showSheetTabs={true}
         showToolbar={false}
         showFormulaBar={false}
+        // @ts-expect-error allowUpdate is a valid prop but missing from types
         allowUpdate={true}
         hooks={{
           afterActivateSheet: handleActivateSheet,
