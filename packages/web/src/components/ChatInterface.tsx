@@ -363,7 +363,6 @@ function ChatPanel({ sessionId }: { sessionId: number }) {
 }
 
 export function ChatInterface({}: Props) {
-  const [collapsed, setCollapsed] = useState(false);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<number | null>(null);
 
@@ -389,27 +388,6 @@ export function ChatInterface({}: Props) {
   const handleSelectSession = (id: number) => {
     setCurrentSessionId(id);
   };
-
-  if (collapsed) {
-    return (
-      <div
-        style={{
-          width: 32,
-          borderLeft: "1px solid #e8e8e8",
-          background: "#fafafa",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          cursor: "pointer",
-        }}
-        onClick={() => setCollapsed(false)}
-      >
-        <span style={{ writingMode: "vertical-rl", fontSize: 12, color: "#666", letterSpacing: 2 }}>
-          对话
-        </span>
-      </div>
-    );
-  }
 
   return (
     <div
@@ -450,21 +428,6 @@ export function ChatInterface({}: Props) {
             title="新建对话"
           >
             +
-          </div>
-          <div
-            onClick={() => setCollapsed(true)}
-            style={{
-              padding: "4px 8px",
-              cursor: "pointer",
-              color: "#888",
-              fontSize: 12,
-              border: "1px solid #e0e0e0",
-              borderRadius: 6,
-              background: "#fff",
-            }}
-            title="收起"
-          >
-            ◀
           </div>
         </div>
       </div>
