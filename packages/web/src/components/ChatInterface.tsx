@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Message as Msg, Session } from "../api/client";
-import { createSession, fetchMessages, fetchSessions, streamChat } from "../api/client";
+import { createSession, deleteSession, fetchMessages, fetchSessions, streamChat } from "../api/client";
 
 /* ============ Icons ============ */
 const SendIcon = ({ size = 14 }: { size?: number }) => (
@@ -365,6 +365,8 @@ function ChatPanel({ sessionId }: { sessionId: number }) {
 export function ChatInterface({}: Props) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<number | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const historyRef = useRef<HTMLDivElement>(null);
 
   const loadSessions = useCallback(() => {
     fetchSessions().then((list) => {
@@ -379,6 +381,17 @@ export function ChatInterface({}: Props) {
     loadSessions();
   }, [loadSessions]);
 
+  useEffect(() => {
+    if (!historyOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (historyRef.current && !historyRef.current.contains(e.target as Node)) {
+        setHistoryOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [historyOpen]);
+
   const handleNewSession = async () => {
     const s = await createSession();
     setSessions((prev) => [s, ...prev]);
@@ -387,6 +400,17 @@ export function ChatInterface({}: Props) {
 
   const handleSelectSession = (id: number) => {
     setCurrentSessionId(id);
+    setHistoryOpen(false);
+  };
+
+  const handleDeleteSession = async (id: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    await deleteSession(id);
+    setSessions((prev) => prev.filter((s) => s.id !== id));
+    if (currentSessionId === id) {
+      const remaining = sessions.filter((s) => s.id !== id);
+      setCurrentSessionId(remaining.length > 0 ? remaining[0].id : null);
+    }
   };
 
   return (
@@ -398,6 +422,7 @@ export function ChatInterface({}: Props) {
         background: "#fff",
         borderLeft: "1px solid #e8e8e8",
         overflow: "hidden",
+        position: "relative",
       }}
     >
       {/* Header */}
@@ -413,6 +438,21 @@ export function ChatInterface({}: Props) {
       >
         <span style={{ fontWeight: 600, fontSize: 14, color: "#1f1f1f" }}>AI 对话</span>
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <div
+            onClick={() => setHistoryOpen(!historyOpen)}
+            style={{
+              padding: "4px 8px",
+              cursor: "pointer",
+              color: "#888",
+              fontSize: 12,
+              border: "1px solid #e0e0e0",
+              borderRadius: 6,
+              background: "#fff",
+            }}
+            title="历史记录"
+          >
+            历史
+          </div>
           <div
             onClick={handleNewSession}
             style={{
@@ -431,6 +471,73 @@ export function ChatInterface({}: Props) {
           </div>
         </div>
       </div>
+
+      {/* History panel */}
+      {historyOpen && (
+        <div
+          ref={historyRef}
+          style={{
+            position: "absolute",
+            top: 44,
+            left: 8,
+            right: 8,
+            zIndex: 100,
+            background: "#fff",
+            border: "1px solid #e0e0e0",
+            borderRadius: 8,
+            boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+            maxHeight: 300,
+            overflowY: "auto",
+          }}
+        >
+          {sessions.length === 0 ? (
+            <div style={{ padding: "16px", textAlign: "center", color: "#999", fontSize: 13 }}>
+              暂无历史记录
+            </div>
+          ) : (
+            sessions.map((s) => (
+              <div
+                key={s.id}
+                onClick={() => handleSelectSession(s.id)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "10px 14px",
+                  cursor: "pointer",
+                  background: s.id === currentSessionId ? "#f5f5f5" : "transparent",
+                  borderBottom: "1px solid #f0f0f0",
+                  transition: "background 0.1s",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "#fafafa")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = s.id === currentSessionId ? "#f5f5f5" : "transparent")}
+              >
+                <span style={{ fontSize: 13, color: "#1f1f1f", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+                  {s.name}
+                </span>
+                <div
+                  onClick={(e) => handleDeleteSession(s.id, e)}
+                  style={{
+                    padding: "2px 6px",
+                    borderRadius: 4,
+                    fontSize: 14,
+                    color: "#bbb",
+                    cursor: "pointer",
+                    lineHeight: 1,
+                    marginLeft: 8,
+                    flexShrink: 0,
+                  }}
+                  title="删除"
+                  onMouseEnter={(e) => (e.currentTarget.style.color = "#ff5252")}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = "#bbb")}
+                >
+                  ✕
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
 
       {/* Session tabs */}
       {sessions.length > 1 && (

@@ -104,6 +104,11 @@ export async function createSession(): Promise<Session> {
   return res.json();
 }
 
+export async function deleteSession(id: number): Promise<void> {
+  const res = await fetch(`${BASE}/sessions/${id}`, { method: "DELETE" });
+  if (!res.ok) throw new Error("删除会话失败");
+}
+
 export async function fetchMessages(sessionId: number): Promise<Message[]> {
   const res = await fetch(`${BASE}/sessions/${sessionId}/messages`);
   if (!res.ok) throw new Error("加载消息失败");
