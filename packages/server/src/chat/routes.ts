@@ -2,18 +2,35 @@ import type { FastifyInstance } from "fastify";
 import * as service from "./service.js";
 
 export async function chatRoutes(app: FastifyInstance) {
-  app.get<{ Params: { sheetId: string } }>("/api/sheets/:sheetId/messages", async (req) => {
-    return service.getMessages(Number(req.params.sheetId));
+  // Sessions
+  app.get<{ Params: { sheetId: string } }>("/api/sheets/:sheetId/sessions", async (req) => {
+    return service.getSessions(Number(req.params.sheetId));
   });
 
+  app.post<{ Params: { sheetId: string } }>("/api/sheets/:sheetId/sessions", async (req, reply) => {
+    const session = await service.createSession(Number(req.params.sheetId));
+    return reply.status(201).send(session);
+  });
+
+  app.delete<{ Params: { id: string } }>("/api/sessions/:id", async (req, reply) => {
+    await service.deleteSession(Number(req.params.id));
+    return { success: true };
+  });
+
+  // Messages
+  app.get<{ Params: { sessionId: string } }>("/api/sessions/:sessionId/messages", async (req) => {
+    return service.getMessages(Number(req.params.sessionId));
+  });
+
+  // Chat
   app.post<{
-    Params: { sheetId: string };
+    Params: { sessionId: string };
     Body: { messages: any[] };
-  }>("/api/sheets/:sheetId/chat", async (req, reply) => {
-    const sheetId = Number(req.params.sheetId);
+  }>("/api/sessions/:sessionId/chat", async (req, reply) => {
+    const sessionId = Number(req.params.sessionId);
     const { messages: incomingMessages } = req.body;
 
-    const resultObj = await service.chat(sheetId, incomingMessages);
+    const resultObj = await service.chat(sessionId, incomingMessages);
     if ("error" in resultObj) {
       return reply.status(404).send({ error: resultObj.error });
     }

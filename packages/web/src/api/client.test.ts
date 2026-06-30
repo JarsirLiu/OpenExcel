@@ -87,7 +87,7 @@ describe("fetchMessages", () => {
 
     const result = await fetchMessages(3);
     expect(result).toEqual(msgs);
-    expect(mockFetch).toHaveBeenCalledWith("/api/sheets/3/messages");
+    expect(mockFetch).toHaveBeenCalledWith("/api/sessions/3/messages");
   });
 });
 

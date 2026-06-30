@@ -81,8 +81,27 @@ export async function deleteSheet(sheetId: number): Promise<void> {
   if (!res.ok) throw new Error("删除 Sheet 失败");
 }
 
-export async function fetchMessages(sheetId: number): Promise<Message[]> {
-  const res = await fetch(`${BASE}/sheets/${sheetId}/messages`);
+export interface Session {
+  id: number;
+  sheetId: number;
+  name: string;
+  createdAt: string;
+}
+
+export async function fetchSessions(sheetId: number): Promise<Session[]> {
+  const res = await fetch(`${BASE}/sheets/${sheetId}/sessions`);
+  if (!res.ok) throw new Error("加载会话失败");
+  return res.json();
+}
+
+export async function createSession(sheetId: number): Promise<Session> {
+  const res = await fetch(`${BASE}/sheets/${sheetId}/sessions`, { method: "POST" });
+  if (!res.ok) throw new Error("创建会话失败");
+  return res.json();
+}
+
+export async function fetchMessages(sessionId: number): Promise<Message[]> {
+  const res = await fetch(`${BASE}/sessions/${sessionId}/messages`);
   if (!res.ok) throw new Error("加载消息失败");
   return res.json();
 }

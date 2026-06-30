@@ -1,4 +1,5 @@
 import * as repo from "./repository.js";
+import { DEFAULT_PROMPT, withSheetContext } from "./prompt.js";
 
 interface Ref {
   type: "sheet";
@@ -38,12 +39,8 @@ export async function buildSystemPrompt(userText: string): Promise<string> {
   }
 
   if (!context) {
-    return `你是一个专业的 Excel 数据分析助手。请回答用户的问题。`;
+    return DEFAULT_PROMPT;
   }
 
-  return `你是一个专业的 Excel 数据分析助手。你可以读取、分析、总结 Excel 表格中的数据。
-
-${context}
-
-请基于以上数据回答用户的问题。如果数据不足以回答，请说明需要哪些额外信息。`;
+  return withSheetContext(context);
 }
