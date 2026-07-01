@@ -20,6 +20,15 @@ function parseMerges(celldata: any[]): { startRow: number; startCol: number; end
   return merges;
 }
 
+function parseStoredJson<T>(value: string | null | undefined, fallback: T): T {
+  if (!value) return fallback;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return fallback;
+  }
+}
+
 export const readSheet = {
   description: "读取指定 Sheet 的全部数据，返回结构化表格信息，包含标题行、行/列数、数据二维数组、以及合并单元格信息。",
   inputSchema: z.object({
@@ -29,36 +38,45 @@ export const readSheet = {
     const sheet = await prisma.sheet.findUnique({ where: { id: sheetId } });
     if (!sheet) return { error: `Sheet ${sheetId} 不存在` };
 
-    const celldata: any[] = sheet.uploadedData ? JSON.parse(sheet.uploadedData) : [];
-    if (!Array.isArray(celldata) || celldata.length === 0) {
+    const celldata: any[] = parseStoredJson(sheet.uploadedData, []);
+    if (Array.isArray(celldata) && celldata.length > 0) {
+      const maxRow = Math.max(...celldata.map((c: any) => c.r), 0);
+      const maxCol = Math.max(...celldata.map((c: any) => c.c), 0);
+      const columnCount = maxCol + 1;
+      const grid = celldataToGrid(celldata, columnCount);
+      const merges = parseMerges(celldata);
+
+      const firstRow = grid[0] ?? [];
+      const secondRow = grid[1] ?? [];
+      const isFirstRowHeader = firstRow.some((v: string) => v.length > 0)
+        && secondRow.some((v: string) => v.length > 0);
+
       return {
         sheetName: sheet.name,
-        rowCount: 0,
-        columnCount: 0,
-        headers: [],
-        data: [],
-        merges: [],
+        rowCount: grid.length,
+        columnCount,
+        headers: isFirstRowHeader ? firstRow : [],
+        data: isFirstRowHeader ? grid.slice(1) : grid,
+        merges,
       };
     }
 
-    const maxRow = Math.max(...celldata.map((c: any) => c.r), 0);
-    const maxCol = Math.max(...celldata.map((c: any) => c.c), 0);
-    const columnCount = maxCol + 1;
-    const grid = celldataToGrid(celldata, columnCount);
-    const merges = parseMerges(celldata);
-
-    const firstRow = grid[0] ?? [];
-    const secondRow = grid[1] ?? [];
-
-    const isFirstRowHeader = firstRow.some((v: string) => v.length > 0)
-      && secondRow.some((v: string) => v.length > 0);
+    const columns = parseStoredJson<{ label: string; width?: number }[]>(sheet.columns, []);
+    const rows = parseStoredJson<string[][]>(sheet.rows, []);
+    const merges = parseStoredJson<{ row: [number, number]; col: [number, number] }[]>(sheet.merges, []).map((m) => ({
+      startRow: m.row[0],
+      startCol: m.col[0],
+      endRow: m.row[1],
+      endCol: m.col[1],
+    }));
+    const columnCount = Math.max(columns.length, ...rows.map((row) => row.length), 0);
 
     return {
       sheetName: sheet.name,
-      rowCount: grid.length,
+      rowCount: rows.length,
       columnCount,
-      headers: isFirstRowHeader ? firstRow : [],
-      data: isFirstRowHeader ? grid.slice(1) : grid,
+      headers: columns.map((c) => c.label),
+      data: rows,
       merges,
     };
   },
