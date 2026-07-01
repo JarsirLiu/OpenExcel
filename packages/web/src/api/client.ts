@@ -52,6 +52,7 @@ export interface Message {
   id: string;
   role: "user" | "assistant" | "system";
   content: string;
+  reasoning?: string;
 }
 
 export interface AgentRunEvent {
@@ -107,6 +108,16 @@ export async function createSession(): Promise<Session> {
 export async function deleteSession(id: number): Promise<void> {
   const res = await fetch(`${BASE}/sessions/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error("删除会话失败");
+}
+
+export async function renameSession(id: number, name: string): Promise<Session> {
+  const res = await fetch(`${BASE}/sessions/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok) throw new Error("重命名会话失败");
+  return res.json();
 }
 
 export async function fetchMessages(sessionId: number): Promise<Message[]> {

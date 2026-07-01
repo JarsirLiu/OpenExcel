@@ -17,6 +17,11 @@ export async function chatRoutes(app: FastifyInstance) {
     return { success: true };
   });
 
+  app.patch<{ Params: { id: string }; Body: { name: string } }>("/api/sessions/:id", async (req, reply) => {
+    const session = await service.renameSession(Number(req.params.id), req.body.name);
+    return session;
+  });
+
   app.get<{ Params: { sessionId: string } }>("/api/sessions/:sessionId/messages", async (req) => {
     return service.getMessages(Number(req.params.sessionId));
   });

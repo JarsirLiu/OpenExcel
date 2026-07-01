@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Message as Msg, Session } from "../api/client";
-import { createSession, deleteSession, fetchMessages, fetchSessions, streamChat } from "../api/client";
+import { createSession, deleteSession, fetchMessages, fetchSessions, renameSession, streamChat } from "../api/client";
 
 /* ============ Icons ============ */
 const SendIcon = ({ size = 14 }: { size?: number }) => (
@@ -15,12 +15,6 @@ const SendIcon = ({ size = 14 }: { size?: number }) => (
 const StopIcon = ({ size = 14 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
     <rect x="6" y="6" width="12" height="12" rx="1" />
-  </svg>
-);
-
-const PaperclipIcon = ({ size = 18 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
   </svg>
 );
 
@@ -76,39 +70,45 @@ const AIAvatar = () => (
 
 interface Props {}
 
-function ChatPanel({ sessionId }: { sessionId: number }) {
+function ChatPanel({ sessionId, onRunComplete, onTitleGenerated }: { sessionId: number; onRunComplete?: () => void; onTitleGenerated?: (title: string) => void }) {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [draft, setDraft] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
-  const assistantIndexRef = useRef<number | null>(null);
+  const [streamReasoning, setStreamReasoning] = useState("");
+  const [streamFinal, setStreamFinal] = useState("");
+  const [thinkingOpen, setThinkingOpen] = useState<Record<string, boolean>>({});
   const abortRef = useRef<AbortController | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const streamReasoningRef = useRef("");
+  const streamFinalRef = useRef("");
 
   useEffect(() => {
     fetchMessages(sessionId).then(setMessages);
-    assistantIndexRef.current = null;
     setDraft("");
+    setStreamReasoning("");
+    setStreamFinal("");
+    setIsStreaming(false);
   }, [sessionId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isStreaming]);
+  }, [messages, isStreaming, streamReasoning, streamFinal]);
 
   const handleSend = async (text: string) => {
     const input = text.trim();
     if (!input || isStreaming) return;
 
-    const nextMessages: Msg[] = [
-      ...messages,
-      { id: `local-user-${Date.now()}`, role: "user", content: input },
-    ];
-    nextMessages.push({ id: `local-assistant-${Date.now()}`, role: "assistant", content: "正在思考..." });
-    assistantIndexRef.current = nextMessages.length - 1;
-    setMessages(nextMessages);
+    const userMsg: Msg = { id: `local-user-${Date.now()}`, role: "user", content: input };
+    setMessages((prev) => [...prev, userMsg]);
+
     setDraft("");
     setIsStreaming(true);
+    streamReasoningRef.current = "";
+    streamFinalRef.current = "";
+    setStreamReasoning("");
+    setStreamFinal("");
     abortRef.current = new AbortController();
 
     try {
@@ -116,18 +116,35 @@ function ChatPanel({ sessionId }: { sessionId: number }) {
         sessionId,
         input,
         (evt) => {
-          if (evt.event === "step.delta" && (evt.data.stepType === "final" || !evt.data.stepType)) {
-            setMessages((current) => {
-              const idx = assistantIndexRef.current ?? current.length - 1;
-              if (idx < 0 || !current[idx]) return current;
-              const updated = [...current];
-              const prefix = updated[idx].content === "正在思考..." ? "" : updated[idx].content ?? "";
-              updated[idx] = { ...updated[idx], content: `${prefix}${evt.data.text ?? ""}` };
-              return updated;
-            });
+          if (evt.event === "step.delta" && evt.data.stepType === "reasoning") {
+            streamReasoningRef.current += evt.data.text ?? "";
+            setStreamReasoning(streamReasoningRef.current);
+          }
+          if (evt.event === "step.delta" && evt.data.stepType === "final") {
+            streamFinalRef.current += evt.data.text ?? "";
+            setStreamFinal(streamFinalRef.current);
           }
           if (evt.event === "run.completed" || evt.event === "run.failed" || evt.event === "run.aborted") {
+            if (evt.event === "run.completed") {
+              const final = streamFinalRef.current;
+              setMessages((prev) => {
+                const next = [...prev];
+                next.push({
+                  id: `assistant-${Date.now()}`,
+                  role: "assistant",
+                  content: final,
+                  reasoning: streamReasoningRef.current,
+                });
+                return next;
+              });
+              onRunComplete?.();
+              if (evt.data.title) onTitleGenerated?.(evt.data.title);
+            }
             setIsStreaming(false);
+            setStreamReasoning("");
+            setStreamFinal("");
+            streamReasoningRef.current = "";
+            streamFinalRef.current = "";
             abortRef.current = null;
           }
         },
@@ -135,19 +152,10 @@ function ChatPanel({ sessionId }: { sessionId: number }) {
       );
     } catch (err) {
       setIsStreaming(false);
-      abortRef.current = null;
-      setMessages((current) => {
-        const idx = assistantIndexRef.current ?? current.length - 1;
-        if (idx < 0 || !current[idx]) return current;
-        const updated = [...current];
-        updated[idx] = {
-          ...updated[idx],
-          content: `请求失败：${err instanceof Error ? err.message : String(err)}`,
-        };
-        return updated;
-      });
-    } finally {
-      setIsStreaming(false);
+      setStreamReasoning("");
+      setStreamFinal("");
+      streamReasoningRef.current = "";
+      streamFinalRef.current = "";
       abortRef.current = null;
     }
   };
@@ -171,6 +179,10 @@ function ChatPanel({ sessionId }: { sessionId: number }) {
     }
   };
 
+  const toggleThinking = (id: string) => {
+    setThinkingOpen((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
   useEffect(() => {
     const ta = textareaRef.current;
     if (!ta) return;
@@ -178,7 +190,7 @@ function ChatPanel({ sessionId }: { sessionId: number }) {
     ta.style.height = Math.min(ta.scrollHeight, 100) + "px";
   }, [draft]);
 
-  const lastAssistantMsg = messages.filter((m) => m.role === "assistant").pop();
+  const lastAssistantMsg = [...messages].reverse().find((m) => m.role === "assistant");
 
   return (
     <div
@@ -222,6 +234,48 @@ function ChatPanel({ sessionId }: { sessionId: number }) {
                 </div>
               ) : (
                 <>
+                  {msg.reasoning && (
+                    <div
+                      onClick={() => toggleThinking(msg.id)}
+                      style={{
+                        background: "#f6f8fa",
+                        border: "1px solid #e8ecf0",
+                        borderRadius: 8,
+                        marginBottom: 12,
+                        overflow: "hidden",
+                        cursor: "pointer",
+                        userSelect: "none",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                          padding: "8px 12px",
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: "#555",
+                        }}
+                      >
+                        <span style={{ fontSize: 11 }}>{thinkingOpen[msg.id] ? "▼" : "▶"}</span>
+                        思考过程
+                      </div>
+                      {thinkingOpen[msg.id] && (
+                        <div
+                          style={{
+                            padding: "0 12px 10px",
+                            fontSize: 13,
+                            lineHeight: 1.6,
+                            color: "#666",
+                            whiteSpace: "pre-wrap",
+                          }}
+                        >
+                          {msg.reasoning}
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <div className="md-content" style={{ fontSize: 15, lineHeight: 1.7, color: "#1f1f1f" }}>
                     <Markdown remarkPlugins={[remarkGfm]}>{msg.content || ""}</Markdown>
                   </div>
@@ -253,37 +307,61 @@ function ChatPanel({ sessionId }: { sessionId: number }) {
         ))}
 
         {isStreaming && (
-          <div style={{ display: "flex", alignItems: "center", gap: 6, paddingLeft: 42, marginBottom: 20 }}>
-            <span
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: "50%",
-                background: "#999",
-                animation: "pulse 1.4s infinite",
-                display: "inline-block",
-              }}
-            />
-            <span
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: "50%",
-                background: "#999",
-                animation: "pulse 1.4s infinite 0.2s",
-                display: "inline-block",
-              }}
-            />
-            <span
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: "50%",
-                background: "#999",
-                animation: "pulse 1.4s infinite 0.4s",
-                display: "inline-block",
-              }}
-            />
+          <div style={{ marginBottom: 28 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+              <AIAvatar />
+              <span style={{ fontSize: 14, fontWeight: 600, color: "#1f1f1f" }}>AI 助手</span>
+            </div>
+            <div style={{ paddingLeft: 42 }}>
+              {streamReasoning && (
+                <div
+                  style={{
+                    background: "#f6f8fa",
+                    border: "1px solid #e8ecf0",
+                    borderRadius: 8,
+                    marginBottom: 12,
+                    overflow: "hidden",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      padding: "8px 12px",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: "#555",
+                    }}
+                  >
+                    <span style={{ fontSize: 11 }}>▼</span>
+                    思考过程
+                  </div>
+                  <div
+                    style={{
+                      padding: "0 12px 10px",
+                      fontSize: 13,
+                      lineHeight: 1.6,
+                      color: "#666",
+                      whiteSpace: "pre-wrap",
+                    }}
+                  >
+                    {streamReasoning}
+                  </div>
+                </div>
+              )}
+              {streamFinal ? (
+                <div className="md-content" style={{ fontSize: 15, lineHeight: 1.7, color: "#1f1f1f" }}>
+                  <Markdown remarkPlugins={[remarkGfm]}>{streamFinal}</Markdown>
+                </div>
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#999", animation: "pulse 1.4s infinite", display: "inline-block" }} />
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#999", animation: "pulse 1.4s infinite 0.2s", display: "inline-block" }} />
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#999", animation: "pulse 1.4s infinite 0.4s", display: "inline-block" }} />
+                </div>
+              )}
+            </div>
           </div>
         )}
         <div ref={messagesEndRef} />
@@ -403,6 +481,10 @@ export function ChatInterface({}: Props) {
     setHistoryOpen(false);
   };
 
+  const handleTitleGenerated = (title: string) => {
+    setSessions((prev) => prev.map((s) => (s.id === currentSessionId ? { ...s, name: title } : s)));
+  };
+
   const handleDeleteSession = async (id: number, e: React.MouseEvent) => {
     e.stopPropagation();
     await deleteSession(id);
@@ -436,7 +518,9 @@ export function ChatInterface({}: Props) {
           flexShrink: 0,
         }}
       >
-        <span style={{ fontWeight: 600, fontSize: 14, color: "#1f1f1f" }}>AI 对话</span>
+        <span style={{ fontWeight: 600, fontSize: 14, color: "#1f1f1f", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, marginRight: 8 }}>
+          {sessions.find((s) => s.id === currentSessionId)?.name ?? "AI 对话"}
+        </span>
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           <div
             onClick={() => setHistoryOpen(!historyOpen)}
@@ -539,43 +623,8 @@ export function ChatInterface({}: Props) {
         </div>
       )}
 
-      {/* Session tabs */}
-      {sessions.length > 1 && (
-        <div
-          style={{
-            display: "flex",
-            gap: 4,
-            padding: "6px 12px",
-            borderBottom: "1px solid #f0f0f0",
-            overflowX: "auto",
-            flexShrink: 0,
-          }}
-        >
-          {sessions.map((s) => (
-            <div
-              key={s.id}
-              onClick={() => handleSelectSession(s.id)}
-              style={{
-                padding: "4px 10px",
-                borderRadius: 12,
-                fontSize: 12,
-                cursor: "pointer",
-                whiteSpace: "nowrap",
-                background: s.id === currentSessionId ? "#e8e8e8" : "#f5f5f5",
-                color: s.id === currentSessionId ? "#1f1f1f" : "#666",
-                fontWeight: s.id === currentSessionId ? 600 : 400,
-                transition: "background 0.15s",
-                userSelect: "none",
-              }}
-            >
-              {s.name}
-            </div>
-          ))}
-        </div>
-      )}
-
       {currentSessionId ? (
-        <ChatPanel key={currentSessionId} sessionId={currentSessionId} />
+        <ChatPanel key={currentSessionId} sessionId={currentSessionId} onRunComplete={loadSessions} onTitleGenerated={handleTitleGenerated} />
       ) : (
         <div
           style={{

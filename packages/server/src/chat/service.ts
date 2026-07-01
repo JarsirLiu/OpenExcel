@@ -20,28 +20,26 @@ export async function deleteSession(sessionId: number) {
   return repo.deleteSession(sessionId);
 }
 
+export async function renameSession(sessionId: number, name: string) {
+  return repo.updateSession(sessionId, { name });
+}
+
 export async function getMessages(sessionId: number) {
   const runs = await repo.findRunsBySession(sessionId);
-  const transcript: { id: string; role: "user" | "assistant"; content: string }[] = [];
+  const transcript: { id: string; role: "user" | "assistant"; content: string; reasoning?: string }[] = [];
   for (const run of runs) {
     const steps = await repo.findStepsByRun(run.id);
     transcript.push({ id: `run-${run.id}-user`, role: "user", content: run.inputText ?? "" });
-    for (const step of steps) {
-      if (step.type === "reasoning" && step.content) {
-        transcript.push({ id: `step-${step.id}`, role: "assistant", content: step.content });
-      }
-      if (step.type === "tool_call" && step.toolName) {
-        transcript.push({ id: `step-${step.id}`, role: "assistant", content: `tool_call: ${step.toolName} ${step.input ?? ""}` });
-      }
-      if (step.type === "tool_result" && step.output) {
-        transcript.push({ id: `step-${step.id}`, role: "assistant", content: `tool_result: ${step.output}` });
-      }
-      if (step.type === "final" && step.content) {
-        transcript.push({ id: `step-${step.id}`, role: "assistant", content: step.content });
-      }
+
+    const reasoningStep = steps.find((s) => s.type === "reasoning");
+    const finalStep = steps.find((s) => s.type === "final");
+    const reasoning = reasoningStep?.content ?? undefined;
+    const final = finalStep?.content ?? "";
+    if (reasoning || final) {
+      transcript.push({ id: `run-${run.id}-assistant`, role: "assistant", content: final, reasoning });
     }
   }
-  return transcript.filter((m) => m.content.length > 0);
+  return transcript.filter((m) => m.content.length > 0 || m.reasoning);
 }
 
 export async function chat(
@@ -114,7 +112,13 @@ export async function chat(
     } else if (reasoningStarted) {
       push("step.completed", { runId: ctx.runId, stepType: "reasoning" });
     }
-    push("run.completed", { runId: ctx.runId });
+
+    const title = runs.length === 0 ? await model.generateTitle(inputText).catch(() => null) : null;
+    if (title) {
+      await repo.updateSession(sessionId, { name: title });
+    }
+
+    push("run.completed", { runId: ctx.runId, title: title ?? undefined });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (abortSignal?.aborted) {

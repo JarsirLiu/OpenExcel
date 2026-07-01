@@ -20,6 +20,10 @@ export async function deleteSession(id: number) {
   return prisma.session.delete({ where: { id } });
 }
 
+export async function updateSession(id: number, data: { name?: string }) {
+  return prisma.session.update({ where: { id }, data });
+}
+
 export async function findSession(id: number) {
   return prisma.session.findUnique({ where: { id } });
 }
