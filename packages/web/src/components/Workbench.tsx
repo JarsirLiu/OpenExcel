@@ -4,6 +4,7 @@ import { uploadNewWorkbook, deleteWorkbook, fetchWorkbooks, fetchWorkbook } from
 import { WorkbenchHeader } from "./WorkbenchHeader";
 import { ExcelWorkspace } from "./ExcelWorkspace";
 import { ChatSidebar } from "./ChatSidebar";
+import { patchWorkbookWithDelta } from "../utils/patchWorkbook";
 
 export function Workbench() {
   const uploadInputRef = useRef<HTMLInputElement>(null);
@@ -31,12 +32,23 @@ export function Workbench() {
       if (!currentWorkbook) return;
       const hasSheet = currentWorkbook.sheets.some((s) => s.id === detail.sheetId);
       if (!hasSheet) return;
-      try {
-        const full = await fetchWorkbook(currentWorkbook.id);
-        setCurrentWorkbook(full);
-        setRevision((r) => r + 1);
-      } catch {
-        // ignore
+
+      if (detail.delta) {
+        // Incremental patch — no server round-trip
+        const patched = patchWorkbookWithDelta(currentWorkbook, detail.sheetId, detail.delta);
+        if (patched) {
+          setCurrentWorkbook(patched);
+          setRevision((r) => r + 1);
+        }
+      } else {
+        // Fallback: full re-fetch (backward compat)
+        try {
+          const full = await fetchWorkbook(currentWorkbook.id);
+          setCurrentWorkbook(full);
+          setRevision((r) => r + 1);
+        } catch {
+          // ignore
+        }
       }
     };
     window.addEventListener("openexcel:sheet-changed", handler);

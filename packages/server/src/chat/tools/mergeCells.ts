@@ -89,7 +89,7 @@ export const mergeCells = {
         const key = `${r},${c}`;
         if (cellMap.has(key)) {
           const cell = cellMap.get(key);
-          cell.v = { ...cell.v, mc: { r: startRow, c: startCol, rs, cs } };
+          cell.v = { mc: { r: startRow, c: startCol, rs, cs } };
         }
       }
     }

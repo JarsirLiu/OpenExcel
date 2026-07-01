@@ -1,0 +1,181 @@
+import type { WorkbookFull, SheetSchema } from "../api/client";
+
+function toColRef(c: number): string {
+  let ref = "";
+  let n = c;
+  while (n >= 0) {
+    ref = String.fromCharCode(65 + (n % 26)) + ref;
+    n = Math.floor(n / 26) - 1;
+  }
+  return ref;
+}
+
+function parseConfig(config: any): Record<string, any> {
+  if (!config) return {};
+  if (typeof config === "string") {
+    try {
+      return JSON.parse(config);
+    } catch {
+      return {};
+    }
+  }
+  return config;
+}
+
+/**
+ * Incrementally patch a WorkbookFull with minimal delta data.
+ * Delta types:
+ *   - { type: "write", cells: [{row, col, value}], merges: [...] }
+ *   - { type: "merge",   range: { startRow, startCol, endRow, endCol } }
+ *   - { type: "unmerge", range: { startRow, startCol, endRow, endCol } }
+ */
+export function patchWorkbookWithDelta(
+  workbook: WorkbookFull,
+  sheetId: number,
+  delta: any,
+): WorkbookFull | null {
+  const sheetIndex = workbook.sheets.findIndex((s) => s.id === sheetId);
+  if (sheetIndex === -1) return null;
+
+  const sheet = workbook.sheets[sheetIndex];
+  let celldata: any[] = sheet.uploadedData ? [...sheet.uploadedData] : [];
+
+  const cellMap = new Map<string, any>();
+  for (const cell of celldata) {
+    if (cell.r != null && cell.c != null) {
+      cellMap.set(`${cell.r},${cell.c}`, cell);
+    }
+  }
+
+  const config = parseConfig(sheet.config);
+
+  if (delta.type === "write") {
+    const { cells, merges } = delta;
+    if (!Array.isArray(cells)) return null;
+
+    // Patch cell values
+    for (const { row, col, value } of cells) {
+      const key = `${row},${col}`;
+      const newVal = value ?? "";
+
+      if (newVal === "") {
+        cellMap.delete(key);
+      } else {
+        if (cellMap.has(key)) {
+          const cell = cellMap.get(key);
+          cell.v = { ...cell.v, v: newVal, m: String(newVal) };
+        } else {
+          cellMap.set(key, { r: row, c: col, v: { v: newVal, m: String(newVal) } });
+        }
+      }
+    }
+
+    // Patch merges (if any write affected merge areas)
+    for (const m of (merges ?? [])) {
+      const rs = m.endRow - m.startRow + 1;
+      const cs = m.endCol - m.startCol + 1;
+      for (let r = m.startRow; r <= m.endRow; r++) {
+        for (let c = m.startCol; c <= m.endCol; c++) {
+          const key = `${r},${c}`;
+          const cell = cellMap.get(key);
+          if (cell) {
+            cell.v = { ...cell.v, mc: { r: m.startRow, c: m.startCol, rs, cs } };
+          }
+        }
+      }
+    }
+
+    // Update config.merge for any merge changes
+    if (merges && merges.length > 0) {
+      for (const m of merges) {
+        const colRef = toColRef(m.startCol);
+        const cellRef = `${colRef}${m.startRow + 1}`;
+        config.merge[cellRef] = {
+          r: m.startRow,
+          c: m.startCol,
+          rs: m.endRow - m.startRow + 1,
+          cs: m.endCol - m.startCol + 1,
+        };
+      }
+    }
+  } else if (delta.type === "merge") {
+    const { range } = delta;
+    const { startRow, startCol, endRow, endCol } = range;
+    const rs = endRow - startRow + 1;
+    const cs = endCol - startCol + 1;
+
+    // Set mc on all cells in range, keep top-left value
+    const topLeftKey = `${startRow},${startCol}`;
+    const topLeft = cellMap.get(topLeftKey);
+
+    for (let r = startRow; r <= endRow; r++) {
+      for (let c = startCol; c <= endCol; c++) {
+        const key = `${r},${c}`;
+        if (r === startRow && c === startCol) {
+          // Top-left: keep value, add mc
+          const cell = cellMap.get(key) ?? { r, c, v: {} };
+          cell.v = { ...cell.v, mc: { r: startRow, c: startCol, rs, cs } };
+          cellMap.set(key, cell);
+        } else {
+          // Other cells: clear value, add mc
+          const cell = cellMap.get(key) ?? { r, c, v: {} };
+          cell.v = { mc: { r: startRow, c: startCol, rs, cs } };
+          cellMap.set(key, cell);
+        }
+      }
+    }
+
+    // Update config.merge
+    const colRef = toColRef(startCol);
+    const cellRef = `${colRef}${startRow + 1}`;
+    config.merge[cellRef] = { r: startRow, c: startCol, rs, cs };
+  } else if (delta.type === "unmerge") {
+    const { range } = delta;
+    const { startRow, startCol, endRow, endCol } = range;
+
+    // Clear mc from all cells in range
+    for (const [key, cell] of cellMap) {
+      if (
+        cell.r >= startRow &&
+        cell.r <= endRow &&
+        cell.c >= startCol &&
+        cell.c <= endCol
+      ) {
+        if (cell.v?.mc) {
+          const { mc, ...rest } = cell.v;
+          cell.v = rest;
+        }
+      }
+    }
+
+    // Remove merge from config
+    if (config.merge) {
+      for (const cellRef of Object.keys(config.merge)) {
+        const m = (config.merge as Record<string, { r: number; c: number }>)[cellRef];
+        if (m.r >= startRow && m.r <= endRow && m.c >= startCol && m.c <= endCol) {
+          delete config.merge[cellRef];
+        }
+      }
+    }
+  } else {
+    return null;
+  }
+
+  // Rebuild celldata
+  const updatedCelldata = Array.from(cellMap.values());
+
+  const updatedSheet: SheetSchema = {
+    ...sheet,
+    uploadedData: updatedCelldata,
+    config: JSON.stringify(config),
+  };
+
+  return {
+    ...workbook,
+    sheets: [
+      ...workbook.sheets.slice(0, sheetIndex),
+      updatedSheet,
+      ...workbook.sheets.slice(sheetIndex + 1),
+    ],
+  };
+}

@@ -83,15 +83,22 @@ export async function chat(
         continue;
       }
       if (chunk.type === "tool-call") {
-        push("step.started", { runId: ctx.runId, stepType: "tool_call", toolName: chunk.toolName, input: chunk.input });
+        push("step.started", { runId: ctx.runId, stepType: "tool_call", toolCallId: chunk.toolCallId, toolName: chunk.toolName, input: chunk.input });
         continue;
       }
       if (chunk.type === "tool-result") {
-        push("step.completed", { runId: ctx.runId, stepType: "tool_result", toolName: chunk.toolName, input: chunk.input, output: chunk.output });
+        push("step.completed", { runId: ctx.runId, stepType: "tool_result", toolCallId: chunk.toolCallId, toolName: chunk.toolName, input: chunk.input, output: chunk.output });
 
-        const sheetTools = ["writeCells", "mergeCells", "unmergeCells"];
-        if (sheetTools.includes(chunk.toolName) && chunk.input?.sheetId != null) {
-          push("sheet.changed", { sheetId: chunk.input.sheetId });
+        const input = chunk.input ?? {};
+        const output = chunk.output ?? {};
+
+        if (chunk.toolName === "writeCells" && input.cells) {
+          push("sheet.changed", { sheetId: input.sheetId, delta: { type: "write", cells: input.cells, merges: output.preview?.merges ?? [] } });
+        } else if ((chunk.toolName === "mergeCells" || chunk.toolName === "unmergeCells") && input.startRow !== undefined) {
+          push("sheet.changed", {
+            sheetId: input.sheetId,
+            delta: { type: chunk.toolName === "mergeCells" ? "merge" : "unmerge", range: { startRow: input.startRow, startCol: input.startCol, endRow: input.endRow, endCol: input.endCol } },
+          });
         }
         continue;
       }

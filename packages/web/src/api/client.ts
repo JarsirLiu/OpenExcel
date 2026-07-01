@@ -60,11 +60,21 @@ export function downloadTemplateUrl(workbookId: number): string {
   return `${BASE}/workbooks/${workbookId}/template`;
 }
 
+export interface ToolCallDisplay {
+  id: string;
+  toolCallId: string;
+  toolName: string;
+  summary: string;
+  status: "running" | "completed";
+  preview?: any;
+}
+
 export interface Message {
   id: string;
   role: "user" | "assistant" | "system";
   content: string;
   reasoning?: string;
+  toolCalls?: ToolCallDisplay[];
 }
 
 export interface AgentRunEvent {
