@@ -1,0 +1,4 @@
+[model]
+baseUrl = "https://your-model-endpoint.example/v1"
+apiKey = "your-api-key"
+modelName = "your-model-name"

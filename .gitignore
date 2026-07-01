@@ -4,3 +4,4 @@ dist/
 *.local
 .data/
 packages/.data/
+config/config.toml
