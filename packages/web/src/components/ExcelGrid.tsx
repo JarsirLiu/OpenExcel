@@ -1,12 +1,9 @@
 import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import { Workbook } from "@fortune-sheet/react";
 import "@fortune-sheet/react/dist/index.css";
-import { celldataToGrid, isCelldata } from "@openexcel/core";
 import type { WorkbookFull } from "../api/client";
 import { updateSheetData } from "../api/client";
 import { toFortuneSheetData } from "../adapters/fortuneSheet";
-import type { FortuneCell } from "../adapters/fortuneSheet";
-import type { WorkbookInstance } from "@fortune-sheet/react";
 
 interface Props {
   workbook: WorkbookFull | null;
@@ -19,11 +16,10 @@ export function ExcelGrid({ workbook, currentSheetIndex, onSheetIndexChange, onS
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedSnapshotRef = useRef<Record<number, string>>({});
-  const workbookRef = useRef<WorkbookInstance>(null);
 
-  const getSheetSnapshot = useCallback((celldata: any[], colCount: number) => {
-    const grid = celldataToGrid(celldata, colCount);
-    return JSON.stringify(grid);
+  const getSnapshot = useCallback((celldata: any[]) => {
+    // 保留 mc 等全部属性，不丢失合并信息
+    return JSON.stringify(celldata);
   }, []);
 
   useEffect(() => {
@@ -31,11 +27,11 @@ export function ExcelGrid({ workbook, currentSheetIndex, onSheetIndexChange, onS
 
     const nextSnapshots: Record<number, string> = {};
     workbook.sheets.forEach((sheet) => {
-      nextSnapshots[sheet.id] = getSheetSnapshot(toFortuneSheetData(sheet).celldata, sheet.columns.length);
+      nextSnapshots[sheet.id] = getSnapshot(toFortuneSheetData(sheet).celldata);
     });
 
     lastSavedSnapshotRef.current = nextSnapshots;
-  }, [workbook, getSheetSnapshot]);
+  }, [workbook, getSnapshot]);
 
   const doSave = useCallback(async (celldata: any[]) => {
     if (!workbook || !workbook.sheets[currentSheetIndex]) return;
@@ -46,45 +42,41 @@ export function ExcelGrid({ workbook, currentSheetIndex, onSheetIndexChange, onS
       await updateSheetData(sheet.id, celldata);
       setSaveStatus("saved");
       onSheetDataChange?.(sheet.id, celldata);
-      lastSavedSnapshotRef.current[sheet.id] = getSheetSnapshot(celldata, sheet.columns.length);
+      lastSavedSnapshotRef.current[sheet.id] = getSnapshot(celldata);
       setTimeout(() => setSaveStatus("idle"), 2000);
     } catch (err) {
       setSaveStatus("idle");
       console.error("保存失败:", err);
     }
-  }, [workbook, currentSheetIndex, onSheetDataChange, getSheetSnapshot]);
+  }, [workbook, currentSheetIndex, onSheetDataChange, getSnapshot]);
 
-  /**
-   * 从当前 FortuneSheet 实例获取该 sheet 的 celldata 并保存。
-   */
-  const saveCurrentSheet = useCallback(() => {
-    const inst = workbookRef.current;
-    if (!inst || !workbook) return;
-    const allSheets = inst.getAllSheets();
+  const trySave = useCallback((celldata: any[]) => {
+    if (!workbook || !workbook.sheets[currentSheetIndex]) return;
     const sheet = workbook.sheets[currentSheetIndex];
-    if (!sheet) return;
-    const fortuneSheet = allSheets.find((s: any) => s.id === String(sheet.id));
-    if (!fortuneSheet) return;
-    // fortuneSheet.celldata 是当前 sheet 的 cell 数据（包含 mc 等属性）
-    const celldata = fortuneSheet.celldata as FortuneCell[];
     if (!Array.isArray(celldata)) return;
-    const snapshot = getSheetSnapshot(celldata, sheet.columns.length);
+    const snapshot = getSnapshot(celldata);
     if (lastSavedSnapshotRef.current[sheet.id] === snapshot) return;
 
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(() => {
       doSave(celldata);
     }, 500);
-  }, [workbook, currentSheetIndex, doSave, getSheetSnapshot]);
+  }, [workbook, currentSheetIndex, doSave, getSnapshot]);
 
   /**
-   * onChange: 当 FortuneSheet 内部数据变更时触发。
-   * data 是所有 sheet 的完整数据（SheetType[]）。
-   * 主要用来更新我们的快照引用。
+   * onChange: 每次 FortuneSheet 内部数据变更时触发。
+   * data 是所有 sheet 的完整数据（SheetType[]），从中提取当前 sheet 的 celldata 进行保存。
    */
-  const handleChange = useCallback((_data: any) => {
-    // 不做立即保存，由 onOp 驱动保存
-  }, []);
+  const handleChange = useCallback((data: any[]) => {
+    if (!workbook || !Array.isArray(data)) return;
+    const sheet = workbook.sheets[currentSheetIndex];
+    if (!sheet) return;
+    const fortuneSheet = data.find((s: any) => String(s.id) === String(sheet.id));
+    if (!fortuneSheet) return;
+    const celldata = fortuneSheet.celldata;
+    if (!Array.isArray(celldata)) return;
+    trySave(celldata);
+  }, [workbook, currentSheetIndex, trySave]);
 
   const sheetData = useMemo(() => {
     if (!workbook) return [];
@@ -99,24 +91,14 @@ export function ExcelGrid({ workbook, currentSheetIndex, onSheetIndexChange, onS
     }
   }, [workbook, onSheetIndexChange]);
 
-  /**
-   * onOp: 监听所有操作（编辑、合并、插入/删除行列等），触发保存。
-   */
-  const handleOp = useCallback((_ops: any[]) => {
-    // 任何操作后都检查并保存
-    saveCurrentSheet();
-  }, [saveCurrentSheet]);
-
   if (!workbook) return null;
 
   return (
     <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0, position: "relative" }}>
       <Workbook
-        ref={workbookRef}
         key={workbook.name}
         data={sheetData as any}
         onChange={handleChange}
-        onOp={handleOp}
         showSheetTabs={true}
         showToolbar={true}
         showFormulaBar={false}
