@@ -59,7 +59,7 @@ export function WorkbenchHeader({
         </div>
         <div style={{ display: "flex", gap: 8, paddingBottom: 6 }}>
           <button onClick={onDownloadTemplate} style={{ fontSize: 12 }}>下载模板</button>
-          <button onClick={onUploadClick} style={{ fontSize: 12 }}>上传 Excel</button>
+          <button onClick={onUploadClick} style={{ fontSize: 12 }}>导入数据</button>
           <button onClick={onCreateSheet} style={{ fontSize: 12 }}>新建 Sheet</button>
           <button onClick={onDeleteSheet} style={{ fontSize: 12 }}>删除当前 Sheet</button>
         </div>
