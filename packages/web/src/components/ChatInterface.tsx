@@ -536,6 +536,11 @@ export function ChatInterface({}: Props) {
       setSessions(list);
       if (list.length > 0 && !currentSessionId) {
         setCurrentSessionId(list[0].id);
+      } else if (list.length === 0) {
+        createSession().then((s) => {
+          setSessions([s]);
+          setCurrentSessionId(s.id);
+        });
       }
     });
   }, [currentSessionId]);
