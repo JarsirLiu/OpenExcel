@@ -4,4 +4,4 @@ export type { FortuneCell } from "./mapper/celldataUtils.js";
 export { jsonToTemplate } from "./analyzer/jsonAnalyzer.js";
 export { templateToExcel } from "./generator/templateToExcel.js";
 export { excelToGrid } from "./mapper/excelToGrid.js";
-export { celldataToGrid, gridToCelldata, isCelldata } from "./mapper/celldataUtils.js";
+export { celldataToGrid, gridToCelldata, isCelldata, matrixToCelldata } from "./mapper/celldataUtils.js";

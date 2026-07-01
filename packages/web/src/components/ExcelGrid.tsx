@@ -1,6 +1,7 @@
 import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import { Workbook } from "@fortune-sheet/react";
 import "@fortune-sheet/react/dist/index.css";
+import { matrixToCelldata } from "@openexcel/core";
 import type { WorkbookFull } from "../api/client";
 import { updateSheetData } from "../api/client";
 import { toFortuneSheetData } from "../adapters/fortuneSheet";
@@ -73,8 +74,10 @@ export function ExcelGrid({ workbook, currentSheetIndex, onSheetIndexChange, onS
     if (!sheet) return;
     const fortuneSheet = data.find((s: any) => String(s.id) === String(sheet.id));
     if (!fortuneSheet) return;
-    const celldata = fortuneSheet.celldata;
-    if (!Array.isArray(celldata)) return;
+    // FortuneSheet 内部把 celldata 转成了 2D data 矩阵，需要转回 celldata 格式
+    const cellMatrix = fortuneSheet.data;
+    if (!Array.isArray(cellMatrix)) return;
+    const celldata = matrixToCelldata(cellMatrix);
     trySave(celldata);
   }, [workbook, currentSheetIndex, trySave]);
 

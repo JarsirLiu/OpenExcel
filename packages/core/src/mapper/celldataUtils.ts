@@ -55,3 +55,22 @@ export function gridToCelldata(grid: string[][], headerRow?: string[]): FortuneC
   });
   return cells;
 }
+
+/**
+ * 将 FortuneSheet 内部的 2D CellMatrix（(Cell|null)[][]）转换回
+ * celldata 稀疏格式（{r, c, v}[]），用于持久化。
+ */
+export function matrixToCelldata(data: (Record<string, any> | null)[][]): any[] {
+  const celldata: any[] = [];
+  for (let r = 0; r < data.length; r++) {
+    const row = data[r];
+    if (!row) continue;
+    for (let c = 0; c < row.length; c++) {
+      const cell = row[c];
+      if (cell != null) {
+        celldata.push({ r, c, v: cell });
+      }
+    }
+  }
+  return celldata;
+}
