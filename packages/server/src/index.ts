@@ -9,7 +9,20 @@ const app = Fastify({
   logger: {
     transport: {
       target: "pino-pretty",
-      options: { colorize: true, translateTime: "HH:MM:ss.l", ignore: "pid,hostname" },
+      options: {
+        colorize: true,
+        translateTime: "SYS:yyyy-mm-dd HH:MM:ss.l",
+        ignore: "pid,hostname,reqId,req,res,responseTime",
+        singleLine: true,
+        messageFormat: (log: any, messageKey: string) => {
+          const parts: string[] = [];
+          if (log.req) parts.push(`[${log.req.method}] ${log.req.url}`);
+          parts.push(log[messageKey]);
+          if (log.res) parts.push(`→ ${log.res.statusCode}`);
+          if (log.responseTime != null) parts.push(`(${log.responseTime.toFixed(0)}ms)`);
+          return parts.join(" ");
+        },
+      },
     },
   },
 });
