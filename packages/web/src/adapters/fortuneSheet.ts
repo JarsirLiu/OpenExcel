@@ -68,8 +68,9 @@ export function toFortuneSheetData(
     celldata = sheet.uploadedData as FortuneCell[];
     merges = extractMergesFromCelldata(celldata);
     if (merges.length === 0) {
+      // uploadedData 来自 Excel 上传，merges 已是 0-indexed，无需 +1
       merges = (sheet.merges || []).map((m) => ({
-        row: [m.row[0] + 1, m.row[1] + 1],
+        row: [m.row[0], m.row[1]],
         col: [m.col[0], m.col[1]],
       }));
     }
