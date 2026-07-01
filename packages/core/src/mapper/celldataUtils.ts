@@ -1,23 +1,29 @@
 export interface FortuneCell {
   r: number;
   c: number;
-  v: {
-    v: any;
-    m: string;
-    mc?: { r: number; c: number; rs?: number; cs?: number };
-    bg?: string;
-    fc?: string;
-    fs?: number;
-    bl?: number;
-    it?: number;
-    ht?: number;
-    vt?: number;
-    tb?: string;
-    ct?: { fa?: string; t?: string };
-  };
+  v: FortuneCellValue;
 }
 
-export function isCelldata(data: any): boolean {
+export interface FortuneCellValue {
+  v: any;
+  m: string;
+  f?: string;
+  mc?: { r: number; c: number; rs?: number; cs?: number };
+  bg?: string;
+  fc?: string;
+  fs?: number;
+  ff?: string;
+  bl?: number;
+  it?: number;
+  cl?: number;
+  un?: number;
+  ht?: number;
+  vt?: number;
+  tb?: string;
+  ct?: { fa?: string; t?: string };
+}
+
+export function isCelldata(data: any): data is FortuneCell[] {
   return (
     Array.isArray(data) &&
     data.length > 0 &&
@@ -60,15 +66,15 @@ export function gridToCelldata(grid: string[][], headerRow?: string[]): FortuneC
  * 将 FortuneSheet 内部的 2D CellMatrix（(Cell|null)[][]）转换回
  * celldata 稀疏格式（{r, c, v}[]），用于持久化。
  */
-export function matrixToCelldata(data: (Record<string, any> | null)[][]): any[] {
-  const celldata: any[] = [];
+export function matrixToCelldata(data: (Record<string, any> | null)[][]): FortuneCell[] {
+  const celldata: FortuneCell[] = [];
   for (let r = 0; r < data.length; r++) {
     const row = data[r];
     if (!row) continue;
     for (let c = 0; c < row.length; c++) {
       const cell = row[c];
       if (cell != null) {
-        celldata.push({ r, c, v: cell });
+        celldata.push({ r, c, v: cell as FortuneCellValue });
       }
     }
   }

@@ -2,7 +2,7 @@ import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import { Workbook } from "@fortune-sheet/react";
 import "@fortune-sheet/react/dist/index.css";
 import * as XLSX from "xlsx";
-import { matrixToCelldata } from "@openexcel/core";
+import { matrixToCelldata, extractSheetConfig } from "@openexcel/core";
 import type { WorkbookFull } from "../api/client";
 import { updateSheetData } from "../api/client";
 import { toFortuneSheetData } from "../adapters/fortuneSheet";
@@ -13,28 +13,6 @@ interface Props {
   currentSheetIndex: number;
   onSheetIndexChange?: (sheetIndex: number) => void;
   onSheetDataChange?: (sheetId: number, celldata: any[]) => void;
-}
-
-/**
- * 从 FortuneSheet sheet 对象中提取需要持久化的 sheet 级配置。
- */
-function extractSheetConfig(sheet: any): any {
-  return {
-    config: sheet.config ?? null,
-    frozen: sheet.frozen ?? null,
-    filter: sheet.filter ?? null,
-    filter_select: sheet.filter_select ?? null,
-    zoomRatio: sheet.zoomRatio ?? null,
-    showGridLines: sheet.showGridLines ?? null,
-    defaultRowHeight: sheet.defaultRowHeight ?? null,
-    defaultColWidth: sheet.defaultColWidth ?? null,
-    images: sheet.images ?? null,
-    dataVerification: sheet.dataVerification ?? null,
-    hyperlink: sheet.hyperlink ?? null,
-    calcChain: sheet.calcChain ?? null,
-    luckysheet_conditionformat_save: sheet.luckysheet_conditionformat_save ?? null,
-    luckysheet_alternateformat_save: sheet.luckysheet_alternateformat_save ?? null,
-  };
 }
 
 export function ExcelGrid({ workbook, currentSheetIndex, onSheetIndexChange, onSheetDataChange }: Props) {
@@ -89,10 +67,6 @@ export function ExcelGrid({ workbook, currentSheetIndex, onSheetIndexChange, onS
     }, 500);
   }, [workbook, currentSheetIndex, doSave, getSnapshot]);
 
-  /**
-   * onChange: 每次 FortuneSheet 内部数据变更时触发。
-   * 提取 cell 数据 +  sheet 级配置一并保存。
-   */
   const handleChange = useCallback((data: any[]) => {
     if (!workbook || !Array.isArray(data)) return;
     const sheet = workbook.sheets[currentSheetIndex];
@@ -135,14 +109,12 @@ export function ExcelGrid({ workbook, currentSheetIndex, onSheetIndexChange, onS
       );
       const ws = XLSX.utils.aoa_to_sheet(rows);
 
-      // 列宽
       if (s.config?.columnlen) {
         ws["!cols"] = Object.entries(s.config.columnlen as Record<string, number>).map(
           ([, w]) => ({ wch: Math.round(w / 7) || 10 }),
         );
       }
 
-      // 合并单元格
       const mergeRows = s.config?.merge;
       if (mergeRows) {
         ws["!merges"] = Object.values(mergeRows as Record<string, { r: number; c: number; rs: number; cs: number }>).map(
