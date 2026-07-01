@@ -1,6 +1,6 @@
 import { loadModelConfig } from "../config.js";
 import { createOpenAI } from "@ai-sdk/openai";
-import { streamText } from "ai";
+import { isLoopFinished, streamText } from "ai";
 
 const openai = createOpenAI({
   baseURL: loadModelConfig().baseUrl,
@@ -27,6 +27,7 @@ export function streamChat(input: {
     system: input.systemPrompt,
     messages: input.messages,
     tools: input.tools,
+    stopWhen: isLoopFinished(),
     reasoning: "high",
     abortSignal: input.abortSignal,
     onChunk: input.onChunk,

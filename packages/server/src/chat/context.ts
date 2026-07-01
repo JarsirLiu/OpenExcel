@@ -1,5 +1,5 @@
 import * as repo from "./repository.js";
-import { DEFAULT_PROMPT } from "./prompt.js";
+import { withSheetContext } from "./prompt.js";
 
 const MAX_TURNS = 20;
 
@@ -19,6 +19,20 @@ function trim(messages: { role: string; content: string }[]): { role: "user" | "
   return messages.slice(-MAX_TURNS * 2) as any;
 }
 
-export function buildSystemPrompt(): string {
-  return DEFAULT_PROMPT;
+export function buildWorkplaceContext(): Promise<string> {
+  return repo.findWorkbooksWithSheets().then((wbs) => {
+    if (wbs.length === 0) return "当前没有可用的工作簿。";
+    return wbs
+      .map(
+        (wb) =>
+          `工作簿: ${wb.name} (id: ${wb.id})\n${wb.sheets
+            .map((s) => `  - Sheet: ${s.name} (id: ${s.id})`)
+            .join("\n")}`,
+      )
+      .join("\n");
+  });
+}
+
+export function buildSystemPrompt(context: string): string {
+  return withSheetContext(context);
 }

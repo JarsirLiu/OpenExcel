@@ -3,6 +3,7 @@ import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Message as Msg, Session } from "../api/client";
 import { createSession, deleteSession, fetchMessages, fetchSessions, renameSession, streamChat } from "../api/client";
+import { SheetPreview } from "./SheetPreview";
 
 /* ============ Icons ============ */
 const SendIcon = ({ size = 14 }: { size?: number }) => (
@@ -68,6 +69,14 @@ const AIAvatar = () => (
   </div>
 );
 
+interface ToolCallDisplay {
+  id: string;
+  toolName: string;
+  summary: string;
+  status: "running" | "completed";
+  preview?: any;
+}
+
 interface Props {}
 
 function ChatPanel({ sessionId, onRunComplete, onTitleGenerated }: { sessionId: number; onRunComplete?: () => void; onTitleGenerated?: (title: string) => void }) {
@@ -77,24 +86,28 @@ function ChatPanel({ sessionId, onRunComplete, onTitleGenerated }: { sessionId: 
   const [isFocused, setIsFocused] = useState(false);
   const [streamReasoning, setStreamReasoning] = useState("");
   const [streamFinal, setStreamFinal] = useState("");
+  const [streamToolCalls, setStreamToolCalls] = useState<ToolCallDisplay[]>([]);
   const [thinkingOpen, setThinkingOpen] = useState<Record<string, boolean>>({});
   const abortRef = useRef<AbortController | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const streamReasoningRef = useRef("");
   const streamFinalRef = useRef("");
+  const streamToolCallsRef = useRef<ToolCallDisplay[]>([]);
 
   useEffect(() => {
     fetchMessages(sessionId).then(setMessages);
     setDraft("");
     setStreamReasoning("");
     setStreamFinal("");
+    setStreamToolCalls([]);
+    streamToolCallsRef.current = [];
     setIsStreaming(false);
   }, [sessionId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isStreaming, streamReasoning, streamFinal]);
+  }, [messages, isStreaming, streamReasoning, streamFinal, streamToolCalls]);
 
   const handleSend = async (text: string) => {
     const input = text.trim();
@@ -107,8 +120,10 @@ function ChatPanel({ sessionId, onRunComplete, onTitleGenerated }: { sessionId: 
     setIsStreaming(true);
     streamReasoningRef.current = "";
     streamFinalRef.current = "";
+    streamToolCallsRef.current = [];
     setStreamReasoning("");
     setStreamFinal("");
+    setStreamToolCalls([]);
     abortRef.current = new AbortController();
 
     try {
@@ -123,6 +138,31 @@ function ChatPanel({ sessionId, onRunComplete, onTitleGenerated }: { sessionId: 
           if (evt.event === "step.delta" && evt.data.stepType === "final") {
             streamFinalRef.current += evt.data.text ?? "";
             setStreamFinal(streamFinalRef.current);
+          }
+          if (evt.event === "step.started" && evt.data.stepType === "tool_call") {
+            const tc: ToolCallDisplay = {
+              id: `${evt.data.toolName}-${Date.now()}-${Math.random()}`,
+              toolName: evt.data.toolName,
+              summary: JSON.stringify(evt.data.input),
+              status: "running",
+            };
+            streamToolCallsRef.current = [...streamToolCallsRef.current, tc];
+            setStreamToolCalls(streamToolCallsRef.current);
+          }
+          if (evt.event === "step.completed" && evt.data.stepType === "tool_result") {
+            streamToolCallsRef.current = streamToolCallsRef.current.map((t) =>
+              t.toolName === evt.data.toolName && t.status === "running"
+                ? { ...t, status: "completed", preview: evt.data.output?.preview ?? null }
+                : t,
+            );
+            setStreamToolCalls(streamToolCallsRef.current);
+          }
+          if (evt.event === "sheet.changed") {
+            window.dispatchEvent(
+              new CustomEvent("openexcel:sheet-changed", {
+                detail: { sheetId: evt.data.sheetId },
+              }),
+            );
           }
           if (evt.event === "run.completed" || evt.event === "run.failed" || evt.event === "run.aborted") {
             if (evt.event === "run.completed") {
@@ -143,8 +183,10 @@ function ChatPanel({ sessionId, onRunComplete, onTitleGenerated }: { sessionId: 
             setIsStreaming(false);
             setStreamReasoning("");
             setStreamFinal("");
+            setStreamToolCalls([]);
             streamReasoningRef.current = "";
             streamFinalRef.current = "";
+            streamToolCallsRef.current = [];
             abortRef.current = null;
           }
         },
@@ -154,8 +196,10 @@ function ChatPanel({ sessionId, onRunComplete, onTitleGenerated }: { sessionId: 
       setIsStreaming(false);
       setStreamReasoning("");
       setStreamFinal("");
+      setStreamToolCalls([]);
       streamReasoningRef.current = "";
       streamFinalRef.current = "";
+      streamToolCallsRef.current = [];
       abortRef.current = null;
     }
   };
@@ -348,6 +392,47 @@ function ChatPanel({ sessionId, onRunComplete, onTitleGenerated }: { sessionId: 
                   >
                     {streamReasoning}
                   </div>
+                </div>
+              )}
+              {streamToolCalls.length > 0 && (
+                <div style={{ marginBottom: 12, display: "flex", flexDirection: "column", gap: 6 }}>
+                  {streamToolCalls.map((tc) => (
+                    <div key={tc.id}>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          padding: "8px 12px",
+                          background: "#fafbfc",
+                          border: "1px solid #e8ecf0",
+                          borderRadius: 8,
+                          fontSize: 13,
+                          color: "#555",
+                        }}
+                      >
+                        {tc.status === "running" ? (
+                          <span style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid #d0d5dd", borderTopColor: "#3b82f6", animation: "spin 0.6s linear infinite", display: "inline-block", flexShrink: 0 }} />
+                        ) : (
+                          <span style={{ color: "#22c55e", fontSize: 14, flexShrink: 0 }}>✓</span>
+                        )}
+                        <span style={{ fontWeight: 500, color: "#1f1f1f", flexShrink: 0 }}>
+                          {tc.toolName}
+                        </span>
+                        <span style={{ color: "#999", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>
+                          {tc.summary}
+                        </span>
+                        <span style={{ fontSize: 12, color: tc.status === "running" ? "#3b82f6" : "#22c55e", flexShrink: 0 }}>
+                          {tc.status === "running" ? "运行中..." : "已完成"}
+                        </span>
+                      </div>
+                      {tc.status === "completed" && tc.preview?.rows?.length > 0 && (
+                        <div style={{ paddingLeft: 22, marginTop: 4 }}>
+                          <SheetPreview preview={tc.preview} />
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               )}
               {streamFinal ? (

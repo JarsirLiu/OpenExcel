@@ -12,12 +12,13 @@ import type { WorkbookInstance } from "@fortune-sheet/react";
 interface Props {
   workbook: WorkbookFull | null;
   currentSheetIndex: number;
+  revision?: number;
   onSheetIndexChange?: (sheetIndex: number) => void;
   onSheetDataChange?: (sheetId: number, celldata: any[]) => void;
   onWorkbookDelete?: (workbookId: number) => void;
 }
 
-export function ExcelGrid({ workbook, currentSheetIndex, onSheetIndexChange, onSheetDataChange, onWorkbookDelete }: Props) {
+export function ExcelGrid({ workbook, currentSheetIndex, revision, onSheetIndexChange, onSheetDataChange, onWorkbookDelete }: Props) {
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedSnapshotRef = useRef<Record<number, string>>({});
@@ -180,7 +181,7 @@ export function ExcelGrid({ workbook, currentSheetIndex, onSheetIndexChange, onS
       <div style={{ flex: 1, minHeight: 0 }}>
         <Workbook
           ref={workbookRef}
-          key={workbook.name}
+          key={`${workbook.name}-${revision ?? 0}`}
           data={sheetData as any}
           onChange={handleChange}
           showSheetTabs={true}

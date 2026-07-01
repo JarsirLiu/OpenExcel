@@ -80,3 +80,10 @@ export async function findStepsByRun(runId: number) {
     orderBy: { order: "asc" },
   });
 }
+
+export async function findWorkbooksWithSheets() {
+  return prisma.workbook.findMany({
+    orderBy: { order: "asc" },
+    include: { sheets: { select: { id: true, name: true }, orderBy: { order: "asc" } } },
+  });
+}

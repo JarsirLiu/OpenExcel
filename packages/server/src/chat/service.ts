@@ -2,6 +2,7 @@ import * as repo from "./repository.js";
 import * as model from "./model.js";
 import * as context from "./context.js";
 import * as rollout from "./rollout.js";
+import { excelTools } from "./tools/index.js";
 import type { Push } from "./stream.js";
 
 export async function getSessions() {
@@ -53,13 +54,14 @@ export async function chat(
 
   const runs = await repo.findRunsBySession(sessionId);
   const history = context.historyFromRuns(runs);
-  const systemPrompt = context.buildSystemPrompt();
+  const workplaceContext = await context.buildWorkplaceContext();
+  const systemPrompt = context.buildSystemPrompt(workplaceContext);
   const ctx = await rollout.initRun(sessionId, inputText, systemPrompt);
 
   const stream = model.streamChat({
     systemPrompt,
     messages: [...history, { role: "user", content: inputText }],
-    tools: {},
+    tools: excelTools,
     abortSignal,
     onChunk: rollout.onChunk(ctx),
     onFinish: rollout.onFinish(ctx),
@@ -86,6 +88,11 @@ export async function chat(
       }
       if (chunk.type === "tool-result") {
         push("step.completed", { runId: ctx.runId, stepType: "tool_result", toolName: chunk.toolName, input: chunk.input, output: chunk.output });
+
+        const sheetTools = ["writeCells", "mergeCells", "unmergeCells"];
+        if (sheetTools.includes(chunk.toolName) && chunk.input?.sheetId != null) {
+          push("sheet.changed", { sheetId: chunk.input.sheetId });
+        }
         continue;
       }
       if (chunk.type === "text-delta") {

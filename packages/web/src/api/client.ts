@@ -68,7 +68,7 @@ export interface Message {
 }
 
 export interface AgentRunEvent {
-  event: "run.started" | "step.started" | "step.completed" | "step.delta" | "run.completed" | "run.failed" | "run.aborted";
+  event: "run.started" | "step.started" | "step.completed" | "step.delta" | "run.completed" | "run.failed" | "run.aborted" | "sheet.changed";
   data: any;
 }
 

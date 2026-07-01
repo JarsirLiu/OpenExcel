@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useEffect } from "react";
 import { useWorkbench } from "../hooks/useWorkbench";
 import { uploadNewWorkbook, deleteWorkbook, fetchWorkbooks, fetchWorkbook } from "../api/client";
 import { WorkbenchHeader } from "./WorkbenchHeader";
@@ -23,10 +23,30 @@ export function Workbench() {
   } = useWorkbench();
 
   const [currentSheetIndex, setCurrentSheetIndex] = useState(0);
+  const [revision, setRevision] = useState(0);
+
+  useEffect(() => {
+    const handler = async (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!currentWorkbook) return;
+      const hasSheet = currentWorkbook.sheets.some((s) => s.id === detail.sheetId);
+      if (!hasSheet) return;
+      try {
+        const full = await fetchWorkbook(currentWorkbook.id);
+        setCurrentWorkbook(full);
+        setRevision((r) => r + 1);
+      } catch {
+        // ignore
+      }
+    };
+    window.addEventListener("openexcel:sheet-changed", handler);
+    return () => window.removeEventListener("openexcel:sheet-changed", handler);
+  }, [currentWorkbook, setCurrentWorkbook]);
 
   const handleSwitchWorkbook = useCallback(async (index: number) => {
     await switchWorkbook(index);
     setCurrentSheetIndex(0);
+    setRevision(0);
   }, [switchWorkbook]);
 
   const handleUploadFileChange = useCallback(async (file: File) => {
@@ -45,6 +65,7 @@ export function Workbench() {
         const full = await fetchWorkbook(result.id);
         setCurrentWorkbook(full);
         setCurrentSheetIndex(0);
+        setRevision(0);
       }
       setStatus("上传完成");
     } catch {
@@ -66,6 +87,7 @@ export function Workbench() {
       setWorkbookIdx(0);
       setCurrentWorkbook(null);
     }
+    setRevision(0);
     setStatus("已删除");
   }, [setWorkbooks, setWorkbookIdx, setCurrentWorkbook, setStatus]);
 
@@ -87,6 +109,18 @@ export function Workbench() {
       />
 
       <input
+        ref={uploadInputRef}
+        type="file"
+        accept=".xlsx,.xls"
+        style={{ display: "none" }}
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) handleUploadFileChange(f);
+          e.target.value = "";
+        }}
+      />
+
+      <input
         ref={newWbInputRef}
         type="file"
         accept=".xlsx,.xls"
@@ -102,6 +136,7 @@ export function Workbench() {
         <ExcelWorkspace
           workbook={currentWorkbook}
           currentSheetIndex={currentSheetIndex}
+          revision={revision}
           onSheetIndexChange={setCurrentSheetIndex}
           onWorkbookDelete={handleWorkbookDelete}
         />
