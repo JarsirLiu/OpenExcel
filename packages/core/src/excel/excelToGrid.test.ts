@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
 import * as XLSX from "xlsx";
-import { excelToGrid } from "../mapper/excelToGrid.js";
-import { templateToExcel } from "../generator/templateToExcel.js";
-import { matrixToCelldata, celldataToGrid, isCelldata } from "../mapper/celldataUtils.js";
-import { extractSheetConfig, restoreSheetConfig } from "../mapper/sheetConfig.js";
+import { excelToGrid } from "./excelToGrid.js";
+import { templateToExcel } from "../exporter/templateToExcel.js";
+import { matrixToCelldata, celldataToGrid, isCelldata } from "./celldataUtils.js";
+import { extractSheetConfig, restoreSheetConfig } from "./sheetConfig.js";
 import type { Template } from "../types/index.js";
-import type { FortuneSheetData } from "../mapper/sheetConfig.js";
+import type { FortuneSheetData } from "./sheetConfig.js";
 
 describe("excelToGrid", () => {
   function makeWorkbook(sheets: Record<string, string[][]>): XLSX.WorkBook {
@@ -164,6 +164,58 @@ describe("isCelldata", () => {
 
   it("returns false for empty arrays", () => {
     expect(isCelldata([])).toBe(false);
+  });
+});
+
+describe("Excel parsing: all rows, merges, config", () => {
+  it("includes header row (no skip) and merges info", () => {
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet([
+      ["项目", "Q1", "Q2"],
+      ["收入", "100", "200"],
+      ["支出", "50", "80"],
+    ]);
+    ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 2 } }];
+    ws["!cols"] = [{ wch: 12 }, { wch: 10 }, { wch: 10 }];
+    ws["!rows"] = [{ hpt: 30 }];
+    XLSX.utils.book_append_sheet(wb, ws, "数据");
+
+    const buf = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+    const results = excelToGrid(buf, ["数据"]);
+
+    expect(results).toHaveLength(1);
+    // All 3 rows parsed (header not skipped)
+    expect(results[0].celldata.some((c) => c.r === 0 && c.c === 0 && c.v.v === "项目")).toBe(true);
+    expect(results[0].celldata.some((c) => c.r === 1 && c.c === 0 && c.v.v === "收入")).toBe(true);
+    expect(results[0].celldata.some((c) => c.r === 2 && c.c === 2 && c.v.v === "80")).toBe(true);
+
+    expect(results[0].merges).toEqual([{ row: [0, 0], col: [0, 2] }]);
+    expect(results[0].config.columnlen).toBeDefined();
+    expect(results[0].config.rowlen).toBeDefined();
+  });
+
+  it("preserves merge info (mc) on the top-left cell", () => {
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet([["Title", "", ""], ["A", "B", "C"]]);
+    ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 2 } }];
+    XLSX.utils.book_append_sheet(wb, ws, "S1");
+
+    const buf = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+    const results = excelToGrid(buf, ["S1"]);
+    const a1 = results[0].celldata.find((c) => c.r === 0 && c.c === 0);
+
+    expect(a1?.v.mc).toEqual({ r: 0, c: 0, rs: 1, cs: 3 });
+  });
+
+  it("matches by sheet name, returns empty for missing sheets", () => {
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["A"]]), "现有表");
+
+    const results = excelToGrid(wb, ["现有表", "不存在的"]);
+    expect(results[0].celldata.length).toBeGreaterThan(0);
+    expect(results[1].celldata).toEqual([]);
+    expect(results[1].merges).toEqual([]);
+    expect(results[1].config).toEqual({});
   });
 });
 
