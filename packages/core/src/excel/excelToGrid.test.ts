@@ -292,6 +292,33 @@ describe("formatting extraction", () => {
     expect(r.tb).toBe("1");
   });
 
+  it("extracts font aliases used by SheetJS", () => {
+    const cell = {
+      t: "s",
+      v: "加粗",
+      w: "加粗",
+      s: {
+        font: {
+          bold: true,
+          italic: true,
+          strike: true,
+          underline: true,
+        },
+      },
+    };
+    const r = extractCellStyle(cell as any);
+    expect(r.bl).toBe(1);
+    expect(r.it).toBe(1);
+    expect(r.cl).toBe(1);
+    expect(r.un).toBe(1);
+  });
+
+  it("treats centerContinuous as centered alignment", () => {
+    const cell = { t: "s", v: "居中", w: "居中", s: { alignment: { horizontal: "centerContinuous" } } };
+    const r = extractCellStyle(cell as any);
+    expect(r.ht).toBe(1);
+  });
+
   it("strips HTML tags from display text", () => {
     const cell = { t: "s", v: "预计执行订单\n（MW）", h: "预计执行订单<br/>（MW）", w: "预计执行订单\n（MW）" };
     const r = extractCellStyle(cell);

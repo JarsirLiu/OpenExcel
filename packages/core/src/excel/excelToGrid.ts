@@ -73,10 +73,10 @@ export function extractCellStyle(cell: XLSX.CellObject): FortuneCellValue {
 
   const font = cell.s?.font;
   if (font) {
-    if (font.b) v.bl = 1;
-    if (font.i) v.it = 1;
-    if (font.s) v.cl = 1;
-    if (font.u) v.un = 1;
+    if (font.b || (font as any).bold) v.bl = 1;
+    if (font.i || (font as any).italic) v.it = 1;
+    if (font.s || (font as any).strike) v.cl = 1;
+    if (font.u || (font as any).underline) v.un = 1;
     if (font.sz) v.fs = font.sz;
     if (font.name) v.ff = font.name;
     if (font.color?.rgb) v.fc = "#" + font.color.rgb;
@@ -93,6 +93,7 @@ export function extractCellStyle(cell: XLSX.CellObject): FortuneCellValue {
       case "left": v.ht = 0; break;
       case "center": v.ht = 1; break;
       case "right": v.ht = 2; break;
+      case "centerContinuous": v.ht = 1; break;
     }
     switch (align.vertical) {
       case "top": v.vt = 0; break;
