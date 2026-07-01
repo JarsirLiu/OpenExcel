@@ -7,7 +7,7 @@ export async function getSheet(sheetId: number) {
   return deserializeSheet(sheet);
 }
 
-export async function updateSheetData(sheetId: number, celldata: any[][]) {
+export async function updateSheetData(sheetId: number, celldata: any[]) {
   if (!Array.isArray(celldata)) {
     return { error: "Invalid data format" };
   }

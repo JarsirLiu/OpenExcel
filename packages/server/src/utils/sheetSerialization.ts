@@ -6,7 +6,7 @@ export interface SheetJson {
   columns: { label: string; width?: number }[];
   merges: { row: [number, number]; col: [number, number] }[];
   rows: string[][];
-  uploadedData: string[][] | null;
+  uploadedData: any[] | null;
 }
 
 function safeParse<T>(value: string, fallback: T): T {

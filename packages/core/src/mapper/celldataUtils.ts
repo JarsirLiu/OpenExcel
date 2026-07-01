@@ -1,0 +1,57 @@
+export interface FortuneCell {
+  r: number;
+  c: number;
+  v: {
+    v: any;
+    m: string;
+    mc?: { r: number; c: number; rs?: number; cs?: number };
+    bg?: string;
+    fc?: string;
+    fs?: number;
+    bl?: number;
+    it?: number;
+    ht?: number;
+    vt?: number;
+    tb?: string;
+    ct?: { fa?: string; t?: string };
+  };
+}
+
+export function isCelldata(data: any): boolean {
+  return (
+    Array.isArray(data) &&
+    data.length > 0 &&
+    typeof data[0] === "object" &&
+    "r" in data[0] &&
+    "c" in data[0] &&
+    "v" in data[0]
+  );
+}
+
+export function celldataToGrid(celldata: FortuneCell[], columnCount: number): string[][] {
+  const maxRow = Math.max(...celldata.map((c) => c.r), 0);
+  const grid: string[][] = Array.from({ length: maxRow + 1 }, () =>
+    Array(columnCount).fill(""),
+  );
+  for (const cell of celldata) {
+    grid[cell.r][cell.c] = String(cell.v?.v ?? "");
+  }
+  return grid;
+}
+
+export function gridToCelldata(grid: string[][], headerRow?: string[]): FortuneCell[] {
+  const cells: FortuneCell[] = [];
+  if (headerRow) {
+    headerRow.forEach((label, ci) => {
+      cells.push({ r: 0, c: ci, v: { v: label, m: label } });
+    });
+  }
+  const rowOffset = headerRow ? 1 : 0;
+  grid.forEach((row, ri) => {
+    const r = ri + rowOffset;
+    row.forEach((val, ci) => {
+      cells.push({ r, c: ci, v: { v: val, m: String(val) } });
+    });
+  });
+  return cells;
+}

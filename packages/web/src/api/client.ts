@@ -13,7 +13,7 @@ export interface SheetSchema {
   columns: { label: string; width?: number }[];
   merges: { row: [number, number]; col: [number, number] }[];
   rows: string[][];
-  uploadedData: string[][] | null;
+  uploadedData: any[] | null;
 }
 
 export interface WorkbookFull {
@@ -60,7 +60,7 @@ export interface AgentRunEvent {
   data: any;
 }
 
-export async function updateSheetData(sheetId: number, celldata: any[][]): Promise<void> {
+export async function updateSheetData(sheetId: number, celldata: any[]): Promise<void> {
   const res = await fetch(`${BASE}/sheets/${sheetId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },

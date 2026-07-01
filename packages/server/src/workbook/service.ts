@@ -1,5 +1,5 @@
 import * as XLSX from "xlsx";
-import { templateToExcel, excelToGrid } from "@openexcel/core";
+import { templateToExcel, excelToGrid, gridToCelldata } from "@openexcel/core";
 import { prisma } from "../db.js";
 import * as repo from "./repository.js";
 import { deserializeSheet, cloneSheetSchema } from "../utils/sheetSerialization.js";
@@ -21,14 +21,19 @@ export async function getWorkbook(id: number) {
 export async function uploadExcel(workbookId: number, buffer: Buffer) {
   const wbFile = XLSX.read(buffer, { type: "buffer" });
   const sheets = await repo.findSheetsByWorkbook(workbookId);
-  const grid = excelToGrid(wbFile, sheets.map((s) => s.name));
+  const results = excelToGrid(wbFile, sheets.map((s) => s.name));
 
   await prisma.$transaction(async (tx) => {
     for (let i = 0; i < sheets.length; i++) {
-      const sheetData = grid[i] ?? [];
+      const parsed = results[i] ?? { data: [], merges: [] };
+      const columns = JSON.parse(sheets[i].columns) as { label: string }[];
+      const celldata = gridToCelldata(parsed.data, columns.map((c) => c.label));
       await tx.sheet.update({
         where: { id: sheets[i].id },
-        data: { uploadedData: JSON.stringify(sheetData) },
+        data: {
+          uploadedData: JSON.stringify(celldata),
+          merges: JSON.stringify(parsed.merges),
+        },
       });
     }
   });
