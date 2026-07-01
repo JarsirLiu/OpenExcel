@@ -25,7 +25,7 @@ export async function uploadExcel(workbookId: number, buffer: Buffer) {
 
   await prisma.$transaction(async (tx) => {
     for (let i = 0; i < sheets.length; i++) {
-      const parsed = results[i] ?? { data: [], merges: [] };
+      const parsed = results[i] ?? { data: [], merges: [], config: {} };
       const columns = JSON.parse(sheets[i].columns) as { label: string }[];
       const celldata = gridToCelldata(parsed.data, columns.map((c) => c.label));
       await tx.sheet.update({
@@ -33,6 +33,7 @@ export async function uploadExcel(workbookId: number, buffer: Buffer) {
         data: {
           uploadedData: JSON.stringify(celldata),
           merges: JSON.stringify(parsed.merges),
+          config: JSON.stringify(parsed.config ?? {}),
         },
       });
     }

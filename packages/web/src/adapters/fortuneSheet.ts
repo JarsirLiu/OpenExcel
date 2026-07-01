@@ -3,12 +3,31 @@ import type { FortuneCell } from "@openexcel/core";
 
 export type { FortuneCell };
 
+/**
+ * 传给 FortuneSheet 的 sheet 数据。
+ * 扩展支持 config／frozen／filter 等 sheet 级配置。
+ */
 export interface FortuneSheetData {
   id: string;
   name: string;
   celldata: FortuneCell[];
   columnWidths: Record<string, number>;
   merges: { row: [number, number]; col: [number, number] }[];
+  // 以下可选属性从 DB config 还原
+  config?: any;
+  frozen?: any;
+  filter?: Record<string, any>;
+  filter_select?: { row: number[]; column: number[] };
+  zoomRatio?: number;
+  showGridLines?: boolean | number;
+  defaultRowHeight?: number;
+  defaultColWidth?: number;
+  images?: any[];
+  dataVerification?: any;
+  hyperlink?: Record<string, any>;
+  calcChain?: any[];
+  luckysheet_conditionformat_save?: any[];
+  luckysheet_alternateformat_save?: any[];
 }
 
 /**
@@ -39,6 +58,7 @@ export function toFortuneSheetData(
     merges: { row: [number, number]; col: [number, number] }[];
     rows: string[][];
     uploadedData: any[] | null;
+    config: any | null;
   },
 ): FortuneSheetData {
   let celldata: FortuneCell[];
@@ -67,7 +87,7 @@ export function toFortuneSheetData(
     }));
   }
 
-  return {
+  const result: FortuneSheetData = {
     id: String(sheet.id),
     name: sheet.name,
     celldata,
@@ -77,4 +97,25 @@ export function toFortuneSheetData(
     }, {}),
     merges,
   };
+
+  // 还原之前保存的 sheet 级配置
+  if (sheet.config && typeof sheet.config === "object") {
+    const cfg = sheet.config;
+    if (cfg.config != null) result.config = cfg.config;
+    if (cfg.frozen != null) result.frozen = cfg.frozen;
+    if (cfg.filter != null) result.filter = cfg.filter;
+    if (cfg.filter_select != null) result.filter_select = cfg.filter_select;
+    if (cfg.zoomRatio != null) result.zoomRatio = cfg.zoomRatio;
+    if (cfg.showGridLines != null) result.showGridLines = cfg.showGridLines;
+    if (cfg.defaultRowHeight != null) result.defaultRowHeight = cfg.defaultRowHeight;
+    if (cfg.defaultColWidth != null) result.defaultColWidth = cfg.defaultColWidth;
+    if (cfg.images != null) result.images = cfg.images;
+    if (cfg.dataVerification != null) result.dataVerification = cfg.dataVerification;
+    if (cfg.hyperlink != null) result.hyperlink = cfg.hyperlink;
+    if (cfg.calcChain != null) result.calcChain = cfg.calcChain;
+    if (cfg.luckysheet_conditionformat_save != null) result.luckysheet_conditionformat_save = cfg.luckysheet_conditionformat_save;
+    if (cfg.luckysheet_alternateformat_save != null) result.luckysheet_alternateformat_save = cfg.luckysheet_alternateformat_save;
+  }
+
+  return result;
 }

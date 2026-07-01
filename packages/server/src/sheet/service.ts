@@ -7,14 +7,19 @@ export async function getSheet(sheetId: number) {
   return deserializeSheet(sheet);
 }
 
-export async function updateSheetData(sheetId: number, celldata: any[]) {
+export async function updateSheetData(sheetId: number, celldata: any[], config?: any) {
   if (!Array.isArray(celldata)) {
     return { error: "Invalid data format" };
   }
 
+  const data: any = { uploadedData: JSON.stringify(celldata) };
+  if (config !== undefined) {
+    data.config = JSON.stringify(config);
+  }
+
   await prisma.sheet.update({
     where: { id: sheetId },
-    data: { uploadedData: JSON.stringify(celldata) },
+    data,
   });
   return { success: true };
 }

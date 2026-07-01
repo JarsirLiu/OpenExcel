@@ -1,10 +1,12 @@
 import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import { Workbook } from "@fortune-sheet/react";
 import "@fortune-sheet/react/dist/index.css";
+import * as XLSX from "xlsx";
 import { matrixToCelldata } from "@openexcel/core";
 import type { WorkbookFull } from "../api/client";
 import { updateSheetData } from "../api/client";
 import { toFortuneSheetData } from "../adapters/fortuneSheet";
+import type { WorkbookInstance } from "@fortune-sheet/react";
 
 interface Props {
   workbook: WorkbookFull | null;
@@ -13,14 +15,36 @@ interface Props {
   onSheetDataChange?: (sheetId: number, celldata: any[]) => void;
 }
 
+/**
+ * 从 FortuneSheet sheet 对象中提取需要持久化的 sheet 级配置。
+ */
+function extractSheetConfig(sheet: any): any {
+  return {
+    config: sheet.config ?? null,
+    frozen: sheet.frozen ?? null,
+    filter: sheet.filter ?? null,
+    filter_select: sheet.filter_select ?? null,
+    zoomRatio: sheet.zoomRatio ?? null,
+    showGridLines: sheet.showGridLines ?? null,
+    defaultRowHeight: sheet.defaultRowHeight ?? null,
+    defaultColWidth: sheet.defaultColWidth ?? null,
+    images: sheet.images ?? null,
+    dataVerification: sheet.dataVerification ?? null,
+    hyperlink: sheet.hyperlink ?? null,
+    calcChain: sheet.calcChain ?? null,
+    luckysheet_conditionformat_save: sheet.luckysheet_conditionformat_save ?? null,
+    luckysheet_alternateformat_save: sheet.luckysheet_alternateformat_save ?? null,
+  };
+}
+
 export function ExcelGrid({ workbook, currentSheetIndex, onSheetIndexChange, onSheetDataChange }: Props) {
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedSnapshotRef = useRef<Record<number, string>>({});
+  const workbookRef = useRef<WorkbookInstance>(null);
 
-  const getSnapshot = useCallback((celldata: any[]) => {
-    // 保留 mc 等全部属性，不丢失合并信息
-    return JSON.stringify(celldata);
+  const getSnapshot = useCallback((celldata: any[], config: any) => {
+    return JSON.stringify({ celldata, config });
   }, []);
 
   useEffect(() => {
@@ -28,22 +52,23 @@ export function ExcelGrid({ workbook, currentSheetIndex, onSheetIndexChange, onS
 
     const nextSnapshots: Record<number, string> = {};
     workbook.sheets.forEach((sheet) => {
-      nextSnapshots[sheet.id] = getSnapshot(toFortuneSheetData(sheet).celldata);
+      const fd = toFortuneSheetData(sheet);
+      nextSnapshots[sheet.id] = getSnapshot(fd.celldata, extractSheetConfig(fd));
     });
 
     lastSavedSnapshotRef.current = nextSnapshots;
   }, [workbook, getSnapshot]);
 
-  const doSave = useCallback(async (celldata: any[]) => {
+  const doSave = useCallback(async (celldata: any[], config: any) => {
     if (!workbook || !workbook.sheets[currentSheetIndex]) return;
 
     setSaveStatus("saving");
     try {
       const sheet = workbook.sheets[currentSheetIndex];
-      await updateSheetData(sheet.id, celldata);
+      await updateSheetData(sheet.id, celldata, config);
       setSaveStatus("saved");
       onSheetDataChange?.(sheet.id, celldata);
-      lastSavedSnapshotRef.current[sheet.id] = getSnapshot(celldata);
+      lastSavedSnapshotRef.current[sheet.id] = getSnapshot(celldata, config);
       setTimeout(() => setSaveStatus("idle"), 2000);
     } catch (err) {
       setSaveStatus("idle");
@@ -51,22 +76,22 @@ export function ExcelGrid({ workbook, currentSheetIndex, onSheetIndexChange, onS
     }
   }, [workbook, currentSheetIndex, onSheetDataChange, getSnapshot]);
 
-  const trySave = useCallback((celldata: any[]) => {
+  const trySave = useCallback((celldata: any[], config: any) => {
     if (!workbook || !workbook.sheets[currentSheetIndex]) return;
     const sheet = workbook.sheets[currentSheetIndex];
     if (!Array.isArray(celldata)) return;
-    const snapshot = getSnapshot(celldata);
+    const snapshot = getSnapshot(celldata, config);
     if (lastSavedSnapshotRef.current[sheet.id] === snapshot) return;
 
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(() => {
-      doSave(celldata);
+      doSave(celldata, config);
     }, 500);
   }, [workbook, currentSheetIndex, doSave, getSnapshot]);
 
   /**
    * onChange: 每次 FortuneSheet 内部数据变更时触发。
-   * data 是所有 sheet 的完整数据（SheetType[]），从中提取当前 sheet 的 celldata 进行保存。
+   * 提取 cell 数据 +  sheet 级配置一并保存。
    */
   const handleChange = useCallback((data: any[]) => {
     if (!workbook || !Array.isArray(data)) return;
@@ -74,11 +99,12 @@ export function ExcelGrid({ workbook, currentSheetIndex, onSheetIndexChange, onS
     if (!sheet) return;
     const fortuneSheet = data.find((s: any) => String(s.id) === String(sheet.id));
     if (!fortuneSheet) return;
-    // FortuneSheet 内部把 celldata 转成了 2D data 矩阵，需要转回 celldata 格式
+
     const cellMatrix = fortuneSheet.data;
     if (!Array.isArray(cellMatrix)) return;
     const celldata = matrixToCelldata(cellMatrix);
-    trySave(celldata);
+    const config = extractSheetConfig(fortuneSheet);
+    trySave(celldata, config);
   }, [workbook, currentSheetIndex, trySave]);
 
   const sheetData = useMemo(() => {
@@ -94,60 +120,95 @@ export function ExcelGrid({ workbook, currentSheetIndex, onSheetIndexChange, onS
     }
   }, [workbook, onSheetIndexChange]);
 
+  const handleDownload = useCallback(() => {
+    const inst = workbookRef.current;
+    if (!inst) return;
+    const allSheets = inst.getAllSheets();
+    if (!allSheets || allSheets.length === 0) return;
+
+    const wb = XLSX.utils.book_new();
+    for (const s of allSheets as any[]) {
+      const data = s.data;
+      if (!data || !Array.isArray(data)) continue;
+      const rows: any[][] = data.map((row: any[]) =>
+        row.map((cell: any) => (cell != null ? (cell.m !== undefined ? cell.m : cell.v) : "")),
+      );
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+
+      // 列宽
+      if (s.config?.columnlen) {
+        ws["!cols"] = Object.entries(s.config.columnlen as Record<string, number>).map(
+          ([, w]) => ({ wch: Math.round(w / 7) || 10 }),
+        );
+      }
+
+      // 合并单元格
+      const mergeRows = s.config?.merge;
+      if (mergeRows) {
+        ws["!merges"] = Object.values(mergeRows as Record<string, { r: number; c: number; rs: number; cs: number }>).map(
+          (m) => ({ s: { r: m.r, c: m.c }, e: { r: m.r + m.rs - 1, c: m.c + m.cs - 1 } }),
+        );
+      }
+
+      XLSX.utils.book_append_sheet(wb, ws, s.name);
+    }
+
+    const buf = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+    const blob = new Blob([buf], { type: "application/octet-stream" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${workbook?.name ?? "export"}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }, [workbook]);
+
   if (!workbook) return null;
 
   return (
     <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0, position: "relative" }}>
-      <Workbook
-        key={workbook.name}
-        data={sheetData as any}
-        onChange={handleChange}
-        showSheetTabs={true}
-        showToolbar={true}
-        showFormulaBar={false}
-        toolbarItems={[
-          "merge-cell", "|",
-          "bold", "italic", "strike-through", "underline", "|",
-          "font-color", "background", "border", "|",
-          "horizontal-align", "vertical-align", "text-wrap", "|",
-          "clear", "filter", "link", "comment",
-        ]}
-        cellContextMenu={[
-          "copy", "paste", "|",
-          "insert-row", "insert-column",
-          "delete-row", "delete-column", "delete-cell", "|",
-          "clear", "sort", "orderAZ", "orderZA", "filter", "|",
-          "data", "cell-format",
-        ]}
-        // @ts-expect-error allowUpdate is a valid prop but missing from types
-        allowUpdate={true}
-        hooks={{
-          afterActivateSheet: handleActivateSheet,
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          top: 10,
-          right: 10,
-          padding: "4px 8px",
-          borderRadius: 4,
-          fontSize: 12,
-          backgroundColor:
-            saveStatus === "saving"
-              ? "#f0ad4e"
-              : saveStatus === "saved"
-              ? "#5cb85c"
-              : "rgba(0,0,0,0.6)",
-          color: "#fff",
-          pointerEvents: "none",
-        }}
-      >
-        {saveStatus === "saving"
-          ? "保存中..."
-          : saveStatus === "saved"
-          ? "已保存"
-          : ""}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 8px", background: "#f5f5f5", borderBottom: "1px solid #e0e4ea" }}>
+        <span style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{workbook.name}</span>
+        <button
+          onClick={handleDownload}
+          style={{
+            fontSize: 12, padding: "2px 10px", cursor: "pointer",
+            border: "1px solid #ccc", borderRadius: 4, background: "#fff",
+          }}
+        >
+          下载 Excel
+        </button>
+        {saveStatus === "saving" && <span style={{ fontSize: 12, color: "#f0ad4e" }}>保存中...</span>}
+        {saveStatus === "saved" && <span style={{ fontSize: 12, color: "#5cb85c" }}>已保存</span>}
+      </div>
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <Workbook
+          ref={workbookRef}
+          key={workbook.name}
+          data={sheetData as any}
+          onChange={handleChange}
+          showSheetTabs={true}
+          showToolbar={true}
+          showFormulaBar={false}
+          toolbarItems={[
+            "merge-cell", "|",
+            "bold", "italic", "strike-through", "underline", "|",
+            "font-color", "background", "border", "|",
+            "horizontal-align", "vertical-align", "text-wrap", "|",
+            "clear", "filter", "link", "comment",
+          ]}
+          cellContextMenu={[
+            "copy", "paste", "|",
+            "insert-row", "insert-column",
+            "delete-row", "delete-column", "delete-cell", "|",
+            "clear", "sort", "orderAZ", "orderZA", "filter", "|",
+            "data", "cell-format",
+          ]}
+          // @ts-expect-error allowUpdate is a valid prop but missing from types
+          allowUpdate={true}
+          hooks={{
+            afterActivateSheet: handleActivateSheet,
+          }}
+        />
       </div>
     </div>
   );

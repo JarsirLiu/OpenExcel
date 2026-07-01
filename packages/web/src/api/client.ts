@@ -14,6 +14,7 @@ export interface SheetSchema {
   merges: { row: [number, number]; col: [number, number] }[];
   rows: string[][];
   uploadedData: any[] | null;
+  config: any | null;
 }
 
 export interface WorkbookFull {
@@ -60,11 +61,13 @@ export interface AgentRunEvent {
   data: any;
 }
 
-export async function updateSheetData(sheetId: number, celldata: any[]): Promise<void> {
+export async function updateSheetData(sheetId: number, celldata: any[], config?: any): Promise<void> {
+  const body: any = { celldata };
+  if (config !== undefined) body.config = config;
   const res = await fetch(`${BASE}/sheets/${sheetId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ celldata }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error("保存失败");
 }

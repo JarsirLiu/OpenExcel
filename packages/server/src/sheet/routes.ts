@@ -4,9 +4,9 @@ import * as service from "./service.js";
 export async function sheetRoutes(app: FastifyInstance) {
   app.patch<{
     Params: { id: string };
-    Body: { celldata: any[] };
+    Body: { celldata: any[]; config?: any };
   }>("/api/sheets/:id", async (req, reply) => {
-    const result = await service.updateSheetData(Number(req.params.id), req.body.celldata);
+    const result = await service.updateSheetData(Number(req.params.id), req.body.celldata, req.body.config);
     if ("error" in result) return reply.status(400).send(result);
     return result;
   });

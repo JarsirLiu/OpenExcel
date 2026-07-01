@@ -25,6 +25,7 @@ model Sheet {
   merges       String   @default("[]")
   rows         String
   uploadedData String?
+  config       String?
   workbook     Workbook @relation(fields: [workbookId], references: [id], onDelete: Cascade)
   sessions     Session[]
   createdAt    DateTime @default(now())

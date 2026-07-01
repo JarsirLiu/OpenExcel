@@ -7,6 +7,7 @@ export interface SheetJson {
   merges: { row: [number, number]; col: [number, number] }[];
   rows: string[][];
   uploadedData: any[] | null;
+  config: any | null;
 }
 
 function safeParse<T>(value: string, fallback: T): T {
@@ -25,6 +26,7 @@ export function deserializeSheet(sheet: Prisma.SheetGetPayload<{}>): SheetJson {
     merges: safeParse(sheet.merges, []),
     rows: safeParse(sheet.rows, []),
     uploadedData: sheet.uploadedData ? safeParse(sheet.uploadedData, null) : null,
+    config: sheet.config ? safeParse(sheet.config, null) : null,
   };
 }
 

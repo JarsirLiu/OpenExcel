@@ -36,6 +36,7 @@ describe("SheetSchema type", () => {
       merges: [],
       rows: [],
       uploadedData: null,
+      config: null,
     };
     expect(sheet.name).toBe("TestSheet");
     expect(sheet.columns).toHaveLength(2);
