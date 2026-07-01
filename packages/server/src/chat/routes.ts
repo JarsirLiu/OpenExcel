@@ -3,11 +3,11 @@ import * as service from "./service.js";
 import { createPush } from "./stream.js";
 
 export async function chatRoutes(app: FastifyInstance) {
-  app.get("/api/chat/sessions", async () => {
+  app.get("/api/sessions", async () => {
     return service.getSessions();
   });
 
-  app.post("/api/chat/sessions", async (_req, reply) => {
+  app.post("/api/sessions", async (_req, reply) => {
     const session = await service.createSession();
     return reply.status(201).send(session);
   });

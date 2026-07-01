@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import { fetchWorkbooks, fetchWorkbook, uploadExcel, downloadTemplateUrl } from "../api/client";
+import { fetchWorkbooks, fetchWorkbook, uploadExcel } from "../api/client";
 import type { WorkbookFull } from "../api/client";
 
 export function useWorkbench() {
@@ -50,29 +50,13 @@ export function useWorkbench() {
     }
   }, [currentWorkbook]);
 
-  const downloadTemplate = useCallback(() => {
-    if (!currentWorkbook) return;
-    const a = document.createElement("a");
-    a.href = downloadTemplateUrl(currentWorkbook.id);
-    a.download = `${currentWorkbook.name}.xlsx`;
-    a.click();
-  }, [currentWorkbook]);
-
-  const clearData = useCallback(() => {
-    setStatus("");
-  }, []);
-
-  const refreshWorkbook = useCallback(async () => {
-    if (!currentWorkbook) return;
-    const full = await fetchWorkbook(currentWorkbook.id);
-    setCurrentWorkbook(full);
-    return full;
-  }, [currentWorkbook]);
-
   return {
-    workbooks, workbookIdx, switchWorkbook,
-    currentWorkbook, uploadExcel: handleUpload,
-    downloadTemplate, status, clearData, loading,
-    refreshWorkbook,
+    workbooks, setWorkbooks,
+    workbookIdx, setWorkbookIdx,
+    currentWorkbook, setCurrentWorkbook,
+    status, setStatus,
+    loading,
+    switchWorkbook,
+    uploadExcel: handleUpload,
   };
 }

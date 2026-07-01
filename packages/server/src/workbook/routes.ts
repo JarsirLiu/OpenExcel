@@ -25,6 +25,18 @@ export async function workbookRoutes(app: FastifyInstance) {
     },
   );
 
+  app.post(
+    "/api/workbooks/upload",
+    async (req, reply) => {
+      const data = await req.file();
+      if (!data) return reply.status(400).send({ error: "No file uploaded" });
+
+      const buf = await data.toBuffer();
+      const result = await service.uploadAsNewWorkbook(buf, data.filename);
+      return reply.status(201).send(result);
+    },
+  );
+
   app.post<{
     Params: { id: string };
     Body: { name?: string; sourceSheetId?: number };

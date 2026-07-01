@@ -63,7 +63,7 @@ function extractCellStyle(cell: XLSX.CellObject): FortuneCellValue {
   if (cell.v != null) {
     v.v = cell.v;
   }
-  v.m = cell.h ?? (cell.v != null ? String(cell.v) : "");
+  v.m = cell.w ?? (cell.v != null ? String(cell.v) : "");
 
   if (cell.f) v.f = cell.f;
 

@@ -11,11 +11,9 @@ interface Props {
   status: string;
   uploadInputRef: RefObject<HTMLInputElement>;
   onSwitchWorkbook: (index: number) => void;
-  onDownloadTemplate: () => void;
   onUploadClick: () => void;
   onUploadFileChange: (file: File) => void;
-  onCreateSheet: () => void;
-  onDeleteSheet: () => void;
+  onUploadNewWorkbookClick: () => void;
 }
 
 export function WorkbenchHeader({
@@ -24,11 +22,9 @@ export function WorkbenchHeader({
   status,
   uploadInputRef,
   onSwitchWorkbook,
-  onDownloadTemplate,
   onUploadClick,
   onUploadFileChange,
-  onCreateSheet,
-  onDeleteSheet,
+  onUploadNewWorkbookClick,
 }: Props) {
   return (
     <>
@@ -58,10 +54,8 @@ export function WorkbenchHeader({
           ))}
         </div>
         <div style={{ display: "flex", gap: 8, paddingBottom: 6 }}>
-          <button onClick={onDownloadTemplate} style={{ fontSize: 12 }}>下载模板</button>
           <button onClick={onUploadClick} style={{ fontSize: 12 }}>导入数据</button>
-          <button onClick={onCreateSheet} style={{ fontSize: 12 }}>新建 Sheet</button>
-          <button onClick={onDeleteSheet} style={{ fontSize: 12 }}>删除当前 Sheet</button>
+          <button onClick={onUploadNewWorkbookClick} style={{ fontSize: 12 }}>上传 Excel</button>
         </div>
         {status && <span style={{ fontSize: 12, color: status.includes("失败") ? "#d32f2f" : "#2e7d32" }}>{status}</span>}
       </div>

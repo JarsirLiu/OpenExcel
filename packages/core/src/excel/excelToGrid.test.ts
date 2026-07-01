@@ -219,6 +219,22 @@ describe("Excel parsing: all rows, merges, config", () => {
   });
 });
 
+describe("cell display value (v.m) uses plain text", () => {
+  it("uses cell.w (formatted text) over cell.h (HTML rich text)", () => {
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet([["指标"]]);
+    // 模拟富文本：h 含 HTML，w 为纯显示文本
+    ws["A1"] = { t: "s", v: "指标", h: '<span style="font-size:12pt">指标</span>', w: "指标" };
+    XLSX.utils.book_append_sheet(wb, ws, "S1");
+    const buf = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+
+    const results = excelToGrid(buf, ["S1"]);
+    const a1 = results[0].celldata.find((c) => c.r === 0 && c.c === 0);
+    expect(a1?.v.m).toBe("指标");
+    expect(a1?.v.m.includes("<span")).toBe(false);
+  });
+});
+
 describe("extractSheetConfig", () => {
   it("extracts non-null config properties", () => {
     const sheet = {

@@ -1,47 +1,28 @@
 import { useRef, useState, useCallback } from "react";
 import { useWorkbench } from "../hooks/useWorkbench";
-import { createSheet, deleteSheet } from "../api/client";
+import { uploadNewWorkbook, fetchWorkbooks, fetchWorkbook } from "../api/client";
 import { WorkbenchHeader } from "./WorkbenchHeader";
 import { ExcelWorkspace } from "./ExcelWorkspace";
 import { ChatSidebar } from "./ChatSidebar";
 
 export function Workbench() {
   const uploadInputRef = useRef<HTMLInputElement>(null);
+  const newWbInputRef = useRef<HTMLInputElement>(null);
   const {
     workbooks,
     workbookIdx,
     switchWorkbook,
     currentWorkbook,
     uploadExcel,
-    downloadTemplate,
     status,
     loading,
-    refreshWorkbook,
+    setWorkbooks,
+    setCurrentWorkbook,
+    setWorkbookIdx,
+    setStatus,
   } = useWorkbench();
 
   const [currentSheetIndex, setCurrentSheetIndex] = useState(0);
-
-  const handleCreateSheet = useCallback(async () => {
-    if (!currentWorkbook) return;
-    const created = await createSheet(currentWorkbook.id, currentWorkbook.sheets[currentSheetIndex]?.id);
-    const refreshed = await refreshWorkbook();
-    if (refreshed) {
-      const nextIndex = refreshed.sheets.findIndex((sheet) => sheet.id === created.id);
-      setCurrentSheetIndex(nextIndex >= 0 ? nextIndex : refreshed.sheets.length - 1);
-    }
-  }, [currentWorkbook, currentSheetIndex, refreshWorkbook]);
-
-  const handleDeleteSheet = useCallback(async () => {
-    if (!currentWorkbook) return;
-    const currentSheet = currentWorkbook.sheets[currentSheetIndex];
-    if (!currentSheet) return;
-    await deleteSheet(currentSheet.id);
-    const nextIndex = Math.max(0, currentSheetIndex - 1);
-    const refreshed = await refreshWorkbook();
-    if (refreshed) {
-      setCurrentSheetIndex(Math.min(nextIndex, refreshed.sheets.length - 1));
-    }
-  }, [currentWorkbook, currentSheetIndex, refreshWorkbook]);
 
   const handleSwitchWorkbook = useCallback(async (index: number) => {
     await switchWorkbook(index);
@@ -51,6 +32,25 @@ export function Workbench() {
   const handleUploadFileChange = useCallback(async (file: File) => {
     await uploadExcel(file);
   }, [uploadExcel]);
+
+  const handleNewWbFileChange = useCallback(async (file: File) => {
+    setStatus("上传中...");
+    try {
+      const result = await uploadNewWorkbook(file);
+      const list = await fetchWorkbooks();
+      setWorkbooks(Array.isArray(list) ? list : []);
+      const idx = (Array.isArray(list) ? list : []).findIndex((w) => w.id === result.id);
+      if (idx >= 0) {
+        setWorkbookIdx(idx);
+        const full = await fetchWorkbook(result.id);
+        setCurrentWorkbook(full);
+        setCurrentSheetIndex(0);
+      }
+      setStatus("上传完成");
+    } catch {
+      setStatus("上传失败");
+    }
+  }, [setWorkbooks, setWorkbookIdx, setCurrentWorkbook, setStatus]);
 
   if (loading) {
     return <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "#666" }}>加载中...</div>;
@@ -64,11 +64,21 @@ export function Workbench() {
         status={status}
         uploadInputRef={uploadInputRef}
         onSwitchWorkbook={handleSwitchWorkbook}
-        onDownloadTemplate={downloadTemplate}
         onUploadClick={() => uploadInputRef.current?.click()}
         onUploadFileChange={handleUploadFileChange}
-        onCreateSheet={handleCreateSheet}
-        onDeleteSheet={handleDeleteSheet}
+        onUploadNewWorkbookClick={() => newWbInputRef.current?.click()}
+      />
+
+      <input
+        ref={newWbInputRef}
+        type="file"
+        accept=".xlsx,.xls"
+        style={{ display: "none" }}
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) handleNewWbFileChange(f);
+          e.target.value = "";
+        }}
       />
 
       <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>

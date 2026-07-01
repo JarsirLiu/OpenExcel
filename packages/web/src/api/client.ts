@@ -45,6 +45,17 @@ export async function uploadExcel(workbookId: number, file: File): Promise<void>
   if (!res.ok) throw new Error("上传失败");
 }
 
+export async function uploadNewWorkbook(file: File): Promise<{ id: number; name: string; sheets: number }> {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(`${BASE}/workbooks/upload`, {
+    method: "POST",
+    body: form,
+  });
+  if (!res.ok) throw new Error("上传工作簿失败");
+  return res.json();
+}
+
 export function downloadTemplateUrl(workbookId: number): string {
   return `${BASE}/workbooks/${workbookId}/template`;
 }
@@ -97,13 +108,13 @@ export interface Session {
 }
 
 export async function fetchSessions(): Promise<Session[]> {
-  const res = await fetch(`${BASE}/chat/sessions`);
+  const res = await fetch(`${BASE}/sessions`);
   if (!res.ok) throw new Error("加载会话失败");
   return res.json();
 }
 
 export async function createSession(): Promise<Session> {
-  const res = await fetch(`${BASE}/chat/sessions`, { method: "POST" });
+  const res = await fetch(`${BASE}/sessions`, { method: "POST" });
   if (!res.ok) throw new Error("创建会话失败");
   return res.json();
 }

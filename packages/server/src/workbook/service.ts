@@ -40,6 +40,37 @@ export async function uploadExcel(workbookId: number, buffer: Buffer) {
   return sheets.length;
 }
 
+export async function uploadAsNewWorkbook(buffer: Buffer, fileName: string) {
+  const wbFile = XLSX.read(buffer, { type: "buffer" });
+  const sheetNames = wbFile.SheetNames;
+  const results = excelToGrid(wbFile, sheetNames);
+  const wbName = fileName.replace(/\.[^.]+$/, "");
+
+  return prisma.$transaction(async (tx) => {
+    const wb = await tx.workbook.create({
+      data: { name: wbName, order: 0 },
+    });
+
+    for (let i = 0; i < sheetNames.length; i++) {
+      const parsed = results[i] ?? { celldata: [], merges: [], config: {} };
+      await tx.sheet.create({
+        data: {
+          workbookId: wb.id,
+          name: sheetNames[i],
+          order: i,
+          columns: JSON.stringify([]),
+          merges: JSON.stringify(parsed.merges),
+          rows: JSON.stringify([]),
+          uploadedData: JSON.stringify(parsed.celldata),
+          config: JSON.stringify(parsed.config ?? {}),
+        },
+      });
+    }
+
+    return { id: wb.id, name: wbName, sheets: sheetNames.length };
+  });
+}
+
 export async function exportTemplate(id: number) {
   const wb = await repo.findWorkbookWithSheets(id);
   if (!wb) return null;
