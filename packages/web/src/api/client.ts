@@ -93,6 +93,11 @@ export async function createSheet(workbookId: number, sourceSheetId?: number): P
   return res.json();
 }
 
+export async function deleteWorkbook(id: number): Promise<void> {
+  const res = await fetch(`${BASE}/workbooks/${id}`, { method: "DELETE" });
+  if (!res.ok) throw new Error("删除工作簿失败");
+}
+
 export async function deleteSheet(sheetId: number): Promise<void> {
   const res = await fetch(`${BASE}/sheets/${sheetId}`, {
     method: "DELETE",

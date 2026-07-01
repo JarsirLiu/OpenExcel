@@ -57,7 +57,7 @@ function extractSheetConfig(ws: XLSX.WorkSheet): Record<string, any> {
   return config;
 }
 
-function extractCellStyle(cell: XLSX.CellObject): FortuneCellValue {
+export function extractCellStyle(cell: XLSX.CellObject): FortuneCellValue {
   const v: FortuneCellValue = { v: null!, m: "" };
 
   if (cell.v != null) {
@@ -102,8 +102,49 @@ function extractCellStyle(cell: XLSX.CellObject): FortuneCellValue {
     if (align.wrapText) v.tb = "1";
   }
 
+  const border = cell.s?.border;
+  if (border) {
+    const bd: FortuneCellValue["bd"] = {};
+    const mapSide = (
+      side: "top" | "bottom" | "left" | "right",
+      key: "t" | "b" | "l" | "r",
+    ) => {
+      const b = border[side];
+      if (!b) return;
+      const s = BORDER_STYLE_MAP[b.style ?? "none"];
+      if (s === 0) return;
+      const c = b.color?.rgb ? "#" + b.color.rgb : undefined;
+      (bd as any)[key] = { s, c };
+    };
+    mapSide("top", "t");
+    mapSide("bottom", "b");
+    mapSide("left", "l");
+    mapSide("right", "r");
+    if (Object.keys(bd).length > 0) {
+      v.bd = bd;
+    }
+  }
+
   return v;
 }
+
+/** SheetJS 边框样式 → FortuneSheet 数值码 */
+const BORDER_STYLE_MAP: Record<string, number> = {
+  none: 0,
+  thin: 1,
+  medium: 2,
+  thick: 3,
+  double: 4,
+  hair: 5,
+  dashed: 6,
+  dotted: 7,
+  dashDot: 8,
+  mediumDashed: 9,
+  mediumDotted: 10,
+  mediumDashDot: 11,
+  dashDotDot: 12,
+  slantDashDot: 13,
+};
 
 /**
  * 将 SheetJS worksheet 完整转换为 celldata 格式，保留所有 cell 属性。

@@ -50,6 +50,10 @@ export async function deleteSheet(id: number) {
   return prisma.sheet.delete({ where: { id } });
 }
 
+export async function deleteWorkbook(id: number) {
+  return prisma.workbook.delete({ where: { id } });
+}
+
 export async function reindexSheetOrder(workbookId: number) {
   const sheets = await prisma.sheet.findMany({
     where: { workbookId },

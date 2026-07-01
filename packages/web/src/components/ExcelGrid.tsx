@@ -4,7 +4,8 @@ import "@fortune-sheet/react/dist/index.css";
 import * as XLSX from "xlsx";
 import { matrixToCelldata, extractSheetConfig } from "@openexcel/core";
 import type { WorkbookFull } from "../api/client";
-import { updateSheetData } from "../api/client";
+import { updateSheetData, deleteWorkbook } from "../api/client";
+import { confirm } from "./ConfirmDialog";
 import { toFortuneSheetData } from "../adapters/fortuneSheet";
 import type { WorkbookInstance } from "@fortune-sheet/react";
 
@@ -13,9 +14,10 @@ interface Props {
   currentSheetIndex: number;
   onSheetIndexChange?: (sheetIndex: number) => void;
   onSheetDataChange?: (sheetId: number, celldata: any[]) => void;
+  onWorkbookDelete?: (workbookId: number) => void;
 }
 
-export function ExcelGrid({ workbook, currentSheetIndex, onSheetIndexChange, onSheetDataChange }: Props) {
+export function ExcelGrid({ workbook, currentSheetIndex, onSheetIndexChange, onSheetDataChange, onWorkbookDelete }: Props) {
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedSnapshotRef = useRef<Record<number, string>>({});
@@ -134,6 +136,19 @@ export function ExcelGrid({ workbook, currentSheetIndex, onSheetIndexChange, onS
     URL.revokeObjectURL(a.href);
   }, [workbook]);
 
+  const handleDeleteWorkbook = useCallback(async () => {
+    if (!workbook) return;
+    const ok = await confirm({
+      title: "删除 Excel",
+      message: `确认删除「${workbook.name}」？此操作不可恢复。`,
+      confirmText: "删除",
+      cancelText: "取消",
+    });
+    if (!ok) return;
+    await deleteWorkbook(workbook.id);
+    onWorkbookDelete?.(workbook.id);
+  }, [workbook, onWorkbookDelete]);
+
   if (!workbook) return null;
 
   return (
@@ -148,6 +163,16 @@ export function ExcelGrid({ workbook, currentSheetIndex, onSheetIndexChange, onS
           }}
         >
           下载 Excel
+        </button>
+        <button
+          onClick={handleDeleteWorkbook}
+          style={{
+            fontSize: 12, padding: "2px 10px", cursor: "pointer",
+            border: "1px solid #ccc", borderRadius: 4, background: "#fff",
+            color: "#d32f2f",
+          }}
+        >
+          删除 Excel
         </button>
         {saveStatus === "saving" && <span style={{ fontSize: 12, color: "#f0ad4e" }}>保存中...</span>}
         {saveStatus === "saved" && <span style={{ fontSize: 12, color: "#5cb85c" }}>已保存</span>}

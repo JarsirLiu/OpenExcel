@@ -1,5 +1,6 @@
 import { prisma } from "../db.js";
 import { deserializeSheet } from "../utils/sheetSerialization.js";
+import * as repo from "../workbook/repository.js";
 
 export async function getSheet(sheetId: number) {
   const sheet = await prisma.sheet.findUnique({ where: { id: sheetId } });
@@ -22,4 +23,19 @@ export async function updateSheetData(sheetId: number, celldata: any[], config?:
     data,
   });
   return { success: true };
+}
+
+export async function deleteSheet(sheetId: number) {
+  const sheet = await repo.findSheetWithWorkbook(sheetId);
+  if (!sheet) return { error: "Sheet not found" };
+  if (sheet.workbook.sheets.length <= 1) {
+    return { error: "Workbook must keep at least one sheet" };
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.sheet.delete({ where: { id: sheetId } });
+    await repo.reindexSheetOrder(sheet.workbookId);
+  });
+
+  return { success: true, workbookId: sheet.workbookId };
 }

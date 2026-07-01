@@ -1,6 +1,6 @@
 import { useRef, useState, useCallback } from "react";
 import { useWorkbench } from "../hooks/useWorkbench";
-import { uploadNewWorkbook, fetchWorkbooks, fetchWorkbook } from "../api/client";
+import { uploadNewWorkbook, deleteWorkbook, fetchWorkbooks, fetchWorkbook } from "../api/client";
 import { WorkbenchHeader } from "./WorkbenchHeader";
 import { ExcelWorkspace } from "./ExcelWorkspace";
 import { ChatSidebar } from "./ChatSidebar";
@@ -52,6 +52,23 @@ export function Workbench() {
     }
   }, [setWorkbooks, setWorkbookIdx, setCurrentWorkbook, setStatus]);
 
+  const handleWorkbookDelete = useCallback(async (_workbookId: number) => {
+    const list = await fetchWorkbooks();
+    setWorkbooks(Array.isArray(list) ? list : []);
+    const remaining = (Array.isArray(list) ? list : []).filter((w) => w.id !== _workbookId);
+    if (remaining.length > 0) {
+      const newIdx = 0;
+      setWorkbookIdx(newIdx);
+      const full = await fetchWorkbook(remaining[0].id);
+      setCurrentWorkbook(full);
+      setCurrentSheetIndex(0);
+    } else {
+      setWorkbookIdx(0);
+      setCurrentWorkbook(null);
+    }
+    setStatus("已删除");
+  }, [setWorkbooks, setWorkbookIdx, setCurrentWorkbook, setStatus]);
+
   if (loading) {
     return <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "#666" }}>加载中...</div>;
   }
@@ -86,6 +103,7 @@ export function Workbench() {
           workbook={currentWorkbook}
           currentSheetIndex={currentSheetIndex}
           onSheetIndexChange={setCurrentSheetIndex}
+          onWorkbookDelete={handleWorkbookDelete}
         />
         <ChatSidebar />
       </div>

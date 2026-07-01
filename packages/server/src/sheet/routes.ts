@@ -16,4 +16,10 @@ export async function sheetRoutes(app: FastifyInstance) {
     if (!sheet) return reply.status(404).send({ error: "Sheet not found" });
     return sheet;
   });
+
+  app.delete<{ Params: { id: string } }>("/api/sheets/:id", async (req, reply) => {
+    const result = await service.deleteSheet(Number(req.params.id));
+    if ("error" in result) return reply.status(404).send(result);
+    return result;
+  });
 }

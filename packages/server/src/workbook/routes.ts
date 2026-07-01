@@ -50,8 +50,8 @@ export async function workbookRoutes(app: FastifyInstance) {
     return reply.status(201).send(result);
   });
 
-  app.delete<{ Params: { id: string } }>("/api/sheets/:id", async (req, reply) => {
-    const result = await service.deleteSheet(Number(req.params.id));
+  app.delete<{ Params: { id: string } }>("/api/workbooks/:id", async (req, reply) => {
+    const result = await service.deleteWorkbook(Number(req.params.id));
     if ("error" in result) return reply.status(404).send(result);
     return result;
   });

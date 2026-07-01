@@ -21,6 +21,12 @@ export interface FortuneCellValue {
   vt?: number;
   tb?: string;
   ct?: { fa?: string; t?: string };
+  bd?: {
+    t?: { s: number; c?: string };
+    b?: { s: number; c?: string };
+    l?: { s: number; c?: string };
+    r?: { s: number; c?: string };
+  };
 }
 
 export function isCelldata(data: any): data is FortuneCell[] {

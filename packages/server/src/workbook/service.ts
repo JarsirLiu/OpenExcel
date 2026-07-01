@@ -19,7 +19,7 @@ export async function getWorkbook(id: number) {
 }
 
 export async function uploadExcel(workbookId: number, buffer: Buffer) {
-  const wbFile = XLSX.read(buffer, { type: "buffer" });
+  const wbFile = XLSX.read(buffer, { type: "buffer", cellStyles: true, cellFormula: true, cellNF: true });
   const sheets = await repo.findSheetsByWorkbook(workbookId);
   const results = excelToGrid(wbFile, sheets.map((s) => s.name));
 
@@ -41,14 +41,17 @@ export async function uploadExcel(workbookId: number, buffer: Buffer) {
 }
 
 export async function uploadAsNewWorkbook(buffer: Buffer, fileName: string) {
-  const wbFile = XLSX.read(buffer, { type: "buffer" });
+  const wbFile = XLSX.read(buffer, { type: "buffer", cellStyles: true, cellFormula: true, cellNF: true });
   const sheetNames = wbFile.SheetNames;
   const results = excelToGrid(wbFile, sheetNames);
   const wbName = fileName.replace(/\.[^.]+$/, "");
 
   return prisma.$transaction(async (tx) => {
+    // 新工作簿放在末尾
+    const maxOrder = await tx.workbook.aggregate({ _max: { order: true } });
+    const nextOrder = (maxOrder._max.order ?? -1) + 1;
     const wb = await tx.workbook.create({
-      data: { name: wbName, order: 0 },
+      data: { name: wbName, order: nextOrder },
     });
 
     for (let i = 0; i < sheetNames.length; i++) {
@@ -116,17 +119,10 @@ export async function createSheet(workbookId: number, name?: string, sourceSheet
   return { id: sheet.id, name: sheet.name, order: sheet.order };
 }
 
-export async function deleteSheet(sheetId: number) {
-  const sheet = await repo.findSheetWithWorkbook(sheetId);
-  if (!sheet) return { error: "Sheet not found" };
-  if (sheet.workbook.sheets.length <= 1) {
-    return { error: "Workbook must keep at least one sheet" };
-  }
+export async function deleteWorkbook(id: number) {
+  const wb = await repo.findWorkbookWithSheets(id);
+  if (!wb) return { error: "Workbook not found" };
 
-  await prisma.$transaction(async (tx) => {
-    await tx.sheet.delete({ where: { id: sheetId } });
-    await repo.reindexSheetOrder(sheet.workbookId);
-  });
-
-  return { success: true, workbookId: sheet.workbookId };
+  await repo.deleteWorkbook(id);
+  return { success: true };
 }

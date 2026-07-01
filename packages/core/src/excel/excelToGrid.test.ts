@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import * as XLSX from "xlsx";
-import { excelToGrid } from "./excelToGrid.js";
+import { excelToGrid, extractCellStyle } from "./excelToGrid.js";
 import { templateToExcel } from "../exporter/templateToExcel.js";
 import { matrixToCelldata, celldataToGrid, isCelldata } from "./celldataUtils.js";
 import { extractSheetConfig, restoreSheetConfig } from "./sheetConfig.js";
@@ -232,6 +232,71 @@ describe("cell display value (v.m) uses plain text", () => {
     const a1 = results[0].celldata.find((c) => c.r === 0 && c.c === 0);
     expect(a1?.v.m).toBe("指标");
     expect(a1?.v.m.includes("<span")).toBe(false);
+  });
+});
+
+describe("border extraction", () => {
+  it("extracts border styles and colors from cell styles", () => {
+    // 直接测 extractCellStyle 逻辑（SheetJS write→read 会丢 .s.border，
+    // 但真实 Excel 上传时边框完整保留）
+    const mockCell: XLSX.CellObject = {
+      t: "s",
+      v: "A1",
+      h: "A1",
+      s: {
+        border: {
+          top: { style: "thin", color: { rgb: "FF0000" } },
+          bottom: { style: "medium", color: { rgb: "0000FF" } },
+          left: { style: "thick", color: { rgb: "00FF00" } },
+          right: { style: "dashed", color: { rgb: "FFFF00" } },
+        },
+      },
+    };
+
+    // 通过 excelToGrid 的解析路径：用 XLSX 读一个带样式的文件
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet([["A1"]]);
+    // 设置样式后写入再读取
+    ws["A1"].s = mockCell.s;
+    XLSX.utils.book_append_sheet(wb, ws, "S1");
+    const buf = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+
+    // 直接验证 extractCellStyle 的映射逻辑
+    const result = extractCellStyle(mockCell);
+    expect(result.bd).toEqual({
+      t: { s: 1, c: "#FF0000" },
+      b: { s: 2, c: "#0000FF" },
+      l: { s: 3, c: "#00FF00" },
+      r: { s: 6, c: "#FFFF00" },
+    });
+  });
+
+  it("skips cells without borders", () => {
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet([["A1"]]);
+    XLSX.utils.book_append_sheet(wb, ws, "S1");
+    const buf = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+
+    const results = excelToGrid(buf, ["S1"]);
+    const a1 = results[0].celldata.find((c) => c.r === 0 && c.c === 0);
+    expect(a1?.v.bd).toBeUndefined();
+  });
+});
+
+describe("formatting extraction", () => {
+  it("extracts alignment from cell styles", () => {
+    const cell = { t: "s", v: "居中", w: "居中", s: { alignment: { horizontal: "center", vertical: "center", wrapText: true } } };
+    const r = extractCellStyle(cell);
+    expect(r.ht).toBe(1);
+    expect(r.vt).toBe(1);
+    expect(r.tb).toBe("1");
+  });
+
+  it("strips HTML tags from display text", () => {
+    const cell = { t: "s", v: "预计执行订单\n（MW）", h: "预计执行订单<br/>（MW）", w: "预计执行订单\n（MW）" };
+    const r = extractCellStyle(cell);
+    expect(r.m).toBe("预计执行订单\n（MW）");
+    expect(r.m.includes("<br")).toBe(false);
   });
 });
 
