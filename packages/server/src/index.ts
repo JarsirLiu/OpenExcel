@@ -5,7 +5,14 @@ import { workbookRoutes } from "./workbook/routes.js";
 import { sheetRoutes } from "./sheet/routes.js";
 import { chatRoutes } from "./chat/routes.js";
 
-const app = Fastify({ logger: true });
+const app = Fastify({
+  logger: {
+    transport: {
+      target: "pino-pretty",
+      options: { colorize: true, translateTime: "HH:MM:ss.l", ignore: "pid,hostname" },
+    },
+  },
+});
 
 await app.register(cors, { origin: true });
 await app.register(multipart);
