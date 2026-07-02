@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useEffect } from "react";
 import type { SheetChangeDelta } from "@openexcel/core";
 import { useWorkbench } from "../hooks/useWorkbench";
 import { uploadNewWorkbook, deleteWorkbook, fetchWorkbooks, fetchWorkbook } from "../api/client";
@@ -26,12 +26,29 @@ export function Workbench() {
     setStatus,
   } = useWorkbench();
 
-  const [currentSheetIndex, setCurrentSheetIndex] = useState(0);
+const [currentSheetIndex, setCurrentSheetIndex] = useState(0);
   const [revision, setRevision] = useState(0);
   const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
   const [importPreview, setImportPreview] = useState<Awaited<ReturnType<typeof buildWorkbookImportPreview>> | null>(null);
   const [importSheetIndex, setImportSheetIndex] = useState(0);
   const [importing, setImporting] = useState(false);
+  const [allSheets, setAllSheets] = useState<{ workbookId: number; workbookName: string; id: number; name: string }[]>([]);
+
+  useEffect(() => {
+    if (workbooks.length === 0) { setAllSheets([]); return; }
+    Promise.all(workbooks.map((wb) => fetchWorkbook(wb.id))).then((fullList) => {
+      setAllSheets(
+        fullList.flatMap((wb) =>
+          wb.sheets.map((s) => ({
+            workbookId: wb.id,
+            workbookName: wb.name,
+            id: s.id,
+            name: s.name,
+          })),
+        ),
+      );
+    });
+  }, [workbooks]);
 
   const handleSheetChanged = useCallback(async (sheetId: number, delta: SheetChangeDelta | null) => {
     if (!currentWorkbook) return;
@@ -206,7 +223,7 @@ export function Workbench() {
         <ChatSidebar
           onSheetChanged={handleSheetChanged}
           onUndoComplete={handleWorkbookRefresh}
-          sheets={currentWorkbook?.sheets ?? []}
+          sheets={allSheets}
         />
       </div>
 

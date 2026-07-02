@@ -64,7 +64,7 @@ function ChatPanel({
   onRunComplete?: () => void;
   onSheetChanged?: (sheetId: number, delta: SheetChangeDelta | null) => void;
   onStreamingChange?: (isStreaming: boolean) => void;
-  sheets: { id: number; name: string }[];
+  sheets: { workbookId: number; workbookName: string; id: number; name: string }[];
 }) {
   const [thinkingOpen, setThinkingOpen] = useState<Record<string, boolean>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -392,7 +392,7 @@ export function ChatInterface({
 }: {
   onSheetChanged?: (sheetId: number, delta: SheetChangeDelta | null) => void;
   onUndoComplete?: () => void;
-  sheets: { id: number; name: string }[];
+  sheets: { workbookId: number; workbookName: string; id: number; name: string }[];
 }) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<number | null>(null);

@@ -8,7 +8,7 @@ export function ChatSidebar({
 }: {
   onSheetChanged?: (sheetId: number, delta: SheetChangeDelta | null) => void;
   onUndoComplete?: () => void;
-  sheets: { id: number; name: string }[];
+  sheets: { workbookId: number; workbookName: string; id: number; name: string }[];
 }) {
   return (
     <div style={{ width: 360, flexShrink: 0, minWidth: 0, overflow: "hidden" }}>

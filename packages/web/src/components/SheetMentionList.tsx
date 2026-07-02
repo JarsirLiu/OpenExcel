@@ -1,18 +1,24 @@
-import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { ReactRenderer } from "@tiptap/react";
 import type { SuggestionKeyDownProps, SuggestionProps } from "@tiptap/suggestion";
 
-type SheetItem = { id: string; label: string };
+type SheetItem = { id: string; label: string; workbookName: string };
 
 export const MentionList = forwardRef<
   { onKeyDown: (event: KeyboardEvent) => boolean },
   { items: SheetItem[]; command: (item: SheetItem) => void }
 >((props, ref) => {
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setSelectedIndex(0);
   }, [props.items]);
+
+  useEffect(() => {
+    const el = listRef.current?.children[selectedIndex] as HTMLElement | undefined;
+    el?.scrollIntoView({ block: "nearest" });
+  }, [selectedIndex]);
 
   const select = (index: number) => {
     const item = props.items[index];
@@ -41,7 +47,7 @@ export const MentionList = forwardRef<
   }));
 
   return (
-    <div style={{
+    <div ref={listRef} style={{
       background: "#fff", border: "1px solid #e0e0e0", borderRadius: 8,
       boxShadow: "0 4px 12px rgba(0,0,0,0.1)", overflow: "hidden", minWidth: 160,
       maxHeight: 200, overflowY: "auto",
@@ -60,7 +66,7 @@ export const MentionList = forwardRef<
             }}
           >
             <span style={{ fontWeight: 500 }}>{item.label}</span>
-            <span style={{ marginLeft: 8, fontSize: 11, color: "#999" }}>Sheet</span>
+            <span style={{ marginLeft: 6, fontSize: 11, color: "#999" }}>{item.workbookName}</span>
           </div>
         ))
       )}
@@ -69,11 +75,12 @@ export const MentionList = forwardRef<
 });
 
 export function createMentionSuggestion(
-  sheets: { id: number; name: string }[],
+  sheets: { workbookId: number; workbookName: string; id: number; name: string }[],
 ) {
   const items: SheetItem[] = sheets.map((s) => ({
     id: `sheet:${s.id}`,
     label: s.name,
+    workbookName: s.workbookName,
   }));
 
   return {
