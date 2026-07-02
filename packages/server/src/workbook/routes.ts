@@ -15,25 +15,47 @@ export async function workbookRoutes(app: FastifyInstance) {
   app.post<{ Params: { id: string } }>(
     "/api/workbooks/:id/upload",
     async (req, reply) => {
-      const workbookId = Number(req.params.id);
-      const data = await req.file();
-      if (!data) return reply.status(400).send({ error: "No file uploaded" });
+      try {
+        const workbookId = Number(req.params.id);
+        const data = await req.file();
+        if (!data) return reply.status(400).send({ error: "No file uploaded" });
 
-      const buf = await data.toBuffer();
-      const count = await service.uploadExcel(workbookId, buf);
-      return { success: true, sheets: count };
+        const buf = await data.toBuffer();
+        const count = await service.uploadExcel(workbookId, buf);
+        return { success: true, sheets: count };
+      } catch (error) {
+        if (error instanceof service.WorkbookUploadError) {
+          return reply.status(error.statusCode).send({
+            error: error.message,
+            code: error.code,
+            details: error.details,
+          });
+        }
+        throw error;
+      }
     },
   );
 
   app.post(
     "/api/workbooks/upload",
     async (req, reply) => {
-      const data = await req.file();
-      if (!data) return reply.status(400).send({ error: "No file uploaded" });
+      try {
+        const data = await req.file();
+        if (!data) return reply.status(400).send({ error: "No file uploaded" });
 
-      const buf = await data.toBuffer();
-      const result = await service.uploadAsNewWorkbook(buf, data.filename);
-      return reply.status(201).send(result);
+        const buf = await data.toBuffer();
+        const result = await service.uploadAsNewWorkbook(buf, data.filename);
+        return reply.status(201).send(result);
+      } catch (error) {
+        if (error instanceof service.WorkbookUploadError) {
+          return reply.status(error.statusCode).send({
+            error: error.message,
+            code: error.code,
+            details: error.details,
+          });
+        }
+        throw error;
+      }
     },
   );
 

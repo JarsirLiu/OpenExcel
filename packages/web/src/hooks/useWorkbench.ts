@@ -39,14 +39,15 @@ export function useWorkbench() {
 
   const handleUpload = useCallback(async (file: File) => {
     if (!currentWorkbook) return;
-    setStatus("解析中...");
+    setStatus("导入中...");
     try {
       await uploadExcel(currentWorkbook.id, file);
       const refreshed = await fetchWorkbook(currentWorkbook.id);
       setCurrentWorkbook(refreshed);
-      setStatus("解析完成");
-    } catch {
-      setStatus("上传失败");
+      setStatus("导入完成");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "导入失败";
+      setStatus(`导入失败：${message}`);
     }
   }, [currentWorkbook]);
 

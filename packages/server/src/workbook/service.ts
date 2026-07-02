@@ -9,6 +9,115 @@ function bufferToArrayBuffer(buffer: Buffer): ArrayBuffer | SharedArrayBuffer {
   return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
 }
 
+export type WorkbookUploadErrorCode =
+  | "INVALID_EXCEL_FILE"
+  | "WORKBOOK_NOT_FOUND"
+  | "EMPTY_WORKBOOK"
+  | "SHEET_COUNT_MISMATCH"
+  | "SHEET_NAME_MISMATCH"
+  | "DUPLICATE_SHEET_NAMES";
+
+export class WorkbookUploadError extends Error {
+  statusCode: number;
+  code: WorkbookUploadErrorCode;
+  details?: Record<string, unknown>;
+
+  constructor(
+    message: string,
+    code: WorkbookUploadErrorCode,
+    statusCode = 400,
+    details?: Record<string, unknown>,
+  ) {
+    super(message);
+    this.name = "WorkbookUploadError";
+    this.code = code;
+    this.statusCode = statusCode;
+    this.details = details;
+  }
+}
+
+function readWorkbookOrThrow(buffer: Buffer) {
+  try {
+    return XLSX.read(buffer, { type: "buffer", cellStyles: true, cellFormula: true, cellNF: true });
+  } catch (error) {
+    throw new WorkbookUploadError(
+      "无法解析上传的 Excel 文件，请确认文件格式有效",
+      "INVALID_EXCEL_FILE",
+      400,
+      { cause: error instanceof Error ? error.message : String(error) },
+    );
+  }
+}
+
+function findDuplicateSheetNames(names: string[]) {
+  const counts = new Map<string, number>();
+  for (const name of names) {
+    counts.set(name, (counts.get(name) ?? 0) + 1);
+  }
+  return [...counts.entries()].filter(([, count]) => count > 1).map(([name]) => name);
+}
+
+export function validateWorkbookSheetAlignment(expectedSheetNames: string[], uploadedSheetNames: string[]) {
+  const expectedDuplicates = findDuplicateSheetNames(expectedSheetNames);
+  if (expectedDuplicates.length > 0) {
+    throw new WorkbookUploadError(
+      "当前工作簿存在重复的 Sheet 名称，无法安全导入",
+      "DUPLICATE_SHEET_NAMES",
+      400,
+      { duplicateSheetNames: expectedDuplicates },
+    );
+  }
+
+  const uploadedDuplicates = findDuplicateSheetNames(uploadedSheetNames);
+  if (uploadedDuplicates.length > 0) {
+    throw new WorkbookUploadError(
+      "上传文件存在重复的 Sheet 名称，无法安全导入",
+      "DUPLICATE_SHEET_NAMES",
+      400,
+      { duplicateSheetNames: uploadedDuplicates },
+    );
+  }
+
+  if (expectedSheetNames.length === 0) {
+    throw new WorkbookUploadError(
+      "当前工作簿没有可导入的 Sheet",
+      "EMPTY_WORKBOOK",
+      400,
+    );
+  }
+
+  if (expectedSheetNames.length !== uploadedSheetNames.length) {
+    throw new WorkbookUploadError(
+      "上传文件的 Sheet 数量与当前工作簿不一致，已拒绝导入",
+      "SHEET_COUNT_MISMATCH",
+      400,
+      {
+        expectedSheetNames,
+        uploadedSheetNames,
+      },
+    );
+  }
+
+  const expectedSet = new Set(expectedSheetNames);
+  const uploadedSet = new Set(uploadedSheetNames);
+  const missingSheetNames = expectedSheetNames.filter((name) => !uploadedSet.has(name));
+  const extraSheetNames = uploadedSheetNames.filter((name) => !expectedSet.has(name));
+
+  if (missingSheetNames.length > 0 || extraSheetNames.length > 0) {
+    throw new WorkbookUploadError(
+      "上传文件的 Sheet 名称与当前工作簿不一致，已拒绝导入",
+      "SHEET_NAME_MISMATCH",
+      400,
+      {
+        expectedSheetNames,
+        uploadedSheetNames,
+        missingSheetNames,
+        extraSheetNames,
+      },
+    );
+  }
+}
+
 export async function getWorkbooks() {
   return repo.findWorkbooks();
 }
@@ -24,14 +133,39 @@ export async function getWorkbook(id: number) {
 }
 
 export async function uploadExcel(workbookId: number, buffer: Buffer) {
-  const sheets = await repo.findSheetsByWorkbook(workbookId);
-  const results = excelToGrid(bufferToArrayBuffer(buffer), sheets.map((s) => s.name));
+  const workbook = await repo.findWorkbookWithSheets(workbookId);
+  if (!workbook) {
+    throw new WorkbookUploadError("当前工作簿不存在", "WORKBOOK_NOT_FOUND", 404);
+  }
+
+  const sheets = workbook.sheets;
+  const uploadedWorkbook = readWorkbookOrThrow(buffer);
+  const uploadedSheetNames = uploadedWorkbook.SheetNames;
+  const expectedSheetNames = sheets.map((s) => s.name);
+
+  validateWorkbookSheetAlignment(expectedSheetNames, uploadedSheetNames);
+
+  const results = excelToGrid(bufferToArrayBuffer(buffer), uploadedSheetNames);
+  const resultBySheetName = new Map(
+    uploadedSheetNames.map((name, index) => [name, results[index] ?? { celldata: [], merges: [], config: {} }]),
+  );
 
   await prisma.$transaction(async (tx) => {
-    for (let i = 0; i < sheets.length; i++) {
-      const parsed = results[i] ?? { celldata: [], merges: [], config: {} };
+    for (const sheet of sheets) {
+      const parsed = resultBySheetName.get(sheet.name);
+      if (!parsed) {
+        throw new WorkbookUploadError(
+          `无法在上传文件中找到 Sheet「${sheet.name}」`,
+          "SHEET_NAME_MISMATCH",
+          400,
+          {
+            expectedSheetNames,
+            uploadedSheetNames,
+          },
+        );
+      }
       await tx.sheet.update({
-        where: { id: sheets[i].id },
+        where: { id: sheet.id },
         data: {
           uploadedData: JSON.stringify(parsed.celldata),
           merges: JSON.stringify(parsed.merges),
@@ -45,7 +179,7 @@ export async function uploadExcel(workbookId: number, buffer: Buffer) {
 }
 
 export async function uploadAsNewWorkbook(buffer: Buffer, fileName: string) {
-  const wbFile = XLSX.read(buffer, { type: "buffer", cellStyles: true, cellFormula: true, cellNF: true });
+  const wbFile = readWorkbookOrThrow(buffer);
   const sheetNames = wbFile.SheetNames;
   const results = excelToGrid(bufferToArrayBuffer(buffer), sheetNames);
   const wbName = fileName.replace(/\.[^.]+$/, "");

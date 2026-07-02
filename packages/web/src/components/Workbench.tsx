@@ -86,8 +86,9 @@ export function Workbench() {
         setRevision(0);
       }
       setStatus("上传完成");
-    } catch {
-      setStatus("上传失败");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "上传失败";
+      setStatus(`上传失败：${message}`);
     }
   }, [setWorkbooks, setWorkbookIdx, setCurrentWorkbook, setStatus]);
 

@@ -1,5 +1,25 @@
 const BASE = "/api";
 
+type ApiErrorResponse = {
+  error?: unknown;
+};
+
+function isApiErrorResponse(value: unknown): value is ApiErrorResponse {
+  return typeof value === "object" && value !== null && "error" in value;
+}
+
+async function readErrorMessage(res: Response, fallback: string): Promise<string> {
+  try {
+    const data: unknown = await res.json();
+    if (isApiErrorResponse(data) && typeof data.error === "string") {
+      return data.error;
+    }
+  } catch {
+    // ignore parse failures and fall back to the generic message
+  }
+  return fallback;
+}
+
 export interface WorkbookMeta {
   id: number;
   name: string;
@@ -41,7 +61,7 @@ export async function uploadExcel(workbookId: number, file: File): Promise<void>
     method: "POST",
     body: form,
   });
-  if (!res.ok) throw new Error("上传失败");
+  if (!res.ok) throw new Error(await readErrorMessage(res, "导入失败"));
 }
 
 export async function uploadNewWorkbook(file: File): Promise<{ id: number; name: string; sheets: number }> {
@@ -51,7 +71,7 @@ export async function uploadNewWorkbook(file: File): Promise<{ id: number; name:
     method: "POST",
     body: form,
   });
-  if (!res.ok) throw new Error("上传工作簿失败");
+  if (!res.ok) throw new Error(await readErrorMessage(res, "上传工作簿失败"));
   return res.json();
 }
 
