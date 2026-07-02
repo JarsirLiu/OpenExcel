@@ -1,6 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import { ReactRenderer } from "@tiptap/react";
-import type { SuggestionOptions, SuggestionProps } from "@tiptap/suggestion";
+import type { SuggestionKeyDownProps, SuggestionProps } from "@tiptap/suggestion";
 
 type SheetItem = { id: string; label: string };
 
@@ -70,7 +70,7 @@ export const MentionList = forwardRef<
 
 export function createMentionSuggestion(
   sheets: { id: number; name: string }[],
-): Partial<SuggestionOptions> {
+) {
   const items: SheetItem[] = sheets.map((s) => ({
     id: `sheet:${s.id}`,
     label: s.name,
@@ -78,7 +78,7 @@ export function createMentionSuggestion(
 
   return {
     char: "@",
-    items: ({ query }) =>
+    items: ({ query }: { query: string }) =>
       items.filter((item) =>
         item.label.toLowerCase().includes(query.toLowerCase()),
       ),
@@ -107,7 +107,7 @@ export function createMentionSuggestion(
             },
           });
         },
-        onKeyDown: (props) => {
+        onKeyDown: (props: SuggestionKeyDownProps) => {
           if (props.event.key === "Escape") {
             unmount?.();
             return true;
