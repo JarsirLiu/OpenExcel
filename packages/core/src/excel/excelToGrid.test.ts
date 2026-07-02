@@ -1,20 +1,22 @@
 import { describe, it, expect } from "vitest";
 import * as XLSX from "xlsx";
+import { unzipSync } from "fflate";
 import { excelToGrid, extractCellStyle } from "./excelToGrid.js";
 import { templateToExcel } from "../exporter/templateToExcel.js";
+import { celldataToExcel } from "../exporter/celldataToExcel.js";
 import { matrixToCelldata, celldataToGrid, isCelldata } from "./celldataUtils.js";
 import { extractSheetConfig, restoreSheetConfig } from "./sheetConfig.js";
 import type { Template } from "../types/index.js";
 import type { FortuneSheetData } from "./sheetConfig.js";
 
 describe("excelToGrid", () => {
-  function makeWorkbook(sheets: Record<string, string[][]>): XLSX.WorkBook {
+  function makeWorkbook(sheets: Record<string, string[][]>): ArrayBuffer {
     const wb = XLSX.utils.book_new();
     for (const [name, rows] of Object.entries(sheets)) {
       const ws = XLSX.utils.aoa_to_sheet(rows);
       XLSX.utils.book_append_sheet(wb, ws, name);
     }
-    return wb;
+    return XLSX.write(wb, { type: "array", bookType: "xlsx" });
   }
 
   it("returns celldata for matching sheets with all rows", () => {
@@ -104,6 +106,105 @@ describe("templateToExcel", () => {
     const ab = templateToExcel(template);
     const wb = XLSX.read(ab, { type: "array" });
     expect(wb.SheetNames).toEqual(["SheetA", "SheetB"]);
+  });
+});
+
+describe("celldataToExcel", () => {
+  it("preserves cell styles, merges, and dimensions when exporting", () => {
+    const ab = celldataToExcel([
+      {
+        name: "Styled",
+        celldata: [
+          {
+            r: 0,
+            c: 0,
+            v: {
+              v: "标题",
+              m: "标题",
+              bl: 1,
+              it: 1,
+              fc: "#112233",
+              bg: "#FFEEDD",
+              fs: 16,
+              ff: "Arial",
+              ht: 1,
+              vt: 1,
+              tb: "1",
+              ct: { fa: "0.00" },
+              bd: { t: { s: 1, c: "#000000" } },
+              mc: { r: 0, c: 0, rs: 1, cs: 2 },
+            },
+          },
+          { r: 1, c: 1, v: { v: 42, m: "42" } },
+        ],
+        config: {
+          columnlen: { 0: 140, 1: 80 },
+          rowlen: { 0: 28 },
+          merge: {
+            A1: { r: 0, c: 0, rs: 1, cs: 2 },
+          },
+        },
+      },
+    ]);
+
+    const wb = XLSX.read(ab, { type: "array", cellStyles: true, cellFormula: true, cellNF: true });
+    const zip = unzipSync(new Uint8Array(ab));
+    const decoder = new TextDecoder();
+    const stylesXml = decoder.decode(zip["xl/styles.xml"]);
+    const sheetXml = decoder.decode(zip["xl/worksheets/sheet1.xml"]);
+    const ws = wb.Sheets.Styled;
+
+    expect(wb.SheetNames).toEqual(["Styled"]);
+    expect(ws["A1"]?.v).toBe("标题");
+    expect(ws["A1"]?.f).toBeUndefined();
+    expect(stylesXml).toContain("<b/>");
+    expect(stylesXml).toContain("<i/>");
+    expect(stylesXml).toContain("112233");
+    expect(stylesXml).toContain("FFEEDD");
+    expect(sheetXml).toContain('s="3"');
+    expect(ws["!merges"]).toEqual([{ s: { r: 0, c: 0 }, e: { r: 0, c: 1 } }]);
+    expect(ws["!cols"]?.[0]?.wch).toBeDefined();
+    expect(ws["!rows"]?.[0]?.hpt).toBe(28);
+  });
+
+  it("round-trips common styles through export and import", () => {
+    const source = [
+      {
+        name: "Styled",
+        celldata: [
+          {
+            r: 0,
+            c: 0,
+            v: {
+              v: "标题",
+              m: "标题",
+              bg: "#FFEEDD",
+              fc: "#112233",
+              un: 1,
+              cl: 1,
+              it: 1,
+              bl: 1,
+              ht: 1,
+              vt: 1,
+            },
+          },
+        ],
+      },
+    ];
+
+    const ab = celldataToExcel(source);
+    const results = excelToGrid(ab, ["Styled"]);
+    const cell = results[0].celldata.find((c) => c.r === 0 && c.c === 0);
+
+    expect(cell?.v.v).toBe("标题");
+    expect(cell?.v.bg).toBe("#FFEEDD");
+    expect(cell?.v.fc).toBe("#112233");
+    expect(cell?.v.un).toBe(1);
+    expect(cell?.v.cl).toBe(1);
+    expect(cell?.v.it).toBe(1);
+    expect(cell?.v.bl).toBe(1);
+    expect(cell?.v.ht).toBe(1);
+    expect(cell?.v.vt).toBe(1);
   });
 });
 
@@ -211,7 +312,8 @@ describe("Excel parsing: all rows, merges, config", () => {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["A"]]), "现有表");
 
-    const results = excelToGrid(wb, ["现有表", "不存在的"]);
+    const buf = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+    const results = excelToGrid(buf, ["现有表", "不存在的"]);
     expect(results[0].celldata.length).toBeGreaterThan(0);
     expect(results[1].celldata).toEqual([]);
     expect(results[1].merges).toEqual([]);

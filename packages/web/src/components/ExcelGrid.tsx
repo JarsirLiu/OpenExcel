@@ -1,8 +1,7 @@
 import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import { Workbook } from "@fortune-sheet/react";
 import "@fortune-sheet/react/dist/index.css";
-import * as XLSX from "xlsx";
-import { matrixToCelldata, extractSheetConfig } from "@openexcel/core";
+import { celldataToExcel, extractSheetConfig, matrixToCelldata } from "@openexcel/core";
 import type { WorkbookFull } from "../api/client";
 import { updateSheetData, deleteWorkbook } from "../api/client";
 import { confirm } from "./ConfirmDialog";
@@ -103,32 +102,15 @@ export function ExcelGrid({ workbook, currentSheetIndex, revision, onSheetIndexC
     const allSheets = inst.getAllSheets();
     if (!allSheets || allSheets.length === 0) return;
 
-    const wb = XLSX.utils.book_new();
-    for (const s of allSheets as any[]) {
-      const data = s.data;
-      if (!data || !Array.isArray(data)) continue;
-      const rows: any[][] = data.map((row: any[]) =>
-        row.map((cell: any) => (cell != null ? (cell.m !== undefined ? cell.m : cell.v) : "")),
-      );
-      const ws = XLSX.utils.aoa_to_sheet(rows);
-
-      if (s.config?.columnlen) {
-        ws["!cols"] = Object.entries(s.config.columnlen as Record<string, number>).map(
-          ([, w]) => ({ wch: Math.round(w / 7) || 10 }),
-        );
-      }
-
-      const mergeRows = s.config?.merge;
-      if (mergeRows) {
-        ws["!merges"] = Object.values(mergeRows as Record<string, { r: number; c: number; rs: number; cs: number }>).map(
-          (m) => ({ s: { r: m.r, c: m.c }, e: { r: m.r + m.rs - 1, c: m.c + m.cs - 1 } }),
-        );
-      }
-
-      XLSX.utils.book_append_sheet(wb, ws, s.name);
-    }
-
-    const buf = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+    const buf = celldataToExcel(
+      (allSheets as any[]).map((sheet) => ({
+        name: sheet.name,
+        celldata: matrixToCelldata(sheet.data ?? []),
+        config: extractSheetConfig(sheet),
+        columnWidths: sheet.columnWidths ?? null,
+        rowHeights: sheet.rowlen ?? sheet.rowHeights ?? null,
+      })),
+    );
     const blob = new Blob([buf], { type: "application/octet-stream" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);

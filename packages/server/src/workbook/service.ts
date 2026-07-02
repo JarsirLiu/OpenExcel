@@ -1,9 +1,13 @@
 import * as XLSX from "xlsx";
-import { templateToExcel, excelToGrid, gridToCelldata } from "@openexcel/core";
+import { celldataToExcel, excelToGrid, gridToCelldata } from "@openexcel/core";
 import { prisma } from "../db.js";
 import * as repo from "./repository.js";
 import { deserializeSheet } from "../utils/sheetSerialization.js";
-import { celldataToGridShape, sheetRecordToCelldata } from "../utils/sheetData.js";
+import { sheetRecordToCelldata } from "../utils/sheetData.js";
+
+function bufferToArrayBuffer(buffer: Buffer): ArrayBuffer | SharedArrayBuffer {
+  return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+}
 
 export async function getWorkbooks() {
   return repo.findWorkbooks();
@@ -20,9 +24,8 @@ export async function getWorkbook(id: number) {
 }
 
 export async function uploadExcel(workbookId: number, buffer: Buffer) {
-  const wbFile = XLSX.read(buffer, { type: "buffer", cellStyles: true, cellFormula: true, cellNF: true });
   const sheets = await repo.findSheetsByWorkbook(workbookId);
-  const results = excelToGrid(wbFile, sheets.map((s) => s.name));
+  const results = excelToGrid(bufferToArrayBuffer(buffer), sheets.map((s) => s.name));
 
   await prisma.$transaction(async (tx) => {
     for (let i = 0; i < sheets.length; i++) {
@@ -44,11 +47,10 @@ export async function uploadExcel(workbookId: number, buffer: Buffer) {
 export async function uploadAsNewWorkbook(buffer: Buffer, fileName: string) {
   const wbFile = XLSX.read(buffer, { type: "buffer", cellStyles: true, cellFormula: true, cellNF: true });
   const sheetNames = wbFile.SheetNames;
-  const results = excelToGrid(wbFile, sheetNames);
+  const results = excelToGrid(bufferToArrayBuffer(buffer), sheetNames);
   const wbName = fileName.replace(/\.[^.]+$/, "");
 
   return prisma.$transaction(async (tx) => {
-    // 新工作簿放在末尾
     const maxOrder = await tx.workbook.aggregate({ _max: { order: true } });
     const nextOrder = (maxOrder._max.order ?? -1) + 1;
     const wb = await tx.workbook.create({
@@ -78,26 +80,27 @@ export async function exportTemplate(id: number) {
   const wb = await repo.findWorkbookWithSheets(id);
   if (!wb) return null;
 
-  const sheets = wb.sheets.map((s) => ({
-    name: s.name,
-    columns: (() => {
-      const grid = celldataToGridShape(sheetRecordToCelldata(s));
-      const headerRow = grid[0] ?? [];
-      const storedColumns = JSON.parse(s.columns) as { label: string; width?: number }[];
-      const hasHeaderValues = headerRow.some((label) => label.length > 0);
-      return (hasHeaderValues ? headerRow : storedColumns.map((column) => column.label)).map((label, index) => ({
-        label,
-        width: storedColumns[index]?.width,
-      }));
-    })(),
-    rows: (() => {
-      const grid = celldataToGridShape(sheetRecordToCelldata(s));
-      return grid.length > 1 ? grid.slice(1) : [];
-    })(),
-    merges: JSON.parse(s.merges),
-  }));
+  const sheets = wb.sheets.map((s) => {
+    const parsed = deserializeSheet(s);
+    const celldata = sheetRecordToCelldata(s);
+    const fallbackRows = celldata.length > 0
+      ? undefined
+      : [parsed.columns.map((column) => column.label)];
+    const columnWidths = parsed.columns.reduce((acc: Record<string, number>, column, index) => {
+      if (column.width != null) acc[index] = column.width;
+      return acc;
+    }, {});
 
-  const ab = templateToExcel({ id: "export", name: wb.name, groups: [], sheets });
+    return {
+      name: s.name,
+      celldata,
+      config: parsed.config,
+      columnWidths,
+      fallbackRows,
+    };
+  });
+
+  const ab = celldataToExcel(sheets);
   return Buffer.from(ab);
 }
 

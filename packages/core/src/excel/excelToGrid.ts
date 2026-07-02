@@ -1,6 +1,7 @@
-import * as XLSX from "xlsx";
+import XLSX from "xlsx-js-style";
 import type { Template, MergeDef } from "../types/index.js";
 import type { FortuneCell, FortuneCellValue } from "./celldataUtils.js";
+import { parseWorkbookStyleMaps } from "./xlsxStyleParser.js";
 
 export interface SheetParseResult {
   celldata: FortuneCell[];
@@ -8,11 +9,8 @@ export interface SheetParseResult {
   config: Record<string, any>;
 }
 
-function getWorkbook(file: ArrayBuffer | XLSX.WorkBook): XLSX.WorkBook {
-  if (file instanceof ArrayBuffer || file instanceof SharedArrayBuffer) {
-    return XLSX.read(file, { type: "array", cellStyles: true, cellFormula: true, cellNF: true });
-  }
-  return file;
+function getWorkbook(file: ArrayBuffer | SharedArrayBuffer): XLSX.WorkBook {
+  return XLSX.read(file, { type: "array", cellStyles: true, cellFormula: true, cellNF: true });
 }
 
 function extractMerges(ws: XLSX.WorkSheet): MergeDef[] {
@@ -21,6 +19,14 @@ function extractMerges(ws: XLSX.WorkSheet): MergeDef[] {
     row: [m.s.r, m.e.r] as [number, number],
     col: [m.s.c, m.e.c] as [number, number],
   }));
+}
+
+function normalizeHexColor(color: string): string {
+  const hex = color.startsWith("#") ? color.slice(1) : color;
+  if (hex.length === 8 && hex.startsWith("FF")) {
+    return `#${hex.slice(2)}`;
+  }
+  return `#${hex}`;
 }
 
 function extractSheetConfig(ws: XLSX.WorkSheet): Record<string, any> {
@@ -79,12 +85,12 @@ export function extractCellStyle(cell: XLSX.CellObject): FortuneCellValue {
     if (font.u || (font as any).underline) v.un = 1;
     if (font.sz) v.fs = font.sz;
     if (font.name) v.ff = font.name;
-    if (font.color?.rgb) v.fc = "#" + font.color.rgb;
+    if (font.color?.rgb) v.fc = normalizeHexColor(font.color.rgb);
   }
 
   const fill = cell.s?.fill;
   if (fill?.fgColor?.rgb) {
-    v.bg = "#" + fill.fgColor.rgb;
+    v.bg = normalizeHexColor(fill.fgColor.rgb);
   }
 
   const align = cell.s?.alignment;
@@ -114,7 +120,7 @@ export function extractCellStyle(cell: XLSX.CellObject): FortuneCellValue {
       if (!b) return;
       const s = BORDER_STYLE_MAP[b.style ?? "none"];
       if (s === 0) return;
-      const c = b.color?.rgb ? "#" + b.color.rgb : undefined;
+      const c = b.color?.rgb ? normalizeHexColor(b.color.rgb) : undefined;
       (bd as any)[key] = { s, c };
     };
     mapSide("top", "t");
@@ -150,7 +156,11 @@ const BORDER_STYLE_MAP: Record<string, number> = {
 /**
  * 将 SheetJS worksheet 完整转换为 celldata 格式，保留所有 cell 属性。
  */
-function worksheetToCelldata(ws: XLSX.WorkSheet, merges: MergeDef[]): FortuneCell[] {
+function worksheetToCelldata(
+  ws: XLSX.WorkSheet,
+  merges: MergeDef[],
+  styleLookup?: Map<string, Record<string, any>>,
+): FortuneCell[] {
   const celldata: FortuneCell[] = [];
   const ref = (ws as any)["!ref"];
   if (!ref) return celldata;
@@ -170,7 +180,8 @@ function worksheetToCelldata(ws: XLSX.WorkSheet, merges: MergeDef[]): FortuneCel
       const cell = ws[cellRef];
       if (!cell) continue;
 
-      const v = extractCellStyle(cell);
+      const parsedStyle = styleLookup?.get(cellRef);
+      const v = extractCellStyle(parsedStyle ? { ...cell, s: parsedStyle } : cell);
 
       const mc = mergeMap.get(`${row},${col}`);
       if (mc) v.mc = mc;
@@ -198,12 +209,22 @@ function worksheetToCelldata(ws: XLSX.WorkSheet, merges: MergeDef[]): FortuneCel
  * 保留所有行（包括标题行），保留所有 cell 样式。
  */
 export function excelToGrid(
-  file: ArrayBuffer | XLSX.WorkBook,
+  file: ArrayBuffer | SharedArrayBuffer,
   sheets: string[] | Template,
 ): SheetParseResult[] {
   const wb = getWorkbook(file);
   const sheetNames = Array.isArray(sheets) ? sheets : sheets.sheets.map((s) => s.name);
   const result: SheetParseResult[] = [];
+  const styleMapBySheetName = new Map<string, Map<string, Record<string, any>>>();
+  if (file instanceof ArrayBuffer || file instanceof SharedArrayBuffer) {
+    const parsedStyleMaps = parseWorkbookStyleMaps(file);
+    wb.SheetNames.forEach((sheetName, index) => {
+      const styleMap = parsedStyleMaps[index];
+      if (styleMap) {
+        styleMapBySheetName.set(sheetName, styleMap);
+      }
+    });
+  }
 
   for (const name of sheetNames) {
     const ws = wb.Sheets[name];
@@ -212,7 +233,7 @@ export function excelToGrid(
       continue;
     }
     const merges = extractMerges(ws);
-    const celldata = worksheetToCelldata(ws, merges);
+    const celldata = worksheetToCelldata(ws, merges, styleMapBySheetName.get(name));
     const config = extractSheetConfig(ws);
     result.push({ celldata, merges, config });
   }
