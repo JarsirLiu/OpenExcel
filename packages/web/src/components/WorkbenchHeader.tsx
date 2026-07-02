@@ -1,5 +1,3 @@
-import type { RefObject } from "react";
-
 type WorkbookTab = {
   id: number;
   name: string;
@@ -9,10 +7,8 @@ interface Props {
   workbooks: WorkbookTab[];
   activeWorkbookIdx: number;
   status: string;
-  uploadInputRef: RefObject<HTMLInputElement>;
   onSwitchWorkbook: (index: number) => void;
   onUploadClick: () => void;
-  onUploadFileChange: (file: File) => void;
   onUploadNewWorkbookClick: () => void;
 }
 
@@ -20,10 +16,8 @@ export function WorkbenchHeader({
   workbooks,
   activeWorkbookIdx,
   status,
-  uploadInputRef,
   onSwitchWorkbook,
   onUploadClick,
-  onUploadFileChange,
   onUploadNewWorkbookClick,
 }: Props) {
   return (
@@ -59,18 +53,6 @@ export function WorkbenchHeader({
         </div>
         {status && <span style={{ fontSize: 12, color: status.includes("失败") ? "#d32f2f" : "#2e7d32" }}>{status}</span>}
       </div>
-
-      <input
-        ref={uploadInputRef}
-        type="file"
-        accept=".xlsx,.xls"
-        style={{ display: "none" }}
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) onUploadFileChange(f);
-          e.target.value = "";
-        }}
-      />
     </>
   );
 }

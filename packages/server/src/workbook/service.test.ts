@@ -1,46 +1,31 @@
 import { describe, expect, it } from "vitest";
-import { WorkbookUploadError, validateWorkbookSheetAlignment } from "./service.js";
+import { WorkbookUploadError, resolveWorkbookImportTargets } from "./service.js";
 
-describe("validateWorkbookSheetAlignment", () => {
-  it("accepts the same sheet names even if the uploaded order differs", () => {
-    expect(() => validateWorkbookSheetAlignment(["A", "B", "C"], ["C", "A", "B"])).not.toThrow();
+describe("resolveWorkbookImportTargets", () => {
+  it("matches sheets by exact name and preserves workbook order", () => {
+    const result = resolveWorkbookImportTargets(["A", "B", "C"], ["C", "A", "B"]);
+
+    expect(result.matchedSheetNames).toEqual(["A", "B", "C"]);
+    expect(result.skippedCurrentSheetNames).toEqual([]);
+    expect(result.ignoredUploadedSheetNames).toEqual([]);
   });
 
-  it("rejects when the uploaded workbook is missing a sheet", () => {
-    expect(() => validateWorkbookSheetAlignment(["A", "B"], ["A"])).toThrow(WorkbookUploadError);
+  it("reports missing and extra sheets without blocking import", () => {
+    const result = resolveWorkbookImportTargets(["A", "B"], ["A", "C"]);
 
-    try {
-      validateWorkbookSheetAlignment(["A", "B"], ["A"]);
-    } catch (error) {
-      expect(error).toBeInstanceOf(WorkbookUploadError);
-      expect((error as WorkbookUploadError).code).toBe("SHEET_COUNT_MISMATCH");
-      expect((error as WorkbookUploadError).details).toEqual({
-        expectedSheetNames: ["A", "B"],
-        uploadedSheetNames: ["A"],
-      });
-    }
+    expect(result.matchedSheetNames).toEqual(["A"]);
+    expect(result.skippedCurrentSheetNames).toEqual(["B"]);
+    expect(result.ignoredUploadedSheetNames).toEqual(["C"]);
   });
+});
 
-  it("rejects when sheet names do not match", () => {
-    try {
-      validateWorkbookSheetAlignment(["A", "B"], ["A", "C"]);
-      throw new Error("expected validation to fail");
-    } catch (error) {
-      expect(error).toBeInstanceOf(WorkbookUploadError);
-      expect((error as WorkbookUploadError).code).toBe("SHEET_NAME_MISMATCH");
-    }
-  });
+describe("WorkbookUploadError", () => {
+  it("stores code, status and details", () => {
+    const err = new WorkbookUploadError("bad file", "INVALID_EXCEL_FILE", 400, { reason: "broken" });
 
-  it("rejects duplicated sheet names in the uploaded workbook", () => {
-    try {
-      validateWorkbookSheetAlignment(["A", "B"], ["A", "A"]);
-      throw new Error("expected validation to fail");
-    } catch (error) {
-      expect(error).toBeInstanceOf(WorkbookUploadError);
-      expect((error as WorkbookUploadError).code).toBe("DUPLICATE_SHEET_NAMES");
-      expect((error as WorkbookUploadError).details).toEqual({
-        duplicateSheetNames: ["A"],
-      });
-    }
+    expect(err).toBeInstanceOf(Error);
+    expect(err.code).toBe("INVALID_EXCEL_FILE");
+    expect(err.statusCode).toBe(400);
+    expect(err.details).toEqual({ reason: "broken" });
   });
 });

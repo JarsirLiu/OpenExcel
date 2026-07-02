@@ -41,10 +41,12 @@ export function useWorkbench() {
     if (!currentWorkbook) return;
     setStatus("导入中...");
     try {
-      await uploadExcel(currentWorkbook.id, file);
+      const result = await uploadExcel(currentWorkbook.id, file);
       const refreshed = await fetchWorkbook(currentWorkbook.id);
       setCurrentWorkbook(refreshed);
-      setStatus("导入完成");
+      setStatus(
+        `导入完成：更新 ${result.updatedSheets.length} 张表，跳过 ${result.skippedCurrentSheets.length} 张当前表，忽略 ${result.ignoredUploadedSheets.length} 张文件表`,
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : "导入失败";
       setStatus(`导入失败：${message}`);

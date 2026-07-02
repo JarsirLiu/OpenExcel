@@ -21,8 +21,8 @@ export async function workbookRoutes(app: FastifyInstance) {
         if (!data) return reply.status(400).send({ error: "No file uploaded" });
 
         const buf = await data.toBuffer();
-        const count = await service.uploadExcel(workbookId, buf);
-        return { success: true, sheets: count };
+        const result = await service.uploadExcel(workbookId, buf);
+        return { success: true, ...result };
       } catch (error) {
         if (error instanceof service.WorkbookUploadError) {
           return reply.status(error.statusCode).send({

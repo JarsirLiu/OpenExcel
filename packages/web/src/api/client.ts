@@ -42,6 +42,15 @@ export interface WorkbookFull {
   sheets: SheetSchema[];
 }
 
+export interface WorkbookImportResult {
+  success: true;
+  workbookId: number;
+  workbookName: string;
+  updatedSheets: { id: number; name: string; rows: number; cols: number }[];
+  skippedCurrentSheets: string[];
+  ignoredUploadedSheets: string[];
+}
+
 export async function fetchWorkbooks(): Promise<WorkbookMeta[]> {
   const res = await fetch(`${BASE}/workbooks`);
   if (!res.ok) throw new Error("加载工作簿失败");
@@ -54,7 +63,7 @@ export async function fetchWorkbook(id: number): Promise<WorkbookFull> {
   return res.json();
 }
 
-export async function uploadExcel(workbookId: number, file: File): Promise<void> {
+export async function uploadExcel(workbookId: number, file: File): Promise<WorkbookImportResult> {
   const form = new FormData();
   form.append("file", file);
   const res = await fetch(`${BASE}/workbooks/${workbookId}/upload`, {
@@ -62,6 +71,7 @@ export async function uploadExcel(workbookId: number, file: File): Promise<void>
     body: form,
   });
   if (!res.ok) throw new Error(await readErrorMessage(res, "导入失败"));
+  return res.json();
 }
 
 export async function uploadNewWorkbook(file: File): Promise<{ id: number; name: string; sheets: number }> {

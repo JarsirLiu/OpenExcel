@@ -1,6 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
+import { useEditor, EditorContent } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
+import Mention from "@tiptap/extension-mention";
 import type { SheetChangeDelta } from "@openexcel/core";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -8,6 +11,7 @@ import type { Session } from "../api/client";
 import { createSession, deleteSession, fetchMessages, fetchSessions, undoLatestRun } from "../api/client";
 import { SheetPreview } from "./SheetPreview";
 import { useSheetPatchSync } from "../hooks/useSheetPatchSync";
+import { createMentionSuggestion } from "./SheetMentionList";
 
 /* ============ Icons ============ */
 const SendIcon = ({ size = 14 }: { size?: number }) => (
@@ -53,17 +57,55 @@ function ChatPanel({
   onRunComplete,
   onSheetChanged,
   onStreamingChange,
+  sheets,
 }: {
   sessionId: number;
   initialMessages: any[];
   onRunComplete?: () => void;
   onSheetChanged?: (sheetId: number, delta: SheetChangeDelta | null) => void;
   onStreamingChange?: (isStreaming: boolean) => void;
+  sheets: { id: number; name: string }[];
 }) {
-  const [draft, setDraft] = useState("");
   const [thinkingOpen, setThinkingOpen] = useState<Record<string, boolean>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editorRef = useRef<HTMLDivElement>(null);
+
+  const handleSend = () => {
+    const text = editor?.getText().trim() ?? "";
+    if (!text || isStreaming) return;
+    editor?.commands.clearContent();
+    editor?.commands.focus();
+    sendMessage({ text });
+  };
+
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      Mention.configure({
+        HTMLAttributes: { class: "mention" },
+        suggestion: createMentionSuggestion(sheets),
+      }),
+    ],
+    editorProps: {
+      attributes: {
+        class: "chat-input",
+        "data-placeholder": "输入消息...",
+      },
+      handleKeyDown: (_, event) => {
+        if (event.key === "Enter" && !event.shiftKey) {
+          event.preventDefault();
+          handleSend();
+          return true;
+        }
+        return false;
+      },
+    },
+    onUpdate: ({ editor: ed }) => {
+      setEditorText(ed.getText());
+    },
+  });
+
+  const [editorText, setEditorText] = useState("");
 
   const { messages, sendMessage, status, stop, error } = useChat({
     id: String(sessionId),
@@ -88,16 +130,6 @@ function ChatPanel({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isStreaming]);
   useSheetPatchSync(messages, onSheetChanged);
-
-  const handleSend = () => {
-    const text = draft.trim();
-    if (!text || isStreaming) return;
-    setDraft("");
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-    }
-    sendMessage({ text });
-  };
 
   const contentText = (m: any) => {
     if (m.content) return m.content;
@@ -195,36 +227,15 @@ function ChatPanel({
           background: "#fff", border: "1px solid #e8e8e8", borderRadius: 16,
           padding: "10px 14px 8px", display: "flex", flexDirection: "column", gap: 8,
         }}>
-          <textarea
-            ref={textareaRef}
-            className="chat-input"
-            value={draft}
-            onChange={(e) => {
-              setDraft(e.target.value);
-              const el = e.target;
-              el.style.height = "auto";
-              el.style.height = el.scrollHeight + "px";
-            }}
-            placeholder="输入消息..."
-            rows={1}
-            style={{
-              width: "100%", border: "none", background: "transparent", resize: "none",
-              outline: "none", fontSize: 14, lineHeight: 1.5, maxHeight: 105, minHeight: 22,
-              padding: 0, color: "#1f1f1f", fontFamily: "inherit", overflowY: "auto",
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                handleSend();
-              }
-            }}
-          />
+          <div ref={editorRef} style={{ maxHeight: 105, overflowY: "auto", fontSize: 14, lineHeight: 1.5, color: "#1f1f1f" }}>
+            <EditorContent editor={editor} />
+          </div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
             <button
               onClick={() => (isStreaming ? stop() : handleSend())}
               style={{
                 width: 32, height: 32, borderRadius: "50%",
-                background: isStreaming ? "#ff5252" : (draft.trim() ? "#1f1f1f" : "#d9d9d9"),
+                background: isStreaming ? "#ff5252" : (editorText.trim() ? "#1f1f1f" : "#d9d9d9"),
                 color: "#fff", border: "none", cursor: "pointer",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 transition: "background 0.2s", flexShrink: 0,
@@ -377,9 +388,11 @@ function isStaticToolPart(part: any): boolean {
 export function ChatInterface({
   onSheetChanged,
   onUndoComplete,
+  sheets,
 }: {
   onSheetChanged?: (sheetId: number, delta: SheetChangeDelta | null) => void;
   onUndoComplete?: () => void;
+  sheets: { id: number; name: string }[];
 }) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<number | null>(null);
@@ -608,6 +621,7 @@ export function ChatInterface({
           onRunComplete={loadSessions}
           onSheetChanged={onSheetChanged}
           onStreamingChange={setIsStreaming}
+          sheets={sheets}
         />
       ) : (
         <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "#999", fontSize: 13 }}>加载中...</div>
