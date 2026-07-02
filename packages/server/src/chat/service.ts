@@ -1,16 +1,54 @@
+import { loadModelConfig } from "../config.js";
 import * as repo from "./repository.js";
 import * as model from "./model.js";
 import * as context from "./context.js";
 import * as rollout from "./rollout.js";
-import { excelTools } from "./tools/index.js";
-import type { Push } from "./stream.js";
+import { buildExcelToolContext, excelTools } from "./tools/index.js";
+import { convertToModelMessages, toUIMessageStream, validateUIMessages } from "ai";
+
+function extractMessageText(message: any): string {
+  if (typeof message?.content === "string") return message.content;
+  if (Array.isArray(message?.parts)) {
+    return message.parts
+      .filter((part: any) => part.type === "text")
+      .map((part: any) => part.text)
+      .join("");
+  }
+  return "";
+}
+
+function extractLatestUserText(messages: any[]): string {
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const message = messages[i];
+    if (message?.role === "user") {
+      return extractMessageText(message);
+    }
+  }
+  return "";
+}
+
+function serializeJson(value: unknown): string | null {
+  if (value === undefined) return null;
+  try {
+    return JSON.stringify(value);
+  } catch {
+    try {
+      return JSON.stringify(String(value));
+    } catch {
+      return null;
+    }
+  }
+}
+
+async function finalizeRun(runId: number, data: Record<string, unknown>) {
+  await repo.updateRun(runId, {
+    ...data,
+    endedAt: new Date(),
+  });
+}
 
 export async function getSessions() {
   return repo.findGlobalSessions();
-}
-
-export async function ensureSession() {
-  return repo.ensureGlobalSession();
 }
 
 export async function createSession() {
@@ -26,121 +64,174 @@ export async function renameSession(sessionId: number, name: string) {
 }
 
 export async function getMessages(sessionId: number) {
-  const runs = await repo.findRunsBySession(sessionId);
-  const transcript: { id: string; role: "user" | "assistant"; content: string; reasoning?: string }[] = [];
-  for (const run of runs) {
-    const steps = await repo.findStepsByRun(run.id);
-    transcript.push({ id: `run-${run.id}-user`, role: "user", content: run.inputText ?? "" });
+  const storedMessages = await rollout.getSessionMessages(sessionId);
+  if (storedMessages.length > 0) return storedMessages;
 
-    const reasoningStep = steps.find((s) => s.type === "reasoning");
-    const finalStep = steps.find((s) => s.type === "final");
-    const reasoning = reasoningStep?.content ?? undefined;
-    const final = finalStep?.content ?? "";
-    if (reasoning || final) {
-      transcript.push({ id: `run-${run.id}-assistant`, role: "assistant", content: final, reasoning });
-    }
-  }
-  return transcript.filter((m) => m.content.length > 0 || m.reasoning);
+  const runs = await repo.findRunsBySession(sessionId);
+  return context.historyFromRuns(runs);
 }
 
-export async function chat(
+export async function getRuns(sessionId: number) {
+  const runs = await repo.findRunsBySession(sessionId);
+  const steps = await Promise.all(runs.map(async (run) => ({
+    ...run,
+    steps: await repo.findStepsByRun(run.id),
+  })));
+  return steps;
+}
+
+export async function streamChat(
   sessionId: number,
-  inputText: string,
-  abortSignal: AbortSignal | undefined,
-  push: Push,
-): Promise<void> {
+  messages: any[],
+  abortSignal?: AbortSignal,
+) {
   const session = await repo.findSession(sessionId);
   if (!session) throw new Error("Session not found");
 
-  const runs = await repo.findRunsBySession(sessionId);
-  const history = context.historyFromRuns(runs);
+  const config = loadModelConfig();
   const workplaceContext = await context.buildWorkplaceContext();
   const systemPrompt = context.buildSystemPrompt(workplaceContext);
-  const ctx = await rollout.initRun(sessionId, inputText, systemPrompt);
+  const inputText = extractLatestUserText(messages);
 
-  const stream = model.streamChat({
+  const run = await repo.createRun({
+    sessionId,
+    status: "running",
+    model: config.modelName,
     systemPrompt,
-    messages: [...history, { role: "user", content: inputText }],
-    tools: excelTools,
-    abortSignal,
-    onChunk: rollout.onChunk(ctx),
-    onFinish: rollout.onFinish(ctx),
+    inputText,
+  });
+  const toolsContext = buildExcelToolContext(run.id);
+
+  let finalized = false;
+  let stepOrder = 0;
+
+  const finalizeRunOnce = async (data: Record<string, unknown>) => {
+    if (finalized) return;
+    finalized = true;
+    try {
+      await finalizeRun(run.id, data);
+    } catch (error) {
+      console.error(`[chat] Failed to finalize run ${run.id}:`, error);
+    }
+  };
+
+  const persistStepOnce = async (step: any) => {
+    try {
+      await repo.createStep({
+        runId: run.id,
+        type: String(step?.stepType ?? "step"),
+        status: Array.isArray(step?.toolResults) && step.toolResults.some((result: any) => result?.isError)
+          ? "error"
+          : String(step?.finishReason ?? "completed"),
+        content: typeof step?.text === "string" ? step.text : null,
+        toolName: Array.isArray(step?.toolCalls)
+          ? step.toolCalls
+              .map((call: any) => call?.toolName)
+              .filter((name: unknown): name is string => typeof name === "string" && name.length > 0)
+              .join(",") || null
+          : null,
+        input: serializeJson(step?.toolCalls ?? []),
+        output: serializeJson(step?.toolResults ?? []),
+        order: stepOrder++,
+      });
+    } catch (error) {
+      console.error(`[chat] Failed to persist step for run ${run.id}:`, error);
+    }
+  };
+
+  let validatedMessages: any[];
+  try {
+    validatedMessages = await validateUIMessages({
+      messages,
+      tools: excelTools as any,
+    });
+  } catch (error) {
+    await finalizeRunOnce({
+      status: "error",
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
+
+  let result;
+  try {
+    result = model.streamChat({
+      systemPrompt,
+      messages: await convertToModelMessages(validatedMessages as any),
+      tools: excelTools,
+      toolsContext,
+      abortSignal,
+      onStepFinish: persistStepOnce,
+      onFinish: async ({ text }: any) => {
+        await finalizeRunOnce({
+          status: "completed",
+          outputText: typeof text === "string" && text.length > 0 ? text : null,
+        });
+      },
+      onAbort: async () => {
+        await finalizeRunOnce({ status: "aborted" });
+      },
+      onError: async (error: any) => {
+        await finalizeRunOnce({
+          status: "error",
+          errorMessage: error instanceof Error ? error.message : String(error),
+        });
+      },
+    });
+  } catch (error) {
+    await finalizeRunOnce({
+      status: "error",
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
+
+  const uiStream = toUIMessageStream({
+    stream: result.stream,
+    originalMessages: validatedMessages,
+    onEnd: async ({ messages: newMessages }) => {
+      try {
+        await rollout.persistSessionMessages(sessionId, newMessages);
+      } catch (error) {
+        console.error(`[chat] Failed to persist transcript for session ${sessionId}:`, error);
+      }
+
+      // 首条消息时生成标题，确保前端刷新会话列表时能拿到新名称
+      if (session.name === "新对话") {
+        const firstUserMsg = newMessages.find((m: any) => m.role === "user");
+        const firstUserText = extractMessageText(firstUserMsg);
+        if (firstUserText) {
+          try {
+            const title = await model.generateTitle(firstUserText);
+            if (title) {
+              await repo.updateSession(sessionId, { name: title });
+            }
+          } catch {
+            // 标题只是增强体验，不能影响主对话链路。
+          }
+        }
+      }
+
+      try {
+        await repo.pruneUndoSnapshots(sessionId);
+      } catch (error) {
+        console.error(`[chat] Failed to prune undo snapshots for session ${sessionId}:`, error);
+      }
+    },
   });
 
-  push("run.started", { runId: ctx.runId });
+  return uiStream;
+}
 
-  let reasoningStarted = false;
-  let finalStarted = false;
-
-  try {
-    for await (const chunk of stream.fullStream) {
-      if (chunk.type === "reasoning-delta") {
-        if (!reasoningStarted) {
-          push("step.started", { runId: ctx.runId, stepType: "reasoning" });
-          reasoningStarted = true;
-        }
-        push("step.delta", { runId: ctx.runId, stepType: "reasoning", text: chunk.text });
-        continue;
-      }
-      if (chunk.type === "tool-call") {
-        push("step.started", { runId: ctx.runId, stepType: "tool_call", toolCallId: chunk.toolCallId, toolName: chunk.toolName, input: chunk.input });
-        continue;
-      }
-      if (chunk.type === "tool-result") {
-        push("step.completed", { runId: ctx.runId, stepType: "tool_result", toolCallId: chunk.toolCallId, toolName: chunk.toolName, input: chunk.input, output: chunk.output });
-
-        const input = chunk.input ?? {};
-        const output = chunk.output ?? {};
-
-        if (chunk.toolName === "writeCells" && input.cells) {
-          push("sheet.changed", { sheetId: input.sheetId, delta: { type: "write", cells: input.cells, merges: output.preview?.merges ?? [] } });
-        } else if ((chunk.toolName === "mergeCells" || chunk.toolName === "unmergeCells") && input.startRow !== undefined) {
-          push("sheet.changed", {
-            sheetId: input.sheetId,
-            delta: { type: chunk.toolName === "mergeCells" ? "merge" : "unmerge", range: { startRow: input.startRow, startCol: input.startCol, endRow: input.endRow, endCol: input.endCol } },
-          });
-        }
-        continue;
-      }
-      if (chunk.type === "text-delta") {
-        if (!finalStarted) {
-          if (reasoningStarted) {
-            push("step.completed", { runId: ctx.runId, stepType: "reasoning" });
-          }
-          push("step.started", { runId: ctx.runId, stepType: "final" });
-          finalStarted = true;
-        }
-        push("step.delta", { runId: ctx.runId, stepType: "final", text: chunk.text });
-        continue;
-      }
-    }
-
-    if (abortSignal?.aborted) {
-      await rollout.markAborted(ctx);
-      push("run.aborted", { runId: ctx.runId });
-      return;
-    }
-
-    if (finalStarted) {
-      push("step.completed", { runId: ctx.runId, stepType: "final" });
-    } else if (reasoningStarted) {
-      push("step.completed", { runId: ctx.runId, stepType: "reasoning" });
-    }
-
-    const title = runs.length === 0 ? await model.generateTitle(inputText).catch(() => null) : null;
-    if (title) {
-      await repo.updateSession(sessionId, { name: title });
-    }
-
-    push("run.completed", { runId: ctx.runId, title: title ?? undefined });
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (abortSignal?.aborted) {
-      await rollout.markAborted(ctx);
-      push("run.aborted", { runId: ctx.runId });
-      return;
-    }
-    await rollout.markFailed(ctx, msg);
-    push("run.failed", { error: msg, runId: ctx.runId });
+export async function undoLatestRun(sessionId: number) {
+  const run = await repo.findLatestUndoableRun(sessionId);
+  if (!run) {
+    throw new Error("没有可撤销的本轮修改");
   }
+
+  const restoredSheetIds = await repo.restoreRunSheetSnapshots(run.id);
+  return {
+    runId: run.id,
+    restoredSheetIds,
+  };
 }

@@ -1,114 +1,117 @@
 import { prisma } from "../../db.js";
-import { celldataToGrid } from "@openexcel/core";
+import {
+  sheetChangePatchOutputSchema,
+  sheetChangeRangeOperationSchema,
+  sheetChangeRangeToZeroBased,
+  type SheetChangeDelta,
+  type SheetChangeRangeOperation,
+} from "@openexcel/core";
 import { z } from "zod";
+import { buildSheetChangePreview, toA1CellRef, toA1Range } from "./preview.js";
+import { sheetMutationContextSchema } from "../undo.js";
+import * as repo from "../repository.js";
+import { sheetRecordToCelldata } from "../../utils/sheetData.js";
 
-function toColRef(c: number): string {
-  let ref = "";
-  let n = c;
-  while (n >= 0) {
-    ref = String.fromCharCode(65 + (n % 26)) + ref;
-    n = Math.floor(n / 26) - 1;
-  }
-  return ref;
-}
+const mergeCellsInputSchema = z.object({
+  sheetId: z.coerce.number().describe("Sheet ID"),
+  operations: z.array(sheetChangeRangeOperationSchema).min(1).describe("要合并的范围列表，行号和列号都从 1 开始"),
+});
 
-function toCellRef(r: number, c: number): string {
-  return `${toColRef(c)}${r + 1}`;
-}
+function applyMergeOperation(cellMap: Map<string, any>, operation: SheetChangeRangeOperation) {
+  const storageRange = sheetChangeRangeToZeroBased(operation);
+  const rs = storageRange.endRow - storageRange.startRow + 1;
+  const cs = storageRange.endCol - storageRange.startCol + 1;
 
-function extractPreview(celldata: any[], sheetName: string, sheetId: number, minRow: number, maxRow: number) {
-  const maxCol = Math.max(...celldata.map((c: any) => c.c), 0);
-  const columnCount = maxCol + 1;
-  const grid = celldataToGrid(celldata, columnCount);
-  const rows = grid.slice(minRow, maxRow + 1);
-
-  const merges: { startRow: number; startCol: number; endRow: number; endCol: number }[] = [];
-  for (const cell of celldata) {
-    const mc = cell.v?.mc;
-    if (mc) {
-      const r = cell.r;
-      const c = cell.c;
-      if (r >= minRow && r <= maxRow) {
-        merges.push({
-          startRow: r - minRow,
-          startCol: c,
-          endRow: r + (mc.rs ?? 1) - 1 - minRow,
-          endCol: c + (mc.cs ?? 1) - 1,
-        });
+  for (let r = storageRange.startRow; r <= storageRange.endRow; r += 1) {
+    for (let c = storageRange.startCol; c <= storageRange.endCol; c += 1) {
+      const key = `${r},${c}`;
+      if (r === storageRange.startRow && c === storageRange.startCol) {
+        const cell = cellMap.get(key) ?? { r, c, v: {} };
+        cell.v = { ...cell.v, mc: { r: storageRange.startRow, c: storageRange.startCol, rs, cs } };
+        cellMap.set(key, cell);
+      } else {
+        const cell = cellMap.get(key) ?? { r, c, v: {} };
+        cell.v = { mc: { r: storageRange.startRow, c: storageRange.startCol, rs, cs } };
+        cellMap.set(key, cell);
       }
     }
   }
-
-  return {
-    sheetId,
-    sheetName,
-    range: { startRow: minRow, endRow: maxRow, startCol: 0, endCol: columnCount - 1 },
-    rows,
-    merges,
-  };
 }
 
 export const mergeCells = {
-  description: "合并指定范围的单元格。合并后只有左上角单元格保留值，其余格子的值会被清除。",
-  inputSchema: z.object({
-    sheetId: z.coerce.number().describe("Sheet ID"),
-    startRow: z.coerce.number().describe("起始行号，从 0 开始"),
-    startCol: z.coerce.number().describe("起始列号，从 0 开始"),
-    endRow: z.coerce.number().describe("结束行号，从 0 开始"),
-    endCol: z.coerce.number().describe("结束列号，从 0 开始"),
-  }),
-  execute: async ({ sheetId, startRow, startCol, endRow, endCol }: { sheetId: number; startRow: number; startCol: number; endRow: number; endCol: number }) => {
+  description: "合并指定范围的单元格。使用 operations 数组，每项都是一个 range；合并后只有左上角单元格保留值，其余格子的值会被清除。行号和列号都从 1 开始。",
+  inputSchema: mergeCellsInputSchema,
+  contextSchema: sheetMutationContextSchema,
+  execute: async (
+    { sheetId, operations }: { sheetId: number; operations: SheetChangeRangeOperation[] },
+    { context }: { context: { runId: number } },
+  ) => {
     const sheet = await prisma.sheet.findUnique({ where: { id: sheetId } });
-    if (!sheet) return { error: `Sheet ${sheetId} 不存在` };
+    if (!sheet) throw new Error(`Sheet ${sheetId} 不存在`);
 
-    const celldata: any[] = sheet.uploadedData ? JSON.parse(sheet.uploadedData) : [];
-    if (!Array.isArray(celldata)) return { error: "celldata 格式错误" };
+    await repo.upsertRunSheetSnapshot({
+      runId: context.runId,
+      sheetId,
+      uploadedData: sheet.uploadedData ?? null,
+      config: sheet.config ?? null,
+    });
 
-    const rs = endRow - startRow + 1;
-    const cs = endCol - startCol + 1;
-    const cellRef = toCellRef(startRow, startCol);
+    const celldata: any[] = sheetRecordToCelldata(sheet);
+    if (!Array.isArray(celldata)) throw new Error("celldata 格式错误");
 
     const cellMap = new Map<string, any>();
     for (const cell of celldata) {
       cellMap.set(`${cell.r},${cell.c}`, cell);
     }
 
-    const topLeftKey = `${startRow},${startCol}`;
-    const topLeft = cellMap.get(topLeftKey);
-    if (topLeft) {
-      topLeft.v = { ...topLeft.v, mc: { r: startRow, c: startCol, rs, cs } };
-    } else {
-      const newCell = { r: startRow, c: startCol, v: { v: "", m: "", mc: { r: startRow, c: startCol, rs, cs } } };
-      celldata.push(newCell);
-      cellMap.set(topLeftKey, newCell);
+    const mergedRanges: string[] = [];
+    let minRow = Number.POSITIVE_INFINITY;
+    let maxRow = Number.NEGATIVE_INFINITY;
+
+    for (const operation of operations) {
+      const storageRange = sheetChangeRangeToZeroBased(operation);
+      applyMergeOperation(cellMap, operation);
+      mergedRanges.push(toA1Range(operation.startRow, operation.startCol, operation.endRow, operation.endCol));
+      minRow = Math.min(minRow, storageRange.startRow);
+      maxRow = Math.max(maxRow, storageRange.endRow);
     }
 
-    for (let r = startRow; r <= endRow; r++) {
-      for (let c = startCol; c <= endCol; c++) {
-        if (r === startRow && c === startCol) continue;
-        const key = `${r},${c}`;
-        if (cellMap.has(key)) {
-          const cell = cellMap.get(key);
-          cell.v = { mc: { r: startRow, c: startCol, rs, cs } };
-        }
-      }
-    }
-
+    const updatedCelldata = Array.from(cellMap.values());
     const config = sheet.config ? JSON.parse(sheet.config) : {};
-    config.merge = { ...(config.merge ?? {}), [cellRef]: { r: startRow, c: startCol, rs, cs } };
+    config.merge = { ...(config.merge ?? {}) };
+    for (const operation of operations) {
+      const storageRange = sheetChangeRangeToZeroBased(operation);
+      const cellRef = toA1CellRef(operation.startRow, operation.startCol);
+      config.merge[cellRef] = {
+        r: storageRange.startRow,
+        c: storageRange.startCol,
+        rs: storageRange.endRow - storageRange.startRow + 1,
+        cs: storageRange.endCol - storageRange.startCol + 1,
+      };
+    }
 
     await prisma.sheet.update({
       where: { id: sheetId },
       data: {
-        uploadedData: JSON.stringify(celldata),
+        uploadedData: JSON.stringify(updatedCelldata),
         config: JSON.stringify(config),
       },
     });
 
-    return {
-      success: true,
-      mergedRange: `${toCellRef(startRow, startCol)}:${toCellRef(endRow, endCol)}`,
-      preview: extractPreview(celldata, sheet.name, sheetId, startRow, endRow),
+    const delta: SheetChangeDelta = {
+      type: "merge",
+      operations,
     };
+
+    const output = {
+      success: true,
+      mergedRanges,
+      delta,
+      preview: buildSheetChangePreview(updatedCelldata, sheet.name, sheetId, minRow, maxRow),
+      sheetInfo: { sheetId: sheet.id, sheetName: sheet.name },
+    };
+
+    sheetChangePatchOutputSchema.parse(output);
+    return output;
   },
 };

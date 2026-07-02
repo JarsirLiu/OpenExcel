@@ -34,7 +34,6 @@ describe("SheetSchema type", () => {
       order: 0,
       columns: [{ label: "Name" }, { label: "Value" }],
       merges: [],
-      rows: [],
       uploadedData: null,
       config: null,
     };

@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import initData from "../../../templates/init.json" assert { type: "json" };
+import { gridToCelldata } from "@openexcel/core";
 
 const prisma = new PrismaClient();
 
@@ -17,6 +18,7 @@ async function main() {
     });
     for (let si = 0; si < wb.sheets.length; si++) {
       const sh = wb.sheets[si];
+      const celldata = gridToCelldata(sh.rows, sh.columns.map((column) => column.label));
       await prisma.sheet.create({
         data: {
           workbookId: workbook.id,
@@ -24,7 +26,7 @@ async function main() {
           order: si,
           columns: JSON.stringify(sh.columns),
           merges: JSON.stringify(sh.merges ?? []),
-          rows: JSON.stringify(sh.rows),
+          uploadedData: JSON.stringify(celldata),
         },
       });
     }

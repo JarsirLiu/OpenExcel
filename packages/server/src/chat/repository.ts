@@ -1,5 +1,7 @@
 import { prisma } from "../db.js";
 
+const DEFAULT_UNDO_SNAPSHOT_RETENTION = 5;
+
 export async function findGlobalSessions() {
   return prisma.session.findMany({
     orderBy: { createdAt: "desc" },
@@ -20,7 +22,7 @@ export async function deleteSession(id: number) {
   return prisma.session.delete({ where: { id } });
 }
 
-export async function updateSession(id: number, data: { name?: string }) {
+export async function updateSession(id: number, data: { name?: string; chatMessages?: string }) {
   return prisma.session.update({ where: { id }, data });
 }
 
@@ -48,6 +50,17 @@ export async function updateRun(id: number, data: Record<string, unknown>) {
 
 export async function findRun(id: number) {
   return prisma.agentRun.findUnique({ where: { id } });
+}
+
+export async function findLatestUndoableRun(sessionId: number) {
+  return prisma.agentRun.findFirst({
+    where: {
+      sessionId,
+      status: { in: ["completed", "aborted", "error"] },
+      snapshots: { some: {} },
+    },
+    orderBy: [{ startedAt: "desc" }, { id: "desc" }],
+  });
 }
 
 export async function findRunsBySession(sessionId: number) {
@@ -79,6 +92,91 @@ export async function findStepsByRun(runId: number) {
     where: { runId },
     orderBy: { order: "asc" },
   });
+}
+
+export async function upsertRunSheetSnapshot(data: {
+  runId: number;
+  sheetId: number;
+  uploadedData: string | null;
+  config: string | null;
+}) {
+  return prisma.agentRunSheetSnapshot.upsert({
+    where: {
+      runId_sheetId: {
+        runId: data.runId,
+        sheetId: data.sheetId,
+      },
+    },
+    create: data,
+    update: {},
+  });
+}
+
+export async function findRunSheetSnapshots(runId: number) {
+  return prisma.agentRunSheetSnapshot.findMany({
+    where: { runId },
+    orderBy: { id: "asc" },
+  });
+}
+
+export async function deleteRunSheetSnapshots(runId: number) {
+  await prisma.agentRunSheetSnapshot.deleteMany({
+    where: { runId },
+  });
+}
+
+export async function pruneUndoSnapshots(sessionId: number, keepRuns = DEFAULT_UNDO_SNAPSHOT_RETENTION) {
+  const runsWithSnapshots = await prisma.agentRun.findMany({
+    where: {
+      sessionId,
+      snapshots: { some: {} },
+    },
+    orderBy: [{ startedAt: "desc" }, { id: "desc" }],
+    select: { id: true },
+  });
+
+  const staleRunIds = runsWithSnapshots.slice(keepRuns).map((run) => run.id);
+  if (staleRunIds.length === 0) {
+    return 0;
+  }
+
+  const result = await prisma.agentRunSheetSnapshot.deleteMany({
+    where: {
+      runId: { in: staleRunIds },
+    },
+  });
+
+  return result.count;
+}
+
+export async function restoreRunSheetSnapshots(runId: number) {
+  const snapshots = await findRunSheetSnapshots(runId);
+  if (snapshots.length === 0) {
+    throw new Error("当前运行没有可撤销的 Sheet 修改");
+  }
+
+  await prisma.$transaction([
+    ...snapshots.map((snapshot) =>
+      prisma.sheet.update({
+        where: { id: snapshot.sheetId },
+        data: {
+          uploadedData: snapshot.uploadedData,
+          config: snapshot.config,
+        },
+      })),
+    prisma.agentRun.update({
+      where: { id: runId },
+      data: {
+        status: "reverted",
+        revertedAt: new Date(),
+      },
+    }),
+    prisma.agentRunSheetSnapshot.deleteMany({
+      where: { runId },
+    }),
+  ]);
+
+  return snapshots.map((snapshot) => snapshot.sheetId);
 }
 
 export async function findWorkbooksWithSheets() {

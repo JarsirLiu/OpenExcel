@@ -9,13 +9,15 @@ const openai = createOpenAI({
 
 export function streamChat(input: {
   systemPrompt: string;
-  messages: { role: "user" | "assistant"; content: string }[];
+  messages: any[];
   tools: Record<string, any>;
+  toolsContext?: Record<string, unknown>;
   abortSignal?: AbortSignal;
-  onChunk?: (chunk: any) => Promise<void> | void;
-  onFinish?: (result: any) => Promise<void> | void;
-  onAbort?: (event: any) => Promise<void> | void;
-}): any {
+  onStepFinish?: (...args: any[]) => void | Promise<void>;
+  onFinish?: (...args: any[]) => void | Promise<void>;
+  onAbort?: (...args: any[]) => void | Promise<void>;
+  onError?: (...args: any[]) => void | Promise<void>;
+}): ReturnType<typeof streamText> {
   const config = loadModelConfig();
   const customOpenAI = createOpenAI({
     baseURL: config.baseUrl,
@@ -27,13 +29,14 @@ export function streamChat(input: {
     system: input.systemPrompt,
     messages: input.messages,
     tools: input.tools,
+    toolsContext: input.toolsContext as any,
     stopWhen: isLoopFinished(),
-    reasoning: "high",
     abortSignal: input.abortSignal,
-    onChunk: input.onChunk,
+    onStepFinish: input.onStepFinish,
     onFinish: input.onFinish,
     onAbort: input.onAbort,
-  }) as any;
+    onError: input.onError,
+  });
 }
 
 export async function generateTitle(prompt: string): Promise<string> {

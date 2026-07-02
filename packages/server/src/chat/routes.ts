@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import * as service from "./service.js";
-import { createPush } from "./stream.js";
+import { pipeUIMessageStreamToResponse } from "ai";
 
 export async function chatRoutes(app: FastifyInstance) {
   app.get("/api/sessions", async () => {
@@ -26,32 +26,32 @@ export async function chatRoutes(app: FastifyInstance) {
     return service.getMessages(Number(req.params.sessionId));
   });
 
-  app.post<{ Params: { sessionId: string }; Body: { input: string } }>("/api/sessions/:sessionId/chat", async (req, reply) => {
-    const sessionId = Number(req.params.sessionId);
-    const { input } = req.body;
-    const controller = new AbortController();
-    const push = createPush(reply);
-
-    reply.raw.writeHead(200, {
-      "Content-Type": "text/event-stream; charset=utf-8",
-      "Cache-Control": "no-cache, no-transform",
-      Connection: "keep-alive",
-      "X-Accel-Buffering": "no",
-    });
-
-    reply.raw.on("close", () => {
-      if (!reply.raw.writableEnded) {
-        controller.abort();
-      }
-    });
-
-    try {
-      await service.chat(sessionId, input, controller.signal, push);
-      reply.raw.end();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      push("run.failed", { error: msg, runId: undefined });
-      reply.raw.end();
-    }
+  app.get<{ Params: { sessionId: string } }>("/api/sessions/:sessionId/runs", async (req) => {
+    return service.getRuns(Number(req.params.sessionId));
   });
+
+  app.post<{ Params: { sessionId: string } }>("/api/sessions/:sessionId/runs/undo-latest", async (req) => {
+    return service.undoLatestRun(Number(req.params.sessionId));
+  });
+
+  app.post<{ Params: { sessionId: string }; Body: { messages: any[] } }>(
+    "/api/sessions/:sessionId/chat",
+    async (req, reply) => {
+      const sessionId = Number(req.params.sessionId);
+      const { messages } = req.body;
+      const controller = new AbortController();
+
+      reply.raw.on("close", () => {
+        if (!reply.raw.writableEnded) {
+          controller.abort();
+        }
+      });
+
+      reply.hijack();
+
+      const stream = await service.streamChat(sessionId, messages, controller.signal);
+
+      pipeUIMessageStreamToResponse({ response: reply.raw, stream });
+    },
+  );
 }

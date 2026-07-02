@@ -27,6 +27,8 @@ function buildMergeMap(merges: PreviewMerge[]): Map<string, { rs: number; cs: nu
 export function SheetPreview({ preview }: { preview: PreviewData }) {
   const mergeMap = buildMergeMap(preview.merges);
   const skipped = new Set<string>();
+  const rowBase = preview.range.startRow;
+  const colBase = preview.range.startCol;
 
   return (
     <div style={{ marginTop: 8 }}>
@@ -48,7 +50,7 @@ export function SheetPreview({ preview }: { preview: PreviewData }) {
                 {row.map((val, ci) => {
                   const key = `${ri},${ci}`;
                   if (skipped.has(key)) return null;
-                  const merge = mergeMap.get(key);
+                  const merge = mergeMap.get(`${ri + rowBase},${ci + colBase}`);
                   if (merge) {
                     for (let r = ri; r < ri + merge.rs; r++) {
                       for (let c = ci; c < ci + merge.cs; c++) {

@@ -1,4 +1,4 @@
-import { gridToCelldata, isCelldata, restoreSheetConfig } from "@openexcel/core";
+import { isCelldata, restoreSheetConfig } from "@openexcel/core";
 import type { FortuneCell, SheetConfig, FortuneSheetData } from "@openexcel/core";
 
 export type { FortuneCell, SheetConfig, FortuneSheetData };
@@ -29,7 +29,6 @@ export function toFortuneSheetData(
     name: string;
     columns: { label: string; width?: number }[];
     merges: { row: [number, number]; col: [number, number] }[];
-    rows: string[][];
     uploadedData: any[] | null;
     config: any | null;
   },
@@ -46,14 +45,8 @@ export function toFortuneSheetData(
         col: [m.col[0], m.col[1]],
       }));
     }
-  } else if (sheet.uploadedData) {
-    celldata = gridToCelldata(sheet.uploadedData, sheet.columns.map((c) => c.label));
-    merges = (sheet.merges || []).map((m) => ({
-      row: [m.row[0] + 1, m.row[1] + 1],
-      col: [m.col[0], m.col[1]],
-    }));
   } else {
-    celldata = gridToCelldata(sheet.rows, sheet.columns.map((c) => c.label));
+    celldata = [];
     merges = (sheet.merges || []).map((m) => ({
       row: [m.row[0] + 1, m.row[1] + 1],
       col: [m.col[0], m.col[1]],

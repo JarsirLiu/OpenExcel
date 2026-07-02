@@ -1,8 +1,9 @@
 import * as XLSX from "xlsx";
-import { templateToExcel, excelToGrid } from "@openexcel/core";
+import { templateToExcel, excelToGrid, gridToCelldata } from "@openexcel/core";
 import { prisma } from "../db.js";
 import * as repo from "./repository.js";
-import { deserializeSheet, cloneSheetSchema } from "../utils/sheetSerialization.js";
+import { deserializeSheet } from "../utils/sheetSerialization.js";
+import { celldataToGridShape, sheetRecordToCelldata } from "../utils/sheetData.js";
 
 export async function getWorkbooks() {
   return repo.findWorkbooks();
@@ -63,7 +64,6 @@ export async function uploadAsNewWorkbook(buffer: Buffer, fileName: string) {
           order: i,
           columns: JSON.stringify([]),
           merges: JSON.stringify(parsed.merges),
-          rows: JSON.stringify([]),
           uploadedData: JSON.stringify(parsed.celldata),
           config: JSON.stringify(parsed.config ?? {}),
         },
@@ -80,8 +80,20 @@ export async function exportTemplate(id: number) {
 
   const sheets = wb.sheets.map((s) => ({
     name: s.name,
-    columns: JSON.parse(s.columns),
-    rows: JSON.parse(s.rows),
+    columns: (() => {
+      const grid = celldataToGridShape(sheetRecordToCelldata(s));
+      const headerRow = grid[0] ?? [];
+      const storedColumns = JSON.parse(s.columns) as { label: string; width?: number }[];
+      const hasHeaderValues = headerRow.some((label) => label.length > 0);
+      return (hasHeaderValues ? headerRow : storedColumns.map((column) => column.label)).map((label, index) => ({
+        label,
+        width: storedColumns[index]?.width,
+      }));
+    })(),
+    rows: (() => {
+      const grid = celldataToGridShape(sheetRecordToCelldata(s));
+      return grid.length > 1 ? grid.slice(1) : [];
+    })(),
     merges: JSON.parse(s.merges),
   }));
 
@@ -99,13 +111,15 @@ export async function createSheet(workbookId: number, name?: string, sourceSheet
 
   const nextOrder = workbook.sheets.length;
   const nextName = name?.trim() || `Sheet${nextOrder + 1}`;
-  const schema = sourceSheet
-    ? cloneSheetSchema(sourceSheet)
-    : {
-        columns: JSON.stringify([{ label: "A" }]),
-        merges: JSON.stringify([]),
-        rows: JSON.stringify([[]]),
-      };
+  const sourceColumns = sourceSheet ? JSON.parse(sourceSheet.columns) as { label: string; width?: number }[] : [{ label: "A" }];
+  const sourceMerges = sourceSheet ? JSON.parse(sourceSheet.merges) as { row: [number, number]; col: [number, number] }[] : [];
+  const schema = {
+    columns: JSON.stringify(sourceColumns),
+    merges: JSON.stringify(sourceMerges),
+  };
+  const celldata = sourceSheet
+    ? sheetRecordToCelldata(sourceSheet)
+    : gridToCelldata([[]], ["A"]);
 
   const sheet = await repo.createSheet({
     workbookId,
@@ -113,7 +127,7 @@ export async function createSheet(workbookId: number, name?: string, sourceSheet
     order: nextOrder,
     columns: schema.columns,
     merges: schema.merges,
-    rows: schema.rows,
+    uploadedData: JSON.stringify(celldata),
   });
 
   return { id: sheet.id, name: sheet.name, order: sheet.order };

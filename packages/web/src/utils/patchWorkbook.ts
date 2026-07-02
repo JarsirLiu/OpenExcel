@@ -1,3 +1,4 @@
+import { sheetChangeDeltaToZeroBased, type SheetChangeDelta } from "@openexcel/core";
 import type { WorkbookFull, SheetSchema } from "../api/client";
 
 function toColRef(c: number): string {
@@ -24,16 +25,19 @@ function parseConfig(config: any): Record<string, any> {
 
 /**
  * Incrementally patch a WorkbookFull with minimal delta data.
+ * Public sheet change deltas are 1-based; we normalize them to internal 0-based indices here.
  * Delta types:
  *   - { type: "write", cells: [{row, col, value}], merges: [...] }
- *   - { type: "merge",   range: { startRow, startCol, endRow, endCol } }
- *   - { type: "unmerge", range: { startRow, startCol, endRow, endCol } }
+ *   - { type: "clear", operations: [{type: "cell", ...} | {type: "range", ...}] }
+ *   - { type: "merge",   operations: [{ type: "range", ... }] }
+ *   - { type: "unmerge", operations: [{ type: "range", ... }] }
  */
 export function patchWorkbookWithDelta(
   workbook: WorkbookFull,
   sheetId: number,
-  delta: any,
+  delta: SheetChangeDelta,
 ): WorkbookFull | null {
+  const internalDelta = sheetChangeDeltaToZeroBased(delta);
   const sheetIndex = workbook.sheets.findIndex((s) => s.id === sheetId);
   if (sheetIndex === -1) return null;
 
@@ -49,8 +53,8 @@ export function patchWorkbookWithDelta(
 
   const config = parseConfig(sheet.config);
 
-  if (delta.type === "write") {
-    const { cells, merges } = delta;
+  if (internalDelta.type === "write") {
+    const { cells, merges } = internalDelta;
     if (!Array.isArray(cells)) return null;
 
     // Patch cell values
@@ -98,62 +102,99 @@ export function patchWorkbookWithDelta(
         };
       }
     }
-  } else if (delta.type === "merge") {
-    const { range } = delta;
-    const { startRow, startCol, endRow, endCol } = range;
-    const rs = endRow - startRow + 1;
-    const cs = endCol - startCol + 1;
-
-    // Set mc on all cells in range, keep top-left value
-    const topLeftKey = `${startRow},${startCol}`;
-    const topLeft = cellMap.get(topLeftKey);
-
-    for (let r = startRow; r <= endRow; r++) {
-      for (let c = startCol; c <= endCol; c++) {
-        const key = `${r},${c}`;
-        if (r === startRow && c === startCol) {
-          // Top-left: keep value, add mc
-          const cell = cellMap.get(key) ?? { r, c, v: {} };
-          cell.v = { ...cell.v, mc: { r: startRow, c: startCol, rs, cs } };
-          cellMap.set(key, cell);
+  } else if (internalDelta.type === "clear") {
+    for (const operation of internalDelta.operations) {
+      if (operation.type === "cell") {
+        const key = `${operation.row},${operation.col}`;
+        const cell = cellMap.get(key);
+        if (!cell?.v) continue;
+        const { v: _cellValue, m: _displayValue, ...rest } = cell.v;
+        if (Object.keys(rest).length > 0) {
+          cell.v = rest;
         } else {
-          // Other cells: clear value, add mc
-          const cell = cellMap.get(key) ?? { r, c, v: {} };
-          cell.v = { mc: { r: startRow, c: startCol, rs, cs } };
-          cellMap.set(key, cell);
+          cellMap.delete(key);
+        }
+        continue;
+      }
+
+      for (const [key, cell] of cellMap) {
+        if (
+          cell.r >= operation.startRow &&
+          cell.r <= operation.endRow &&
+          cell.c >= operation.startCol &&
+          cell.c <= operation.endCol
+        ) {
+          if (!cell.v) continue;
+          const { v: _cellValue, m: _displayValue, ...rest } = cell.v;
+          if (Object.keys(rest).length > 0) {
+            cell.v = rest;
+          } else {
+            cellMap.delete(key);
+          }
+        }
+      }
+    }
+  } else if (internalDelta.type === "merge") {
+    for (const range of internalDelta.operations) {
+      const { startRow, startCol, endRow, endCol } = range;
+      const rs = endRow - startRow + 1;
+      const cs = endCol - startCol + 1;
+
+      for (let r = startRow; r <= endRow; r++) {
+        for (let c = startCol; c <= endCol; c++) {
+          const key = `${r},${c}`;
+          if (r === startRow && c === startCol) {
+            // Top-left: keep value, add mc
+            const cell = cellMap.get(key) ?? { r, c, v: {} };
+            cell.v = { ...cell.v, mc: { r: startRow, c: startCol, rs, cs } };
+            cellMap.set(key, cell);
+          } else {
+            // Other cells: clear value, add mc
+            const cell = cellMap.get(key) ?? { r, c, v: {} };
+            cell.v = { mc: { r: startRow, c: startCol, rs, cs } };
+            cellMap.set(key, cell);
+          }
         }
       }
     }
 
     // Update config.merge
-    const colRef = toColRef(startCol);
-    const cellRef = `${colRef}${startRow + 1}`;
-    config.merge[cellRef] = { r: startRow, c: startCol, rs, cs };
-  } else if (delta.type === "unmerge") {
-    const { range } = delta;
-    const { startRow, startCol, endRow, endCol } = range;
+    for (const range of internalDelta.operations) {
+      const colRef = toColRef(range.startCol);
+      const cellRef = `${colRef}${range.startRow + 1}`;
+      config.merge[cellRef] = {
+        r: range.startRow,
+        c: range.startCol,
+        rs: range.endRow - range.startRow + 1,
+        cs: range.endCol - range.startCol + 1,
+      };
+    }
+  } else if (internalDelta.type === "unmerge") {
+    for (const range of internalDelta.operations) {
+      const { startRow, startCol, endRow, endCol } = range;
 
-    // Clear mc from all cells in range
-    for (const [key, cell] of cellMap) {
-      if (
-        cell.r >= startRow &&
-        cell.r <= endRow &&
-        cell.c >= startCol &&
-        cell.c <= endCol
-      ) {
-        if (cell.v?.mc) {
-          const { mc, ...rest } = cell.v;
-          cell.v = rest;
+      // Clear mc from all cells in range
+      for (const [key, cell] of cellMap) {
+        if (
+          cell.r >= startRow &&
+          cell.r <= endRow &&
+          cell.c >= startCol &&
+          cell.c <= endCol
+        ) {
+          if (cell.v?.mc) {
+            const { mc, ...rest } = cell.v;
+            cell.v = rest;
+          }
         }
       }
-    }
 
-    // Remove merge from config
-    if (config.merge) {
-      for (const cellRef of Object.keys(config.merge)) {
-        const m = (config.merge as Record<string, { r: number; c: number }>)[cellRef];
-        if (m.r >= startRow && m.r <= endRow && m.c >= startCol && m.c <= endCol) {
-          delete config.merge[cellRef];
+      // Remove merge from config
+      if (config.merge) {
+        for (const cellRef of Object.keys(config.merge)) {
+          const m = (config.merge as Record<string, { r: number; c: number }>)[cellRef];
+          if (m.r >= startRow && m.r <= endRow && m.c >= startCol && m.c <= endCol) {
+            delete config.merge[cellRef];
+          }
         }
       }
     }

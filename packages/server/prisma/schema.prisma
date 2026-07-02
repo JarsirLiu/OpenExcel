@@ -23,11 +23,11 @@ model Sheet {
   order        Int
   columns      String
   merges       String   @default("[]")
-  rows         String
   uploadedData String?
   config       String?
   workbook     Workbook @relation(fields: [workbookId], references: [id], onDelete: Cascade)
   sessions     Session[]
+  runSnapshots AgentRunSheetSnapshot[]
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
@@ -36,6 +36,7 @@ model Session {
   id        Int       @id @default(autoincrement())
   sheetId   Int?
   name      String
+  chatMessages String? @default("[]")
   sheet     Sheet?    @relation(fields: [sheetId], references: [id], onDelete: Cascade)
   runs      AgentRun[]
   createdAt DateTime  @default(now())
@@ -50,8 +51,10 @@ model AgentRun {
   inputText String?
   outputText String?
   errorMessage String?
+  revertedAt DateTime?
   session   Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   steps     AgentStep[]
+  snapshots AgentRunSheetSnapshot[]
   startedAt DateTime @default(now())
   endedAt   DateTime?
 }
@@ -68,4 +71,18 @@ model AgentStep {
   order     Int
   run       AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
+}
+
+model AgentRunSheetSnapshot {
+  id           Int      @id @default(autoincrement())
+  runId        Int
+  sheetId      Int
+  uploadedData  String?
+  config       String?
+  createdAt    DateTime @default(now())
+  run          AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  sheet        Sheet    @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, sheetId])
+  @@index([runId])
 }

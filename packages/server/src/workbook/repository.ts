@@ -41,9 +41,15 @@ export async function createSheet(data: {
   order: number;
   columns: string;
   merges: string;
-  rows: string;
+  uploadedData: string;
+  config?: string;
 }) {
-  return prisma.sheet.create({ data });
+  return prisma.sheet.create({
+    data: {
+      ...data,
+      config: data.config ?? null,
+    },
+  });
 }
 
 export async function deleteSheet(id: number) {

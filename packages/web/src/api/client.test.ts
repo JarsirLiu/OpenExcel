@@ -6,6 +6,8 @@ import {
   createSheet,
   deleteSheet,
   fetchMessages,
+  fetchRuns,
+  undoLatestRun,
   downloadTemplateUrl,
 } from "./client";
 
@@ -91,8 +93,29 @@ describe("fetchMessages", () => {
   });
 });
 
+describe("fetchRuns", () => {
+  it("returns parsed runs", async () => {
+    const runs = [{ id: 7, status: "completed" }];
+    mockFetch.mockResolvedValue(new Response(JSON.stringify(runs), { status: 200 }));
+
+    const result = await fetchRuns(3);
+    expect(result).toEqual(runs);
+    expect(mockFetch).toHaveBeenCalledWith("/api/sessions/3/runs");
+  });
+});
+
 describe("downloadTemplateUrl", () => {
   it("returns correct URL", () => {
     expect(downloadTemplateUrl(4)).toBe("/api/workbooks/4/template");
+  });
+});
+
+describe("undoLatestRun", () => {
+  it("posts undo request for latest run", async () => {
+    mockFetch.mockResolvedValue(new Response(JSON.stringify({ runId: 8, restoredSheetIds: [1, 2] }), { status: 200 }));
+
+    const result = await undoLatestRun(3);
+    expect(result).toEqual({ runId: 8, restoredSheetIds: [1, 2] });
+    expect(mockFetch).toHaveBeenCalledWith("/api/sessions/3/runs/undo-latest", { method: "POST" });
   });
 });

@@ -12,7 +12,6 @@ export interface SheetSchema {
   order: number;
   columns: { label: string; width?: number }[];
   merges: { row: [number, number]; col: [number, number] }[];
-  rows: string[][];
   uploadedData: any[] | null;
   config: any | null;
 }
@@ -58,28 +57,6 @@ export async function uploadNewWorkbook(file: File): Promise<{ id: number; name:
 
 export function downloadTemplateUrl(workbookId: number): string {
   return `${BASE}/workbooks/${workbookId}/template`;
-}
-
-export interface ToolCallDisplay {
-  id: string;
-  toolCallId: string;
-  toolName: string;
-  summary: string;
-  status: "running" | "completed";
-  preview?: any;
-}
-
-export interface Message {
-  id: string;
-  role: "user" | "assistant" | "system";
-  content: string;
-  reasoning?: string;
-  toolCalls?: ToolCallDisplay[];
-}
-
-export interface AgentRunEvent {
-  event: "run.started" | "step.started" | "step.completed" | "step.delta" | "run.completed" | "run.failed" | "run.aborted" | "sheet.changed";
-  data: any;
 }
 
 export async function updateSheetData(sheetId: number, celldata: any[], config?: any): Promise<void> {
@@ -149,53 +126,22 @@ export async function renameSession(id: number, name: string): Promise<Session> 
   return res.json();
 }
 
-export async function fetchMessages(sessionId: number): Promise<Message[]> {
+export async function fetchMessages(sessionId: number): Promise<any[]> {
   const res = await fetch(`${BASE}/sessions/${sessionId}/messages`);
   if (!res.ok) throw new Error("加载消息失败");
   return res.json();
 }
 
-export async function streamChat(
-  sessionId: number,
-  input: string,
-  onEvent: (event: AgentRunEvent) => void,
-  signal?: AbortSignal,
-): Promise<void> {
-  const res = await fetch(`${BASE}/sessions/${sessionId}/chat`, {
+export async function fetchRuns(sessionId: number): Promise<any[]> {
+  const res = await fetch(`${BASE}/sessions/${sessionId}/runs`);
+  if (!res.ok) throw new Error("加载运行日志失败");
+  return res.json();
+}
+
+export async function undoLatestRun(sessionId: number): Promise<{ runId: number; restoredSheetIds: number[] }> {
+  const res = await fetch(`${BASE}/sessions/${sessionId}/runs/undo-latest`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ input }),
-    signal,
   });
-  if (!res.ok || !res.body) {
-    throw new Error("聊天流启动失败");
-  }
-
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-
-  const flush = () => {
-    const parts = buffer.split("\n\n");
-    buffer = parts.pop() ?? "";
-    for (const part of parts) {
-      const lines = part.split("\n");
-      const eventLine = lines.find((line) => line.startsWith("event: "));
-      const dataLine = lines.find((line) => line.startsWith("data: "));
-      if (!eventLine || !dataLine) continue;
-      const event = eventLine.slice(7).trim() as AgentRunEvent["event"];
-      const data = JSON.parse(dataLine.slice(6));
-      onEvent({ event, data });
-    }
-  };
-
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    flush();
-  }
-
-  buffer += decoder.decode();
-  flush();
+  if (!res.ok) throw new Error("撤销本轮修改失败");
+  return res.json();
 }

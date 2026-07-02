@@ -1,88 +1,67 @@
 import { prisma } from "../../db.js";
-import { celldataToGrid } from "@openexcel/core";
+import {
+  sheetChangePatchOutputSchema,
+  sheetChangeRangeOperationSchema,
+  sheetChangeRangeToZeroBased,
+  type SheetChangeDelta,
+  type SheetChangeRangeOperation,
+} from "@openexcel/core";
 import { z } from "zod";
+import { buildSheetChangePreview, toA1Range } from "./preview.js";
+import { sheetMutationContextSchema } from "../undo.js";
+import * as repo from "../repository.js";
+import { sheetRecordToCelldata } from "../../utils/sheetData.js";
 
-function toColRef(c: number): string {
-  let ref = "";
-  let n = c;
-  while (n >= 0) {
-    ref = String.fromCharCode(65 + (n % 26)) + ref;
-    n = Math.floor(n / 26) - 1;
-  }
-  return ref;
-}
-
-function toCellRef(r: number, c: number): string {
-  return `${toColRef(c)}${r + 1}`;
-}
-
-function extractPreview(celldata: any[], sheetName: string, sheetId: number, minRow: number, maxRow: number) {
-  const maxCol = Math.max(...celldata.map((c: any) => c.c), 0);
-  const columnCount = maxCol + 1;
-  const grid = celldataToGrid(celldata, columnCount);
-  const rows = grid.slice(minRow, maxRow + 1);
-
-  const merges: { startRow: number; startCol: number; endRow: number; endCol: number }[] = [];
-  for (const cell of celldata) {
-    const mc = cell.v?.mc;
-    if (mc) {
-      const r = cell.r;
-      const c = cell.c;
-      if (r >= minRow && r <= maxRow) {
-        merges.push({
-          startRow: r - minRow,
-          startCol: c,
-          endRow: r + (mc.rs ?? 1) - 1 - minRow,
-          endCol: c + (mc.cs ?? 1) - 1,
-        });
-      }
-    }
-  }
-
-  return {
-    sheetId,
-    sheetName,
-    range: { startRow: minRow, endRow: maxRow, startCol: 0, endCol: columnCount - 1 },
-    rows,
-    merges,
-  };
-}
+const unmergeCellsInputSchema = z.object({
+  sheetId: z.coerce.number().describe("Sheet ID"),
+  operations: z.array(sheetChangeRangeOperationSchema).min(1).describe("要取消合并的范围列表，行号和列号都从 1 开始"),
+});
 
 export const unmergeCells = {
-  description: "取消指定范围内的单元格合并。取消后每个单元格独立。",
-  inputSchema: z.object({
-    sheetId: z.coerce.number().describe("Sheet ID"),
-    startRow: z.coerce.number().describe("起始行号，从 0 开始"),
-    startCol: z.coerce.number().describe("起始列号，从 0 开始"),
-    endRow: z.coerce.number().describe("结束行号，从 0 开始"),
-    endCol: z.coerce.number().describe("结束列号，从 0 开始"),
-  }),
-  execute: async ({ sheetId, startRow, startCol, endRow, endCol }: { sheetId: number; startRow: number; startCol: number; endRow: number; endCol: number }) => {
+  description: "取消指定范围内的单元格合并。使用 operations 数组，每项都是一个 range；取消后每个单元格独立。行号和列号都从 1 开始。",
+  inputSchema: unmergeCellsInputSchema,
+  contextSchema: sheetMutationContextSchema,
+  execute: async (
+    { sheetId, operations }: { sheetId: number; operations: SheetChangeRangeOperation[] },
+    { context }: { context: { runId: number } },
+  ) => {
     const sheet = await prisma.sheet.findUnique({ where: { id: sheetId } });
-    if (!sheet) return { error: `Sheet ${sheetId} 不存在` };
+    if (!sheet) throw new Error(`Sheet ${sheetId} 不存在`);
 
-    const celldata: any[] = sheet.uploadedData ? JSON.parse(sheet.uploadedData) : [];
-    if (!Array.isArray(celldata)) return { error: "celldata 格式错误" };
+    await repo.upsertRunSheetSnapshot({
+      runId: context.runId,
+      sheetId,
+      uploadedData: sheet.uploadedData ?? null,
+      config: sheet.config ?? null,
+    });
 
-    for (const cell of celldata) {
-      if (cell.r >= startRow && cell.r <= endRow && cell.c >= startCol && cell.c <= endCol) {
-        if (cell.v?.mc) {
-          const { ...rest } = cell.v;
-          delete rest.mc;
-          cell.v = rest;
+    const celldata: any[] = sheetRecordToCelldata(sheet);
+    if (!Array.isArray(celldata)) throw new Error("celldata 格式错误");
+
+    const storageRanges = operations.map(sheetChangeRangeToZeroBased);
+
+    for (const range of storageRanges) {
+      for (const cell of celldata) {
+        if (cell.r >= range.startRow && cell.r <= range.endRow && cell.c >= range.startCol && cell.c <= range.endCol) {
+          if (cell.v?.mc) {
+            const { mc, ...rest } = cell.v;
+            cell.v = rest;
+          }
         }
       }
     }
 
     const config = sheet.config ? JSON.parse(sheet.config) : {};
     if (config.merge) {
-      for (const key of Object.keys(config.merge)) {
-        const m = config.merge[key];
-        if (
-          m.r >= startRow && m.r <= endRow &&
-          m.c >= startCol && m.c <= endCol
-        ) {
-          delete config.merge[key];
+      for (const range of storageRanges) {
+        for (const key of Object.keys(config.merge)) {
+          const m = config.merge[key];
+          if (
+            m.r >= range.startRow && m.r <= range.endRow &&
+            m.c >= range.startCol && m.c <= range.endCol
+          ) {
+            delete config.merge[key];
+          }
         }
       }
     }
@@ -95,10 +74,23 @@ export const unmergeCells = {
       },
     });
 
-    return {
-      success: true,
-      unmergedRange: `${toCellRef(startRow, startCol)}:${toCellRef(endRow, endCol)}`,
-      preview: extractPreview(celldata, sheet.name, sheetId, startRow, endRow),
+    const minRow = Math.min(...storageRanges.map((range) => range.startRow));
+    const maxRow = Math.max(...storageRanges.map((range) => range.endRow));
+
+    const delta: SheetChangeDelta = {
+      type: "unmerge",
+      operations,
     };
+
+    const output = {
+      success: true,
+      unmergedRanges: operations.map((operation) => toA1Range(operation.startRow, operation.startCol, operation.endRow, operation.endCol)),
+      delta,
+      preview: buildSheetChangePreview(celldata, sheet.name, sheetId, minRow, maxRow),
+      sheetInfo: { sheetId: sheet.id, sheetName: sheet.name },
+    };
+
+    sheetChangePatchOutputSchema.parse(output);
+    return output;
   },
 };

@@ -1,4 +1,5 @@
-import { useRef, useState, useCallback, useEffect } from "react";
+import { useRef, useState, useCallback } from "react";
+import type { SheetChangeDelta } from "@openexcel/core";
 import { useWorkbench } from "../hooks/useWorkbench";
 import { uploadNewWorkbook, deleteWorkbook, fetchWorkbooks, fetchWorkbook } from "../api/client";
 import { WorkbenchHeader } from "./WorkbenchHeader";
@@ -26,33 +27,38 @@ export function Workbench() {
   const [currentSheetIndex, setCurrentSheetIndex] = useState(0);
   const [revision, setRevision] = useState(0);
 
-  useEffect(() => {
-    const handler = async (e: Event) => {
-      const detail = (e as CustomEvent).detail;
-      if (!currentWorkbook) return;
-      const hasSheet = currentWorkbook.sheets.some((s) => s.id === detail.sheetId);
-      if (!hasSheet) return;
+  const handleSheetChanged = useCallback(async (sheetId: number, delta: SheetChangeDelta | null) => {
+    if (!currentWorkbook) return;
+    const hasSheet = currentWorkbook.sheets.some((s) => s.id === sheetId);
+    if (!hasSheet) return;
 
-      if (detail.delta) {
-        // Incremental patch — no server round-trip
-        const patched = patchWorkbookWithDelta(currentWorkbook, detail.sheetId, detail.delta);
-        if (patched) {
-          setCurrentWorkbook(patched);
-          setRevision((r) => r + 1);
-        }
-      } else {
-        // Fallback: full re-fetch (backward compat)
-        try {
-          const full = await fetchWorkbook(currentWorkbook.id);
-          setCurrentWorkbook(full);
-          setRevision((r) => r + 1);
-        } catch {
-          // ignore
-        }
+    if (delta) {
+      const patched = patchWorkbookWithDelta(currentWorkbook, sheetId, delta);
+      if (patched) {
+        setCurrentWorkbook(patched);
+        setRevision((r) => r + 1);
+        return;
       }
-    };
-    window.addEventListener("openexcel:sheet-changed", handler);
-    return () => window.removeEventListener("openexcel:sheet-changed", handler);
+    }
+
+    try {
+      const full = await fetchWorkbook(currentWorkbook.id);
+      setCurrentWorkbook(full);
+      setRevision((r) => r + 1);
+    } catch {
+      // ignore
+    }
+  }, [currentWorkbook, setCurrentWorkbook]);
+
+  const handleWorkbookRefresh = useCallback(async () => {
+    if (!currentWorkbook) return;
+    try {
+      const full = await fetchWorkbook(currentWorkbook.id);
+      setCurrentWorkbook(full);
+      setRevision((r) => r + 1);
+    } catch {
+      // ignore
+    }
   }, [currentWorkbook, setCurrentWorkbook]);
 
   const handleSwitchWorkbook = useCallback(async (index: number) => {
@@ -152,7 +158,7 @@ export function Workbench() {
           onSheetIndexChange={setCurrentSheetIndex}
           onWorkbookDelete={handleWorkbookDelete}
         />
-        <ChatSidebar />
+        <ChatSidebar onSheetChanged={handleSheetChanged} onUndoComplete={handleWorkbookRefresh} />
       </div>
     </div>
   );
