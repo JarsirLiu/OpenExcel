@@ -78,7 +78,7 @@ function ChatPanel({
     },
   });
 
-  const isStreaming = status === "streaming";
+  const isStreaming = status === "submitted" || status === "streaming";
 
   useEffect(() => {
     onStreamingChange?.(isStreaming);
@@ -93,6 +93,9 @@ function ChatPanel({
     const text = draft.trim();
     if (!text || isStreaming) return;
     setDraft("");
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+    }
     sendMessage({ text });
   };
 
@@ -167,7 +170,7 @@ function ChatPanel({
       {/* Stream indicator */}
       {isStreaming && (() => {
         const last = messages[messages.length - 1];
-        const showDots = !last || last.role !== "assistant" || !last.parts?.some((p: any) =>
+        const showDots = status === "submitted" || !last || last.role !== "assistant" || !last.parts?.some((p: any) =>
           p.type === "text" || p.type.startsWith("tool-") || p.type === "reasoning"
         );
         if (!showDots) return null;
@@ -196,12 +199,17 @@ function ChatPanel({
             ref={textareaRef}
             className="chat-input"
             value={draft}
-            onChange={(e) => setDraft(e.target.value)}
+            onChange={(e) => {
+              setDraft(e.target.value);
+              const el = e.target;
+              el.style.height = "auto";
+              el.style.height = el.scrollHeight + "px";
+            }}
             placeholder="输入消息..."
             rows={1}
             style={{
               width: "100%", border: "none", background: "transparent", resize: "none",
-              outline: "none", fontSize: 14, lineHeight: 1.5, maxHeight: 100, minHeight: 22,
+              outline: "none", fontSize: 14, lineHeight: 1.5, maxHeight: 105, minHeight: 22,
               padding: 0, color: "#1f1f1f", fontFamily: "inherit", overflowY: "auto",
             }}
             onKeyDown={(e) => {
