@@ -3,6 +3,13 @@ import type { FortuneCell, SheetConfig, FortuneSheetData } from "@openexcel/core
 
 export type { FortuneCell, SheetConfig, FortuneSheetData };
 
+function cloneFortuneSheetData<T>(value: T): T {
+  if (typeof structuredClone === "function") {
+    return structuredClone(value);
+  }
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
 /**
  * 从 celldata 的 mc 属性提取合并范围。
  */
@@ -68,5 +75,5 @@ export function toFortuneSheetData(
     restoreSheetConfig(result, sheet.config as SheetConfig);
   }
 
-  return result;
+  return cloneFortuneSheetData(result);
 }

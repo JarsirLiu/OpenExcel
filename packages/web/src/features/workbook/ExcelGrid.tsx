@@ -69,6 +69,7 @@ export function ExcelGrid({
       </div>
       <div style={{ flex: 1, minHeight: 0 }}>
         <Workbook
+          key={workbook.id}
           ref={workbookRef}
           data={sheetData as any}
           onChange={handleChange}
