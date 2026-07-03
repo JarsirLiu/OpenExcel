@@ -6,10 +6,10 @@ import {
   fetchWorkbooks,
   uploadNewWorkbook,
 } from "../../api/client";
-import { useWorkbench } from "../../hooks/useWorkbench";
 import { patchWorkbookWithDelta } from "../../utils/patchWorkbook";
 import { useWorkbookImportFlow } from "./useWorkbookImportFlow";
 import { useWorkbookSheetSummaries } from "./useWorkbookSheetSummaries";
+import { useWorkbookCatalog } from "./useWorkbookCatalog";
 
 export function useWorkbookWorkspace() {
   const {
@@ -25,7 +25,7 @@ export function useWorkbookWorkspace() {
     setStatus,
     uploadExcel,
     workbookRevision,
-  } = useWorkbench();
+  } = useWorkbookCatalog();
 
   const [currentSheetIndex, setCurrentSheetIndex] = useState(0);
   const allSheets = useWorkbookSheetSummaries();
