@@ -30,20 +30,21 @@ const CopyIcon = ({ size = 14 }: { size?: number }) => (
 
 function renderAssistantParts(
   msg: any,
+  isStreaming: boolean,
   thinkingOpen: Record<string, boolean>,
   setThinkingOpen: (fn: (prev: Record<string, boolean>) => Record<string, boolean>) => void,
 ) {
   if (!msg.parts || msg.parts.length === 0) {
-    return <MessageMarkdown content={msg.content || ""} />;
+    return <MessageMarkdown content={msg.content || ""} isStreaming={isStreaming} />;
   }
 
   const result: JSX.Element[] = [];
   let textParts: string[] = [];
   const flushText = (key: string) => {
     if (textParts.length > 0) {
-      result.push(
-        <MessageMarkdown key={key} content={textParts.join("")} />,
-      );
+        result.push(
+          <MessageMarkdown key={key} content={textParts.join("")} isStreaming={isStreaming} />,
+        );
       textParts = [];
     }
   };
@@ -113,7 +114,7 @@ export function MessageItem({
           </div>
         ) : (
           <>
-            {renderAssistantParts(msg, thinkingOpen, setThinkingOpen)}
+            {renderAssistantParts(msg, isStreaming, thinkingOpen, setThinkingOpen)}
             {!isStreaming && isLastAssistantMessage && (
               <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 14 }}>
                 <button
