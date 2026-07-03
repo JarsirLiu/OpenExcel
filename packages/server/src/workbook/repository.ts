@@ -7,6 +7,13 @@ export async function findWorkbooks(): Promise<Prisma.WorkbookGetPayload<{}>[]> 
   return prisma.workbook.findMany({ orderBy: { order: "asc" } });
 }
 
+export async function findWorkbooksWithSheets() {
+  return prisma.workbook.findMany({
+    orderBy: { order: "asc" },
+    include: { sheets: { orderBy: { order: "asc" } } },
+  });
+}
+
 export async function findWorkbookWithSheets(id: number) {
   return prisma.workbook.findUnique({
     where: { id },

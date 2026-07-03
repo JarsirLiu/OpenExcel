@@ -6,6 +6,10 @@ export async function workbookRoutes(app: FastifyInstance) {
     return service.getWorkbooks();
   });
 
+  app.get("/api/workbooks/reference-candidates", async () => {
+    return service.getReferenceCandidates();
+  });
+
   app.get<{ Params: { id: string } }>("/api/workbooks/:id", async (req) => {
     const wb = await service.getWorkbook(Number(req.params.id));
     if (!wb) return { error: "Not found" };

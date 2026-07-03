@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   fetchWorkbooks,
+  fetchWorkbookReferenceCandidates,
   fetchWorkbook,
   updateSheetData,
   createSheet,
@@ -43,6 +44,23 @@ describe("fetchWorkbook", () => {
     const result = await fetchWorkbook(1);
     expect(result).toEqual(data);
     expect(mockFetch).toHaveBeenCalledWith("/api/workbooks/1");
+  });
+});
+
+describe("fetchWorkbookReferenceCandidates", () => {
+  it("calls correct URL", async () => {
+    const data = [
+      {
+        id: 1,
+        name: "WB1",
+        sheets: [{ id: 11, name: "Sheet1" }],
+      },
+    ];
+    mockFetch.mockResolvedValue(new Response(JSON.stringify(data), { status: 200 }));
+
+    const result = await fetchWorkbookReferenceCandidates();
+    expect(result).toEqual(data);
+    expect(mockFetch).toHaveBeenCalledWith("/api/workbooks/reference-candidates");
   });
 });
 

@@ -28,7 +28,7 @@ export function useWorkbookWorkspace() {
   } = useWorkbench();
 
   const [currentSheetIndex, setCurrentSheetIndex] = useState(0);
-  const allSheets = useWorkbookSheetSummaries(workbooks);
+  const allSheets = useWorkbookSheetSummaries();
 
   const refreshCurrentWorkbook = useCallback(async () => {
     if (!currentWorkbook) return;

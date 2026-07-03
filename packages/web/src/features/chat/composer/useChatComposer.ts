@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Mention from "@tiptap/extension-mention";
-import { createMentionSuggestion } from "../../../components/SheetMentionList";
+import { createMentionSuggestion } from "./SheetMentionList";
 
 type SheetMeta = { workbookId: number; workbookName: string; id: number; name: string };
 
@@ -17,9 +17,13 @@ export function useChatComposer({
 }) {
   const editorRef = useRef<any>(null);
   const [editorText, setEditorText] = useState("");
+  const [isMentionOpen, setIsMentionOpen] = useState(false);
+  const isMentionOpenRef = useRef(false);
+  const sheetsRef = useRef(sheets);
 
   const handleSend = useCallback(() => {
     const editor = editorRef.current;
+    if (isMentionOpenRef.current) return;
     const text = editor?.getText().trim() ?? "";
     if (!text || isStreaming) return;
     editor?.commands.clearContent();
@@ -32,7 +36,17 @@ export function useChatComposer({
       StarterKit,
       Mention.configure({
         HTMLAttributes: { class: "mention" },
-        suggestion: createMentionSuggestion(sheets),
+        suggestion: createMentionSuggestion(
+          () => sheetsRef.current.map((sheet) => ({
+            workbookId: sheet.workbookId,
+            workbookName: sheet.workbookName,
+            sheetId: sheet.id,
+            sheetName: sheet.name,
+          })),
+          {
+          onOpenChange: setIsMentionOpen,
+          },
+        ),
       }),
     ],
     editorProps: {
@@ -42,6 +56,9 @@ export function useChatComposer({
       },
       handleKeyDown: (_, event) => {
         if (event.key === "Enter" && !event.shiftKey) {
+          if (isMentionOpenRef.current) {
+            return false;
+          }
           event.preventDefault();
           handleSend();
           return true;
@@ -58,9 +75,18 @@ export function useChatComposer({
     editorRef.current = editor ?? null;
   }, [editor]);
 
+  useEffect(() => {
+    isMentionOpenRef.current = isMentionOpen;
+  }, [isMentionOpen]);
+
+  useEffect(() => {
+    sheetsRef.current = sheets;
+  }, [sheets]);
+
   return {
     editor,
     editorText,
     handleSend,
+    isMentionOpen,
   };
 }

@@ -26,6 +26,17 @@ export interface WorkbookMeta {
   order: number;
 }
 
+export interface WorkbookReferenceCandidateSheet {
+  id: number;
+  name: string;
+}
+
+export interface WorkbookReferenceCandidate {
+  id: number;
+  name: string;
+  sheets: WorkbookReferenceCandidateSheet[];
+}
+
 export interface SheetSchema {
   id: number;
   name: string;
@@ -54,6 +65,12 @@ export interface WorkbookImportResult {
 export async function fetchWorkbooks(): Promise<WorkbookMeta[]> {
   const res = await fetch(`${BASE}/workbooks`);
   if (!res.ok) throw new Error("加载工作簿失败");
+  return res.json();
+}
+
+export async function fetchWorkbookReferenceCandidates(): Promise<WorkbookReferenceCandidate[]> {
+  const res = await fetch(`${BASE}/workbooks/reference-candidates`);
+  if (!res.ok) throw new Error("加载引用候选失败");
   return res.json();
 }
 

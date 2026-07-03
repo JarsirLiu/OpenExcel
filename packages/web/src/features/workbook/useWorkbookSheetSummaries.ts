@@ -1,10 +1,5 @@
 import { useEffect, useState } from "react";
-import { fetchWorkbook } from "../../api/client";
-
-type WorkbookMeta = {
-  id: number;
-  name: string;
-};
+import { fetchWorkbookReferenceCandidates } from "../../api/client";
 
 export type WorkbookSheetSummary = {
   workbookId: number;
@@ -13,20 +8,15 @@ export type WorkbookSheetSummary = {
   name: string;
 };
 
-export function useWorkbookSheetSummaries(workbooks: WorkbookMeta[]) {
+export function useWorkbookSheetSummaries() {
   const [allSheets, setAllSheets] = useState<WorkbookSheetSummary[]>([]);
 
   useEffect(() => {
-    if (workbooks.length === 0) {
-      setAllSheets([]);
-      return;
-    }
-
     let cancelled = false;
-    Promise.all(workbooks.map((wb) => fetchWorkbook(wb.id))).then((fullList) => {
+    void fetchWorkbookReferenceCandidates().then((workbooks) => {
       if (cancelled) return;
       setAllSheets(
-        fullList.flatMap((wb) =>
+        workbooks.flatMap((wb) =>
           wb.sheets.map((sheet) => ({
             workbookId: wb.id,
             workbookName: wb.name,
@@ -40,7 +30,7 @@ export function useWorkbookSheetSummaries(workbooks: WorkbookMeta[]) {
     return () => {
       cancelled = true;
     };
-  }, [workbooks]);
+  }, []);
 
   return allSheets;
 }

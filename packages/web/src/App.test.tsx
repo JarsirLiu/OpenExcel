@@ -11,6 +11,7 @@ vi.mock("./features/workbook/ExcelGrid", () => ({
 vi.mock("./api/client", () => ({
   fetchWorkbooks: vi.fn().mockResolvedValue([]),
   fetchWorkbook: vi.fn(),
+  fetchWorkbookReferenceCandidates: vi.fn().mockResolvedValue([]),
   uploadExcel: vi.fn(),
   uploadNewWorkbook: vi.fn(),
   deleteWorkbook: vi.fn(),
