@@ -1,4 +1,5 @@
 import * as repo from "./repository.js";
+import { buildWorkspaceContext as buildAgentWorkspaceContext } from "@openexcel/agent";
 
 const MAX_TURNS = 20;
 
@@ -18,16 +19,16 @@ function trim(messages: { role: string; content: string }[]): { role: "user" | "
   return messages.slice(-MAX_TURNS * 2) as any;
 }
 
-export function buildWorkplaceContext(): Promise<string> {
-  return repo.findWorkbooksWithSheets().then((wbs) => {
-    if (wbs.length === 0) return "当前没有可用的工作簿。";
-    return wbs
-      .map(
-        (wb) =>
-          `工作簿: ${wb.name} (id: ${wb.id})\n${wb.sheets
-            .map((s) => `  - Sheet: ${s.name} (id: ${s.id})`)
-            .join("\n")}`,
-      )
-      .join("\n");
-  });
+export async function buildWorkplaceContext(): Promise<string> {
+  const workbooks = await repo.findWorkbooksWithSheets();
+  return buildAgentWorkspaceContext(
+    workbooks.map((workbook) => ({
+      id: workbook.id,
+      name: workbook.name,
+      sheets: workbook.sheets.map((sheet) => ({
+        id: sheet.id,
+        name: sheet.name,
+      })),
+    })),
+  );
 }

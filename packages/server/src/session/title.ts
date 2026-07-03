@@ -1,16 +1,7 @@
 import { generateText, type LanguageModel } from "ai";
-import { createTitleModel, type ModelConfig } from "../model.js";
-
-export async function generateSessionTitle(
-  updateSession: (id: number, data: { name?: string }) => Promise<unknown>,
-  sessionId: number,
-  firstUserText: string,
-  modelConfig: ModelConfig,
-): Promise<string> {
-  const title = await generateTitle(createTitleModel(modelConfig), firstUserText);
-  await updateSession(sessionId, { name: title });
-  return title;
-}
+import { createTitleModel, type ModelConfig } from "@openexcel/agent";
+import * as repo from "./repository.js";
+import { loadModelConfig } from "../config.js";
 
 export async function generateTitle(model: LanguageModel, prompt: string): Promise<string> {
   try {
@@ -26,10 +17,23 @@ export async function generateTitle(model: LanguageModel, prompt: string): Promi
       return cleaned.slice(0, 10);
     }
   } catch (error) {
-    console.error("[agent] Failed to generate title from model, falling back:", error);
+    console.error("[server] Failed to generate title from model, falling back:", error);
   }
 
   return fallbackTitleFromPrompt(prompt);
+}
+
+export async function generateSessionTitleForSession(sessionId: number, firstUserText: string) {
+  const session = await repo.findSession(sessionId);
+  if (!session) throw new Error("会话不存在");
+  if (session.name !== "新对话") {
+    return session.name;
+  }
+
+  const config: ModelConfig = loadModelConfig();
+  const title = await generateTitle(createTitleModel(config), firstUserText);
+  await repo.updateSession(sessionId, { name: title });
+  return title;
 }
 
 function stripThinkingTags(text: string): string {

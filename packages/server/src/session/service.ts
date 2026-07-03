@@ -5,12 +5,13 @@ import {
   buildSystemPrompt,
   buildExcelToolCatalog,
   buildExcelToolContext,
-  generateSessionTitle,
   historyFromRuns,
   streamChat as streamAgentChat,
 } from "@openexcel/agent";
 import { excelTools } from "./tools/index.js";
 import { loadModelConfig } from "../config.js";
+
+export { generateSessionTitleForSession } from "./title.js";
 
 function extractMessageText(message: any): string {
   if (typeof message?.content === "string") return message.content;
@@ -194,22 +195,6 @@ export async function streamChat(
     });
     throw error;
   }
-}
-
-export async function generateSessionTitleForSession(sessionId: number, firstUserText: string) {
-  const session = await repo.findSession(sessionId);
-  if (!session) throw new Error("会话不存在");
-  if (session.name !== "新对话") {
-    return session.name;
-  }
-
-  const config = loadModelConfig();
-  return generateSessionTitle(
-    (id, data) => repo.updateSession(id, data),
-    sessionId,
-    firstUserText,
-    config,
-  );
 }
 
 export async function undoLatestRun(sessionId: number) {

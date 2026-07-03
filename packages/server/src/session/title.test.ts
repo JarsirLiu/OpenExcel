@@ -2,20 +2,37 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockGenerateText = vi.fn();
 const mockCreateTitleModel = vi.fn();
+const mockFindSession = vi.fn();
+const mockUpdateSession = vi.fn();
+const mockLoadModelConfig = vi.fn();
 
 vi.mock("ai", () => ({
   generateText: mockGenerateText,
 }));
 
-vi.mock("../model.js", () => ({
+vi.mock("@openexcel/agent", () => ({
   createTitleModel: mockCreateTitleModel,
 }));
 
-const { generateSessionTitle, generateTitle } = await import("./title.js");
+vi.mock("./repository.js", () => ({
+  findSession: mockFindSession,
+  updateSession: mockUpdateSession,
+}));
+
+vi.mock("../config.js", () => ({
+  loadModelConfig: mockLoadModelConfig,
+}));
+
+const { generateSessionTitleForSession, generateTitle } = await import("./title.js");
 
 beforeEach(() => {
   vi.clearAllMocks();
   mockCreateTitleModel.mockReturnValue("title-model");
+  mockLoadModelConfig.mockReturnValue({
+    baseUrl: "http://test.local",
+    apiKey: "test-key",
+    modelName: "test-model",
+  });
 });
 
 describe("generateTitle", () => {
@@ -64,30 +81,37 @@ describe("generateTitle", () => {
   });
 });
 
-describe("generateSessionTitle", () => {
+describe("generateSessionTitleForSession", () => {
   it("调用标题模型工厂并持久化结果", async () => {
     mockGenerateText.mockResolvedValue({
       text: "数据分析",
     });
+    mockFindSession.mockResolvedValue({
+      id: 1,
+      name: "新对话",
+    });
 
-    const updateSession = vi.fn();
-    const title = await generateSessionTitle(
-      updateSession,
-      1,
-      "分析这些数据",
-      {
-        baseUrl: "http://test.local",
-        apiKey: "test-key",
-        modelName: "test-model",
-      },
-    );
+    const title = await generateSessionTitleForSession(1, "分析这些数据");
 
     expect(mockCreateTitleModel).toHaveBeenCalledWith({
       baseUrl: "http://test.local",
       apiKey: "test-key",
       modelName: "test-model",
     });
-    expect(updateSession).toHaveBeenCalledWith(1, { name: "数据分析" });
+    expect(mockUpdateSession).toHaveBeenCalledWith(1, { name: "数据分析" });
     expect(title).toBe("数据分析");
+  });
+
+  it("已有标题时直接返回", async () => {
+    mockFindSession.mockResolvedValue({
+      id: 1,
+      name: "已有标题",
+    });
+
+    const title = await generateSessionTitleForSession(1, "分析这些数据");
+
+    expect(title).toBe("已有标题");
+    expect(mockGenerateText).not.toHaveBeenCalled();
+    expect(mockUpdateSession).not.toHaveBeenCalled();
   });
 });

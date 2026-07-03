@@ -38,7 +38,7 @@ This package must not know about:
 
 ### 2.2 Agent logic is headless
 
-Agent execution, session context, compaction, tool registry, and title generation belong to an agent layer.
+Agent execution, session context, compaction, and tool registry belong to an agent layer.
 
 This layer must not know about:
 
@@ -46,6 +46,8 @@ This layer must not know about:
 - React state
 - DOM events
 - Presentation details
+
+Session title generation is a session API/service concern in `packages/server`, not an agent concern.
 
 ### 2.3 Server is an adapter
 
@@ -117,7 +119,6 @@ Responsibilities:
 - Tool registry for spreadsheet actions
 - Agent execution loop
 - Context compaction
-- Session title generation
 - Runtime abstraction for future environments
 
 ### 3.3 `packages/server`
@@ -129,6 +130,7 @@ Responsibilities:
 - Database persistence
 - Session, run, and step records
 - Workbook and sheet persistence
+- Session title generation
 - Authentication, if needed
 
 Server code may depend on `agent`, but should not duplicate agent logic.
@@ -219,7 +221,7 @@ It may represent:
 
 Title is a derived session attribute.
 
-It should be treated as a side effect:
+It should be treated as a side effect owned by the session API/service layer:
 
 - generated after chat completion
 - persisted independently
@@ -244,14 +246,13 @@ should remain framework-free and continue to act as shared primitives.
 
 ### 5.2 `packages/server`
 
-Current chat-related files:
+Current session-related files:
 
-- `src/chat/service.ts`
-- `src/chat/routes.ts`
-- `src/chat/model.ts`
-- `src/chat/title.ts`
-- `src/chat/context.ts`
-- `src/chat/tools/*`
+- `src/session/service.ts`
+- `src/session/routes.ts`
+- `src/session/title.ts`
+- `src/session/context.ts`
+- `src/session/tools/*`
 
 represent the agent/server boundary today.
 
@@ -259,6 +260,8 @@ Long term, these should move toward a cleaner split:
 
 - `agent` owns model/tool/session semantics
 - `server` owns request handling and persistence
+
+Session title generation remains in `server`, because it is a session API capability rather than an agent primitive.
 
 ### 5.3 `packages/web`
 
@@ -552,7 +555,8 @@ The architecture should evolve in steps.
 
 ### Phase 2: Extract agent layer
 
-- Move session context, title generation, tool registry, and compaction into `packages/agent`
+- Move session context, tool registry, and compaction into `packages/agent`
+- Keep session title generation in `packages/server` as a dedicated session service
 - Keep server as an adapter over the agent layer
 
 ### Phase 3: Harden state boundaries
@@ -574,6 +578,7 @@ The architecture is considered aligned when:
 - workbook edits do not disturb chat session state
 - chat streaming does not wait on title generation
 - title generation can fail independently
+- title generation stays in the session service layer, not the agent layer
 - UI components are small and feature-scoped
 - server routes are thin and predictable
 - core spreadsheet logic remains reusable outside the web app

@@ -1,7 +1,11 @@
 export { createChatModel, createTitleModel, type ModelConfig } from "./model.js";
 export { DEFAULT_PROMPT, buildSystemPrompt } from "./prompt/systemPrompt.js";
+export {
+  buildWorkspaceContext,
+  type WorkspaceSheetSummary,
+  type WorkspaceWorkbookSummary,
+} from "./session/context.js";
 export { historyFromRuns } from "./session/transcript.js";
-export { generateSessionTitle, generateTitle } from "./session/title.js";
 export {
   buildExcelToolCatalog,
   buildExcelToolContext,

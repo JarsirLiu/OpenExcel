@@ -4,6 +4,7 @@ import {
   streamText,
   toUIMessageStream,
   validateUIMessages,
+  type ToolSet,
 } from "ai";
 import { createChatModel, type ModelConfig } from "../model.js";
 
@@ -11,7 +12,7 @@ export interface StreamChatInput {
   modelConfig: ModelConfig;
   systemPrompt: string;
   messages: any[];
-  tools: Record<string, any>;
+  tools: ToolSet;
   toolsContext?: Record<string, unknown>;
   abortSignal?: AbortSignal;
   onStepFinish?: (...args: any[]) => void | Promise<void>;
@@ -31,7 +32,7 @@ export async function streamChat(input: StreamChatInput): Promise<ReturnType<typ
     model: createChatModel(input.modelConfig),
     system: input.systemPrompt,
     messages: await convertToModelMessages(validatedMessages as any),
-    tools: input.tools as any,
+    tools: input.tools,
     toolsContext: input.toolsContext as any,
     stopWhen: isLoopFinished(),
     abortSignal: input.abortSignal,

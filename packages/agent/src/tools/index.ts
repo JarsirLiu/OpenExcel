@@ -1,8 +1,10 @@
 export {
   buildExcelToolCatalog,
   buildExcelToolContext,
+} from "./catalog.js";
+export {
   excelToolSpecs,
   sheetMutationContextSchema,
   type ExcelToolName,
   type SheetMutationContext,
-} from "./excel.js";
+} from "./schema.js";
