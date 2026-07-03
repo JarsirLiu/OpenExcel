@@ -1,21 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { createPortal } from "react-dom";
-
-interface ConfirmOptions {
-  title: string;
-  message: string;
-  confirmText?: string;
-  cancelText?: string;
-}
-
-let resolveRef: ((result: boolean) => void) | null = null;
-
-export function confirm(options: ConfirmOptions): Promise<boolean> {
-  return new Promise((resolve) => {
-    resolveRef = resolve;
-    window.dispatchEvent(new CustomEvent("confirmDialogShow", { detail: options }));
-  });
-}
+import { clearConfirmDialog, resolveConfirmDialog, type ConfirmOptions } from "../lib/confirmDialog";
 
 export function ConfirmDialog() {
   const [visible, setVisible] = useState(false);
@@ -35,7 +20,7 @@ export function ConfirmDialog() {
 
   useEffect(() => {
     if (!visible) {
-      resolveRef = null;
+      clearConfirmDialog();
       return;
     }
     const handler = (e: KeyboardEvent) => {
@@ -47,8 +32,7 @@ export function ConfirmDialog() {
 
   const handleClose = useCallback((result: boolean) => {
     setVisible(false);
-    resolveRef?.(result);
-    resolveRef = null;
+    resolveConfirmDialog(result);
   }, []);
 
   const handleOverlayClick = useCallback(

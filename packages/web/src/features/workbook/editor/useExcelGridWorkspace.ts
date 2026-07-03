@@ -3,7 +3,7 @@ import { celldataToExcel, extractSheetConfig, matrixToCelldata } from "@openexce
 import type { WorkbookInstance } from "@fortune-sheet/react";
 import type { WorkbookFull } from "../../../api/client";
 import { deleteWorkbook, updateSheetData } from "../../../api/client";
-import { confirm } from "../../../shared/ui";
+import { confirm } from "../../../shared/lib";
 import { useWorkbookEditorSession } from "./useWorkbookEditorSession";
 import { toFortuneSheetData } from "./fortuneSheet";
 
