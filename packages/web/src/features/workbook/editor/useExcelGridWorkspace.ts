@@ -3,9 +3,9 @@ import { celldataToExcel, extractSheetConfig, matrixToCelldata } from "@openexce
 import type { WorkbookInstance } from "@fortune-sheet/react";
 import type { WorkbookFull } from "../../../api/client";
 import { deleteWorkbook, updateSheetData } from "../../../api/client";
-import { confirm } from "../../../shared/ui/ConfirmDialog";
-import { toFortuneSheetData } from "../../../adapters/fortuneSheet";
+import { confirm } from "../../../shared/ui";
 import { useWorkbookEditorSession } from "./useWorkbookEditorSession";
+import { toFortuneSheetData } from "./fortuneSheet";
 
 type UseExcelGridWorkspaceProps = {
   workbook: WorkbookFull | null;

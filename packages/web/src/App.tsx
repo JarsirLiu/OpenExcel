@@ -1,5 +1,5 @@
 import { Workbench } from "./app/Workbench";
-import { ConfirmDialog } from "./shared/ui/ConfirmDialog";
+import { ConfirmDialog } from "./shared/ui";
 
 export default function App() {
   return (

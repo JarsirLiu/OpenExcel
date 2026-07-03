@@ -1,6 +1,6 @@
 import { useMemo } from "react";
-import { toFortuneSheetData, type FortuneSheetData } from "../../../adapters/fortuneSheet";
 import type { WorkbookFull } from "../../../api/client";
+import { toFortuneSheetData, type FortuneSheetData } from "./fortuneSheet";
 
 type WorkbookEditorSession = {
   sheetData: FortuneSheetData[];
