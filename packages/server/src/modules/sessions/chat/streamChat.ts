@@ -4,12 +4,12 @@ import {
   buildExcelToolContext,
   streamChat as streamAgentChat,
 } from "@openexcel/agent";
-import * as repo from "./repository.js";
-import * as runRepo from "./runRepository.js";
+import * as repo from "../repository.js";
+import * as runRepo from "../runs/repository.js";
 import { buildWorkplaceContext } from "./context.js";
-import { persistSessionMessages } from "./transcript.js";
-import { excelTools } from "../sheets/tools/index.js";
-import { loadModelConfig } from "../../config.js";
+import { persistSessionMessages } from "../transcript.js";
+import { excelTools } from "../../sheets/tools/index.js";
+import { loadModelConfig } from "../../../config.js";
 
 function extractMessageText(message: any): string {
   if (typeof message?.content === "string") return message.content;

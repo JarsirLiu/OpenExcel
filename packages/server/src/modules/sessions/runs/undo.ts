@@ -1,4 +1,4 @@
-import * as repo from "./runRepository.js";
+import * as repo from "./repository.js";
 
 export async function undoLatestRun(sessionId: number) {
   const run = await repo.findLatestUndoableRun(sessionId);

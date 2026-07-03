@@ -1,6 +1,6 @@
 import * as repo from "./repository.js";
-import * as runRepo from "./runRepository.js";
-import { historyFromRuns } from "./context.js";
+import * as runRepo from "./runs/repository.js";
+import { historyFromRuns } from "./chat/index.js";
 import { getSessionMessages } from "./transcript.js";
 
 export async function getSessions() {
@@ -33,7 +33,7 @@ export async function getMessages(sessionId: number) {
 
 export async function getRuns(sessionId: number) {
   const runs = await runRepo.findRunsBySession(sessionId);
-  const steps = await Promise.all(runs.map(async (run) => ({
+  const steps = await Promise.all(runs.map(async (run: (typeof runs)[number]) => ({
     ...run,
     steps: await runRepo.findStepsByRun(run.id),
   })));

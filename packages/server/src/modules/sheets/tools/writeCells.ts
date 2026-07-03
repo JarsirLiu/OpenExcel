@@ -12,7 +12,7 @@ import {
   normalizeWriteOperations,
   type WriteCellsInput,
 } from "../domain.js";
-import * as repo from "../../sessions/runRepository.js";
+import * as repo from "../../sessions/runs/repository.js";
 import { sheetRecordToCelldata } from "../../../shared/utils/sheetData.js";
 
 export const writeCells = {

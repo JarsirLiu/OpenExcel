@@ -1,4 +1,4 @@
-import { prisma } from "../../db.js";
+import { prisma } from "../../../db.js";
 
 const DEFAULT_UNDO_SNAPSHOT_RETENTION = 5;
 
@@ -103,7 +103,7 @@ export async function pruneUndoSnapshots(sessionId: number, keepRuns = DEFAULT_U
     select: { id: true },
   });
 
-  const staleRunIds = runsWithSnapshots.slice(keepRuns).map((run) => run.id);
+  const staleRunIds = runsWithSnapshots.slice(keepRuns).map((run: (typeof runsWithSnapshots)[number]) => run.id);
   if (staleRunIds.length === 0) {
     return 0;
   }
@@ -124,7 +124,7 @@ export async function restoreRunSheetSnapshots(runId: number) {
   }
 
   await prisma.$transaction([
-    ...snapshots.map((snapshot) =>
+    ...snapshots.map((snapshot: (typeof snapshots)[number]) =>
       prisma.sheet.update({
         where: { id: snapshot.sheetId },
         data: {
@@ -144,5 +144,5 @@ export async function restoreRunSheetSnapshots(runId: number) {
     }),
   ]);
 
-  return snapshots.map((snapshot) => snapshot.sheetId);
+  return snapshots.map((snapshot: (typeof snapshots)[number]) => snapshot.sheetId);
 }

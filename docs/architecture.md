@@ -340,7 +340,9 @@ Current session-related files:
 - `src/modules/sessions/service.ts`
 - `src/modules/sessions/routes.ts`
 - `src/modules/sessions/title.ts`
-- `src/modules/sessions/context.ts`
+- `src/modules/sessions/transcript.ts`
+- `src/modules/sessions/chat/*`
+- `src/modules/sessions/runs/*`
 - `src/modules/sheets/tools/*`
 
 represent the agent/server boundary today.

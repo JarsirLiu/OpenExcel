@@ -1,6 +1,6 @@
 import { buildWorkspaceContext as buildAgentWorkspaceContext } from "@openexcel/agent";
-import type { findRunsBySession } from "./runRepository.js";
-import * as workbookRepo from "../workbooks/repository.js";
+import type { findRunsBySession } from "../runs/repository.js";
+import * as workbookRepo from "../../workbooks/repository.js";
 
 const MAX_TURNS = 20;
 
@@ -23,10 +23,10 @@ function trim(messages: { role: string; content: string }[]): { role: "user" | "
 export async function buildWorkplaceContext(): Promise<string> {
   const workbooks = await workbookRepo.findWorkbooksWithSheets();
   return buildAgentWorkspaceContext(
-    workbooks.map((workbook) => ({
+    workbooks.map((workbook: (typeof workbooks)[number]) => ({
       id: workbook.id,
       name: workbook.name,
-      sheets: workbook.sheets.map((sheet) => ({
+      sheets: workbook.sheets.map((sheet: (typeof workbook.sheets)[number]) => ({
         id: sheet.id,
         name: sheet.name,
       })),

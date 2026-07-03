@@ -7,7 +7,7 @@ import {
   type SheetChangeRangeOperation,
 } from "@openexcel/core";
 import { buildSheetChangePreview, toA1Range } from "../domain.js";
-import * as repo from "../../sessions/runRepository.js";
+import * as repo from "../../sessions/runs/repository.js";
 import { sheetRecordToCelldata } from "../../../shared/utils/sheetData.js";
 
 export const unmergeCells = {
