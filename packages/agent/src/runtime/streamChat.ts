@@ -25,14 +25,14 @@ export interface StreamChatInput {
 export async function streamChat(input: StreamChatInput): Promise<ReturnType<typeof toUIMessageStream>> {
   const validatedMessages = await validateUIMessages({
     messages: input.messages,
-    tools: input.tools,
+    tools: input.tools as any,
   });
 
   const result = streamText({
     model: createChatModel(input.modelConfig),
     system: input.systemPrompt,
     messages: await convertToModelMessages(validatedMessages as any),
-    tools: input.tools,
+    tools: input.tools as any,
     toolsContext: input.toolsContext as any,
     stopWhen: isLoopFinished(),
     abortSignal: input.abortSignal,

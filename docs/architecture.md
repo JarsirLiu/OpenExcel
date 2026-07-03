@@ -135,6 +135,95 @@ Responsibilities:
 
 Server code may depend on `agent`, but should not duplicate agent logic.
 
+#### 3.3.1 Recommended server directory layout
+
+```text
+packages/server/src/
+├── app.ts                 # Fastify bootstrap and plugin registration
+├── index.ts               # process entrypoint
+├── config.ts              # env parsing and runtime config
+├── db.ts                  # Prisma client and DB wiring
+├── logger.ts              # request logging and server logging helpers
+├── shared/                # server-wide shared helpers
+│   ├── errors/            # typed errors, error mapping, error helpers
+│   ├── http/              # response helpers, route adapters, stream helpers
+│   ├── auth/             # auth primitives shared by modules
+│   ├── validation/       # request schema helpers and parsing
+│   └── utils/            # generic utilities that do not belong to a module
+├── infra/                 # technical integrations used by modules
+│   ├── ai/               # model config, provider adapters, title model setup
+│   ├── auth/             # password hashing, token/session cookie, OAuth hooks
+│   ├── storage/          # file/blob helpers if we add local or remote storage
+│   ├── streaming/        # SSE / response piping primitives
+│   └── observability/    # metrics, tracing, structured logging glue
+├── middleware/           # request-scoped middleware and guards
+│   ├── auth.ts           # populate current user / session principal
+│   ├── requireAuth.ts    # enforce signed-in access
+│   ├── requireRole.ts    # workspace/admin role checks
+│   └── requestContext.ts # request id, actor id, tenant id attachment
+├── modules/              # business modules, split by domain
+│   ├── auth/
+│   │   ├── routes.ts     # login/logout/session refresh endpoints
+│   │   ├── service.ts    # auth flows and session issuance
+│   │   ├── repository.ts # user/session/token persistence
+│   │   ├── policy.ts     # password, MFA, lockout, invitation rules
+│   │   ├── dto.ts        # request/response shapes
+│   │   └── types.ts      # auth module types
+│   ├── users/
+│   │   ├── routes.ts     # user profile and admin user endpoints
+│   │   ├── service.ts    # profile, status, account lifecycle
+│   │   ├── repository.ts # user persistence
+│   │   └── types.ts
+│   ├── workspaces/
+│   │   ├── routes.ts     # future org/workspace boundaries
+│   │   ├── service.ts    # workspace creation, membership, tenant scoping
+│   │   ├── repository.ts # workspace and membership persistence
+│   │   └── types.ts
+│   ├── sessions/
+│   │   ├── routes.ts     # session CRUD, chat, title, undo endpoints
+│   │   ├── service.ts    # session orchestration and use-case composition
+│   │   ├── query.ts      # session read models and list/detail queries
+│   │   ├── transcript.ts # stored message history read/write
+│   │   ├── title.ts      # title generation and fallback handling
+│   │   ├── undo.ts       # undo-latest logic
+│   │   ├── repository.ts # session/run/step persistence
+│   │   └── types.ts      # session domain DTOs and contracts
+│   ├── runs/
+│   │   ├── repository.ts # run and step persistence helpers
+│   │   └── types.ts
+│   ├── workbooks/
+│   │   ├── routes.ts     # workbook upload, export, create, delete endpoints
+│   │   ├── service.ts    # workbook import/export and workbook-level use cases
+│   │   ├── repository.ts # workbook persistence
+│   │   └── types.ts
+│   └── sheets/
+│       ├── routes.ts     # sheet CRUD and patch endpoints
+│       ├── service.ts    # sheet update/delete orchestration
+│       ├── repository.ts # sheet persistence
+│       └── types.ts
+└── tests/                # cross-module integration tests and HTTP tests
+```
+
+This tree is intentionally more explicit than the current codebase.
+It is meant to support future multi-user, workspace scoping, auth, and role checks without forcing a redesign later.
+
+The important long-term rule is:
+
+- `modules/*` own business use cases
+- `middleware/*` own request-scoped security and context
+- `infra/*` own technical integrations
+- `shared/*` only contains cross-cutting helpers that do not belong to a specific module
+
+For multi-user support, the ownership chain should become:
+
+- user
+- workspace or tenant
+- session
+- run
+- step
+
+That means the server should eventually treat `workspaceId` and `ownerUserId` as first-class scoping fields on session/workbook records, not as ad hoc filters added later.
+
 ### 3.4 `packages/web`
 
 Responsibilities:
