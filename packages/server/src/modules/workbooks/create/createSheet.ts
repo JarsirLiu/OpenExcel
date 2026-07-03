@@ -1,35 +1,33 @@
-import { gridToCelldata } from "@openexcel/core";
 import * as repo from "../repository.js";
-import { sheetRecordToCelldata } from "../../../shared/utils/sheetData.js";
+import { buildBlankSheetInitialization, buildSourceSheetInitialization, normalizeSheetName, WorkbookCreationError } from "./creation.js";
 
 export async function createSheet(workbookId: number, name?: string, sourceSheetId?: number) {
   const workbook = await repo.findWorkbookWithSheets(workbookId);
   if (!workbook) return null;
 
-  const sourceSheet = sourceSheetId
+  const sourceSheet = sourceSheetId != null
     ? workbook.sheets.find((sheet) => sheet.id === sourceSheetId)
     : workbook.sheets[workbook.sheets.length - 1];
 
+  if (sourceSheetId != null && !sourceSheet) {
+    throw new WorkbookCreationError("源 Sheet 不存在", "SOURCE_SHEET_NOT_FOUND", 404);
+  }
+
   const nextOrder = workbook.sheets.length;
-  const nextName = name?.trim() || `Sheet${nextOrder + 1}`;
-  const sourceColumns = sourceSheet ? JSON.parse(sourceSheet.columns) as { label: string; width?: number }[] : [{ label: "A" }];
-  const sourceMerges = sourceSheet ? JSON.parse(sourceSheet.merges) as { row: [number, number]; col: [number, number] }[] : [];
-  const schema = {
-    columns: JSON.stringify(sourceColumns),
-    merges: JSON.stringify(sourceMerges),
-  };
-  const celldata = sourceSheet
-    ? sheetRecordToCelldata(sourceSheet)
-    : gridToCelldata([[]], ["A"]);
+  const nextName = normalizeSheetName(name, nextOrder + 1);
+  const payload = sourceSheet
+    ? buildSourceSheetInitialization(sourceSheet)
+    : buildBlankSheetInitialization();
 
   const sheet = await repo.createSheet({
     workbookId,
     name: nextName,
     order: nextOrder,
-    columns: schema.columns,
-    merges: schema.merges,
-    uploadedData: JSON.stringify(celldata),
+    columns: payload.columns,
+    merges: payload.merges,
+    uploadedData: payload.uploadedData,
+    config: payload.config,
   });
 
-  return { id: sheet.id, name: sheet.name, order: sheet.order };
+  return { workbookId, id: sheet.id, name: sheet.name, order: sheet.order };
 }

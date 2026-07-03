@@ -6,6 +6,30 @@ export async function workbookRoutes(app: FastifyInstance) {
     return service.getWorkbooks();
   });
 
+  app.post<{
+    Body: { name?: string; sheetName?: string; sourceSheetId?: number };
+  }>("/api/workbooks", async (req, reply) => {
+    try {
+      const result = await service.createWorkbook(req.body.name, req.body.sheetName, req.body.sourceSheetId);
+      return reply.status(201).send(result);
+    } catch (error) {
+      if (error instanceof service.WorkbookUploadError) {
+        return reply.status(error.statusCode).send({
+          error: error.message,
+          code: error.code,
+          details: error.details,
+        });
+      }
+      if (error instanceof service.WorkbookCreationError) {
+        return reply.status(404).send({
+          error: error.message,
+          code: "SOURCE_SHEET_NOT_FOUND",
+        });
+      }
+      throw error;
+    }
+  });
+
   app.get("/api/workbooks/reference-candidates", async () => {
     return service.getReferenceCandidates();
   });
@@ -67,13 +91,23 @@ export async function workbookRoutes(app: FastifyInstance) {
     Params: { id: string };
     Body: { name?: string; sourceSheetId?: number };
   }>("/api/workbooks/:id/sheets", async (req, reply) => {
-    const result = await service.createSheet(
-      Number(req.params.id),
-      req.body.name,
-      req.body.sourceSheetId,
-    );
-    if (!result) return reply.status(404).send({ error: "Workbook not found" });
-    return reply.status(201).send(result);
+    try {
+      const result = await service.createSheet(
+        Number(req.params.id),
+        req.body.name,
+        req.body.sourceSheetId,
+      );
+      if (!result) return reply.status(404).send({ error: "Workbook not found" });
+      return reply.status(201).send(result);
+    } catch (error) {
+      if (error instanceof service.WorkbookCreationError) {
+        return reply.status(404).send({
+          error: error.message,
+          code: "SOURCE_SHEET_NOT_FOUND",
+        });
+      }
+      throw error;
+    }
   });
 
   app.delete<{ Params: { id: string } }>("/api/workbooks/:id", async (req, reply) => {

@@ -5,6 +5,8 @@ describe("buildExcelToolCatalog", () => {
   it("renders a markdown catalog from tool specs", () => {
     const catalog = buildExcelToolCatalog();
 
+    expect(catalog).toContain("**createWorkbook**");
+    expect(catalog).toContain("**createSheet**");
     expect(catalog).toContain("**readSheet**");
     expect(catalog).toContain("**writeCells**");
     expect(catalog).toContain(excelToolSpecs.readSheet.description);
@@ -22,5 +24,7 @@ describe("buildExcelToolContext", () => {
       unmergeCells: { runId: 7 },
     });
     expect(context.readSheet).toBeUndefined();
+    expect(context.createWorkbook).toBeUndefined();
+    expect(context.createSheet).toBeUndefined();
   });
 });

@@ -13,6 +13,24 @@ export const sheetMutationContextSchema = z.object({
 export type SheetMutationContext = z.infer<typeof sheetMutationContextSchema>;
 
 export const excelToolSpecs = {
+  createWorkbook: {
+    description:
+      "新建一个工作簿，并同时创建第一个 Sheet。可选地传入初始工作簿名称、初始 Sheet 名称，或者从已有 Sheet 复制初始结构。",
+    inputSchema: z.object({
+      name: z.string().trim().min(1).optional().describe("工作簿名称"),
+      sheetName: z.string().trim().min(1).optional().describe("初始 Sheet 名称"),
+      sourceSheetId: z.coerce.number().int().positive().optional().describe("可选的源 Sheet ID，用于复制初始结构"),
+    }),
+  },
+  createSheet: {
+    description:
+      "在指定工作簿中创建一个新的 Sheet。可选地传入名称，或者从已有 Sheet 复制初始结构。",
+    inputSchema: z.object({
+      workbookId: z.coerce.number().int().positive().describe("工作簿 ID"),
+      name: z.string().trim().min(1).optional().describe("Sheet 名称"),
+      sourceSheetId: z.coerce.number().int().positive().optional().describe("可选的源 Sheet ID，用于复制初始结构"),
+    }),
+  },
   readSheet: {
     description:
       "读取指定 Sheet 的全部数据，返回结构化表格信息，包含标题行、行/列数、数据二维数组、以及合并单元格信息。行号和列号按 Excel 视觉顺序从 1 开始；data 数组的第一项对应第 1 行。",

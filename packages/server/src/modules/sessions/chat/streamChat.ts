@@ -8,6 +8,7 @@ import * as repo from "../repository.js";
 import * as runRepo from "../runs/repository.js";
 import { buildWorkplaceContext } from "./context.js";
 import { persistSessionMessages } from "../transcript.js";
+import { workbookTools } from "../../workbooks/tools/index.js";
 import { excelTools } from "../../sheets/tools/index.js";
 import { loadModelConfig } from "../../../config.js";
 
@@ -112,7 +113,7 @@ export async function streamChat(
       modelConfig: config,
       systemPrompt,
       messages,
-      tools: excelTools,
+      tools: { ...workbookTools, ...excelTools },
       toolsContext,
       abortSignal,
       onStepFinish: persistStepOnce,

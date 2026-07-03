@@ -1,0 +1,67 @@
+import { prisma } from "../../../db.js";
+import { normalizeSheetName, normalizeWorkbookName, buildBlankSheetInitialization, buildSourceSheetInitialization, WorkbookCreationError } from "./creation.js";
+
+export type CreateWorkbookResult = {
+  id: number;
+  name: string;
+  sheets: number;
+  initialSheet: {
+    id: number;
+    name: string;
+    order: number;
+  };
+};
+
+export async function createWorkbook(name?: string, sheetName?: string, sourceSheetId?: number): Promise<CreateWorkbookResult> {
+  const workbookName = normalizeWorkbookName(name);
+  const initialSheetName = normalizeSheetName(sheetName, 1);
+
+  return prisma.$transaction(async (tx) => {
+    const maxOrder = await tx.workbook.aggregate({ _max: { order: true } });
+    const nextOrder = (maxOrder._max.order ?? -1) + 1;
+
+    const workbook = await tx.workbook.create({
+      data: {
+        name: workbookName,
+        order: nextOrder,
+      },
+    });
+
+    const sourceSheet = sourceSheetId == null
+      ? null
+      : await tx.sheet.findUnique({
+          where: { id: sourceSheetId },
+        });
+
+    if (sourceSheetId != null && !sourceSheet) {
+      throw new WorkbookCreationError("源 Sheet 不存在", "SOURCE_SHEET_NOT_FOUND", 404);
+    }
+
+    const payload = sourceSheet
+      ? buildSourceSheetInitialization(sourceSheet)
+      : buildBlankSheetInitialization();
+
+    const initialSheet = await tx.sheet.create({
+      data: {
+        workbookId: workbook.id,
+        name: initialSheetName,
+        order: 0,
+        columns: payload.columns,
+        merges: payload.merges,
+        uploadedData: payload.uploadedData,
+        config: payload.config ?? null,
+      },
+    });
+
+    return {
+      id: workbook.id,
+      name: workbook.name,
+      sheets: 1,
+      initialSheet: {
+        id: initialSheet.id,
+        name: initialSheet.name,
+        order: initialSheet.order,
+      },
+    };
+  });
+}

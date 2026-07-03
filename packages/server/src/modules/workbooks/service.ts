@@ -2,5 +2,7 @@ export { WorkbookUploadError, type WorkbookUploadErrorCode, resolveWorkbookImpor
 export { getWorkbooks, getReferenceCandidates, getWorkbook } from "./query.js";
 export { uploadExcel, uploadAsNewWorkbook } from "./import/uploadWorkbook.js";
 export { exportTemplate } from "./export/exportTemplate.js";
+export { WorkbookCreationError } from "./create/creation.js";
+export { createWorkbook } from "./create/createWorkbook.js";
 export { createSheet } from "./create/createSheet.js";
 export { deleteWorkbook } from "./delete/deleteWorkbook.js";
