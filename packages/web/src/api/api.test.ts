@@ -6,12 +6,10 @@ import {
   updateSheetData,
   createSheet,
   deleteSheet,
-  fetchMessages,
-  fetchRuns,
-  undoLatestRun,
   downloadTemplateUrl,
-  generateSessionTitle,
-} from "./client";
+} from "./workbooks";
+import { fetchMessages, fetchRuns, undoLatestRun } from "./chat";
+import { generateSessionTitle } from "./sessions";
 
 const mockFetch = vi.fn();
 globalThis.fetch = mockFetch;

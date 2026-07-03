@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import {
-  generateSessionTitle,
   createSession,
   deleteSession,
-  fetchMessages,
   fetchSessions,
-  undoLatestRun,
+  generateSessionTitle,
   type Session,
-} from "../../api/client";
+} from "../../api/sessions";
+import { fetchMessages as fetchChatMessages, undoLatestRun as undoLatestChatRun } from "../../api/chat";
 import { getFirstUserText } from "./utils";
 
 type UndoState = "idle" | "loading" | "success" | "error";
@@ -52,7 +51,7 @@ export function useSessionWorkspace(onUndoComplete?: () => void) {
     const loadInitialMessages = async () => {
       try {
         if (currentSessionId) {
-          const msgs = await fetchMessages(currentSessionId);
+          const msgs = await fetchChatMessages(currentSessionId);
           if (!cancelled) {
             setInitialMessages(msgs);
           }
@@ -122,7 +121,7 @@ export function useSessionWorkspace(onUndoComplete?: () => void) {
     setUndoState("loading");
     setUndoError("");
     try {
-      await undoLatestRun(currentSessionId);
+      await undoLatestChatRun(currentSessionId);
       setUndoState("success");
       onUndoComplete?.();
     } catch (error) {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { fetchWorkbookReferenceCandidates } from "../../../api/client";
+import { fetchWorkbookReferenceCandidates } from "../../../api/workbooks";
 
 export type WorkbookSheetSummary = {
   workbookId: number;

@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import type { WorkbookFull } from "../../../api/client";
+import type { WorkbookFull } from "../../../api/workbooks";
 import { buildWorkbookImportPreview, type WorkbookImportPreview } from "./importPreview";
 
 type UseWorkbookImportFlowProps = {

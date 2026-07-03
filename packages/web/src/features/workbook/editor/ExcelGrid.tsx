@@ -1,6 +1,6 @@
 import { Workbook } from "@fortune-sheet/react";
 import "@fortune-sheet/react/dist/index.css";
-import type { WorkbookFull } from "../../../api/client";
+import type { WorkbookFull } from "../../../api/workbooks";
 import { useExcelGridWorkspace } from "./useExcelGridWorkspace";
 
 interface Props {

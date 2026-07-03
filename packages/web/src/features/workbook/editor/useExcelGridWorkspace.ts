@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { celldataToExcel, extractSheetConfig, matrixToCelldata } from "@openexcel/core";
 import type { WorkbookInstance } from "@fortune-sheet/react";
-import type { WorkbookFull } from "../../../api/client";
-import { deleteWorkbook, updateSheetData } from "../../../api/client";
+import type { WorkbookFull } from "../../../api/workbooks";
+import { deleteWorkbook, updateSheetData } from "../../../api/workbooks";
 import { confirm } from "../../../shared/lib";
 import { useWorkbookEditorSession } from "./useWorkbookEditorSession";
 import { toFortuneSheetData } from "./fortuneSheet";

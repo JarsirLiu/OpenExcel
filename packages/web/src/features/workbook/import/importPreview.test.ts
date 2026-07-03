@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import * as XLSX from "xlsx";
 import { buildWorkbookImportPreview } from "./importPreview";
-import type { WorkbookFull } from "../../../api/client";
+import type { WorkbookFull } from "../../../api/workbooks";
 
 function makeFile(): File {
   const wb = XLSX.utils.book_new();

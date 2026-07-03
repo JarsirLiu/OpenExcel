@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, waitFor } from "@testing-library/react";
-import type { SheetSchema } from "./api/client";
+import type { SheetSchema } from "./api/workbooks";
 
 // Mock the ExcelGrid since Fortune-Sheet is complex and not needed for this test
 vi.mock("./features/workbook/editor/ExcelGrid", () => ({
@@ -8,13 +8,20 @@ vi.mock("./features/workbook/editor/ExcelGrid", () => ({
 }));
 
 // Mock the API client
-vi.mock("./api/client", () => ({
+vi.mock("./api/workbooks", () => ({
   fetchWorkbooks: vi.fn().mockResolvedValue([]),
   fetchWorkbook: vi.fn(),
   fetchWorkbookReferenceCandidates: vi.fn().mockResolvedValue([]),
   uploadExcel: vi.fn(),
   uploadNewWorkbook: vi.fn(),
   deleteWorkbook: vi.fn(),
+  updateSheetData: vi.fn(),
+  createSheet: vi.fn(),
+  deleteSheet: vi.fn(),
+  downloadTemplateUrl: vi.fn(),
+}));
+
+vi.mock("./api/sessions", () => ({
   fetchSessions: vi.fn().mockResolvedValue([]),
   createSession: vi.fn().mockResolvedValue({
     id: 1,
@@ -23,10 +30,14 @@ vi.mock("./api/client", () => ({
     createdAt: new Date().toISOString(),
   }),
   deleteSession: vi.fn(),
-  fetchMessages: vi.fn().mockResolvedValue([]),
+  renameSession: vi.fn(),
   generateSessionTitle: vi.fn().mockResolvedValue({ title: "新对话" }),
+}));
+
+vi.mock("./api/chat", () => ({
+  fetchMessages: vi.fn().mockResolvedValue([]),
+  fetchRuns: vi.fn().mockResolvedValue([]),
   undoLatestRun: vi.fn().mockResolvedValue({ runId: 1, restoredSheetIds: [] }),
-  updateSheetData: vi.fn(),
 }));
 
 import App from "./App";

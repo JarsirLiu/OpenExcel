@@ -1,5 +1,5 @@
 import { ExcelGrid } from "../editor/ExcelGrid";
-import type { WorkbookFull } from "../../../api/client";
+import type { WorkbookFull } from "../../../api/workbooks";
 
 interface Props {
   workbook: WorkbookFull | null;

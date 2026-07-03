@@ -3,7 +3,7 @@ import type { SheetChangeDelta } from "@openexcel/core";
 import { ChatPanel } from "../chat/conversation/ChatPanel";
 import { SessionHeader } from "./components/SessionHeader";
 import { SessionHistoryPopover } from "./components/SessionHistoryPopover";
-import type { Session } from "../../api/client";
+import type { Session } from "../../api/sessions";
 
 type Props = {
   sessions: Session[];

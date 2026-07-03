@@ -1,4 +1,4 @@
-import type { Session } from "../../../api/client";
+import type { Session } from "../../../api/sessions";
 
 type Props = {
   sessions: Session[];

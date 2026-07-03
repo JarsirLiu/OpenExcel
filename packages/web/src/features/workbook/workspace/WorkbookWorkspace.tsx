@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import type { WorkbookFull } from "../../../api/client";
+import type { WorkbookFull } from "../../../api/workbooks";
 import { WorkbookHeader } from "../ui/WorkbookHeader";
 import { ExcelWorkspace } from "../ui/ExcelWorkspace";
 import { ImportPreviewDialog } from "../import/ImportPreviewDialog";
