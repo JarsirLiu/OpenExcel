@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useState } from "react";
 import {
+  generateSessionTitle,
   createSession,
   deleteSession,
   fetchMessages,
   fetchSessions,
   undoLatestRun,
   type Session,
-} from "../../../api/client";
+} from "../../api/client";
+import { getFirstUserText } from "./utils";
 
 type UndoState = "idle" | "loading" | "success" | "error";
 
-export function useChatSessionWorkspace(onUndoComplete?: () => void) {
+export function useSessionWorkspace(onUndoComplete?: () => void) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<number | null>(null);
   const [initialMessages, setInitialMessages] = useState<any[]>([]);
@@ -98,6 +100,23 @@ export function useChatSessionWorkspace(onUndoComplete?: () => void) {
     await refreshSessions();
   }, [refreshSessions]);
 
+  const handleRunComplete = useCallback(async (sessionId: number, finishedMessages: any[]) => {
+    const firstUserText = getFirstUserText(finishedMessages).trim();
+    try {
+      if (firstUserText) {
+        await generateSessionTitle(sessionId, firstUserText);
+      }
+    } catch (error) {
+      console.error("[session] Failed to generate session title:", error);
+    }
+
+    try {
+      await refreshSessions();
+    } catch (error) {
+      console.error("[session] Failed to refresh sessions after title update:", error);
+    }
+  }, [refreshSessions]);
+
   const handleUndoLatestRun = useCallback(async () => {
     if (!currentSessionId || undoState === "loading" || isStreaming) return;
     setUndoState("loading");
@@ -124,6 +143,7 @@ export function useChatSessionWorkspace(onUndoComplete?: () => void) {
     isStreaming,
     setIsStreaming,
     refreshSessions,
+    handleRunComplete,
     handleNewSession,
     handleSelectSession,
     handleDeleteSession,

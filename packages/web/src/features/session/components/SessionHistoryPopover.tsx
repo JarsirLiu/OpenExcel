@@ -1,4 +1,4 @@
-import type { Session } from "../../../../api/client";
+import type { Session } from "../../../api/client";
 
 type Props = {
   sessions: Session[];
@@ -7,7 +7,7 @@ type Props = {
   onDeleteSession: (id: number) => void;
 };
 
-export function ChatSessionHistoryPopover({
+export function SessionHistoryPopover({
   sessions,
   currentSessionId,
   onSelectSession,

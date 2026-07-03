@@ -2,9 +2,7 @@ import { useCallback, useEffect, useMemo } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import type { SheetChangeDelta } from "@openexcel/core";
-import { generateSessionTitle } from "../../../api/client";
 import { useSheetPatchSync } from "./useSheetPatchSync";
-import { getFirstUserText } from "../utils";
 
 export function useChatConversation({
   sessionId,
@@ -15,7 +13,7 @@ export function useChatConversation({
 }: {
   sessionId: number;
   initialMessages: any[];
-  onRunComplete?: () => void;
+  onRunComplete?: (messages: any[]) => void;
   onSheetChanged?: (sheetId: number, delta: SheetChangeDelta | null) => void;
   onStreamingChange?: (isStreaming: boolean) => void;
 }) {
@@ -29,19 +27,7 @@ export function useChatConversation({
     transport,
     onFinish: ({ isAbort, isError, messages: finishedMessages }) => {
       if (isAbort || isError) return;
-
-      const firstUserText = getFirstUserText(finishedMessages).trim();
-      void (async () => {
-        try {
-          if (firstUserText) {
-            await generateSessionTitle(sessionId, firstUserText);
-          }
-        } catch (error) {
-          console.error("[chat] Failed to generate session title:", error);
-        } finally {
-          void onRunComplete?.();
-        }
-      })();
+      void onRunComplete?.(finishedMessages);
     },
   });
 

@@ -15,7 +15,7 @@ export function ChatPanel({
 }: {
   sessionId: number;
   initialMessages: any[];
-  onRunComplete?: () => void;
+  onRunComplete?: (sessionId: number, messages: any[]) => void;
   onSheetChanged?: (sheetId: number, delta: SheetChangeDelta | null) => void;
   onStreamingChange?: (isStreaming: boolean) => void;
   sheets: SheetMeta[];
@@ -23,7 +23,9 @@ export function ChatPanel({
   const { messages, error, isStreaming, sendMessage, stop } = useChatConversation({
     sessionId,
     initialMessages,
-    onRunComplete,
+    onRunComplete: (finishedMessages) => {
+      onRunComplete?.(sessionId, finishedMessages);
+    },
     onSheetChanged,
     onStreamingChange,
   });

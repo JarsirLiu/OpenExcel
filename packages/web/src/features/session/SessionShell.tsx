@@ -1,9 +1,9 @@
 import { useEffect, useRef } from "react";
 import type { SheetChangeDelta } from "@openexcel/core";
-import { ChatPanel } from "../conversation/ChatPanel";
-import { ChatSessionHeader } from "./components/ChatSessionHeader";
-import { ChatSessionHistoryPopover } from "./components/ChatSessionHistoryPopover";
-import type { Session } from "../../../api/client";
+import { ChatPanel } from "../chat/conversation/ChatPanel";
+import { SessionHeader } from "./components/SessionHeader";
+import { SessionHistoryPopover } from "./components/SessionHistoryPopover";
+import type { Session } from "../../api/client";
 
 type Props = {
   sessions: Session[];
@@ -16,7 +16,7 @@ type Props = {
   undoError: string;
   isStreaming: boolean;
   setIsStreaming: (next: boolean) => void;
-  refreshSessions: () => Promise<Session[]>;
+  handleRunComplete: (sessionId: number, messages: any[]) => Promise<void>;
   handleNewSession: () => Promise<void>;
   handleSelectSession: (id: number) => void;
   handleDeleteSession: (id: number) => Promise<void>;
@@ -25,7 +25,7 @@ type Props = {
   sheets: { workbookId: number; workbookName: string; id: number; name: string }[];
 };
 
-export function ChatSessionShell({
+export function SessionShell({
   sessions,
   currentSessionId,
   initialMessages,
@@ -36,7 +36,7 @@ export function ChatSessionShell({
   undoError,
   isStreaming,
   setIsStreaming,
-  refreshSessions,
+  handleRunComplete,
   handleNewSession,
   handleSelectSession,
   handleDeleteSession,
@@ -64,7 +64,7 @@ export function ChatSessionShell({
       display: "flex", flexDirection: "column", height: "100%", background: "#fff",
       borderLeft: "1px solid #e8e8e8", overflow: "hidden", position: "relative",
     }}>
-      <ChatSessionHeader
+      <SessionHeader
         sessionName={currentSession?.name ?? "AI 对话"}
         currentSessionId={currentSessionId}
         undoState={undoState}
@@ -81,7 +81,7 @@ export function ChatSessionShell({
           background: "#fff", border: "1px solid #e0e0e0", borderRadius: 8,
           boxShadow: "0 8px 24px rgba(0,0,0,0.12)", maxHeight: 300, overflowY: "auto",
         }}>
-          <ChatSessionHistoryPopover
+          <SessionHistoryPopover
             sessions={sessions}
             currentSessionId={currentSessionId}
             onSelectSession={handleSelectSession}
@@ -95,7 +95,7 @@ export function ChatSessionShell({
           key={currentSessionId}
           sessionId={currentSessionId}
           initialMessages={initialMessages}
-          onRunComplete={refreshSessions}
+          onRunComplete={handleRunComplete}
           onSheetChanged={onSheetChanged}
           onStreamingChange={setIsStreaming}
           sheets={sheets}

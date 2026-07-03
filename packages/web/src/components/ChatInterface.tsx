@@ -1,6 +1,6 @@
 import type { SheetChangeDelta } from "@openexcel/core";
-import { useChatSessionWorkspace } from "../features/chat/session/useChatSessionWorkspace";
-import { ChatSessionShell } from "../features/chat/session/ChatSessionShell";
+import { useSessionWorkspace } from "../features/session/useSessionWorkspace";
+import { SessionShell } from "../features/session/SessionShell";
 
 export function ChatInterface({
   onSheetChanged,
@@ -11,10 +11,10 @@ export function ChatInterface({
   onUndoComplete?: () => void;
   sheets: { workbookId: number; workbookName: string; id: number; name: string }[];
 }) {
-  const sessionWorkspace = useChatSessionWorkspace(onUndoComplete);
+  const sessionWorkspace = useSessionWorkspace(onUndoComplete);
 
   return (
-    <ChatSessionShell
+    <SessionShell
       {...sessionWorkspace}
       onSheetChanged={onSheetChanged}
       sheets={sheets}

@@ -9,7 +9,7 @@ type Props = {
   onNewSession: () => void;
 };
 
-export function ChatSessionHeader({
+export function SessionHeader({
   sessionName,
   currentSessionId,
   undoState,
