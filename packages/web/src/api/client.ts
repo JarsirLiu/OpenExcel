@@ -175,3 +175,13 @@ export async function undoLatestRun(sessionId: number): Promise<{ runId: number;
   if (!res.ok) throw new Error("撤销本轮修改失败");
   return res.json();
 }
+
+export async function generateSessionTitle(sessionId: number, firstUserText: string): Promise<{ title: string }> {
+  const res = await fetch(`${BASE}/sessions/${sessionId}/title`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ firstUserText }),
+  });
+  if (!res.ok) throw new Error(await readErrorMessage(res, "生成标题失败"));
+  return res.json();
+}

@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import * as service from "./service.js";
+import { generateSessionTitle } from "./title.js";
 import { pipeUIMessageStreamToResponse } from "ai";
 
 export async function chatRoutes(app: FastifyInstance) {
@@ -33,6 +34,37 @@ export async function chatRoutes(app: FastifyInstance) {
   app.post<{ Params: { sessionId: string } }>("/api/sessions/:sessionId/runs/undo-latest", async (req) => {
     return service.undoLatestRun(Number(req.params.sessionId));
   });
+
+  app.post<{ Params: { sessionId: string }; Body: { firstUserText: string } }>(
+    "/api/sessions/:sessionId/title",
+    async (req, reply) => {
+      const sessionId = Number(req.params.sessionId);
+      const firstUserText = typeof req.body?.firstUserText === "string"
+        ? req.body.firstUserText.trim()
+        : "";
+
+      if (!firstUserText) {
+        return reply.status(400).send({ error: "标题生成需要用户消息" });
+      }
+
+      const session = await service.getSession(sessionId);
+      if (!session) {
+        return reply.status(404).send({ error: "会话不存在" });
+      }
+
+      if (session.name !== "新对话") {
+        return { title: session.name };
+      }
+
+      const title = await generateSessionTitle(
+        (id, data) => service.renameSession(id, data.name ?? ""),
+        sessionId,
+        firstUserText,
+      );
+
+      return { title };
+    },
+  );
 
   app.post<{ Params: { sessionId: string }; Body: { messages: any[] } }>(
     "/api/sessions/:sessionId/chat",

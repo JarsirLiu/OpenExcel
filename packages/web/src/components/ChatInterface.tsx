@@ -8,7 +8,7 @@ import type { SheetChangeDelta } from "@openexcel/core";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Session } from "../api/client";
-import { createSession, deleteSession, fetchMessages, fetchSessions, undoLatestRun } from "../api/client";
+import { createSession, deleteSession, fetchMessages, fetchSessions, generateSessionTitle, undoLatestRun } from "../api/client";
 import { SheetPreview } from "./SheetPreview";
 import { useSheetPatchSync } from "../hooks/useSheetPatchSync";
 import { createMentionSuggestion } from "./SheetMentionList";
@@ -113,9 +113,22 @@ function ChatPanel({
     transport: new DefaultChatTransport({
       api: `/api/sessions/${sessionId}/chat`,
     }),
-    onFinish: ({ isAbort, isError }) => {
+    onFinish: ({ isAbort, isError, messages: finishedMessages }) => {
       if (!isAbort && !isError) {
         void onRunComplete?.();
+
+        const firstUserMessage = finishedMessages.find((msg) => msg.role === "user");
+        const firstUserText = contentText(firstUserMessage).trim();
+
+        if (firstUserText) {
+          void generateSessionTitle(sessionId, firstUserText)
+            .then(() => {
+              void onRunComplete?.();
+            })
+            .catch((error) => {
+              console.error("[chat] Failed to generate session title:", error);
+            });
+        }
       }
     },
   });

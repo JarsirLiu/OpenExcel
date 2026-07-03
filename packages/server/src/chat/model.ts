@@ -1,6 +1,6 @@
 import { loadModelConfig } from "../config.js";
 import { createOpenAI } from "@ai-sdk/openai";
-import { isLoopFinished, streamText } from "ai";
+import { isLoopFinished, streamText, type LanguageModel } from "ai";
 
 function createOpenAIProvider(config: ReturnType<typeof loadModelConfig>) {
   return createOpenAI({
@@ -9,13 +9,13 @@ function createOpenAIProvider(config: ReturnType<typeof loadModelConfig>) {
   });
 }
 
-export function createChatModel() {
+export function createChatModel(): LanguageModel {
   const config = loadModelConfig();
   const openai = createOpenAIProvider(config);
   return openai.chat(config.modelName);
 }
 
-export function createTitleModel() {
+export function createTitleModel(): LanguageModel {
   const config = loadModelConfig();
   const openai = createOpenAIProvider(config);
   return openai.completion(config.modelName);

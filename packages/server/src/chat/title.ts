@@ -31,12 +31,16 @@ export async function generateTitle(model: LanguageModel, prompt: string): Promi
     console.error("[chat] Failed to generate title from model, falling back:", error);
   }
 
-  const fallback = prompt.replace(/\s+/g, " ").trim().slice(0, 10);
-  return fallback || "新对话";
+  return fallbackTitleFromPrompt(prompt);
 }
 
 function stripThinkingTags(text: string): string {
   return text
     .replace(/<think>[\s\S]*?<\/think>/gi, "")
     .replace(/<\/?think>/gi, "");
+}
+
+function fallbackTitleFromPrompt(prompt: string): string {
+  const fallback = prompt.replace(/\s+/g, " ").trim().slice(0, 10);
+  return fallback || "新对话";
 }

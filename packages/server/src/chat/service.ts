@@ -63,6 +63,10 @@ export async function renameSession(sessionId: number, name: string) {
   return repo.updateSession(sessionId, { name });
 }
 
+export async function getSession(sessionId: number) {
+  return repo.findSession(sessionId);
+}
+
 export async function getMessages(sessionId: number) {
   const storedMessages = await rollout.getSessionMessages(sessionId);
   if (storedMessages.length > 0) return storedMessages;
@@ -194,22 +198,6 @@ export async function streamChat(
         await rollout.persistSessionMessages(sessionId, newMessages);
       } catch (error) {
         console.error(`[chat] Failed to persist transcript for session ${sessionId}:`, error);
-      }
-
-      // 首条消息时生成标题，确保前端刷新会话列表时能拿到新名称
-      if (session.name === "新对话") {
-        const firstUserMsg = newMessages.find((m: any) => m.role === "user");
-        const firstUserText = extractMessageText(firstUserMsg);
-        if (firstUserText) {
-          try {
-            const title = await model.generateTitle(firstUserText);
-            if (title) {
-              await repo.updateSession(sessionId, { name: title });
-            }
-          } catch {
-            // 标题只是增强体验，不能影响主对话链路。
-          }
-        }
       }
 
       try {

@@ -9,6 +9,7 @@ import {
   fetchRuns,
   undoLatestRun,
   downloadTemplateUrl,
+  generateSessionTitle,
 } from "./client";
 
 const mockFetch = vi.fn();
@@ -117,5 +118,19 @@ describe("undoLatestRun", () => {
     const result = await undoLatestRun(3);
     expect(result).toEqual({ runId: 8, restoredSheetIds: [1, 2] });
     expect(mockFetch).toHaveBeenCalledWith("/api/sessions/3/runs/undo-latest", { method: "POST" });
+  });
+});
+
+describe("generateSessionTitle", () => {
+  it("posts first user text to title endpoint", async () => {
+    mockFetch.mockResolvedValue(new Response(JSON.stringify({ title: "数据分析" }), { status: 200 }));
+
+    const result = await generateSessionTitle(3, "分析这些数据");
+    expect(result).toEqual({ title: "数据分析" });
+    expect(mockFetch).toHaveBeenCalledWith("/api/sessions/3/title", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ firstUserText: "分析这些数据" }),
+    });
   });
 });

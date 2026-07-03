@@ -54,6 +54,14 @@ describe("generateTitle", () => {
 
     expect(title).toBe("新对话");
   });
+
+  it("模型抛错时回退到用户输入前十个字", async () => {
+    mockGenerateText.mockRejectedValue(new Error("model failed"));
+
+    const title = await generateTitle("title-model", "请帮我分析这份销售数据并给出结论");
+
+    expect(title).toBe("请帮我分析这份销售数据".slice(0, 10));
+  });
 });
 
 describe("generateSessionTitle", () => {
