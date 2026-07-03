@@ -1,25 +1,27 @@
-import { useMemo, useState, useCallback, useEffect, useRef } from "react";
-import { Workbook } from "@fortune-sheet/react";
-import "@fortune-sheet/react/dist/index.css";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { celldataToExcel, extractSheetConfig, matrixToCelldata } from "@openexcel/core";
-import type { WorkbookFull } from "../api/client";
-import { updateSheetData, deleteWorkbook } from "../api/client";
-import { confirm } from "./ConfirmDialog";
-import { toFortuneSheetData } from "../adapters/fortuneSheet";
 import type { WorkbookInstance } from "@fortune-sheet/react";
+import type { WorkbookFull } from "../../api/client";
+import { deleteWorkbook, updateSheetData } from "../../api/client";
+import { confirm } from "../../components/ConfirmDialog";
+import { toFortuneSheetData } from "../../adapters/fortuneSheet";
 
-interface Props {
+type UseExcelGridWorkspaceProps = {
   workbook: WorkbookFull | null;
   currentSheetIndex: number;
-  revision?: number;
   onSheetIndexChange?: (sheetIndex: number) => void;
-  onSheetDataChange?: (sheetId: number, celldata: any[]) => void;
   onWorkbookDelete?: (workbookId: number) => void;
-}
+};
 
-export function ExcelGrid({ workbook, currentSheetIndex, revision, onSheetIndexChange, onSheetDataChange, onWorkbookDelete }: Props) {
+export function useExcelGridWorkspace({
+  workbook,
+  currentSheetIndex,
+  onSheetIndexChange,
+  onWorkbookDelete,
+}: UseExcelGridWorkspaceProps) {
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveStatusResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedSnapshotRef = useRef<Record<number, string>>({});
   const workbookRef = useRef<WorkbookInstance>(null);
 
@@ -39,7 +41,18 @@ export function ExcelGrid({ workbook, currentSheetIndex, revision, onSheetIndexC
     lastSavedSnapshotRef.current = nextSnapshots;
   }, [workbook, getSnapshot]);
 
-  const doSave = useCallback(async (celldata: any[], config: any) => {
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+      if (saveStatusResetRef.current) {
+        clearTimeout(saveStatusResetRef.current);
+      }
+    };
+  }, []);
+
+  const syncSheetToServer = useCallback(async (celldata: any[], config: any) => {
     if (!workbook || !workbook.sheets[currentSheetIndex]) return;
 
     setSaveStatus("saving");
@@ -47,27 +60,28 @@ export function ExcelGrid({ workbook, currentSheetIndex, revision, onSheetIndexC
       const sheet = workbook.sheets[currentSheetIndex];
       await updateSheetData(sheet.id, celldata, config);
       setSaveStatus("saved");
-      onSheetDataChange?.(sheet.id, celldata);
       lastSavedSnapshotRef.current[sheet.id] = getSnapshot(celldata, config);
-      setTimeout(() => setSaveStatus("idle"), 2000);
-    } catch (err) {
+      if (saveStatusResetRef.current) clearTimeout(saveStatusResetRef.current);
+      saveStatusResetRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
+    } catch (error) {
       setSaveStatus("idle");
-      console.error("保存失败:", err);
+      console.error("保存失败:", error);
     }
-  }, [workbook, currentSheetIndex, onSheetDataChange, getSnapshot]);
+  }, [currentSheetIndex, getSnapshot, workbook]);
 
-  const trySave = useCallback((celldata: any[], config: any) => {
+  const scheduleSave = useCallback((celldata: any[], config: any) => {
     if (!workbook || !workbook.sheets[currentSheetIndex]) return;
     const sheet = workbook.sheets[currentSheetIndex];
     if (!Array.isArray(celldata)) return;
+
     const snapshot = getSnapshot(celldata, config);
     if (lastSavedSnapshotRef.current[sheet.id] === snapshot) return;
 
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(() => {
-      doSave(celldata, config);
+      void syncSheetToServer(celldata, config);
     }, 500);
-  }, [workbook, currentSheetIndex, doSave, getSnapshot]);
+  }, [currentSheetIndex, getSnapshot, syncSheetToServer, workbook]);
 
   const handleChange = useCallback((data: any[]) => {
     if (!workbook || !Array.isArray(data)) return;
@@ -80,13 +94,19 @@ export function ExcelGrid({ workbook, currentSheetIndex, revision, onSheetIndexC
     if (!Array.isArray(cellMatrix)) return;
     const celldata = matrixToCelldata(cellMatrix);
     const config = extractSheetConfig(fortuneSheet);
-    trySave(celldata, config);
-  }, [workbook, currentSheetIndex, trySave]);
+    scheduleSave(celldata, config);
+  }, [currentSheetIndex, scheduleSave, workbook]);
 
   const sheetData = useMemo(() => {
     if (!workbook) return [];
     return workbook.sheets.map((sheet) => toFortuneSheetData(sheet));
   }, [workbook]);
+
+  useEffect(() => {
+    if (!workbookRef.current) return;
+    workbookRef.current.updateSheet(sheetData as any);
+    workbookRef.current.activateSheet({ index: currentSheetIndex });
+  }, [currentSheetIndex, sheetData]);
 
   const handleActivateSheet = useCallback((sheetId: string) => {
     if (!workbook) return;
@@ -94,7 +114,7 @@ export function ExcelGrid({ workbook, currentSheetIndex, revision, onSheetIndexC
     if (nextIndex >= 0) {
       onSheetIndexChange?.(nextIndex);
     }
-  }, [workbook, onSheetIndexChange]);
+  }, [onSheetIndexChange, workbook]);
 
   const handleDownload = useCallback(() => {
     const inst = workbookRef.current;
@@ -130,66 +150,15 @@ export function ExcelGrid({ workbook, currentSheetIndex, revision, onSheetIndexC
     if (!ok) return;
     await deleteWorkbook(workbook.id);
     onWorkbookDelete?.(workbook.id);
-  }, [workbook, onWorkbookDelete]);
+  }, [onWorkbookDelete, workbook]);
 
-  if (!workbook) return null;
-
-  return (
-    <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0, position: "relative" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 8px", background: "#f5f5f5", borderBottom: "1px solid #e0e4ea" }}>
-        <span style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{workbook.name}</span>
-        <button
-          onClick={handleDownload}
-          style={{
-            fontSize: 12, padding: "2px 10px", cursor: "pointer",
-            border: "1px solid #ccc", borderRadius: 4, background: "#fff",
-          }}
-        >
-          下载 Excel
-        </button>
-        <button
-          onClick={handleDeleteWorkbook}
-          style={{
-            fontSize: 12, padding: "2px 10px", cursor: "pointer",
-            border: "1px solid #ccc", borderRadius: 4, background: "#fff",
-            color: "#d32f2f",
-          }}
-        >
-          删除 Excel
-        </button>
-        {saveStatus === "saving" && <span style={{ fontSize: 12, color: "#f0ad4e" }}>保存中...</span>}
-        {saveStatus === "saved" && <span style={{ fontSize: 12, color: "#5cb85c" }}>已保存</span>}
-      </div>
-      <div style={{ flex: 1, minHeight: 0 }}>
-        <Workbook
-          ref={workbookRef}
-          key={`${workbook.name}-${revision ?? 0}`}
-          data={sheetData as any}
-          onChange={handleChange}
-          showSheetTabs={true}
-          showToolbar={true}
-          showFormulaBar={false}
-          toolbarItems={[
-            "merge-cell", "|",
-            "bold", "italic", "strike-through", "underline", "|",
-            "font-color", "background", "border", "|",
-            "horizontal-align", "vertical-align", "text-wrap", "|",
-            "clear", "filter", "link", "comment",
-          ]}
-          cellContextMenu={[
-            "copy", "paste", "|",
-            "insert-row", "insert-column",
-            "delete-row", "delete-column", "delete-cell", "|",
-            "clear", "sort", "orderAZ", "orderZA", "filter", "|",
-            "data", "cell-format",
-          ]}
-          // @ts-expect-error allowUpdate is a valid prop but missing from types
-          allowUpdate={true}
-          hooks={{
-            afterActivateSheet: handleActivateSheet,
-          }}
-        />
-      </div>
-    </div>
-  );
+  return {
+    saveStatus,
+    workbookRef,
+    sheetData,
+    handleChange,
+    handleActivateSheet,
+    handleDownload,
+    handleDeleteWorkbook,
+  };
 }
