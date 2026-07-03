@@ -1,9 +1,8 @@
 import type { FastifyInstance } from "fastify";
-import * as service from "./service.js";
-import { generateSessionTitle } from "./title.js";
 import { pipeUIMessageStreamToResponse } from "ai";
+import * as service from "./service.js";
 
-export async function chatRoutes(app: FastifyInstance) {
+export async function sessionRoutes(app: FastifyInstance) {
   app.get("/api/sessions", async () => {
     return service.getSessions();
   });
@@ -52,16 +51,7 @@ export async function chatRoutes(app: FastifyInstance) {
         return reply.status(404).send({ error: "会话不存在" });
       }
 
-      if (session.name !== "新对话") {
-        return { title: session.name };
-      }
-
-      const title = await generateSessionTitle(
-        (id, data) => service.renameSession(id, data.name ?? ""),
-        sessionId,
-        firstUserText,
-      );
-
+      const title = await service.generateSessionTitleForSession(sessionId, firstUserText);
       return { title };
     },
   );

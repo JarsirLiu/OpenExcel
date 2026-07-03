@@ -7,7 +7,7 @@ vi.mock("ai", () => ({
   generateText: mockGenerateText,
 }));
 
-vi.mock("./model.js", () => ({
+vi.mock("../model.js", () => ({
   createTitleModel: mockCreateTitleModel,
 }));
 
@@ -24,7 +24,7 @@ describe("generateTitle", () => {
       text: "<think>推理中</think>\n\n数据分析报告生成",
     });
 
-    const title = await generateTitle("title-model", "分析这些数据");
+    const title = await generateTitle("title-model" as any, "分析这些数据");
 
     expect(mockGenerateText).toHaveBeenCalledWith(expect.objectContaining({
       model: "title-model",
@@ -40,7 +40,7 @@ describe("generateTitle", () => {
       text: "   \n <think>只有思考</think> \n",
     });
 
-    const title = await generateTitle("title-model", "这是一段很长的用户输入");
+    const title = await generateTitle("title-model" as any, "这是一段很长的用户输入");
 
     expect(title).toBe("这是一段很长的用户输");
   });
@@ -50,7 +50,7 @@ describe("generateTitle", () => {
       text: "",
     });
 
-    const title = await generateTitle("title-model", "   ");
+    const title = await generateTitle("title-model" as any, "   ");
 
     expect(title).toBe("新对话");
   });
@@ -58,7 +58,7 @@ describe("generateTitle", () => {
   it("模型抛错时回退到用户输入前十个字", async () => {
     mockGenerateText.mockRejectedValue(new Error("model failed"));
 
-    const title = await generateTitle("title-model", "请帮我分析这份销售数据并给出结论");
+    const title = await generateTitle("title-model" as any, "请帮我分析这份销售数据并给出结论");
 
     expect(title).toBe("请帮我分析这份销售数据".slice(0, 10));
   });
@@ -71,9 +71,22 @@ describe("generateSessionTitle", () => {
     });
 
     const updateSession = vi.fn();
-    const title = await generateSessionTitle(updateSession, 1, "分析这些数据");
+    const title = await generateSessionTitle(
+      updateSession,
+      1,
+      "分析这些数据",
+      {
+        baseUrl: "http://test.local",
+        apiKey: "test-key",
+        modelName: "test-model",
+      },
+    );
 
-    expect(mockCreateTitleModel).toHaveBeenCalledTimes(1);
+    expect(mockCreateTitleModel).toHaveBeenCalledWith({
+      baseUrl: "http://test.local",
+      apiKey: "test-key",
+      modelName: "test-model",
+    });
     expect(updateSession).toHaveBeenCalledWith(1, { name: "数据分析" });
     expect(title).toBe("数据分析");
   });

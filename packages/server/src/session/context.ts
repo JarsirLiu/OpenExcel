@@ -1,5 +1,4 @@
 import * as repo from "./repository.js";
-import { withSheetContext } from "./prompt.js";
 
 const MAX_TURNS = 20;
 
@@ -31,8 +30,4 @@ export function buildWorkplaceContext(): Promise<string> {
       )
       .join("\n");
   });
-}
-
-export function buildSystemPrompt(context: string): string {
-  return withSheetContext(context);
 }

@@ -1,10 +1,14 @@
-import { loadModelConfig } from "../config.js";
 import * as repo from "./repository.js";
-import * as model from "./model.js";
 import * as context from "./context.js";
 import * as rollout from "./rollout.js";
-import { buildExcelToolContext, excelTools } from "./tools/index.js";
-import { convertToModelMessages, toUIMessageStream, validateUIMessages } from "ai";
+import { buildExcelToolCatalog, buildExcelToolContext, excelTools } from "./tools/index.js";
+import {
+  buildSystemPrompt,
+  generateSessionTitle,
+  historyFromRuns,
+  streamChat as streamAgentChat,
+} from "@openexcel/agent";
+import { loadModelConfig } from "../config.js";
 
 function extractMessageText(message: any): string {
   if (typeof message?.content === "string") return message.content;
@@ -72,7 +76,7 @@ export async function getMessages(sessionId: number) {
   if (storedMessages.length > 0) return storedMessages;
 
   const runs = await repo.findRunsBySession(sessionId);
-  return context.historyFromRuns(runs);
+  return historyFromRuns(runs);
 }
 
 export async function getRuns(sessionId: number) {
@@ -94,7 +98,7 @@ export async function streamChat(
 
   const config = loadModelConfig();
   const workplaceContext = await context.buildWorkplaceContext();
-  const systemPrompt = context.buildSystemPrompt(workplaceContext);
+  const systemPrompt = buildSystemPrompt(workplaceContext, buildExcelToolCatalog());
   const inputText = extractLatestUserText(messages);
 
   const run = await repo.createRun({
@@ -115,7 +119,7 @@ export async function streamChat(
     try {
       await finalizeRun(run.id, data);
     } catch (error) {
-      console.error(`[chat] Failed to finalize run ${run.id}:`, error);
+      console.error(`[session] Failed to finalize run ${run.id}:`, error);
     }
   };
 
@@ -139,29 +143,15 @@ export async function streamChat(
         order: stepOrder++,
       });
     } catch (error) {
-      console.error(`[chat] Failed to persist step for run ${run.id}:`, error);
+      console.error(`[session] Failed to persist step for run ${run.id}:`, error);
     }
   };
 
-  let validatedMessages: any[];
   try {
-    validatedMessages = await validateUIMessages({
-      messages,
-      tools: excelTools as any,
-    });
-  } catch (error) {
-    await finalizeRunOnce({
-      status: "error",
-      errorMessage: error instanceof Error ? error.message : String(error),
-    });
-    throw error;
-  }
-
-  let result;
-  try {
-    result = model.streamChat({
+    return await streamAgentChat({
+      modelConfig: config,
       systemPrompt,
-      messages: await convertToModelMessages(validatedMessages as any),
+      messages,
       tools: excelTools,
       toolsContext,
       abortSignal,
@@ -181,6 +171,19 @@ export async function streamChat(
           errorMessage: error instanceof Error ? error.message : String(error),
         });
       },
+      onEnd: async ({ messages: newMessages }) => {
+        try {
+          await rollout.persistSessionMessages(sessionId, newMessages);
+        } catch (error) {
+          console.error(`[session] Failed to persist transcript for session ${sessionId}:`, error);
+        }
+
+        try {
+          await repo.pruneUndoSnapshots(sessionId);
+        } catch (error) {
+          console.error(`[session] Failed to prune undo snapshots for session ${sessionId}:`, error);
+        }
+      },
     });
   } catch (error) {
     await finalizeRunOnce({
@@ -189,26 +192,22 @@ export async function streamChat(
     });
     throw error;
   }
+}
 
-  const uiStream = toUIMessageStream({
-    stream: result.stream,
-    originalMessages: validatedMessages,
-    onEnd: async ({ messages: newMessages }) => {
-      try {
-        await rollout.persistSessionMessages(sessionId, newMessages);
-      } catch (error) {
-        console.error(`[chat] Failed to persist transcript for session ${sessionId}:`, error);
-      }
+export async function generateSessionTitleForSession(sessionId: number, firstUserText: string) {
+  const session = await repo.findSession(sessionId);
+  if (!session) throw new Error("会话不存在");
+  if (session.name !== "新对话") {
+    return session.name;
+  }
 
-      try {
-        await repo.pruneUndoSnapshots(sessionId);
-      } catch (error) {
-        console.error(`[chat] Failed to prune undo snapshots for session ${sessionId}:`, error);
-      }
-    },
-  });
-
-  return uiStream;
+  const config = loadModelConfig();
+  return generateSessionTitle(
+    (id, data) => repo.updateSession(id, data),
+    sessionId,
+    firstUserText,
+    config,
+  );
 }
 
 export async function undoLatestRun(sessionId: number) {

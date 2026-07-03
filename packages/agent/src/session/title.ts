@@ -1,15 +1,13 @@
 import { generateText, type LanguageModel } from "ai";
-import { createTitleModel } from "./model.js";
+import { createTitleModel, type ModelConfig } from "../model.js";
 
-/**
- * Generate a session title and persist it separately from chat execution.
- */
 export async function generateSessionTitle(
   updateSession: (id: number, data: { name?: string }) => Promise<unknown>,
   sessionId: number,
   firstUserText: string,
+  modelConfig: ModelConfig,
 ): Promise<string> {
-  const title = await generateTitle(createTitleModel(), firstUserText);
+  const title = await generateTitle(createTitleModel(modelConfig), firstUserText);
   await updateSession(sessionId, { name: title });
   return title;
 }
@@ -28,7 +26,7 @@ export async function generateTitle(model: LanguageModel, prompt: string): Promi
       return cleaned.slice(0, 10);
     }
   } catch (error) {
-    console.error("[chat] Failed to generate title from model, falling back:", error);
+    console.error("[agent] Failed to generate title from model, falling back:", error);
   }
 
   return fallbackTitleFromPrompt(prompt);

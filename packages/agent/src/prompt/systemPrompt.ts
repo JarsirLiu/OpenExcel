@@ -1,5 +1,3 @@
-import { buildExcelToolCatalog } from "./tools/index.js";
-
 export const DEFAULT_PROMPT = `你是一个专业的 Excel 数据分析 agent。你有以下工具可用于操作 Excel 工作簿：
 
 ## 重要规则
@@ -11,12 +9,12 @@ export const DEFAULT_PROMPT = `你是一个专业的 Excel 数据分析 agent。
 - 工具执行后的结果不是终点。拿到工具结果后，如果还需要解释、总结或继续操作，必须继续完成并给出最终回答
 - 不要为了遵循固定流程而阻塞自己，按任务需要自主决定是否调用工具与何时结束`;
 
-export function withSheetContext(context: string): string {
+export function buildSystemPrompt(context: string, toolCatalog: string): string {
   return `${DEFAULT_PROMPT}
 
 ## 可用工具
 
-${buildExcelToolCatalog()}
+${toolCatalog}
 
 ## 可用数据
 
