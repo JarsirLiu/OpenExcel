@@ -2,10 +2,24 @@ import { loadModelConfig } from "../config.js";
 import { createOpenAI } from "@ai-sdk/openai";
 import { isLoopFinished, streamText } from "ai";
 
-const openai = createOpenAI({
-  baseURL: loadModelConfig().baseUrl,
-  apiKey: loadModelConfig().apiKey,
-});
+function createOpenAIProvider(config: ReturnType<typeof loadModelConfig>) {
+  return createOpenAI({
+    baseURL: config.baseUrl,
+    apiKey: config.apiKey,
+  });
+}
+
+export function createChatModel() {
+  const config = loadModelConfig();
+  const openai = createOpenAIProvider(config);
+  return openai.chat(config.modelName);
+}
+
+export function createTitleModel() {
+  const config = loadModelConfig();
+  const openai = createOpenAIProvider(config);
+  return openai.completion(config.modelName);
+}
 
 export function streamChat(input: {
   systemPrompt: string;
@@ -18,14 +32,8 @@ export function streamChat(input: {
   onAbort?: (...args: any[]) => void | Promise<void>;
   onError?: (...args: any[]) => void | Promise<void>;
 }): ReturnType<typeof streamText> {
-  const config = loadModelConfig();
-  const customOpenAI = createOpenAI({
-    baseURL: config.baseUrl,
-    apiKey: config.apiKey,
-  });
-
   return streamText({
-    model: customOpenAI.chat(config.modelName),
+    model: createChatModel(),
     system: input.systemPrompt,
     messages: input.messages,
     tools: input.tools,
@@ -37,16 +45,4 @@ export function streamChat(input: {
     onAbort: input.onAbort,
     onError: input.onError,
   });
-}
-
-export async function generateTitle(prompt: string): Promise<string> {
-  const config = loadModelConfig();
-  const result = await streamText({
-    model: openai.chat(config.modelName),
-    system: "请用10个字以内概括用户消息的主题。只输出标题，不要多余内容。",
-    messages: [{ role: "user", content: prompt }],
-  });
-
-  const text = await result.text;
-  return (text || "").trim().slice(0, 10) || "新对话";
 }
