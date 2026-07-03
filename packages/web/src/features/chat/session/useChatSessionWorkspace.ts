@@ -6,11 +6,11 @@ import {
   fetchSessions,
   undoLatestRun,
   type Session,
-} from "../../api/client";
+} from "../../../api/client";
 
 type UndoState = "idle" | "loading" | "success" | "error";
 
-export function useSessionWorkspace(onUndoComplete?: () => void) {
+export function useChatSessionWorkspace(onUndoComplete?: () => void) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<number | null>(null);
   const [initialMessages, setInitialMessages] = useState<any[]>([]);

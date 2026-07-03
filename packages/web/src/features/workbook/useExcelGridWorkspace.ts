@@ -1,13 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { celldataToExcel, extractSheetConfig, matrixToCelldata } from "@openexcel/core";
 import type { WorkbookInstance } from "@fortune-sheet/react";
 import type { WorkbookFull } from "../../api/client";
 import { deleteWorkbook, updateSheetData } from "../../api/client";
 import { confirm } from "../../components/ConfirmDialog";
 import { toFortuneSheetData } from "../../adapters/fortuneSheet";
+import { useWorkbookEditorSession } from "./useWorkbookEditorSession";
 
 type UseExcelGridWorkspaceProps = {
   workbook: WorkbookFull | null;
+  workbookRevision: number;
   currentSheetIndex: number;
   onSheetIndexChange?: (sheetIndex: number) => void;
   onWorkbookDelete?: (workbookId: number) => void;
@@ -15,6 +17,7 @@ type UseExcelGridWorkspaceProps = {
 
 export function useExcelGridWorkspace({
   workbook,
+  workbookRevision,
   currentSheetIndex,
   onSheetIndexChange,
   onWorkbookDelete,
@@ -24,6 +27,7 @@ export function useExcelGridWorkspace({
   const saveStatusResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedSnapshotRef = useRef<Record<number, string>>({});
   const workbookRef = useRef<WorkbookInstance>(null);
+  const { sheetData, sessionKey } = useWorkbookEditorSession(workbook, workbookRevision);
 
   const getSnapshot = useCallback((celldata: any[], config: any) => {
     return JSON.stringify({ celldata, config });
@@ -97,17 +101,6 @@ export function useExcelGridWorkspace({
     scheduleSave(celldata, config);
   }, [currentSheetIndex, scheduleSave, workbook]);
 
-  const sheetData = useMemo(() => {
-    if (!workbook) return [];
-    return workbook.sheets.map((sheet) => toFortuneSheetData(sheet));
-  }, [workbook]);
-
-  useEffect(() => {
-    if (!workbookRef.current) return;
-    workbookRef.current.updateSheet(sheetData as any);
-    workbookRef.current.activateSheet({ index: currentSheetIndex });
-  }, [currentSheetIndex, sheetData]);
-
   const handleActivateSheet = useCallback((sheetId: string) => {
     if (!workbook) return;
     const nextIndex = workbook.sheets.findIndex((sheet) => String(sheet.id) === sheetId);
@@ -156,6 +149,7 @@ export function useExcelGridWorkspace({
     saveStatus,
     workbookRef,
     sheetData,
+    sessionKey,
     handleChange,
     handleActivateSheet,
     handleDownload,

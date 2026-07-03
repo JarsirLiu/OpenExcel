@@ -15,6 +15,7 @@ type Props = {
   workbooks: WorkbookMeta[];
   workbookIdx: number;
   currentWorkbook: WorkbookFull | null;
+  workbookRevision: number;
   status: string;
   loading: boolean;
   currentSheetIndex: number;
@@ -35,6 +36,7 @@ export function WorkbookWorkspace({
   workbooks,
   workbookIdx,
   currentWorkbook,
+  workbookRevision,
   status,
   loading,
   currentSheetIndex,
@@ -95,6 +97,7 @@ export function WorkbookWorkspace({
       <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
         <ExcelWorkspace
           workbook={currentWorkbook}
+          workbookRevision={workbookRevision}
           currentSheetIndex={currentSheetIndex}
           onSheetIndexChange={setCurrentSheetIndex}
           onWorkbookDelete={handleWorkbookDelete}

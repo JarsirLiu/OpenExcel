@@ -7,6 +7,7 @@ export function Workbench() {
     workbooks,
     workbookIdx,
     currentWorkbook,
+    workbookRevision,
     status,
     loading,
     currentSheetIndex,
@@ -33,6 +34,7 @@ export function Workbench() {
           workbooks={workbooks}
           workbookIdx={workbookIdx}
           currentWorkbook={currentWorkbook}
+          workbookRevision={workbookRevision}
           status={status}
           loading={loading}
           currentSheetIndex={currentSheetIndex}

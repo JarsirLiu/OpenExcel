@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { collectSheetPatchUpdates } from "./useSheetPatchSync";
+import { collectSheetPatchUpdates } from "../features/chat/hooks/useSheetPatchSync";
 
 describe("collectSheetPatchUpdates", () => {
   it("collects valid completed patch outputs once", () => {

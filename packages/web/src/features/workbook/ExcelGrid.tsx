@@ -5,6 +5,7 @@ import { useExcelGridWorkspace } from "./useExcelGridWorkspace";
 
 interface Props {
   workbook: WorkbookFull | null;
+  workbookRevision: number;
   currentSheetIndex: number;
   onSheetIndexChange?: (sheetIndex: number) => void;
   onWorkbookDelete?: (workbookId: number) => void;
@@ -12,6 +13,7 @@ interface Props {
 
 export function ExcelGrid({
   workbook,
+  workbookRevision,
   currentSheetIndex,
   onSheetIndexChange,
   onWorkbookDelete,
@@ -20,12 +22,14 @@ export function ExcelGrid({
     saveStatus,
     workbookRef,
     sheetData,
+    sessionKey,
     handleChange,
     handleActivateSheet,
     handleDownload,
     handleDeleteWorkbook,
   } = useExcelGridWorkspace({
     workbook,
+    workbookRevision,
     currentSheetIndex,
     onSheetIndexChange,
     onWorkbookDelete,
@@ -69,7 +73,7 @@ export function ExcelGrid({
       </div>
       <div style={{ flex: 1, minHeight: 0 }}>
         <Workbook
-          key={workbook.id}
+          key={`${workbook.id}:${sessionKey}`}
           ref={workbookRef}
           data={sheetData as any}
           onChange={handleChange}

@@ -20,10 +20,11 @@ export function useWorkbookWorkspace() {
     status,
     loading,
     setWorkbooks,
-    setCurrentWorkbook,
+    replaceCurrentWorkbook,
     setWorkbookIdx,
     setStatus,
     uploadExcel,
+    workbookRevision,
   } = useWorkbench();
 
   const [currentSheetIndex, setCurrentSheetIndex] = useState(0);
@@ -33,11 +34,11 @@ export function useWorkbookWorkspace() {
     if (!currentWorkbook) return;
     try {
       const full = await fetchWorkbook(currentWorkbook.id);
-      setCurrentWorkbook(full);
+      replaceCurrentWorkbook(full);
     } catch {
       // ignore
     }
-  }, [currentWorkbook, setCurrentWorkbook]);
+  }, [currentWorkbook, replaceCurrentWorkbook]);
 
   const handleSheetChanged = useCallback(async (sheetId: number, delta: SheetChangeDelta | null) => {
     if (!currentWorkbook) return;
@@ -47,18 +48,18 @@ export function useWorkbookWorkspace() {
     if (delta) {
       const patched = patchWorkbookWithDelta(currentWorkbook, sheetId, delta);
       if (patched) {
-        setCurrentWorkbook(patched);
+        replaceCurrentWorkbook(patched);
         return;
       }
     }
 
     try {
       const full = await fetchWorkbook(currentWorkbook.id);
-      setCurrentWorkbook(full);
+      replaceCurrentWorkbook(full);
     } catch {
       // ignore
     }
-  }, [currentWorkbook, setCurrentWorkbook]);
+  }, [currentWorkbook, replaceCurrentWorkbook]);
 
   const handleSwitchWorkbook = useCallback(async (index: number) => {
     await switchWorkbook(index);
@@ -89,7 +90,7 @@ export function useWorkbookWorkspace() {
       if (idx >= 0) {
         setWorkbookIdx(idx);
         const full = await fetchWorkbook(result.id);
-        setCurrentWorkbook(full);
+        replaceCurrentWorkbook(full);
         setCurrentSheetIndex(0);
       }
       setStatus("上传完成");
@@ -97,7 +98,7 @@ export function useWorkbookWorkspace() {
       const message = error instanceof Error ? error.message : "上传失败";
       setStatus(`上传失败：${message}`);
     }
-  }, [setCurrentWorkbook, setStatus, setWorkbooks, setWorkbookIdx]);
+  }, [replaceCurrentWorkbook, setStatus, setWorkbooks, setWorkbookIdx]);
 
   const handleWorkbookDelete = useCallback(async (workbookId: number) => {
     await deleteWorkbook(workbookId);
@@ -107,19 +108,20 @@ export function useWorkbookWorkspace() {
     if (remaining.length > 0) {
       setWorkbookIdx(0);
       const full = await fetchWorkbook(remaining[0].id);
-      setCurrentWorkbook(full);
+      replaceCurrentWorkbook(full);
       setCurrentSheetIndex(0);
     } else {
       setWorkbookIdx(0);
-      setCurrentWorkbook(null);
+      replaceCurrentWorkbook(null);
     }
     setStatus("已删除");
-  }, [setCurrentWorkbook, setStatus, setWorkbooks, setWorkbookIdx]);
+  }, [replaceCurrentWorkbook, setStatus, setWorkbooks, setWorkbookIdx]);
 
   return {
     workbooks,
     workbookIdx,
     currentWorkbook,
+    workbookRevision,
     status,
     loading,
     currentSheetIndex,
