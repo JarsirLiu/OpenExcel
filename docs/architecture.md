@@ -343,6 +343,10 @@ Current session-related files:
 - `src/modules/sessions/transcript.ts`
 - `src/modules/sessions/chat/*`
 - `src/modules/sessions/runs/*`
+- `src/modules/workbooks/import/*`
+- `src/modules/workbooks/export/*`
+- `src/modules/workbooks/create/*`
+- `src/modules/workbooks/delete/*`
 - `src/modules/sheets/tools/*`
 
 represent the agent/server boundary today.

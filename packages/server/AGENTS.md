@@ -36,7 +36,11 @@ The current codebase is still transitional. The important source areas are:
 - `src/modules/sessions/*` - session chat, history, title, transcript, and session orchestration
 - `src/modules/sessions/chat/*` - chat streaming and workspace-context assembly
 - `src/modules/sessions/runs/*` - run persistence and undo logic
-- `src/modules/workbooks/*` - workbook import/export and workbook-level use cases
+- `src/modules/workbooks/*` - workbook orchestration and query entrypoints
+- `src/modules/workbooks/import/*` - workbook upload and import helpers
+- `src/modules/workbooks/export/*` - workbook export helpers
+- `src/modules/workbooks/create/*` - workbook sheet creation helpers
+- `src/modules/workbooks/delete/*` - workbook deletion helpers
 - `src/modules/sheets/*` - sheet patching, CRUD, and AI tool adapters
 - `src/shared/utils/*` - shared server-side helpers
 

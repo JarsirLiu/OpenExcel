@@ -1,6 +1,6 @@
-export { WorkbookUploadError, type WorkbookUploadErrorCode, resolveWorkbookImportTargets } from "./import.js";
+export { WorkbookUploadError, type WorkbookUploadErrorCode, resolveWorkbookImportTargets } from "./import/uploadWorkbook.js";
 export { getWorkbooks, getReferenceCandidates, getWorkbook } from "./query.js";
-export { uploadExcel, uploadAsNewWorkbook } from "./import.js";
-export { exportTemplate } from "./export.js";
-export { createSheet } from "./create.js";
-export { deleteWorkbook } from "./delete.js";
+export { uploadExcel, uploadAsNewWorkbook } from "./import/uploadWorkbook.js";
+export { exportTemplate } from "./export/exportTemplate.js";
+export { createSheet } from "./create/createSheet.js";
+export { deleteWorkbook } from "./delete/deleteWorkbook.js";

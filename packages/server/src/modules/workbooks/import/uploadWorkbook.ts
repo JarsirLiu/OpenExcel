@@ -1,6 +1,6 @@
 import * as XLSX from "xlsx";
-import { prisma } from "../../db.js";
-import * as repo from "./repository.js";
+import { prisma } from "../../../db.js";
+import * as repo from "../repository.js";
 
 function bufferToArrayBuffer(buffer: Buffer): ArrayBuffer | SharedArrayBuffer {
   return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);

@@ -1,4 +1,4 @@
-import * as repo from "./repository.js";
+import * as repo from "../repository.js";
 
 export async function deleteWorkbook(id: number) {
   const wb = await repo.findWorkbookWithSheets(id);
