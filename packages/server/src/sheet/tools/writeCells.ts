@@ -5,62 +5,15 @@ import {
   sheetChangePatchOutputSchema,
   sheetChangeRangeToZeroBased,
   type SheetChangeDelta,
-  type SheetChangeCell,
 } from "@openexcel/core";
-import { buildSheetChangePreview } from "./preview.js";
-import * as repo from "../repository.js";
+import {
+  applyCellWrite,
+  buildSheetChangePreview,
+  normalizeWriteOperations,
+  type WriteCellsInput,
+} from "../domain.js";
+import * as repo from "../../session/repository.js";
 import { sheetRecordToCelldata } from "../../utils/sheetData.js";
-type WriteCellsInput = {
-  sheetId: number;
-  operations: Array<
-    | { type: "cell"; row: number; col: number; value: string }
-    | { type: "range"; startRow: number; startCol: number; endRow: number; endCol: number; value: string }
-  >;
-};
-
-function normalizeWriteOperations(input: WriteCellsInput): { sheetId: number; operations: Array<
-  | { type: "cell"; row: number; col: number; value: string }
-  | { type: "range"; startRow: number; startCol: number; endRow: number; endCol: number; value: string }
-> } {
-  return {
-    sheetId: input.sheetId,
-    operations: input.operations.map((operation) => (
-      operation.type === "cell"
-        ? { type: "cell", row: operation.row, col: operation.col, value: operation.value }
-        : {
-            type: "range",
-            startRow: operation.startRow,
-            startCol: operation.startCol,
-            endRow: operation.endRow,
-            endCol: operation.endCol,
-            value: operation.value,
-          }
-    )),
-  };
-}
-
-function applyCellWrite(
-  cellMap: Map<string, any>,
-  touchedCells: Map<string, SheetChangeCell>,
-  row0: number,
-  col0: number,
-  value: string,
-) {
-  const key = `${row0},${col0}`;
-  if (cellMap.has(key)) {
-    const existing = cellMap.get(key);
-    existing.v = { ...existing.v, v: value, m: String(value) };
-  } else {
-    const newCell = { r: row0, c: col0, v: { v: value, m: String(value) } };
-    cellMap.set(key, newCell);
-  }
-
-  touchedCells.set(key, {
-    row: row0 + 1,
-    col: col0 + 1,
-    value,
-  });
-}
 
 export const writeCells = {
   ...excelToolSpecs.writeCells,
@@ -88,7 +41,7 @@ export const writeCells = {
       cellMap.set(`${cell.r},${cell.c}`, cell);
     }
 
-    const touchedCells = new Map<string, SheetChangeCell>();
+    const touchedCells = new Map<string, { row: number; col: number; value: string }>();
     for (const operation of operations) {
       if (operation.type === "cell") {
         const storageCell = sheetChangeCellToZeroBased(operation);

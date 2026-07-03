@@ -7,7 +7,7 @@ import {
 import * as repo from "./repository.js";
 import { buildWorkplaceContext } from "./context.js";
 import { persistSessionMessages } from "./transcript.js";
-import { excelTools } from "./tools/index.js";
+import { excelTools } from "../sheet/tools/index.js";
 import { loadModelConfig } from "../config.js";
 
 function extractMessageText(message: any): string {

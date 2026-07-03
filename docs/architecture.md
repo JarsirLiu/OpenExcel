@@ -341,7 +341,7 @@ Current session-related files:
 - `src/session/routes.ts`
 - `src/session/title.ts`
 - `src/session/context.ts`
-- `src/session/tools/*`
+- `src/sheet/tools/*`
 
 represent the agent/server boundary today.
 
@@ -351,6 +351,7 @@ Long term, these should move toward a cleaner split:
 - `server` owns request handling and persistence
 
 Session title generation remains in `server`, because it is a session API capability rather than an agent primitive.
+Sheet mutation tools now live under `src/sheet/tools/*`, which is a better fit for the domain than `src/session/tools/*`.
 
 ### 5.3 `packages/web`
 

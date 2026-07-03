@@ -28,20 +28,6 @@ export async function findSheetsByWorkbook(workbookId: number) {
   });
 }
 
-export async function findSheetWithWorkbook(id: number) {
-  return prisma.sheet.findUnique({
-    where: { id },
-    include: { workbook: { include: { sheets: { orderBy: { order: "asc" } } } } },
-  });
-}
-
-export async function updateSheetUploadedData(sheetId: number, uploadedData: string) {
-  return prisma.sheet.update({
-    where: { id: sheetId },
-    data: { uploadedData },
-  });
-}
-
 export async function createSheet(data: {
   workbookId: number;
   name: string;
@@ -59,22 +45,8 @@ export async function createSheet(data: {
   });
 }
 
-export async function deleteSheet(id: number) {
-  return prisma.sheet.delete({ where: { id } });
-}
-
 export async function deleteWorkbook(id: number) {
   return prisma.workbook.delete({ where: { id } });
-}
-
-export async function reindexSheetOrder(workbookId: number) {
-  const sheets = await prisma.sheet.findMany({
-    where: { workbookId },
-    orderBy: { order: "asc" },
-  });
-  await Promise.all(
-    sheets.map((s, i) => prisma.sheet.update({ where: { id: s.id }, data: { order: i } })),
-  );
 }
 
 export function toSheetJson(sheet: Prisma.SheetGetPayload<{}>): SheetJson {

@@ -1,25 +1,8 @@
 import { excelToolSpecs } from "@openexcel/agent";
 import { prisma } from "../../db.js";
 import { celldataToGrid, toOneBasedIndex } from "@openexcel/core";
+import { parseMergesFromCelldata } from "../domain.js";
 import { sheetRecordToCelldata } from "../../utils/sheetData.js";
-
-function parseMerges(celldata: any[]): { startRow: number; startCol: number; endRow: number; endCol: number }[] {
-  const merges: { startRow: number; startCol: number; endRow: number; endCol: number }[] = [];
-  for (const cell of celldata) {
-    const mc = cell.v?.mc;
-    if (mc) {
-      const r = cell.r;
-      const c = cell.c;
-      merges.push({
-        startRow: toOneBasedIndex(r),
-        startCol: toOneBasedIndex(c),
-        endRow: toOneBasedIndex(r + (mc.rs ?? 1) - 1),
-        endCol: toOneBasedIndex(c + (mc.cs ?? 1) - 1),
-      });
-    }
-  }
-  return merges;
-}
 
 export const readSheet = {
   ...excelToolSpecs.readSheet,
@@ -32,7 +15,7 @@ export const readSheet = {
       const maxCol = Math.max(...celldata.map((c: any) => c.c), 0);
       const columnCount = maxCol + 1;
       const grid = celldataToGrid(celldata, columnCount);
-      const merges = parseMerges(celldata);
+      const merges = parseMergesFromCelldata(celldata);
 
       const firstRow = grid[0] ?? [];
       const secondRow = grid[1] ?? [];

@@ -6,30 +6,14 @@ import {
   type SheetChangeDelta,
   type SheetChangeRangeOperation,
 } from "@openexcel/core";
-import { buildSheetChangePreview, toA1CellRef, toA1Range } from "./preview.js";
-import * as repo from "../repository.js";
+import {
+  applyMergeOperation,
+  buildSheetChangePreview,
+  toA1CellRef,
+  toA1Range,
+} from "../domain.js";
+import * as repo from "../../session/repository.js";
 import { sheetRecordToCelldata } from "../../utils/sheetData.js";
-
-function applyMergeOperation(cellMap: Map<string, any>, operation: SheetChangeRangeOperation) {
-  const storageRange = sheetChangeRangeToZeroBased(operation);
-  const rs = storageRange.endRow - storageRange.startRow + 1;
-  const cs = storageRange.endCol - storageRange.startCol + 1;
-
-  for (let r = storageRange.startRow; r <= storageRange.endRow; r += 1) {
-    for (let c = storageRange.startCol; c <= storageRange.endCol; c += 1) {
-      const key = `${r},${c}`;
-      if (r === storageRange.startRow && c === storageRange.startCol) {
-        const cell = cellMap.get(key) ?? { r, c, v: {} };
-        cell.v = { ...cell.v, mc: { r: storageRange.startRow, c: storageRange.startCol, rs, cs } };
-        cellMap.set(key, cell);
-      } else {
-        const cell = cellMap.get(key) ?? { r, c, v: {} };
-        cell.v = { mc: { r: storageRange.startRow, c: storageRange.startCol, rs, cs } };
-        cellMap.set(key, cell);
-      }
-    }
-  }
-}
 
 export const mergeCells = {
   ...excelToolSpecs.mergeCells,
@@ -62,7 +46,7 @@ export const mergeCells = {
 
     for (const operation of operations) {
       const storageRange = sheetChangeRangeToZeroBased(operation);
-      applyMergeOperation(cellMap, operation);
+      applyMergeOperation(cellMap, storageRange);
       mergedRanges.push(toA1Range(operation.startRow, operation.startCol, operation.endRow, operation.endCol));
       minRow = Math.min(minRow, storageRange.startRow);
       maxRow = Math.max(maxRow, storageRange.endRow);

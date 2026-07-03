@@ -2,53 +2,12 @@ import { excelToolSpecs, sheetMutationContextSchema } from "@openexcel/agent";
 import { prisma } from "../../db.js";
 import {
   sheetChangePatchOutputSchema,
-  sheetChangeRangeToZeroBased,
   type SheetChangeDelta,
   type SheetChangeClearOperation,
 } from "@openexcel/core";
-import { buildSheetChangePreview } from "./preview.js";
-import * as repo from "../repository.js";
+import { applyClearOperation, buildSheetChangePreview } from "../domain.js";
+import * as repo from "../../session/repository.js";
 import { sheetRecordToCelldata } from "../../utils/sheetData.js";
-
-function stripCellContent(value: Record<string, unknown> | undefined | null): Record<string, unknown> | null {
-  if (!value) return null;
-  const { v: _cellValue, m: _displayValue, ...rest } = value;
-  return Object.keys(rest).length > 0 ? rest : null;
-}
-
-function applyClearOperation(
-  cellMap: Map<string, any>,
-  operation: SheetChangeClearOperation,
-) {
-  const touchedKeys: string[] = [];
-
-  const clearCell = (row0: number, col0: number) => {
-    const key = `${row0},${col0}`;
-    const cell = cellMap.get(key);
-    if (!cell?.v) return;
-
-    const cleaned = stripCellContent(cell.v);
-    if (cleaned) {
-      cell.v = cleaned;
-    } else {
-      cellMap.delete(key);
-    }
-    touchedKeys.push(key);
-  };
-
-  if (operation.type === "cell") {
-    clearCell(operation.row - 1, operation.col - 1);
-    return touchedKeys;
-  }
-
-  const range = sheetChangeRangeToZeroBased(operation);
-  for (let r = range.startRow; r <= range.endRow; r += 1) {
-    for (let c = range.startCol; c <= range.endCol; c += 1) {
-      clearCell(r, c);
-    }
-  }
-  return touchedKeys;
-}
 
 export const clearCells = {
   ...excelToolSpecs.clearCells,
