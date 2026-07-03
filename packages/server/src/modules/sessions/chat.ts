@@ -5,10 +5,11 @@ import {
   streamChat as streamAgentChat,
 } from "@openexcel/agent";
 import * as repo from "./repository.js";
+import * as runRepo from "./runRepository.js";
 import { buildWorkplaceContext } from "./context.js";
 import { persistSessionMessages } from "./transcript.js";
-import { excelTools } from "../sheet/tools/index.js";
-import { loadModelConfig } from "../config.js";
+import { excelTools } from "../sheets/tools/index.js";
+import { loadModelConfig } from "../../config.js";
 
 function extractMessageText(message: any): string {
   if (typeof message?.content === "string") return message.content;
@@ -44,13 +45,6 @@ function serializeJson(value: unknown): string | null {
   }
 }
 
-async function finalizeRun(runId: number, data: Record<string, unknown>) {
-  await repo.updateRun(runId, {
-    ...data,
-    endedAt: new Date(),
-  });
-}
-
 export async function streamChat(
   sessionId: number,
   messages: any[],
@@ -64,7 +58,7 @@ export async function streamChat(
   const systemPrompt = buildSystemPrompt(workplaceContext, buildExcelToolCatalog());
   const inputText = extractLatestUserText(messages);
 
-  const run = await repo.createRun({
+  const run = await runRepo.createRun({
     sessionId,
     status: "running",
     model: config.modelName,
@@ -80,7 +74,10 @@ export async function streamChat(
     if (finalized) return;
     finalized = true;
     try {
-      await finalizeRun(run.id, data);
+      await runRepo.updateRun(run.id, {
+        ...data,
+        endedAt: new Date(),
+      });
     } catch (error) {
       console.error(`[session] Failed to finalize run ${run.id}:`, error);
     }
@@ -88,7 +85,7 @@ export async function streamChat(
 
   const persistStepOnce = async (step: any) => {
     try {
-      await repo.createStep({
+      await runRepo.createStep({
         runId: run.id,
         type: String(step?.stepType ?? "step"),
         status: Array.isArray(step?.toolResults) && step.toolResults.some((result: any) => result?.isError)
@@ -142,7 +139,7 @@ export async function streamChat(
         }
 
         try {
-          await repo.pruneUndoSnapshots(sessionId);
+          await runRepo.pruneUndoSnapshots(sessionId);
         } catch (error) {
           console.error(`[session] Failed to prune undo snapshots for session ${sessionId}:`, error);
         }

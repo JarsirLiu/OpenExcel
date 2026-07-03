@@ -1,13 +1,13 @@
 import { excelToolSpecs, sheetMutationContextSchema } from "@openexcel/agent";
-import { prisma } from "../../db.js";
+import { prisma } from "../../../db.js";
 import {
   sheetChangePatchOutputSchema,
   type SheetChangeDelta,
   type SheetChangeClearOperation,
 } from "@openexcel/core";
 import { applyClearOperation, buildSheetChangePreview } from "../domain.js";
-import * as repo from "../../session/repository.js";
-import { sheetRecordToCelldata } from "../../utils/sheetData.js";
+import * as repo from "../../sessions/runRepository.js";
+import { sheetRecordToCelldata } from "../../../shared/utils/sheetData.js";
 
 export const clearCells = {
   ...excelToolSpecs.clearCells,

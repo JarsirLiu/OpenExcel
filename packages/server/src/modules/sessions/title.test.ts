@@ -19,7 +19,7 @@ vi.mock("./repository.js", () => ({
   updateSession: mockUpdateSession,
 }));
 
-vi.mock("../config.js", () => ({
+vi.mock("../../config.js", () => ({
   loadModelConfig: mockLoadModelConfig,
 }));
 

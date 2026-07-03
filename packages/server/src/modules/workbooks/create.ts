@@ -1,6 +1,6 @@
 import { gridToCelldata } from "@openexcel/core";
 import * as repo from "./repository.js";
-import { sheetRecordToCelldata } from "../utils/sheetData.js";
+import { sheetRecordToCelldata } from "../../shared/utils/sheetData.js";
 
 export async function createSheet(workbookId: number, name?: string, sourceSheetId?: number) {
   const workbook = await repo.findWorkbookWithSheets(workbookId);

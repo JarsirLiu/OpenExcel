@@ -1,4 +1,5 @@
 import * as repo from "./repository.js";
+import * as runRepo from "./runRepository.js";
 import { historyFromRuns } from "./context.js";
 import { getSessionMessages } from "./transcript.js";
 
@@ -26,15 +27,15 @@ export async function getMessages(sessionId: number) {
   const storedMessages = await getSessionMessages(sessionId);
   if (storedMessages.length > 0) return storedMessages;
 
-  const runs = await repo.findRunsBySession(sessionId);
+  const runs = await runRepo.findRunsBySession(sessionId);
   return historyFromRuns(runs);
 }
 
 export async function getRuns(sessionId: number) {
-  const runs = await repo.findRunsBySession(sessionId);
+  const runs = await runRepo.findRunsBySession(sessionId);
   const steps = await Promise.all(runs.map(async (run) => ({
     ...run,
-    steps: await repo.findStepsByRun(run.id),
+    steps: await runRepo.findStepsByRun(run.id),
   })));
   return steps;
 }

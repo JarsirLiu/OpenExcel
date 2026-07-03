@@ -1,5 +1,5 @@
 import { excelToolSpecs, sheetMutationContextSchema } from "@openexcel/agent";
-import { prisma } from "../../db.js";
+import { prisma } from "../../../db.js";
 import {
   sheetChangePatchOutputSchema,
   sheetChangeRangeToZeroBased,
@@ -12,8 +12,8 @@ import {
   toA1CellRef,
   toA1Range,
 } from "../domain.js";
-import * as repo from "../../session/repository.js";
-import { sheetRecordToCelldata } from "../../utils/sheetData.js";
+import * as repo from "../../sessions/runRepository.js";
+import { sheetRecordToCelldata } from "../../../shared/utils/sheetData.js";
 
 export const mergeCells = {
   ...excelToolSpecs.mergeCells,

@@ -28,14 +28,15 @@ It must not own:
 
 The current codebase is still transitional. The important source areas are:
 
-- `src/index.ts` - Fastify bootstrap
+- `src/app.ts` - Fastify composition and plugin registration
+- `src/index.ts` - process entrypoint
 - `src/db.ts` - Prisma client wiring
 - `src/config.ts` - environment parsing and runtime config
 - `src/logger.ts` - logging helpers
-- `src/session/*` - session chat, history, title, undo, and current session context
-- `src/workbook/*` - workbook import/export and workbook-level use cases
-- `src/sheet/*` - sheet patching and sheet-level CRUD
-- `src/utils/*` - shared server-side helpers
+- `src/modules/sessions/*` - session chat, history, title, undo, and context assembly
+- `src/modules/workbooks/*` - workbook import/export and workbook-level use cases
+- `src/modules/sheets/*` - sheet patching, CRUD, and AI tool adapters
+- `src/shared/utils/*` - shared server-side helpers
 
 `dist/` and `node_modules/` are build artifacts and dependency output.
 Do not edit them manually.

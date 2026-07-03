@@ -1,5 +1,5 @@
 import * as repo from "./repository.js";
-import { deserializeSheet } from "../utils/sheetSerialization.js";
+import { deserializeSheet } from "../../shared/utils/sheetSerialization.js";
 
 export async function getWorkbooks() {
   return repo.findWorkbooks();

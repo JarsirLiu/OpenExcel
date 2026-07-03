@@ -1,5 +1,5 @@
-import { prisma } from "../db.js";
-import { deserializeSheet } from "../utils/sheetSerialization.js";
+import { prisma } from "../../db.js";
+import { deserializeSheet } from "../../shared/utils/sheetSerialization.js";
 
 export async function findSheetWithWorkbook(id: number) {
   return prisma.sheet.findUnique({

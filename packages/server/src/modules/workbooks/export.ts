@@ -1,7 +1,7 @@
 import { celldataToExcel } from "@openexcel/core";
 import * as repo from "./repository.js";
-import { deserializeSheet } from "../utils/sheetSerialization.js";
-import { sheetRecordToCelldata } from "../utils/sheetData.js";
+import { deserializeSheet } from "../../shared/utils/sheetSerialization.js";
+import { sheetRecordToCelldata } from "../../shared/utils/sheetData.js";
 
 export async function exportTemplate(id: number) {
   const wb = await repo.findWorkbookWithSheets(id);

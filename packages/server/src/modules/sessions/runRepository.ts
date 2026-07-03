@@ -1,38 +1,6 @@
-import { prisma } from "../db.js";
+import { prisma } from "../../db.js";
 
 const DEFAULT_UNDO_SNAPSHOT_RETENTION = 5;
-
-export async function findGlobalSessions() {
-  return prisma.session.findMany({
-    orderBy: { createdAt: "desc" },
-  });
-}
-
-export async function createSession(name: string) {
-  return prisma.session.create({ data: { name, sheetId: null } });
-}
-
-export async function ensureGlobalSession() {
-  const existing = await prisma.session.findFirst({ orderBy: { createdAt: "asc" } });
-  if (existing) return existing;
-  return createSession("全局对话");
-}
-
-export async function deleteSession(id: number) {
-  return prisma.session.delete({ where: { id } });
-}
-
-export async function updateSession(id: number, data: { name?: string; chatMessages?: string }) {
-  return prisma.session.update({ where: { id }, data });
-}
-
-export async function findSession(id: number) {
-  return prisma.session.findUnique({ where: { id } });
-}
-
-export async function findSheet(id: number) {
-  return prisma.sheet.findUnique({ where: { id } });
-}
 
 export async function createRun(data: {
   sessionId: number;
@@ -177,11 +145,4 @@ export async function restoreRunSheetSnapshots(runId: number) {
   ]);
 
   return snapshots.map((snapshot) => snapshot.sheetId);
-}
-
-export async function findWorkbooksWithSheets() {
-  return prisma.workbook.findMany({
-    orderBy: { order: "asc" },
-    include: { sheets: { select: { id: true, name: true }, orderBy: { order: "asc" } } },
-  });
 }

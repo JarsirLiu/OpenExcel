@@ -1,9 +1,10 @@
-import * as repo from "./repository.js";
 import { buildWorkspaceContext as buildAgentWorkspaceContext } from "@openexcel/agent";
+import type { findRunsBySession } from "./runRepository.js";
+import * as workbookRepo from "../workbooks/repository.js";
 
 const MAX_TURNS = 20;
 
-export function historyFromRuns(runs: Awaited<ReturnType<typeof repo.findRunsBySession>>) {
+export function historyFromRuns(runs: Awaited<ReturnType<typeof findRunsBySession>>) {
   const transcript: { role: "user" | "assistant"; content: string }[] = [];
   for (const run of runs) {
     if (run.inputText) transcript.push({ role: "user", content: run.inputText });
@@ -20,7 +21,7 @@ function trim(messages: { role: string; content: string }[]): { role: "user" | "
 }
 
 export async function buildWorkplaceContext(): Promise<string> {
-  const workbooks = await repo.findWorkbooksWithSheets();
+  const workbooks = await workbookRepo.findWorkbooksWithSheets();
   return buildAgentWorkspaceContext(
     workbooks.map((workbook) => ({
       id: workbook.id,

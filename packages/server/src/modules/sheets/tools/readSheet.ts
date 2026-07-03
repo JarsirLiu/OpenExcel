@@ -1,8 +1,8 @@
 import { excelToolSpecs } from "@openexcel/agent";
-import { prisma } from "../../db.js";
+import { prisma } from "../../../db.js";
 import { celldataToGrid, toOneBasedIndex } from "@openexcel/core";
 import { parseMergesFromCelldata } from "../domain.js";
-import { sheetRecordToCelldata } from "../../utils/sheetData.js";
+import { sheetRecordToCelldata } from "../../../shared/utils/sheetData.js";
 
 export const readSheet = {
   ...excelToolSpecs.readSheet,

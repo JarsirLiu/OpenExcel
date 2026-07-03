@@ -337,11 +337,11 @@ should remain framework-free and continue to act as shared primitives.
 
 Current session-related files:
 
-- `src/session/service.ts`
-- `src/session/routes.ts`
-- `src/session/title.ts`
-- `src/session/context.ts`
-- `src/sheet/tools/*`
+- `src/modules/sessions/service.ts`
+- `src/modules/sessions/routes.ts`
+- `src/modules/sessions/title.ts`
+- `src/modules/sessions/context.ts`
+- `src/modules/sheets/tools/*`
 
 represent the agent/server boundary today.
 
@@ -351,7 +351,7 @@ Long term, these should move toward a cleaner split:
 - `server` owns request handling and persistence
 
 Session title generation remains in `server`, because it is a session API capability rather than an agent primitive.
-Sheet mutation tools now live under `src/sheet/tools/*`, which is a better fit for the domain than `src/session/tools/*`.
+Sheet mutation tools now live under `src/modules/sheets/tools/*`, which is a better fit for the domain than the old session-tools location.
 
 ### 5.3 `packages/web`
 
