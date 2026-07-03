@@ -1,10 +1,9 @@
 import { useRef } from "react";
-import type { SheetChangeDelta } from "@openexcel/core";
-import type { WorkbookFull } from "../../api/client";
-import { WorkbenchHeader } from "../../components/WorkbenchHeader";
-import { ExcelWorkspace } from "../../components/ExcelWorkspace";
-import { ImportPreviewDialog } from "../../components/ImportPreviewDialog";
-import type { WorkbookImportPreview } from "../../utils/importPreview";
+import type { WorkbookFull } from "../../../api/client";
+import { WorkbookHeader } from "../ui/WorkbookHeader";
+import { ExcelWorkspace } from "../ui/ExcelWorkspace";
+import { ImportPreviewDialog } from "../import/ImportPreviewDialog";
+import type { WorkbookImportPreview } from "../import/importPreview";
 
 type WorkbookMeta = {
   id: number;
@@ -61,7 +60,7 @@ export function WorkbookWorkspace({
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
-      <WorkbenchHeader
+      <WorkbookHeader
         workbooks={workbooks}
         activeWorkbookIdx={workbookIdx}
         status={status}

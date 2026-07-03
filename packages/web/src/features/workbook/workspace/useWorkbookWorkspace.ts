@@ -5,9 +5,9 @@ import {
   fetchWorkbook,
   fetchWorkbooks,
   uploadNewWorkbook,
-} from "../../api/client";
-import { patchWorkbookWithDelta } from "../../utils/patchWorkbook";
-import { useWorkbookImportFlow } from "./useWorkbookImportFlow";
+} from "../../../api/client";
+import { patchWorkbookWithDelta } from "../utils/patchWorkbook";
+import { useWorkbookImportFlow } from "../import/useWorkbookImportFlow";
 import { useWorkbookSheetSummaries } from "./useWorkbookSheetSummaries";
 import { useWorkbookCatalog } from "./useWorkbookCatalog";
 

@@ -1,5 +1,5 @@
 import { sheetChangeDeltaToZeroBased, type SheetChangeDelta } from "@openexcel/core";
-import type { WorkbookFull, SheetSchema } from "../api/client";
+import type { WorkbookFull, SheetSchema } from "../../../api/client";
 
 function toColRef(c: number): string {
   let ref = "";

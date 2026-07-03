@@ -12,7 +12,7 @@ interface Props {
   onUploadNewWorkbookClick: () => void;
 }
 
-export function WorkbenchHeader({
+export function WorkbookHeader({
   workbooks,
   activeWorkbookIdx,
   status,

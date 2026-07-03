@@ -3,7 +3,7 @@ import { render, waitFor } from "@testing-library/react";
 import type { SheetSchema } from "./api/client";
 
 // Mock the ExcelGrid since Fortune-Sheet is complex and not needed for this test
-vi.mock("./features/workbook/ExcelGrid", () => ({
+vi.mock("./features/workbook/editor/ExcelGrid", () => ({
   ExcelGrid: () => <div data-testid="excel-grid">ExcelGrid</div>,
 }));
 

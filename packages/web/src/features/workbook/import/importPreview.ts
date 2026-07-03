@@ -1,6 +1,6 @@
 import * as XLSX from "xlsx";
 import { celldataToGrid, excelToGrid, isCelldata, type FortuneCell } from "@openexcel/core";
-import type { WorkbookFull, SheetSchema } from "../api/client";
+import type { WorkbookFull, SheetSchema } from "../../../api/client";
 
 export type ImportSheetStatus = "matched" | "missing" | "extra";
 

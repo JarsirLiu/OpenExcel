@@ -1,6 +1,6 @@
 import type { SheetChangeDelta } from "@openexcel/core";
-import { useSessionWorkspace } from "../features/session/useSessionWorkspace";
-import { SessionShell } from "../features/session/SessionShell";
+import { useSessionWorkspace } from "../session/useSessionWorkspace";
+import { SessionShell } from "../session/SessionShell";
 
 export function ChatInterface({
   onSheetChanged,

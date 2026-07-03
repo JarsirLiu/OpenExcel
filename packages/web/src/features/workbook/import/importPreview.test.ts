@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import * as XLSX from "xlsx";
 import { buildWorkbookImportPreview } from "./importPreview";
-import type { WorkbookFull } from "../api/client";
+import type { WorkbookFull } from "../../../api/client";
 
 function makeFile(): File {
   const wb = XLSX.utils.book_new();
@@ -65,7 +65,7 @@ describe("buildWorkbookImportPreview", () => {
     expect(preview.missingCount).toBe(1);
     expect(preview.extraCount).toBe(1);
 
-    const matched = preview.sheets.find((sheet) => sheet.name === "Sheet1");
+    const matched = preview.sheets.find((sheet: (typeof preview.sheets)[number]) => sheet.name === "Sheet1");
     expect(matched?.changedCells).toBe(1);
     expect(matched?.sampleDiffs[0]).toMatchObject({
       row: 1,

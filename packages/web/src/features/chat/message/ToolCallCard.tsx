@@ -1,4 +1,4 @@
-import { SheetPreview } from "../../../components/SheetPreview";
+import { SheetPreview } from "./SheetPreview";
 
 function isStaticToolPart(part: any): boolean {
   return part.args === undefined && part.input !== undefined;

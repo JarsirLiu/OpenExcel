@@ -1,6 +1,6 @@
-import { ChatSidebar } from "./ChatSidebar";
-import { WorkbookWorkspace } from "../features/workbook/WorkbookWorkspace";
-import { useWorkbookWorkspace } from "../features/workbook/useWorkbookWorkspace";
+import { ChatSidebar } from "../features/chat/ChatSidebar";
+import { WorkbookWorkspace } from "../features/workbook/workspace/WorkbookWorkspace";
+import { useWorkbookWorkspace } from "../features/workbook/workspace/useWorkbookWorkspace";
 
 export function Workbench() {
   const {

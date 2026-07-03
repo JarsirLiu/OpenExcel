@@ -1,7 +1,7 @@
 import { createPortal } from "react-dom";
 import { useMemo } from "react";
-import type { WorkbookImportPreview, ImportSheetPreview } from "../utils/importPreview";
-import { getCellSignature, makeDisplayGrid } from "../utils/importPreview";
+import type { WorkbookImportPreview, ImportSheetPreview } from "./importPreview";
+import { getCellSignature, makeDisplayGrid } from "./importPreview";
 
 interface Props {
   open: boolean;
