@@ -1,6 +1,6 @@
+import { excelToolSpecs } from "@openexcel/agent";
 import { prisma } from "../../db.js";
 import { celldataToGrid, toOneBasedIndex } from "@openexcel/core";
-import { z } from "zod";
 import { sheetRecordToCelldata } from "../../utils/sheetData.js";
 
 function parseMerges(celldata: any[]): { startRow: number; startCol: number; endRow: number; endCol: number }[] {
@@ -22,10 +22,7 @@ function parseMerges(celldata: any[]): { startRow: number; startCol: number; end
 }
 
 export const readSheet = {
-  description: "读取指定 Sheet 的全部数据，返回结构化表格信息，包含标题行、行/列数、数据二维数组、以及合并单元格信息。行号和列号按 Excel 视觉顺序从 1 开始；data 数组的第一项对应第 1 行。",
-  inputSchema: z.object({
-    sheetId: z.coerce.number().describe("Sheet ID"),
-  }),
+  ...excelToolSpecs.readSheet,
   execute: async ({ sheetId }: { sheetId: number }) => {
     const sheet = await prisma.sheet.findUnique({ where: { id: sheetId } });
     if (!sheet) throw new Error(`Sheet ${sheetId} 不存在`);

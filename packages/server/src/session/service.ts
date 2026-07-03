@@ -1,13 +1,15 @@
 import * as repo from "./repository.js";
 import * as context from "./context.js";
 import * as rollout from "./rollout.js";
-import { buildExcelToolCatalog, buildExcelToolContext, excelTools } from "./tools/index.js";
 import {
   buildSystemPrompt,
+  buildExcelToolCatalog,
+  buildExcelToolContext,
   generateSessionTitle,
   historyFromRuns,
   streamChat as streamAgentChat,
 } from "@openexcel/agent";
+import { excelTools } from "./tools/index.js";
 import { loadModelConfig } from "../config.js";
 
 function extractMessageText(message: any): string {

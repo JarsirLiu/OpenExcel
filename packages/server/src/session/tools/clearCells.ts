@@ -1,21 +1,14 @@
+import { excelToolSpecs, sheetMutationContextSchema } from "@openexcel/agent";
 import { prisma } from "../../db.js";
 import {
-  sheetChangeClearOperationSchema,
   sheetChangePatchOutputSchema,
   sheetChangeRangeToZeroBased,
   type SheetChangeDelta,
   type SheetChangeClearOperation,
 } from "@openexcel/core";
-import { z } from "zod";
 import { buildSheetChangePreview } from "./preview.js";
-import { sheetMutationContextSchema } from "../undo.js";
 import * as repo from "../repository.js";
 import { sheetRecordToCelldata } from "../../utils/sheetData.js";
-
-const clearCellsInputSchema = z.object({
-  sheetId: z.coerce.number().describe("Sheet ID"),
-  operations: z.array(sheetChangeClearOperationSchema).min(1).describe("清空操作列表，支持离散单元格和连续范围"),
-});
 
 function stripCellContent(value: Record<string, unknown> | undefined | null): Record<string, unknown> | null {
   if (!value) return null;
@@ -58,8 +51,7 @@ function applyClearOperation(
 }
 
 export const clearCells = {
-  description: "清空单元格内容。使用 operations 数组，cell 用于清空离散单格，range 用于清空连续区域。行号和列号都从 1 开始；如果要写入内容，请使用 writeCells。",
-  inputSchema: clearCellsInputSchema,
+  ...excelToolSpecs.clearCells,
   contextSchema: sheetMutationContextSchema,
   execute: async (
     { sheetId, operations }: { sheetId: number; operations: SheetChangeClearOperation[] },

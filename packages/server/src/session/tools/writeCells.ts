@@ -1,3 +1,4 @@
+import { excelToolSpecs, sheetMutationContextSchema } from "@openexcel/agent";
 import { prisma } from "../../db.js";
 import {
   sheetChangeCellToZeroBased,
@@ -6,47 +7,16 @@ import {
   type SheetChangeDelta,
   type SheetChangeCell,
 } from "@openexcel/core";
-import { z } from "zod";
 import { buildSheetChangePreview } from "./preview.js";
-import { sheetMutationContextSchema } from "../undo.js";
 import * as repo from "../repository.js";
 import { sheetRecordToCelldata } from "../../utils/sheetData.js";
-
-const writeCellPayloadSchema = z.object({
-  row: z.coerce.number().positive().describe("行号，从 1 开始"),
-  col: z.coerce.number().positive().describe("列号，从 1 开始"),
-  value: z.string().describe("写入的值"),
-});
-
-const writeRangePayloadSchema = z.object({
-  startRow: z.coerce.number().positive().describe("起始行号，从 1 开始"),
-  startCol: z.coerce.number().positive().describe("起始列号，从 1 开始"),
-  endRow: z.coerce.number().positive().describe("结束行号，从 1 开始"),
-  endCol: z.coerce.number().positive().describe("结束列号，从 1 开始"),
-  value: z.string().describe("写入的值"),
-});
-
-const writeCellOperationSchema = z.object({
-  type: z.literal("cell"),
-  ...writeCellPayloadSchema.shape,
-});
-
-const writeRangeOperationSchema = z.object({
-  type: z.literal("range"),
-  ...writeRangePayloadSchema.shape,
-}).refine((value) => value.endRow >= value.startRow && value.endCol >= value.startCol, {
-  message: "Invalid sheet range",
-});
-
-const writeCellsInputSchema = z.object({
-  sheetId: z.coerce.number().describe("Sheet ID"),
-  operations: z.array(z.discriminatedUnion("type", [
-    writeCellOperationSchema,
-    writeRangeOperationSchema,
-  ])).min(1).describe("写入操作列表，支持离散单元格和连续范围"),
-});
-
-type WriteCellsInput = z.infer<typeof writeCellsInputSchema>;
+type WriteCellsInput = {
+  sheetId: number;
+  operations: Array<
+    | { type: "cell"; row: number; col: number; value: string }
+    | { type: "range"; startRow: number; startCol: number; endRow: number; endCol: number; value: string }
+  >;
+};
 
 function normalizeWriteOperations(input: WriteCellsInput): { sheetId: number; operations: Array<
   | { type: "cell"; row: number; col: number; value: string }
@@ -93,8 +63,7 @@ function applyCellWrite(
 }
 
 export const writeCells = {
-  description: "批量写入单元格数据。使用 operations 数组，支持两种操作：cell 用于离散单格写入，range 用于连续区域填充同一个值。行号和列号都从 1 开始；如果要清空内容，请使用 clearCells。",
-  inputSchema: writeCellsInputSchema,
+  ...excelToolSpecs.writeCells,
   contextSchema: sheetMutationContextSchema,
   execute: async (
     input: WriteCellsInput,

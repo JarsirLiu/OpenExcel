@@ -1,25 +1,17 @@
+import { excelToolSpecs, sheetMutationContextSchema } from "@openexcel/agent";
 import { prisma } from "../../db.js";
 import {
   sheetChangePatchOutputSchema,
-  sheetChangeRangeOperationSchema,
   sheetChangeRangeToZeroBased,
   type SheetChangeDelta,
   type SheetChangeRangeOperation,
 } from "@openexcel/core";
-import { z } from "zod";
 import { buildSheetChangePreview, toA1Range } from "./preview.js";
-import { sheetMutationContextSchema } from "../undo.js";
 import * as repo from "../repository.js";
 import { sheetRecordToCelldata } from "../../utils/sheetData.js";
 
-const unmergeCellsInputSchema = z.object({
-  sheetId: z.coerce.number().describe("Sheet ID"),
-  operations: z.array(sheetChangeRangeOperationSchema).min(1).describe("要取消合并的范围列表，行号和列号都从 1 开始"),
-});
-
 export const unmergeCells = {
-  description: "取消指定范围内的单元格合并。使用 operations 数组，每项都是一个 range；取消后每个单元格独立。行号和列号都从 1 开始。",
-  inputSchema: unmergeCellsInputSchema,
+  ...excelToolSpecs.unmergeCells,
   contextSchema: sheetMutationContextSchema,
   execute: async (
     { sheetId, operations }: { sheetId: number; operations: SheetChangeRangeOperation[] },

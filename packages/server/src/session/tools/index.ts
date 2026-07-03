@@ -1,6 +1,1 @@
-export {
-  buildExcelToolCatalog,
-  buildExcelToolContext,
-  excelToolManifest,
-  excelTools,
-} from "./manifest.js";
+export { excelTools } from "./manifest.js";

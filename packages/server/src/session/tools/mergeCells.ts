@@ -1,21 +1,14 @@
+import { excelToolSpecs, sheetMutationContextSchema } from "@openexcel/agent";
 import { prisma } from "../../db.js";
 import {
   sheetChangePatchOutputSchema,
-  sheetChangeRangeOperationSchema,
   sheetChangeRangeToZeroBased,
   type SheetChangeDelta,
   type SheetChangeRangeOperation,
 } from "@openexcel/core";
-import { z } from "zod";
 import { buildSheetChangePreview, toA1CellRef, toA1Range } from "./preview.js";
-import { sheetMutationContextSchema } from "../undo.js";
 import * as repo from "../repository.js";
 import { sheetRecordToCelldata } from "../../utils/sheetData.js";
-
-const mergeCellsInputSchema = z.object({
-  sheetId: z.coerce.number().describe("Sheet ID"),
-  operations: z.array(sheetChangeRangeOperationSchema).min(1).describe("要合并的范围列表，行号和列号都从 1 开始"),
-});
 
 function applyMergeOperation(cellMap: Map<string, any>, operation: SheetChangeRangeOperation) {
   const storageRange = sheetChangeRangeToZeroBased(operation);
@@ -39,8 +32,7 @@ function applyMergeOperation(cellMap: Map<string, any>, operation: SheetChangeRa
 }
 
 export const mergeCells = {
-  description: "合并指定范围的单元格。使用 operations 数组，每项都是一个 range；合并后只有左上角单元格保留值，其余格子的值会被清除。行号和列号都从 1 开始。",
-  inputSchema: mergeCellsInputSchema,
+  ...excelToolSpecs.mergeCells,
   contextSchema: sheetMutationContextSchema,
   execute: async (
     { sheetId, operations }: { sheetId: number; operations: SheetChangeRangeOperation[] },
