@@ -211,7 +211,7 @@ export const MentionList = forwardRef<
       }}
     >
       {groups.length === 0 ? (
-        <div style={{ padding: "12px 14px", fontSize: 13, color: "#94a3b8" }}>无匹配的 Sheet</div>
+        <div style={{ padding: "12px 14px", fontSize: 13, color: "var(--hint-foreground)" }}>无匹配的 Sheet</div>
       ) : (
         <div style={{ display: "flex", minHeight: 0, flex: 1 }}>
           <div
@@ -227,7 +227,7 @@ export const MentionList = forwardRef<
               fontSize: 11,
               letterSpacing: "0.08em",
               textTransform: "uppercase",
-              color: "#94a3b8",
+              color: "var(--hint-foreground)",
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
@@ -237,7 +237,7 @@ export const MentionList = forwardRef<
                 padding: "2px 8px",
                 borderRadius: 999,
                 background: "rgba(255,255,255,0.7)",
-                color: "#64748b",
+                color: "var(--muted-foreground)",
                 border: "1px solid rgba(148, 163, 184, 0.18)",
               }}>
                 {groups.length}
@@ -268,7 +268,7 @@ export const MentionList = forwardRef<
                       ? "linear-gradient(135deg, rgba(219, 234, 254, 0.95) 0%, rgba(239, 246, 255, 0.95) 100%)"
                       : "rgba(255,255,255,0.55)",
                     fontSize: 13,
-                    color: "#0f172a",
+                    color: "var(--foreground)",
                     borderRadius: 12,
                     border: isSelected ? "1px solid rgba(59, 130, 246, 0.18)" : "1px solid transparent",
                     boxShadow: isSelected ? "0 8px 18px rgba(59, 130, 246, 0.08)" : "none",
@@ -331,7 +331,7 @@ export const MentionList = forwardRef<
                         fontSize: 11,
                         letterSpacing: "0.08em",
                         textTransform: "uppercase",
-                        color: "#94a3b8",
+              color: "var(--hint-foreground)",
                         marginBottom: 3,
                       }}>
                         Sheet
@@ -339,7 +339,7 @@ export const MentionList = forwardRef<
                       <div style={{
                         fontSize: 14,
                         fontWeight: 700,
-                        color: "#0f172a",
+                        color: "var(--foreground)",
                         overflow: "hidden",
                         textOverflow: "ellipsis",
                         whiteSpace: "nowrap",
@@ -382,7 +382,7 @@ export const MentionList = forwardRef<
                             marginBottom: 6,
                             cursor: "pointer",
                             fontSize: 13,
-                            color: "#0f172a",
+                            color: "var(--foreground)",
                             background: isSelected
                               ? "linear-gradient(135deg, rgba(219, 234, 254, 0.85) 0%, rgba(239, 246, 255, 0.9) 100%)"
                               : "rgba(255,255,255,0.7)",
@@ -424,12 +424,12 @@ export const MentionList = forwardRef<
                   </div>
                 </>
               ) : (
-                <div style={{ padding: "14px", fontSize: 13, color: "#94a3b8", lineHeight: 1.6 }}>
+                <div style={{ padding: "14px", fontSize: 13, color: "var(--hint-foreground)", lineHeight: 1.6 }}>
                   这个工作簿下没有可引用的 sheet，按 Enter 可直接引用工作簿。
                 </div>
               )
             ) : (
-              <div style={{ padding: "14px", fontSize: 13, color: "#94a3b8" }}>请选择一个工作簿。</div>
+              <div style={{ padding: "14px", fontSize: 13, color: "var(--hint-foreground)" }}>请选择一个工作簿。</div>
             )}
           </div>
         </div>
@@ -439,7 +439,7 @@ export const MentionList = forwardRef<
           padding: "6px 12px",
           borderTop: "1px solid rgba(148, 163, 184, 0.18)",
           fontSize: 11,
-          color: "#64748b",
+          color: "var(--muted-foreground)",
           background: "rgba(248, 250, 252, 0.92)",
           display: "flex",
           justifyContent: "space-between",
@@ -447,7 +447,7 @@ export const MentionList = forwardRef<
           gap: 12,
         }}>
           <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>↑↓ 切换，→ 进入 sheet，← 返回工作簿，Enter 选中</span>
-          <span style={{ color: "#94a3b8" }}>
+          <span style={{ color: "var(--hint-foreground)" }}>
             {activePane === "sheet" ? "当前在 sheet 列" : "当前在工作簿列"}
           </span>
         </div>

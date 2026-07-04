@@ -4,8 +4,6 @@ import { MessageList } from "../message/MessageList";
 import { useChatConversation } from "../hooks/useChatConversation";
 import type { WorkbookStructureUpdate } from "../hooks/useSheetPatchSync";
 
-type SheetMeta = { workbookId: number; workbookName: string; id: number; name: string };
-
 export function ChatPanel({
   sessionId,
   workspaceId,
@@ -15,6 +13,7 @@ export function ChatPanel({
   onWorkbookStructureChanged,
   onStreamingChange,
   referenceCacheRevision,
+  onRegenerate,
 }: {
   sessionId: number;
   workspaceId: number;
@@ -24,6 +23,7 @@ export function ChatPanel({
   onWorkbookStructureChanged?: (update: WorkbookStructureUpdate) => void;
   onStreamingChange?: (isStreaming: boolean) => void;
   referenceCacheRevision: number;
+  onRegenerate?: () => void;
 }) {
   const { messages, error, isStreaming, sendMessage, stop } = useChatConversation({
     sessionId,
@@ -38,16 +38,20 @@ export function ChatPanel({
   });
 
   return (
-    <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0, background: "#fff", position: "relative", overflow: "hidden" }}>
-      <MessageList messages={messages} isStreaming={isStreaming} />
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0, background: "var(--background)", position: "relative" }}>
+      <MessageList
+        messages={messages}
+        isStreaming={isStreaming}
+        onRegenerate={onRegenerate}
+      />
 
       {error && (
         <div style={{ padding: "0 14px 10px" }}>
           <div style={{
-            border: "1px solid #fecaca",
-            background: "#fef2f2",
-            color: "#b91c1c",
-            borderRadius: 10,
+            border: "1px solid var(--border)",
+            background: "var(--muted)",
+            color: "var(--muted-foreground)",
+            borderRadius: "var(--radius-sm)",
             padding: "8px 12px",
             fontSize: 13,
             lineHeight: 1.5,

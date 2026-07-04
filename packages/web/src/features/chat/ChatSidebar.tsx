@@ -16,7 +16,7 @@ export function ChatSidebar({
   workspaceId: number | null;
 }) {
   return (
-    <div style={{ width: 360, flexShrink: 0, minWidth: 0, overflow: "hidden" }}>
+    <div style={{ width: "min(520px, 38vw)", flexShrink: 0, minWidth: 0, overflow: "hidden" }}>
       <ChatInterface
         onSheetChanged={onSheetChanged}
         onWorkbookStructureChanged={onWorkbookStructureChanged}

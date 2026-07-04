@@ -31,8 +31,8 @@ export function SheetPreview({ preview }: { preview: PreviewData }) {
   const colBase = preview.range.startCol;
 
   return (
-    <div style={{ marginTop: 8 }}>
-      <div style={{ fontSize: 12, fontWeight: 600, color: "#555", marginBottom: 4 }}>
+      <div style={{ marginTop: 8 }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: "var(--muted-foreground)", marginBottom: 4 }}>
         {preview.sheetName} — 变更区域
       </div>
       <div style={{ overflowX: "auto" }}>
@@ -64,13 +64,13 @@ export function SheetPreview({ preview }: { preview: PreviewData }) {
                       rowSpan={merge?.rs ?? 1}
                       colSpan={merge?.cs ?? 1}
                       style={{
-                        border: "1px solid #d0d5dd",
+                        border: "1px solid var(--border)",
                         padding: "4px 8px",
                         whiteSpace: "nowrap",
                         minWidth: 60,
-                        background: ri === 0 ? "#f6f8fa" : "#fff",
+                        background: ri === 0 ? "var(--muted)" : "var(--background)",
                         fontWeight: ri === 0 ? 600 : 400,
-                        color: "#1f1f1f",
+                        color: "var(--foreground)",
                         fontSize: 12,
                       }}
                     >

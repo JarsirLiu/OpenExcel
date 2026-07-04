@@ -7,17 +7,17 @@ import { ToolCallCard } from "./ToolCallCard";
 
 const UserAvatar = () => (
   <div style={{
-    width: 32, height: 32, borderRadius: "50%", background: "#10a37f",
+    width: 26, height: 26, borderRadius: "50%", background: "var(--avatar-user)",
     display: "flex", alignItems: "center", justifyContent: "center",
-    color: "#fff", fontSize: 13, fontWeight: 600, flexShrink: 0, userSelect: "none",
+    color: "#fff", fontSize: 11, fontWeight: 600, flexShrink: 0, userSelect: "none",
   }}>Y</div>
 );
 
 const AIAvatar = () => (
   <div style={{
-    width: 32, height: 32, borderRadius: "50%", background: "#3b82f6",
+    width: 26, height: 26, borderRadius: "50%", background: "var(--avatar-ai)",
     display: "flex", alignItems: "center", justifyContent: "center",
-    color: "#fff", fontSize: 13, fontWeight: 600, flexShrink: 0, userSelect: "none",
+    color: "#fff", fontSize: 11, fontWeight: 600, flexShrink: 0, userSelect: "none",
   }}>AI</div>
 );
 
@@ -27,6 +27,43 @@ const CopyIcon = ({ size = 14 }: { size?: number }) => (
     <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
   </svg>
 );
+
+const RefreshIcon = ({ size = 14 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 12a9 9 0 0 1 15.5-6.3L21 8" />
+    <path d="M21 3v5h-5" />
+    <path d="M21 12a9 9 0 0 1-15.5 6.3L3 16" />
+    <path d="M3 21v-5h5" />
+  </svg>
+);
+
+const ThumbUpIcon = ({ size = 14 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
+  </svg>
+);
+
+const ThumbDownIcon = ({ size = 14 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H6.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zM17 2h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3" />
+  </svg>
+);
+
+const DownloadIcon = ({ size = 14 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <polyline points="7 10 12 15 17 10" />
+    <line x1="12" y1="15" x2="12" y2="3" />
+  </svg>
+);
+
+const actionButtonStyle: React.CSSProperties = {
+  display: "flex", alignItems: "center", gap: 4,
+  fontSize: 12, color: "var(--muted-foreground)",
+  background: "transparent", border: "none", cursor: "pointer",
+  padding: "4px 8px", borderRadius: "var(--radius-pill)",
+  transition: "background 0.15s",
+};
 
 function renderAssistantParts(
   msg: any,
@@ -69,7 +106,7 @@ function renderAssistantParts(
         break;
       case "step-start":
         flushText(`step-${i}-flush`);
-        result.push(<div key={`step-${i}`} style={{ height: 1, background: "#e8ecf0", margin: "8px 0" }} />);
+        result.push(<div key={`step-${i}`} style={{ height: 1, background: "var(--border)", margin: "8px 0" }} />);
         break;
       default:
         if (part.type.startsWith("tool-")) {
@@ -92,41 +129,69 @@ export function MessageItem({
   msg,
   isStreaming,
   isLastAssistantMessage,
+  onRegenerate,
 }: {
   msg: any;
   isStreaming: boolean;
   isLastAssistantMessage: boolean;
+  onRegenerate?: () => void;
 }) {
   const [thinkingOpen, setThinkingOpen] = useState<Record<string, boolean>>({});
 
-  return (
-    <div style={{ marginBottom: 28, minWidth: 0 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-        {msg.role === "user" ? <UserAvatar /> : <AIAvatar />}
-        <span style={{ fontSize: 14, fontWeight: 600, color: "#1f1f1f" }}>
-          {msg.role === "user" ? "You" : "AI 助手"}
-        </span>
-      </div>
-      <div style={{ paddingLeft: 42, minWidth: 0 }}>
-        {msg.role === "user" ? (
-          <div style={{ whiteSpace: "pre-wrap", fontSize: 15, lineHeight: 1.7, color: "#1f1f1f" }}>
+  if (msg.role === "user") {
+    return (
+      <div style={{ marginBottom: 24, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+          <UserAvatar />
+          <span style={{ fontSize: 14, fontWeight: 600, color: "var(--foreground)" }}>You</span>
+        </div>
+        <div style={{ paddingLeft: 36, minWidth: 0 }}>
+          <div style={{ whiteSpace: "pre-wrap", fontSize: 15, lineHeight: 1.7, color: "var(--foreground)" }}>
             {getMessageText(msg)}
           </div>
-        ) : (
-          <>
-            {renderAssistantParts(msg, isStreaming, thinkingOpen, setThinkingOpen)}
-            {!isStreaming && isLastAssistantMessage && (
-              <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 14 }}>
-                <button
-                  onClick={() => navigator.clipboard.writeText(getMessageText(msg) || "")}
-                  style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, color: "#666", background: "transparent", border: "none", cursor: "pointer", padding: "4px 0" }}
-                >
-                  <CopyIcon />
-                  复制
-                </button>
-              </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+      <div style={{ marginBottom: 24, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+          <AIAvatar />
+          <span style={{ fontSize: 14, fontWeight: 600, color: "var(--foreground)" }}>AI 助手</span>
+        </div>
+        <div style={{ paddingLeft: 36, minWidth: 0 }}>
+        {renderAssistantParts(msg, isStreaming, thinkingOpen, setThinkingOpen)}
+        {!isStreaming && isLastAssistantMessage && (
+          <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+            {onRegenerate && (
+              <button
+                onClick={onRegenerate}
+                style={actionButtonStyle}
+                title="重新生成"
+              >
+                <RefreshIcon size={14} />
+                重新生成
+              </button>
             )}
-          </>
+            <button style={actionButtonStyle} title="赞">
+              <ThumbUpIcon size={14} />
+            </button>
+            <button style={actionButtonStyle} title="踩">
+              <ThumbDownIcon size={14} />
+            </button>
+            <button style={actionButtonStyle} title="下载">
+              <DownloadIcon size={14} />
+            </button>
+            <button
+              style={actionButtonStyle}
+              onClick={() => navigator.clipboard.writeText(getMessageText(msg) || "")}
+              title="复制"
+            >
+              <CopyIcon size={14} />
+              复制
+            </button>
+          </div>
         )}
       </div>
     </div>
