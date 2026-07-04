@@ -12,6 +12,7 @@ export function ChatPanel({
   onSheetChanged,
   onWorkbookStructureChanged,
   onStreamingChange,
+  onAttachExcel,
   referenceCacheRevision,
   onRegenerate,
 }: {
@@ -22,6 +23,7 @@ export function ChatPanel({
   onSheetChanged?: (sheetId: number, delta: SheetChangeDelta | null) => void;
   onWorkbookStructureChanged?: (update: WorkbookStructureUpdate) => void;
   onStreamingChange?: (isStreaming: boolean) => void;
+  onAttachExcel: (file: File) => Promise<void> | void;
   referenceCacheRevision: number;
   onRegenerate?: () => void;
 }) {
@@ -65,6 +67,7 @@ export function ChatPanel({
         isStreaming={isStreaming}
         onSend={sendMessage}
         onStop={stop}
+        onAttachExcel={onAttachExcel}
         referenceCacheRevision={referenceCacheRevision}
         workspaceId={workspaceId}
       />

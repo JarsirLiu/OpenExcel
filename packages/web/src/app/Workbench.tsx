@@ -62,6 +62,7 @@ export function Workbench() {
         onSheetChanged={handleSheetChanged}
         onWorkbookStructureChanged={handleWorkbookStructureChanged}
         onUndoComplete={handleWorkbookRefresh}
+        onAttachExcel={handleNewWorkbookFileChange}
         referenceCacheRevision={referenceCacheRevision}
       />
     </div>

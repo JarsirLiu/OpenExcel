@@ -23,6 +23,7 @@ type Props = {
   handleSelectSession: (id: number) => void;
   handleDeleteSession: (id: number) => Promise<void>;
   handleUndoLatestRun: () => Promise<void>;
+  onAttachExcel: (file: File) => Promise<void> | void;
   onSheetChanged?: (sheetId: number, delta: SheetChangeDelta | null) => void;
   onWorkbookStructureChanged?: (update: WorkbookStructureUpdate) => void;
   referenceCacheRevision: number;
@@ -45,6 +46,7 @@ export function SessionShell({
   handleSelectSession,
   handleDeleteSession,
   handleUndoLatestRun,
+  onAttachExcel,
   onSheetChanged,
   onWorkbookStructureChanged,
   referenceCacheRevision,
@@ -116,6 +118,7 @@ export function SessionShell({
           onSheetChanged={onSheetChanged}
           onWorkbookStructureChanged={onWorkbookStructureChanged}
           onStreamingChange={setIsStreaming}
+          onAttachExcel={onAttachExcel}
           referenceCacheRevision={referenceCacheRevision}
         />
       ) : (

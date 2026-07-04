@@ -6,12 +6,14 @@ export function ChatSidebar({
   onSheetChanged,
   onWorkbookStructureChanged,
   onUndoComplete,
+  onAttachExcel,
   referenceCacheRevision,
   workspaceId,
 }: {
   onSheetChanged?: (sheetId: number, delta: SheetChangeDelta | null) => void;
   onWorkbookStructureChanged?: (update: WorkbookStructureUpdate) => void;
   onUndoComplete?: () => void;
+  onAttachExcel: (file: File) => Promise<void> | void;
   referenceCacheRevision: number;
   workspaceId: number | null;
 }) {
@@ -21,6 +23,7 @@ export function ChatSidebar({
         onSheetChanged={onSheetChanged}
         onWorkbookStructureChanged={onWorkbookStructureChanged}
         onUndoComplete={onUndoComplete}
+        onAttachExcel={onAttachExcel}
         referenceCacheRevision={referenceCacheRevision}
         workspaceId={workspaceId}
       />

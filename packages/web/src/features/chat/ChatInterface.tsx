@@ -7,12 +7,14 @@ export function ChatInterface({
   onSheetChanged,
   onWorkbookStructureChanged,
   onUndoComplete,
+  onAttachExcel,
   referenceCacheRevision,
   workspaceId,
 }: {
   onSheetChanged?: (sheetId: number, delta: SheetChangeDelta | null) => void;
   onWorkbookStructureChanged?: (update: WorkbookStructureUpdate) => void;
   onUndoComplete?: () => void;
+  onAttachExcel: (file: File) => Promise<void> | void;
   referenceCacheRevision: number;
   workspaceId: number | null;
 }) {
@@ -25,6 +27,7 @@ export function ChatInterface({
       onSheetChanged={onSheetChanged}
       onWorkbookStructureChanged={onWorkbookStructureChanged}
       referenceCacheRevision={referenceCacheRevision}
+      onAttachExcel={onAttachExcel}
     />
   );
 }

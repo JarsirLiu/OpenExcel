@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 import { EditorContent } from "@tiptap/react";
 import { useChatComposer } from "./useChatComposer";
 
@@ -16,18 +16,10 @@ const StopIcon = () => (
 );
 
 const AttachIcon = () => (
-  <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
-  </svg>
-);
-
-const ScissorsIcon = () => (
-  <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="6" cy="6" r="3" />
-    <circle cx="6" cy="18" r="3" />
-    <line x1="20" y1="4" x2="8.12" y2="15.88" />
-    <line x1="14.47" y1="14.48" x2="20" y2="20" />
-    <line x1="8.12" y1="8.12" x2="12" y2="12" />
+  <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <polyline points="17 8 12 3 7 8" />
+    <line x1="12" y1="3" x2="12" y2="15" />
   </svg>
 );
 
@@ -40,12 +32,14 @@ export function ChatComposer({
   isStreaming,
   onSend,
   onStop,
+  onAttachExcel,
   referenceCacheRevision,
   workspaceId,
 }: {
   isStreaming: boolean;
   onSend: (text: string) => void;
   onStop: () => void;
+  onAttachExcel: (file: File) => Promise<void> | void;
   referenceCacheRevision: number;
   workspaceId: number;
 }) {
@@ -58,6 +52,7 @@ export function ChatComposer({
 
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const [editorEmpty, setEditorEmpty] = useState(true);
+  const attachmentInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -69,6 +64,18 @@ export function ChatComposer({
   useEffect(() => {
     setEditorEmpty(!editorText || editorText.trim() === "");
   }, [editorText]);
+
+  const handleAttachClick = useCallback(() => {
+    attachmentInputRef.current?.click();
+  }, []);
+
+  const handleAttachmentChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      void onAttachExcel(file);
+    }
+    event.target.value = "";
+  }, [onAttachExcel]);
 
   return (
     <div style={{ padding: "10px 14px", borderTop: "1px solid var(--border)", background: "var(--background)", flexShrink: 0 }}>
@@ -97,35 +104,41 @@ export function ChatComposer({
           )}
         </div>
 
-        {/* Bottom bar: toggle + icons + send */}
+        {/* Bottom bar: actions + send */}
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", userSelect: "none", color: "var(--muted-foreground)", fontSize: 13 }}>
-            <div style={{
-              width: 30, height: 18, borderRadius: "var(--radius-pill)",
-              background: "var(--border)", position: "relative", transition: "background 0.2s",
-            }}>
-              <div style={{
-                width: 14, height: 14, borderRadius: "var(--radius-pill)",
-                background: "#fff", position: "absolute", top: 2, left: 2,
-                transition: "left 0.2s",
-              }} />
-            </div>
-            <span>与页面对话</span>
-          </label>
-          <div style={{ flex: 1 }} />
-          <button style={{
-            background: "transparent", border: "none", cursor: "pointer",
-            display: "flex", alignItems: "center", color: "var(--muted-foreground)", padding: 4, borderRadius: "var(--radius-pill)",
-          }}>
-            <ScissorsIcon />
-          </button>
-          <button style={{
-            background: "transparent", border: "none", cursor: "pointer",
-            display: "flex", alignItems: "center", color: "var(--muted-foreground)", padding: 4, borderRadius: "var(--radius-pill)",
-          }}>
-            <AttachIcon />
-          </button>
+          <input
+            ref={attachmentInputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            style={{ display: "none" }}
+            onChange={handleAttachmentChange}
+          />
           <button
+            type="button"
+            onClick={handleAttachClick}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "6px 10px",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-pill)",
+              background: "var(--background)",
+              color: "var(--muted-foreground)",
+              cursor: "pointer",
+              fontSize: 12,
+              lineHeight: 1,
+              whiteSpace: "nowrap",
+            }}
+            title="上传 Excel"
+            aria-label="上传 Excel"
+          >
+            <AttachIcon />
+            <span>上传 Excel</span>
+          </button>
+          <div style={{ flex: 1 }} />
+          <button
+            type="button"
             onClick={() => (isStreaming ? onStop() : handleSend())}
             style={{
               width: 32, height: 32, borderRadius: "50%",
