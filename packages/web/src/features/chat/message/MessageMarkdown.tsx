@@ -31,52 +31,51 @@ function CodeBlock({ children, ...props }: JSX.IntrinsicElements["pre"]) {
   const codeText = extractText(children);
 
   return (
-    <div style={{
+    <div className="codeblock" style={{
       margin: "8px 0",
-      borderRadius: "var(--radius-sm)",
+      borderRadius: "var(--radius)",
       overflow: "hidden",
       background: "var(--muted)",
       border: "1px solid var(--border)",
+      position: "relative",
     }}>
-      <div style={{
-        display: "flex",
-        justifyContent: "flex-end",
-        alignItems: "center",
-        padding: "4px 8px",
-        borderBottom: "1px solid var(--border)",
-      }}>
-        <button
-          onClick={() => navigator.clipboard.writeText(codeText)}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 4,
-            padding: "3px 8px",
-            border: "none",
-            borderRadius: "var(--radius-pill)",
-            background: "transparent",
-            color: "var(--muted-foreground)",
-            fontSize: 12,
-            fontWeight: 500,
-            cursor: "pointer",
-            transition: "background 0.15s",
-          }}
-          title="复制代码"
-        >
-          <CopyIcon size={13} />
-          复制
-        </button>
-      </div>
       <pre style={{
         margin: 0,
-        padding: "10px 14px",
+        padding: "14px 40px 14px 16px",
         overflowX: "auto",
-        fontSize: 13,
-        lineHeight: 1.5,
+        fontSize: 14,
+        lineHeight: 1.6,
         color: "var(--foreground)",
+        whiteSpace: "pre",
+        fontFamily: "ui-monospace, 'Cascadia Code', 'JetBrains Mono', 'Fira Code', monospace",
       }}>
         <code>{children}</code>
       </pre>
+      <button
+        onClick={() => navigator.clipboard.writeText(codeText)}
+        style={{
+          position: "absolute",
+          top: 8,
+          right: 8,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 28,
+          height: 28,
+          borderRadius: "var(--radius-pill)",
+          border: "1px solid var(--border)",
+          background: "var(--background)",
+          color: "var(--muted-foreground)",
+          cursor: "pointer",
+          opacity: 0,
+          transition: "opacity 0.15s",
+          pointerEvents: "none",
+        }}
+        title="复制"
+      >
+        <CopyIcon size={12} />
+      </button>
+      <style>{`.md-content .codeblock:hover > button { opacity: 1; pointer-events: auto; }`}</style>
     </div>
   );
 }
