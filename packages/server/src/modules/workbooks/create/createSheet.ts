@@ -7,7 +7,7 @@ export async function createSheet(workbookId: number, name?: string, sourceSheet
 
   const sourceSheet = sourceSheetId != null
     ? workbook.sheets.find((sheet) => sheet.id === sourceSheetId)
-    : workbook.sheets[workbook.sheets.length - 1];
+    : null;
 
   if (sourceSheetId != null && !sourceSheet) {
     throw new WorkbookCreationError("源 Sheet 不存在", "SOURCE_SHEET_NOT_FOUND", 404);

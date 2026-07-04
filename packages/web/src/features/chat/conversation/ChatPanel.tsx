@@ -2,6 +2,7 @@ import type { SheetChangeDelta } from "@openexcel/core";
 import { ChatComposer } from "../composer/ChatComposer";
 import { MessageList } from "../message/MessageList";
 import { useChatConversation } from "../hooks/useChatConversation";
+import type { WorkbookStructureUpdate } from "../hooks/useSheetPatchSync";
 
 type SheetMeta = { workbookId: number; workbookName: string; id: number; name: string };
 
@@ -10,6 +11,7 @@ export function ChatPanel({
   initialMessages,
   onRunComplete,
   onSheetChanged,
+  onWorkbookStructureChanged,
   onStreamingChange,
   sheets,
 }: {
@@ -17,6 +19,7 @@ export function ChatPanel({
   initialMessages: any[];
   onRunComplete?: (sessionId: number, messages: any[]) => void;
   onSheetChanged?: (sheetId: number, delta: SheetChangeDelta | null) => void;
+  onWorkbookStructureChanged?: (update: WorkbookStructureUpdate) => void;
   onStreamingChange?: (isStreaming: boolean) => void;
   sheets: SheetMeta[];
 }) {
@@ -27,6 +30,7 @@ export function ChatPanel({
       onRunComplete?.(sessionId, finishedMessages);
     },
     onSheetChanged,
+    onWorkbookStructureChanged,
     onStreamingChange,
   });
 

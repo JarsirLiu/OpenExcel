@@ -88,12 +88,12 @@ export async function workbookRoutes(app: FastifyInstance) {
   );
 
   app.post<{
-    Params: { id: string };
+    Params: { workbookId: string };
     Body: { name?: string; sourceSheetId?: number };
-  }>("/api/workbooks/:id/sheets", async (req, reply) => {
+  }>("/api/workbooks/:workbookId/sheets", async (req, reply) => {
     try {
       const result = await service.createSheet(
-        Number(req.params.id),
+        Number(req.params.workbookId),
         req.body.name,
         req.body.sourceSheetId,
       );
@@ -108,6 +108,17 @@ export async function workbookRoutes(app: FastifyInstance) {
       }
       throw error;
     }
+  });
+
+  app.delete<{
+    Params: { workbookId: string; sheetId: string };
+  }>("/api/workbooks/:workbookId/sheets/:sheetId", async (req, reply) => {
+    const result = await service.deleteSheet(Number(req.params.workbookId), Number(req.params.sheetId));
+    if (!result) return reply.status(404).send({ error: "Workbook not found" });
+    if ("error" in result) {
+      return reply.status(result.statusCode).send({ error: result.error });
+    }
+    return reply.status(204).send();
   });
 
   app.delete<{ Params: { id: string } }>("/api/workbooks/:id", async (req, reply) => {

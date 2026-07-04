@@ -37,6 +37,19 @@ export async function createSheet(data: {
   });
 }
 
+export async function deleteSheetAndReindex(workbookId: number, sheetId: number) {
+  return prisma.$transaction(async (tx) => {
+    await tx.sheet.delete({ where: { id: sheetId } });
+    const sheets = await tx.sheet.findMany({
+      where: { workbookId },
+      orderBy: { order: "asc" },
+    });
+    await Promise.all(
+      sheets.map((sheet, index) => tx.sheet.update({ where: { id: sheet.id }, data: { order: index } })),
+    );
+  });
+}
+
 export async function deleteWorkbook(id: number) {
   return prisma.workbook.delete({ where: { id } });
 }

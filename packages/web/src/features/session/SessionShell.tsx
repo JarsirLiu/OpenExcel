@@ -4,6 +4,7 @@ import { ChatPanel } from "../chat/conversation/ChatPanel";
 import { SessionHeader } from "./components/SessionHeader";
 import { SessionHistoryPopover } from "./components/SessionHistoryPopover";
 import type { Session } from "../../api/sessions";
+import type { WorkbookStructureUpdate } from "../chat/hooks/useSheetPatchSync";
 
 type Props = {
   sessions: Session[];
@@ -22,6 +23,7 @@ type Props = {
   handleDeleteSession: (id: number) => Promise<void>;
   handleUndoLatestRun: () => Promise<void>;
   onSheetChanged?: (sheetId: number, delta: SheetChangeDelta | null) => void;
+  onWorkbookStructureChanged?: (update: WorkbookStructureUpdate) => void;
   sheets: { workbookId: number; workbookName: string; id: number; name: string }[];
 };
 
@@ -42,6 +44,7 @@ export function SessionShell({
   handleDeleteSession,
   handleUndoLatestRun,
   onSheetChanged,
+  onWorkbookStructureChanged,
   sheets,
 }: Props) {
   const historyRef = useRef<HTMLDivElement>(null);
@@ -97,6 +100,7 @@ export function SessionShell({
           initialMessages={initialMessages}
           onRunComplete={handleRunComplete}
           onSheetChanged={onSheetChanged}
+          onWorkbookStructureChanged={onWorkbookStructureChanged}
           onStreamingChange={setIsStreaming}
           sheets={sheets}
         />

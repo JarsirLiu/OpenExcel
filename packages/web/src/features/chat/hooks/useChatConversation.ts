@@ -3,18 +3,21 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import type { SheetChangeDelta } from "@openexcel/core";
 import { useSheetPatchSync } from "./useSheetPatchSync";
+import type { WorkbookStructureUpdate } from "./useSheetPatchSync";
 
 export function useChatConversation({
   sessionId,
   initialMessages,
   onRunComplete,
   onSheetChanged,
+  onWorkbookStructureChanged,
   onStreamingChange,
 }: {
   sessionId: number;
   initialMessages: any[];
   onRunComplete?: (messages: any[]) => void;
   onSheetChanged?: (sheetId: number, delta: SheetChangeDelta | null) => void;
+  onWorkbookStructureChanged?: (update: WorkbookStructureUpdate) => void;
   onStreamingChange?: (isStreaming: boolean) => void;
 }) {
   const transport = useMemo(() => new DefaultChatTransport({
@@ -37,7 +40,7 @@ export function useChatConversation({
     onStreamingChange?.(isStreaming);
   }, [isStreaming, onStreamingChange]);
 
-  useSheetPatchSync(messages, onSheetChanged);
+  useSheetPatchSync(messages, onSheetChanged, onWorkbookStructureChanged);
 
   const handleSend = useCallback((text: string) => {
     if (!text || isStreaming) return;

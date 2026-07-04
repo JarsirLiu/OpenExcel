@@ -4,6 +4,7 @@ import { normalizeSheetName, normalizeWorkbookName, buildBlankSheetInitializatio
 export type CreateWorkbookResult = {
   id: number;
   name: string;
+  order: number;
   sheets: number;
   initialSheet: {
     id: number;
@@ -56,6 +57,7 @@ export async function createWorkbook(name?: string, sheetName?: string, sourceSh
     return {
       id: workbook.id,
       name: workbook.name,
+      order: workbook.order,
       sheets: 1,
       initialSheet: {
         id: initialSheet.id,

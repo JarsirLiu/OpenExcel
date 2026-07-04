@@ -8,7 +8,7 @@ export type WorkbookSheetSummary = {
   name: string;
 };
 
-export function useWorkbookSheetSummaries() {
+export function useWorkbookSheetSummaries(refreshToken = 0) {
   const [allSheets, setAllSheets] = useState<WorkbookSheetSummary[]>([]);
 
   useEffect(() => {
@@ -30,7 +30,7 @@ export function useWorkbookSheetSummaries() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refreshToken]);
 
   return allSheets;
 }

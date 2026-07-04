@@ -1,5 +1,6 @@
 import { ExcelGrid } from "../editor/ExcelGrid";
 import type { WorkbookFull } from "../../../api/workbooks";
+import type { WorkbookStructureUpdate } from "../../chat/hooks/useSheetPatchSync";
 
 interface Props {
   workbook: WorkbookFull | null;
@@ -7,9 +8,19 @@ interface Props {
   currentSheetIndex: number;
   onSheetIndexChange: (sheetIndex: number) => void;
   onWorkbookDelete?: (workbookId: number) => void;
+  onWorkbookStructureChanged?: (update: WorkbookStructureUpdate) => void;
+  onWorkbookRefresh?: () => Promise<void>;
 }
 
-export function ExcelWorkspace({ workbook, workbookRevision, currentSheetIndex, onSheetIndexChange, onWorkbookDelete }: Props) {
+export function ExcelWorkspace({
+  workbook,
+  workbookRevision,
+  currentSheetIndex,
+  onSheetIndexChange,
+  onWorkbookDelete,
+  onWorkbookStructureChanged,
+  onWorkbookRefresh,
+}: Props) {
   return (
     <div style={{ flex: 1, minWidth: 0, overflow: "hidden", borderRight: "1px solid #e0e4ea" }}>
       <ExcelGrid
@@ -18,6 +29,8 @@ export function ExcelWorkspace({ workbook, workbookRevision, currentSheetIndex, 
         currentSheetIndex={currentSheetIndex}
         onSheetIndexChange={onSheetIndexChange}
         onWorkbookDelete={onWorkbookDelete}
+        onWorkbookStructureChanged={onWorkbookStructureChanged}
+        onWorkbookRefresh={onWorkbookRefresh}
       />
     </div>
   );

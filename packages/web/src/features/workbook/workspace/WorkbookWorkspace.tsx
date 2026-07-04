@@ -4,6 +4,7 @@ import { WorkbookHeader } from "../ui/WorkbookHeader";
 import { ExcelWorkspace } from "../ui/ExcelWorkspace";
 import { ImportPreviewDialog } from "../import/ImportPreviewDialog";
 import type { WorkbookImportPreview } from "../import/importPreview";
+import type { WorkbookStructureUpdate } from "../../chat/hooks/useSheetPatchSync";
 
 type WorkbookMeta = {
   id: number;
@@ -29,6 +30,8 @@ type Props = {
   handleImportCancel: () => void;
   handleNewWorkbookFileChange: (file: File) => void;
   handleWorkbookDelete: (workbookId: number) => void;
+  handleWorkbookStructureChanged: (update: WorkbookStructureUpdate) => void;
+  handleWorkbookRefresh: () => Promise<void>;
 };
 
 export function WorkbookWorkspace({
@@ -50,6 +53,8 @@ export function WorkbookWorkspace({
   handleImportCancel,
   handleNewWorkbookFileChange,
   handleWorkbookDelete,
+  handleWorkbookStructureChanged,
+  handleWorkbookRefresh,
 }: Props) {
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const newWbInputRef = useRef<HTMLInputElement>(null);
@@ -100,6 +105,8 @@ export function WorkbookWorkspace({
           currentSheetIndex={currentSheetIndex}
           onSheetIndexChange={setCurrentSheetIndex}
           onWorkbookDelete={handleWorkbookDelete}
+          onWorkbookStructureChanged={handleWorkbookStructureChanged}
+          onWorkbookRefresh={handleWorkbookRefresh}
         />
       </div>
 

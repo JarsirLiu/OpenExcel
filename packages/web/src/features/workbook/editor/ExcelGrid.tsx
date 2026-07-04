@@ -2,6 +2,7 @@ import { Workbook } from "@fortune-sheet/react";
 import "@fortune-sheet/react/dist/index.css";
 import type { WorkbookFull } from "../../../api/workbooks";
 import { useExcelGridWorkspace } from "./useExcelGridWorkspace";
+import type { WorkbookStructureUpdate } from "../../chat/hooks/useSheetPatchSync";
 
 interface Props {
   workbook: WorkbookFull | null;
@@ -9,6 +10,8 @@ interface Props {
   currentSheetIndex: number;
   onSheetIndexChange?: (sheetIndex: number) => void;
   onWorkbookDelete?: (workbookId: number) => void;
+  onWorkbookStructureChanged?: (update: WorkbookStructureUpdate) => void;
+  onWorkbookRefresh?: () => Promise<void> | void;
 }
 
 export function ExcelGrid({
@@ -17,6 +20,8 @@ export function ExcelGrid({
   currentSheetIndex,
   onSheetIndexChange,
   onWorkbookDelete,
+  onWorkbookStructureChanged,
+  onWorkbookRefresh,
 }: Props) {
   const {
     saveStatus,
@@ -25,6 +30,8 @@ export function ExcelGrid({
     sessionKey,
     handleChange,
     handleActivateSheet,
+    handleBeforeAddSheet,
+    handleBeforeDeleteSheet,
     handleDownload,
     handleDeleteWorkbook,
   } = useExcelGridWorkspace({
@@ -33,6 +40,8 @@ export function ExcelGrid({
     currentSheetIndex,
     onSheetIndexChange,
     onWorkbookDelete,
+    onWorkbookStructureChanged,
+    onWorkbookRefresh,
   });
 
   if (!workbook) return null;
@@ -98,6 +107,8 @@ export function ExcelGrid({
           allowUpdate={true}
           hooks={{
             afterActivateSheet: handleActivateSheet,
+            beforeAddSheet: handleBeforeAddSheet,
+            beforeDeleteSheet: handleBeforeDeleteSheet,
           }}
         />
       </div>

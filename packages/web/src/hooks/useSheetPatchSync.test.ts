@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { collectSheetPatchUpdates } from "../features/chat/hooks/useSheetPatchSync";
+import { collectSheetPatchUpdates, collectWorkbookStructureUpdates } from "../features/chat/hooks/useSheetPatchSync";
 
 describe("collectSheetPatchUpdates", () => {
   it("collects valid completed patch outputs once", () => {
@@ -109,5 +109,87 @@ describe("collectSheetPatchUpdates", () => {
         },
       },
     ]);
+  });
+});
+
+describe("collectWorkbookStructureUpdates", () => {
+  it("collects workbook and sheet creation outputs once", () => {
+    const messages = [
+      {
+        role: "assistant",
+        parts: [
+          {
+            toolCallId: "tool-5",
+            toolName: "createWorkbook",
+            state: "output-available",
+            input: { sourceSheetId: 9 },
+            output: {
+              id: 21,
+              name: "Monthly Plan",
+              order: 4,
+              sheets: 1,
+              initialSheet: { id: 88, name: "Sheet 1", order: 0 },
+            },
+          },
+        ],
+      },
+      {
+        role: "assistant",
+        parts: [
+          {
+            toolCallId: "tool-6",
+            toolName: "createSheet",
+            state: "output-available",
+            args: { workbookId: 21 },
+            output: {
+              workbookId: 21,
+              id: 89,
+              name: "Extra",
+              order: 1,
+            },
+          },
+        ],
+      },
+    ];
+
+    const updates = collectWorkbookStructureUpdates(messages, new Set(["tool-5"]));
+
+    expect(updates).toEqual([
+      {
+        toolCallId: "tool-6",
+        kind: "sheet-created",
+        workbookId: 21,
+        sheetId: 89,
+        sheetName: "Extra",
+        order: 1,
+        sourceSheetId: null,
+      },
+    ]);
+  });
+
+  it("skips malformed structure outputs", () => {
+    const messages = [
+      {
+        role: "assistant",
+        parts: [
+          {
+            toolCallId: "tool-7",
+            toolName: "createWorkbook",
+            state: "output-available",
+            output: {
+              id: 22,
+              name: "Broken",
+              order: "bad",
+              sheets: 1,
+              initialSheet: { id: 90, name: "Sheet 1", order: 0 },
+            },
+          },
+        ],
+      },
+    ];
+
+    const updates = collectWorkbookStructureUpdates(messages, new Set());
+
+    expect(updates).toEqual([]);
   });
 });

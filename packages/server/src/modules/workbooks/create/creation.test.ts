@@ -20,8 +20,7 @@ describe("workbook creation helpers", () => {
 
     expect(payload.columns).toBe(JSON.stringify([{ label: "A" }]));
     expect(payload.merges).toBe(JSON.stringify([]));
-    expect(() => JSON.parse(payload.uploadedData)).not.toThrow();
-    expect(Array.isArray(JSON.parse(payload.uploadedData))).toBe(true);
+    expect(JSON.parse(payload.uploadedData)).toEqual([]);
     expect(payload.config).toBeUndefined();
   });
 

@@ -2,10 +2,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { celldataToExcel, extractSheetConfig, matrixToCelldata } from "@openexcel/core";
 import type { WorkbookInstance } from "@fortune-sheet/react";
 import type { WorkbookFull } from "../../../api/workbooks";
-import { deleteWorkbook, updateSheetData } from "../../../api/workbooks";
+import { createSheet, deleteSheet, deleteWorkbook, updateSheetData } from "../../../api/workbooks";
 import { confirm } from "../../../shared/lib";
 import { useWorkbookEditorSession } from "./useWorkbookEditorSession";
 import { toFortuneSheetData } from "./fortuneSheet";
+import type { WorkbookStructureUpdate } from "../../chat/hooks/useSheetPatchSync";
 
 type UseExcelGridWorkspaceProps = {
   workbook: WorkbookFull | null;
@@ -13,6 +14,8 @@ type UseExcelGridWorkspaceProps = {
   currentSheetIndex: number;
   onSheetIndexChange?: (sheetIndex: number) => void;
   onWorkbookDelete?: (workbookId: number) => void;
+  onWorkbookStructureChanged?: (update: WorkbookStructureUpdate) => void;
+  onWorkbookRefresh?: () => Promise<void> | void;
 };
 
 export function useExcelGridWorkspace({
@@ -21,6 +24,8 @@ export function useExcelGridWorkspace({
   currentSheetIndex,
   onSheetIndexChange,
   onWorkbookDelete,
+  onWorkbookStructureChanged,
+  onWorkbookRefresh,
 }: UseExcelGridWorkspaceProps) {
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -109,6 +114,53 @@ export function useExcelGridWorkspace({
     }
   }, [onSheetIndexChange, workbook]);
 
+  const handleBeforeAddSheet = useCallback((sheet: any) => {
+    if (!workbook) return false;
+    const name = typeof sheet?.name === "string" ? sheet.name : undefined;
+    void (async () => {
+      try {
+        const result = await createSheet(workbook.id, { name });
+        await onWorkbookStructureChanged?.({
+          toolCallId: `ui-create-sheet:${workbook.id}:${result.id}`,
+          kind: "sheet-created",
+          workbookId: result.workbookId,
+          sheetId: result.id,
+          sheetName: result.name,
+          order: result.order,
+          sourceSheetId: null,
+        });
+      } catch (error) {
+        console.error("创建 Sheet 失败:", error);
+        await onWorkbookRefresh?.();
+      }
+    })();
+    return false;
+  }, [onWorkbookRefresh, onWorkbookStructureChanged, workbook]);
+
+  const handleBeforeDeleteSheet = useCallback((sheetId: string | number) => {
+    if (!workbook) return false;
+    const numericSheetId = Number(sheetId);
+    const deletedSheet = workbook.sheets.find((sheet) => sheet.id === numericSheetId);
+    if (!deletedSheet) return false;
+
+    void (async () => {
+      try {
+        await deleteSheet(workbook.id, numericSheetId);
+        await onWorkbookStructureChanged?.({
+          toolCallId: `ui-delete-sheet:${workbook.id}:${numericSheetId}`,
+          kind: "sheet-deleted",
+          workbookId: workbook.id,
+          sheetId: numericSheetId,
+          order: deletedSheet.order,
+        });
+      } catch (error) {
+        console.error("删除 Sheet 失败:", error);
+        await onWorkbookRefresh?.();
+      }
+    })();
+    return false;
+  }, [onWorkbookRefresh, onWorkbookStructureChanged, workbook]);
+
   const handleDownload = useCallback(() => {
     const inst = workbookRef.current;
     if (!inst) return;
@@ -152,6 +204,8 @@ export function useExcelGridWorkspace({
     sessionKey,
     handleChange,
     handleActivateSheet,
+    handleBeforeAddSheet,
+    handleBeforeDeleteSheet,
     handleDownload,
     handleDeleteWorkbook,
   };

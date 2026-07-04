@@ -1,5 +1,3 @@
-import { gridToCelldata } from "@openexcel/core";
-
 export type SheetInitializationPayload = {
   columns: string;
   merges: string;
@@ -40,7 +38,7 @@ export function buildBlankSheetInitialization(): SheetInitializationPayload {
   return {
     columns: JSON.stringify([{ label: "A" }]),
     merges: JSON.stringify([]),
-    uploadedData: JSON.stringify(gridToCelldata([[]], ["A"])),
+    uploadedData: JSON.stringify([]),
   };
 }
 

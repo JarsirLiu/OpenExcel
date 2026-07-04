@@ -12,6 +12,40 @@ export type SheetPatchUpdate = {
   delta: SheetChangeDelta | null;
 };
 
+export type WorkbookCreatedUpdate = {
+  toolCallId: string;
+  kind: "workbook-created";
+  workbookId: number;
+  workbookName: string;
+  order: number;
+  sourceSheetId: number | null;
+  initialSheet: {
+    id: number;
+    name: string;
+    order: number;
+  };
+};
+
+export type SheetCreatedUpdate = {
+  toolCallId: string;
+  kind: "sheet-created";
+  workbookId: number;
+  sheetId: number;
+  sheetName: string;
+  order: number;
+  sourceSheetId: number | null;
+};
+
+export type SheetDeletedUpdate = {
+  toolCallId: string;
+  kind: "sheet-deleted";
+  workbookId: number;
+  sheetId: number;
+  order: number;
+};
+
+export type WorkbookStructureUpdate = WorkbookCreatedUpdate | SheetCreatedUpdate | SheetDeletedUpdate;
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -20,6 +54,9 @@ type CompletedToolPart = {
   toolCallId: string;
   state: "output-available";
   output: unknown;
+  input?: unknown;
+  args?: unknown;
+  toolName?: unknown;
 };
 
 function isCompletedToolPart(part: unknown): part is CompletedToolPart {
@@ -56,19 +93,109 @@ export function collectSheetPatchUpdates(
   return updates;
 }
 
+function getToolInput(part: CompletedToolPart): Record<string, unknown> | null {
+  if (isRecord(part.input)) return part.input;
+  if (isRecord(part.args)) return part.args;
+  return null;
+}
+
+function isWorkbookCreatedOutput(output: unknown): output is {
+  id: number;
+  name: string;
+  order: number;
+  sheets: number;
+  initialSheet: { id: number; name: string; order: number };
+} {
+  if (!isRecord(output)) return false;
+  return typeof output.id === "number"
+    && typeof output.name === "string"
+    && typeof output.order === "number"
+    && typeof output.sheets === "number"
+    && isRecord(output.initialSheet)
+    && typeof output.initialSheet.id === "number"
+    && typeof output.initialSheet.name === "string"
+    && typeof output.initialSheet.order === "number";
+}
+
+function isSheetCreatedOutput(output: unknown): output is {
+  workbookId: number;
+  id: number;
+  name: string;
+  order: number;
+} {
+  if (!isRecord(output)) return false;
+  return typeof output.workbookId === "number"
+    && typeof output.id === "number"
+    && typeof output.name === "string"
+    && typeof output.order === "number";
+}
+
+export function collectWorkbookStructureUpdates(
+  messages: ReadonlyArray<SheetPatchMessageLike>,
+  seenToolCallIds: ReadonlySet<string>,
+): WorkbookStructureUpdate[] {
+  const updates: WorkbookStructureUpdate[] = [];
+
+  for (const message of messages) {
+    if (message.role !== "assistant" || !Array.isArray(message.parts)) continue;
+
+    for (const part of message.parts) {
+      if (!isCompletedToolPart(part)) continue;
+      if (seenToolCallIds.has(part.toolCallId)) continue;
+
+      const toolName = typeof part.toolName === "string" ? part.toolName : "";
+      const input = getToolInput(part);
+
+      if (toolName === "createWorkbook" && isWorkbookCreatedOutput(part.output)) {
+        updates.push({
+          toolCallId: part.toolCallId,
+          kind: "workbook-created",
+          workbookId: part.output.id,
+          workbookName: part.output.name,
+          order: part.output.order,
+          sourceSheetId: typeof input?.sourceSheetId === "number" ? input.sourceSheetId : null,
+          initialSheet: part.output.initialSheet,
+        });
+        continue;
+      }
+
+      if (toolName === "createSheet" && isSheetCreatedOutput(part.output)) {
+        updates.push({
+          toolCallId: part.toolCallId,
+          kind: "sheet-created",
+          workbookId: part.output.workbookId,
+          sheetId: part.output.id,
+          sheetName: part.output.name,
+          order: part.output.order,
+          sourceSheetId: typeof input?.sourceSheetId === "number" ? input.sourceSheetId : null,
+        });
+      }
+    }
+  }
+
+  return updates;
+}
+
 export function useSheetPatchSync(
   messages: ReadonlyArray<SheetPatchMessageLike>,
   onSheetChanged?: (sheetId: number, delta: SheetChangeDelta | null) => void,
+  onWorkbookStructureChanged?: (update: WorkbookStructureUpdate) => void,
 ) {
   const appliedToolCallIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    if (!onSheetChanged) return;
-
-    const updates = collectSheetPatchUpdates(messages, appliedToolCallIdsRef.current);
-    for (const update of updates) {
+    const patchUpdates = onSheetChanged ? collectSheetPatchUpdates(messages, appliedToolCallIdsRef.current) : [];
+    for (const update of patchUpdates) {
       appliedToolCallIdsRef.current.add(update.toolCallId);
-      onSheetChanged(update.sheetId, update.delta);
+      onSheetChanged?.(update.sheetId, update.delta);
     }
-  }, [messages, onSheetChanged]);
+
+    const structureUpdates = onWorkbookStructureChanged
+      ? collectWorkbookStructureUpdates(messages, appliedToolCallIdsRef.current)
+      : [];
+    for (const update of structureUpdates) {
+      appliedToolCallIdsRef.current.add(update.toolCallId);
+      onWorkbookStructureChanged?.(update);
+    }
+  }, [messages, onSheetChanged, onWorkbookStructureChanged]);
 }

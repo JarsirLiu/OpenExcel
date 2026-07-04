@@ -18,6 +18,7 @@ export function Workbench() {
     setCurrentSheetIndex,
     setImportSheetIndex,
     handleSheetChanged,
+    handleWorkbookStructureChanged,
     handleWorkbookRefresh,
     handleSwitchWorkbook,
     handleUploadFileChange,
@@ -43,16 +44,19 @@ export function Workbench() {
           importing={importing}
           setCurrentSheetIndex={setCurrentSheetIndex}
           setImportSheetIndex={setImportSheetIndex}
-          handleSwitchWorkbook={handleSwitchWorkbook}
-          handleUploadFileChange={handleUploadFileChange}
-          handleImportConfirm={handleImportConfirm}
-          handleImportCancel={handleImportCancel}
-          handleNewWorkbookFileChange={handleNewWorkbookFileChange}
-          handleWorkbookDelete={handleWorkbookDelete}
-        />
+        handleSwitchWorkbook={handleSwitchWorkbook}
+        handleUploadFileChange={handleUploadFileChange}
+        handleImportConfirm={handleImportConfirm}
+        handleImportCancel={handleImportCancel}
+        handleNewWorkbookFileChange={handleNewWorkbookFileChange}
+        handleWorkbookDelete={handleWorkbookDelete}
+        handleWorkbookStructureChanged={handleWorkbookStructureChanged}
+        handleWorkbookRefresh={handleWorkbookRefresh}
+      />
       </div>
       <ChatSidebar
         onSheetChanged={handleSheetChanged}
+        onWorkbookStructureChanged={handleWorkbookStructureChanged}
         onUndoComplete={handleWorkbookRefresh}
         sheets={allSheets}
       />

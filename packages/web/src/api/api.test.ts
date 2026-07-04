@@ -79,9 +79,10 @@ describe("updateSheetData", () => {
 
 describe("createSheet", () => {
   it("sends POST with sourceSheetId", async () => {
-    mockFetch.mockResolvedValue(new Response(JSON.stringify({ id: 10, name: "New", order: 2 }), { status: 200 }));
+    mockFetch.mockResolvedValue(new Response(JSON.stringify({ workbookId: 1, id: 10, name: "New", order: 2 }), { status: 200 }));
 
-    const result = await createSheet(1, 3);
+    const result = await createSheet(1, { sourceSheetId: 3 });
+    expect(result.workbookId).toBe(1);
     expect(result.id).toBe(10);
     expect(mockFetch).toHaveBeenCalledWith("/api/workbooks/1/sheets", {
       method: "POST",
@@ -94,8 +95,8 @@ describe("createSheet", () => {
 describe("deleteSheet", () => {
   it("sends DELETE", async () => {
     mockFetch.mockResolvedValue(new Response(null, { status: 200 }));
-    await deleteSheet(7);
-    expect(mockFetch).toHaveBeenCalledWith("/api/sheets/7", { method: "DELETE" });
+    await deleteSheet(3, 7);
+    expect(mockFetch).toHaveBeenCalledWith("/api/workbooks/3/sheets/7", { method: "DELETE" });
   });
 });
 
