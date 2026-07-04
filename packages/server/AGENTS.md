@@ -30,9 +30,9 @@ The current codebase is still transitional. The important source areas are:
 
 - `src/app.ts` - Fastify composition and plugin registration
 - `src/index.ts` - process entrypoint
-- `src/db.ts` - Prisma client wiring
+- `src/infra/db.ts` - Prisma client wiring
 - `src/config.ts` - environment parsing and runtime config
-- `src/logger.ts` - logging helpers
+- `src/infra/observability/logger.ts` - logging helpers
 - `src/modules/sessions/*` - session chat, history, title, transcript, and session orchestration
 - `src/modules/sessions/chat/*` - chat streaming and workspace-context assembly
 - `src/modules/sessions/runs/*` - run persistence and undo logic
@@ -41,7 +41,7 @@ The current codebase is still transitional. The important source areas are:
 - `src/modules/workbooks/export/*` - workbook export helpers
 - `src/modules/workbooks/create/*` - workbook sheet creation helpers
 - `src/modules/workbooks/delete/*` - workbook deletion helpers
-- `src/modules/sheets/*` - sheet patching, CRUD, and AI tool adapters
+- `src/modules/sheets/*` - sheet patching and AI tool adapters
 - `src/shared/utils/*` - shared server-side helpers
 
 `dist/` and `node_modules/` are build artifacts and dependency output.

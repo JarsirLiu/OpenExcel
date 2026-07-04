@@ -1,4 +1,4 @@
-import { prisma } from "../../db.js";
+import { prisma } from "../../infra/db.js";
 
 export async function findGlobalSessions() {
   return prisma.session.findMany({

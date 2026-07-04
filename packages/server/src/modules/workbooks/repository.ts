@@ -1,4 +1,4 @@
-import { prisma } from "../../db.js";
+import { prisma } from "../../infra/db.js";
 import type { Prisma } from "@prisma/client";
 import { deserializeSheet } from "../../shared/utils/sheetSerialization.js";
 

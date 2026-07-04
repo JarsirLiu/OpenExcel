@@ -1,5 +1,5 @@
 import * as XLSX from "xlsx";
-import { prisma } from "../../../db.js";
+import { prisma } from "../../../infra/db.js";
 import * as repo from "../repository.js";
 
 function bufferToArrayBuffer(buffer: Buffer): ArrayBuffer | SharedArrayBuffer {

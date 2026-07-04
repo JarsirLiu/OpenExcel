@@ -1,5 +1,5 @@
 import { excelToolSpecs } from "@openexcel/agent";
-import { prisma } from "../../../db.js";
+import { prisma } from "../../../infra/db.js";
 import { celldataToGrid, toOneBasedIndex } from "@openexcel/core";
 import { parseMergesFromCelldata } from "../domain.js";
 import { sheetRecordToCelldata } from "../../../shared/utils/sheetData.js";

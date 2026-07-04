@@ -1,4 +1,4 @@
-import { prisma } from "../../../db.js";
+import { prisma } from "../../../infra/db.js";
 import { normalizeSheetName, normalizeWorkbookName, buildBlankSheetInitialization, buildSourceSheetInitialization, WorkbookCreationError } from "./creation.js";
 
 export type CreateWorkbookResult = {

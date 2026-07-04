@@ -142,8 +142,6 @@ packages/server/src/
 ├── app.ts                 # Fastify bootstrap and plugin registration
 ├── index.ts               # process entrypoint
 ├── config.ts              # env parsing and runtime config
-├── db.ts                  # Prisma client and DB wiring
-├── logger.ts              # request logging and server logging helpers
 ├── shared/                # server-wide shared helpers
 │   ├── errors/            # typed errors, error mapping, error helpers
 │   ├── http/              # response helpers, route adapters, stream helpers
@@ -151,11 +149,13 @@ packages/server/src/
 │   ├── validation/       # request schema helpers and parsing
 │   └── utils/            # generic utilities that do not belong to a module
 ├── infra/                 # technical integrations used by modules
+│   ├── db.ts              # Prisma client and DB wiring
 │   ├── ai/               # model config, provider adapters, title model setup
 │   ├── auth/             # password hashing, token/session cookie, OAuth hooks
 │   ├── storage/          # file/blob helpers if we add local or remote storage
 │   ├── streaming/        # SSE / response piping primitives
-│   └── observability/    # metrics, tracing, structured logging glue
+│   └── observability/
+│       └── logger.ts      # request logging and server logging helpers
 ├── middleware/           # request-scoped middleware and guards
 │   ├── auth.ts           # populate current user / session principal
 │   ├── requireAuth.ts    # enforce signed-in access

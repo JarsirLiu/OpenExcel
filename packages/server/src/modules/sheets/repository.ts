@@ -1,4 +1,4 @@
-import { prisma } from "../../db.js";
+import { prisma } from "../../infra/db.js";
 import { deserializeSheet } from "../../shared/utils/sheetSerialization.js";
 
 export async function findSheetWithWorkbook(id: number) {

@@ -116,7 +116,7 @@ export async function workbookRoutes(app: FastifyInstance) {
     const result = await service.deleteSheet(Number(req.params.workbookId), Number(req.params.sheetId));
     if (!result) return reply.status(404).send({ error: "Workbook not found" });
     if ("error" in result) {
-      return reply.status(result.statusCode).send({ error: result.error });
+      return reply.status(result.statusCode ?? 500).send({ error: result.error });
     }
     return reply.status(204).send();
   });

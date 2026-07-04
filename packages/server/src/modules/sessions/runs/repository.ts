@@ -1,4 +1,4 @@
-import { prisma } from "../../../db.js";
+import { prisma } from "../../../infra/db.js";
 
 const DEFAULT_UNDO_SNAPSHOT_RETENTION = 5;
 

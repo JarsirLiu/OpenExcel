@@ -4,7 +4,7 @@ import multipart from "@fastify/multipart";
 import { workbookRoutes } from "./modules/workbooks/routes.js";
 import { sheetRoutes } from "./modules/sheets/routes.js";
 import { sessionRoutes } from "./modules/sessions/routes.js";
-import { pinoStream, logRequest } from "./logger.js";
+import { pinoStream, logRequest } from "./infra/observability/logger.js";
 
 export async function createApp() {
   const app = Fastify({ logger: { stream: pinoStream, level: "info" } });
