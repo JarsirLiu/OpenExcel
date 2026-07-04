@@ -82,7 +82,6 @@ export function useChatComposer({
     editorProps: {
       attributes: {
         class: "chat-input",
-        "data-placeholder": "输入消息...",
       },
       handleKeyDown: (_, event) => {
         if (event.key === "Enter" && !event.shiftKey) {

@@ -5,8 +5,8 @@ import remarkGfm from "remark-gfm";
 
 function MarkdownTable({ children, ...props }: Record<string, unknown> & { children?: ReactNode }) {
   return (
-    <div style={{ maxWidth: "100%", overflowX: "auto" }}>
-      <table {...(props as ComponentPropsWithoutRef<"table">)}>{children}</table>
+    <div style={{ maxWidth: "100%", overflowX: "auto", whiteSpace: "nowrap" }}>
+      <table {...(props as ComponentPropsWithoutRef<"table">)} style={{ minWidth: "max-content" }}>{children}</table>
     </div>
   );
 }
