@@ -1,4 +1,5 @@
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
+import { useState } from "react";
 import { Streamdown } from "streamdown";
 import "streamdown/styles.css";
 import remarkGfm from "remark-gfm";
@@ -18,9 +19,9 @@ function extractText(node: ReactNode): string {
   return "";
 }
 
-function CopyIcon({ size = 14 }: { size?: number }) {
+function CopyIcon() {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
       <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
     </svg>
@@ -28,17 +29,22 @@ function CopyIcon({ size = 14 }: { size?: number }) {
 }
 
 function CodeBlock({ children, ...props }: JSX.IntrinsicElements["pre"]) {
+  const [hovered, setHovered] = useState(false);
   const codeText = extractText(children);
 
   return (
-    <div className="codeblock" style={{
-      margin: "8px 0",
-      borderRadius: "var(--radius)",
-      overflow: "hidden",
-      background: "var(--muted)",
-      border: "1px solid var(--border)",
-      position: "relative",
-    }}>
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        margin: "8px 0",
+        borderRadius: "var(--radius)",
+        overflow: "hidden",
+        background: "var(--muted)",
+        border: "1px solid var(--border)",
+        position: "relative",
+      }}
+    >
       <pre style={{
         margin: 0,
         padding: "14px 40px 14px 16px",
@@ -57,9 +63,6 @@ function CodeBlock({ children, ...props }: JSX.IntrinsicElements["pre"]) {
           position: "absolute",
           top: 8,
           right: 8,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
           width: 28,
           height: 28,
           borderRadius: "var(--radius-pill)",
@@ -67,15 +70,17 @@ function CodeBlock({ children, ...props }: JSX.IntrinsicElements["pre"]) {
           background: "var(--background)",
           color: "var(--muted-foreground)",
           cursor: "pointer",
-          opacity: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
           transition: "opacity 0.15s",
-          pointerEvents: "none",
+          opacity: hovered ? 1 : 0,
+          pointerEvents: hovered ? "auto" : "none",
         }}
         title="复制"
       >
-        <CopyIcon size={12} />
+        <CopyIcon />
       </button>
-      <style>{`.md-content .codeblock:hover > button { opacity: 1; pointer-events: auto; }`}</style>
     </div>
   );
 }
