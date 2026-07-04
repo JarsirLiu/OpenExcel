@@ -192,13 +192,13 @@ packages/server/src/
 │   │   ├── repository.ts # run and step persistence helpers
 │   │   └── types.ts
 │   ├── workbooks/
-│   │   ├── routes.ts     # workbook upload, export, create, delete endpoints
+│   │   ├── routes.ts     # workbook upload, export, create, sheet structure endpoints
 │   │   ├── service.ts    # workbook import/export and workbook-level use cases
 │   │   ├── repository.ts # workbook persistence
 │   │   └── types.ts
 │   └── sheets/
-│       ├── routes.ts     # sheet CRUD and patch endpoints
-│       ├── service.ts    # sheet update/delete orchestration
+│       ├── routes.ts     # sheet read and patch endpoints
+│       ├── service.ts    # sheet patch orchestration
 │       ├── repository.ts # sheet persistence
 │       └── types.ts
 └── tests/                # cross-module integration tests and HTTP tests
@@ -548,11 +548,12 @@ The API surface should stay explicit.
 - `POST /api/workbooks/upload`
 - `POST /api/workbooks/:id/upload`
 - `POST /api/workbooks/:id/sheets`
+- `DELETE /api/workbooks/:id/sheets/:sheetId`
 
 ### 8.2 Sheet APIs
 
 - `PATCH /api/sheets/:id`
-- `DELETE /api/sheets/:id`
+- `GET /api/sheets/:id`
 
 ### 8.3 Session APIs
 
@@ -573,6 +574,13 @@ The API surface should stay explicit.
 - `POST /api/sessions/:sessionId/title`
 
 Title must remain a separate endpoint.
+
+### 8.6 Workspace Context APIs
+
+- `GET /api/workbooks/reference-candidates`
+
+This endpoint backs `@` mention suggestions in the chat composer.
+It should load on demand instead of being fetched during workbook bootstrap, so ordinary workbook open/delete flows stay fast.
 
 ## 9. Server Execution Rules
 
