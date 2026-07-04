@@ -23,7 +23,7 @@ export type RunToolContext = z.infer<typeof runToolContextSchema>;
 export const excelToolSpecs = {
   createWorkbook: {
     description:
-      "新建一个工作簿，并同时创建第一个 Sheet。可选地传入初始工作簿名称、初始 Sheet 名称，或者从已有 Sheet 复制初始结构。",
+      "新建一个工作簿，并同时创建第一个 Sheet。仅在用户明确要求创建新工作簿时使用。可选地传入初始工作簿名称、初始 Sheet 名称，或者从已有 Sheet 复制初始结构。",
     inputSchema: z.object({
       name: z.string().trim().min(1).optional().describe("工作簿名称"),
       sheetName: z.string().trim().min(1).optional().describe("初始 Sheet 名称"),
@@ -32,7 +32,7 @@ export const excelToolSpecs = {
   },
   createSheet: {
     description:
-      "在指定工作簿中创建一个新的 Sheet。可选地传入名称，或者从已有 Sheet 复制初始结构。",
+      "在指定工作簿中创建一个新的 Sheet。仅在用户明确要求新增 Sheet 时使用。可选地传入名称，或者从已有 Sheet 复制初始结构。",
     inputSchema: z.object({
       workbookId: z.coerce.number().int().positive().describe("工作簿 ID"),
       name: z.string().trim().min(1).optional().describe("Sheet 名称"),
@@ -90,7 +90,7 @@ export const excelToolSpecs = {
   },
   clearCells: {
     description:
-      "清空单元格内容。使用 operations 数组，cell 用于清空离散单格，range 用于清空连续区域。行号和列号都从 1 开始；如果要写入内容，请使用 writeCells。",
+      "清空单元格内容。仅在用户明确要求清空时使用。使用 operations 数组，cell 用于清空离散单格，range 用于清空连续区域。行号和列号都从 1 开始；如果要写入内容，请使用 writeCells。",
     needsRunContext: true,
     inputSchema: z.object({
       sheetId: z.coerce.number().describe("Sheet ID"),
@@ -117,7 +117,7 @@ export const excelToolSpecs = {
   },
   mergeCells: {
     description:
-      "合并指定范围的单元格。使用 operations 数组，每项都是一个 range；合并后只有左上角单元格保留值，其余格子的值会被清除。行号和列号都从 1 开始。",
+      "合并指定范围的单元格。仅在用户明确要求合并时使用。使用 operations 数组，每项都是一个 range；合并后只有左上角单元格保留值，其余格子的值会被清除。行号和列号都从 1 开始。",
     needsRunContext: true,
     inputSchema: z.object({
       sheetId: z.coerce.number().describe("Sheet ID"),
@@ -137,7 +137,7 @@ export const excelToolSpecs = {
   },
   unmergeCells: {
     description:
-      "取消指定范围内的单元格合并。使用 operations 数组，每项都是一个 range；取消后每个单元格独立。行号和列号都从 1 开始。",
+      "取消指定范围内的单元格合并。仅在用户明确要求取消合并时使用。使用 operations 数组，每项都是一个 range；取消后每个单元格独立。行号和列号都从 1 开始。",
     needsRunContext: true,
     inputSchema: z.object({
       sheetId: z.coerce.number().describe("Sheet ID"),
