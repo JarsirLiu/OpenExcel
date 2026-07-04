@@ -22,10 +22,10 @@ export function SessionHeader({
   return (
     <>
       <div style={{
-        padding: "10px 12px", borderBottom: "1px solid #f0f0f0",
+        padding: "10px 12px", borderBottom: "1px solid var(--border)",
         display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0,
       }}>
-        <span style={{ fontWeight: 600, fontSize: 14, color: "#1f1f1f", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, marginRight: 8 }}>
+        <span style={{ fontWeight: 600, fontSize: 14, color: "var(--foreground)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, marginRight: 8 }}>
           {sessionName}
         </span>
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
@@ -34,11 +34,11 @@ export function SessionHeader({
             style={{
               padding: "4px 8px",
               cursor: currentSessionId && undoState !== "loading" && !isStreaming ? "pointer" : "not-allowed",
-              color: currentSessionId && !isStreaming ? "#888" : "#c0c0c0",
+              color: currentSessionId && !isStreaming ? "var(--muted-foreground)" : "var(--hint-foreground)",
               fontSize: 12,
-              border: "1px solid #e0e0e0",
-              borderRadius: 6,
-              background: "#fff",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-pill)",
+              background: "var(--background)",
               opacity: undoState === "loading" || isStreaming ? 0.7 : 1,
             }}
             title={isStreaming ? "对话进行中，无法撤销" : undoState === "loading" ? "撤销中..." : "撤销本轮修改"}
@@ -47,14 +47,14 @@ export function SessionHeader({
           </div>
           <div
             onClick={onToggleHistory}
-            style={{ padding: "4px 8px", cursor: "pointer", color: "#888", fontSize: 12, border: "1px solid #e0e0e0", borderRadius: 6, background: "#fff" }}
+            style={{ padding: "4px 8px", cursor: "pointer", color: "var(--muted-foreground)", fontSize: 12, border: "1px solid var(--border)", borderRadius: "var(--radius-pill)", background: "var(--background)" }}
             title="历史记录"
           >
             历史
           </div>
           <div
             onClick={onNewSession}
-            style={{ padding: "4px 8px", cursor: "pointer", color: "#888", fontSize: 16, border: "1px solid #e0e0e0", borderRadius: 6, background: "#fff", lineHeight: 1 }}
+            style={{ padding: "4px 8px", cursor: "pointer", color: "var(--muted-foreground)", fontSize: 16, border: "1px solid var(--border)", borderRadius: "var(--radius-pill)", background: "var(--background)", lineHeight: 1 }}
             title="新建对话"
           >
             +
@@ -64,10 +64,10 @@ export function SessionHeader({
       {undoError && (
         <div style={{ padding: "10px 14px 0" }}>
           <div style={{
-            border: "1px solid #fde68a",
-            background: "#fffbeb",
-            color: "#92400e",
-            borderRadius: 10,
+            border: "1px solid var(--border)",
+            background: "var(--muted)",
+            color: "var(--muted-foreground)",
+            borderRadius: "var(--radius-sm)",
             padding: "8px 12px",
             fontSize: 13,
             lineHeight: 1.5,
@@ -79,10 +79,10 @@ export function SessionHeader({
       {undoState === "success" && (
         <div style={{ padding: "10px 14px 0" }}>
           <div style={{
-            border: "1px solid #bbf7d0",
-            background: "#f0fdf4",
-            color: "#166534",
-            borderRadius: 10,
+            border: "1px solid var(--border)",
+            background: "var(--muted)",
+            color: "var(--muted-foreground)",
+            borderRadius: "var(--radius-sm)",
             padding: "8px 12px",
             fontSize: 13,
             lineHeight: 1.5,

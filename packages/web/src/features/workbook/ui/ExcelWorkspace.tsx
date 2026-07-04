@@ -24,7 +24,7 @@ export function ExcelWorkspace({
   onWorkbookRefresh,
 }: Props) {
   return (
-    <div style={{ flex: 1, minWidth: 0, overflow: "hidden", borderRight: "1px solid #e0e4ea" }}>
+    <div style={{ flex: 1, minWidth: 0, overflow: "hidden", borderRight: "1px solid var(--border)" }}>
       <ExcelGrid
         workspaceId={workspaceId}
         workbook={workbook}

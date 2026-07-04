@@ -66,19 +66,19 @@ export function SessionShell({
 
   if (workspaceId == null) {
     return (
-      <div style={{
-        display: "flex", flexDirection: "column", height: "100%", background: "#fff",
-        borderLeft: "1px solid #e8e8e8", overflow: "hidden", position: "relative",
-      }}>
-        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "#999", fontSize: 13 }}>加载工作区中...</div>
+    <div style={{
+      display: "flex", flexDirection: "column", height: "100%", background: "var(--background)",
+      borderLeft: "1px solid var(--border)", overflow: "hidden", position: "relative",
+    }}>
+      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--hint-foreground)", fontSize: 13 }}>加载工作区中...</div>
       </div>
     );
   }
 
   return (
     <div style={{
-      display: "flex", flexDirection: "column", height: "100%", background: "#fff",
-      borderLeft: "1px solid #e8e8e8", overflow: "hidden", position: "relative",
+      display: "flex", flexDirection: "column", height: "100%", background: "var(--background)",
+      borderLeft: "1px solid var(--border)", overflow: "hidden", position: "relative",
     }}>
       <SessionHeader
         sessionName={currentSession?.name ?? "AI 对话"}
@@ -94,8 +94,8 @@ export function SessionShell({
       {historyOpen && (
         <div ref={historyRef} style={{
           position: "absolute", top: 44, left: 8, right: 8, zIndex: 100,
-          background: "#fff", border: "1px solid #e0e0e0", borderRadius: 8,
-          boxShadow: "0 8px 24px rgba(0,0,0,0.12)", maxHeight: 300, overflowY: "auto",
+          background: "var(--background)", border: "1px solid var(--border)", borderRadius: "var(--radius)",
+          boxShadow: "var(--shadow)", maxHeight: 300, overflowY: "auto",
         }}>
           <SessionHistoryPopover
             sessions={sessions}
@@ -119,7 +119,7 @@ export function SessionShell({
           referenceCacheRevision={referenceCacheRevision}
         />
       ) : (
-        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "#999", fontSize: 13 }}>加载中...</div>
+        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--hint-foreground)", fontSize: 13 }}>加载中...</div>
       )}
     </div>
   );

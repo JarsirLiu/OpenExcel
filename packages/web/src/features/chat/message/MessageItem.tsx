@@ -7,7 +7,7 @@ import { ToolCallCard } from "./ToolCallCard";
 
 const UserAvatar = () => (
   <div style={{
-    width: 26, height: 26, borderRadius: "50%", background: "#10a37f",
+    width: 26, height: 26, borderRadius: "50%", background: "var(--avatar-user)",
     display: "flex", alignItems: "center", justifyContent: "center",
     color: "#fff", fontSize: 11, fontWeight: 600, flexShrink: 0, userSelect: "none",
   }}>Y</div>
@@ -15,7 +15,7 @@ const UserAvatar = () => (
 
 const AIAvatar = () => (
   <div style={{
-    width: 26, height: 26, borderRadius: "50%", background: "#3b82f6",
+    width: 26, height: 26, borderRadius: "50%", background: "var(--avatar-ai)",
     display: "flex", alignItems: "center", justifyContent: "center",
     color: "#fff", fontSize: 11, fontWeight: 600, flexShrink: 0, userSelect: "none",
   }}>AI</div>
@@ -59,9 +59,10 @@ const DownloadIcon = ({ size = 14 }: { size?: number }) => (
 
 const actionButtonStyle: React.CSSProperties = {
   display: "flex", alignItems: "center", gap: 4,
-  fontSize: 13, color: "#666", background: "transparent",
-  border: "none", cursor: "pointer", padding: "4px 8px",
-  borderRadius: 6, transition: "background 0.15s",
+  fontSize: 12, color: "var(--muted-foreground)",
+  background: "transparent", border: "none", cursor: "pointer",
+  padding: "4px 8px", borderRadius: "var(--radius-pill)",
+  transition: "background 0.15s",
 };
 
 function renderAssistantParts(
@@ -105,7 +106,7 @@ function renderAssistantParts(
         break;
       case "step-start":
         flushText(`step-${i}-flush`);
-        result.push(<div key={`step-${i}`} style={{ height: 1, background: "#e8ecf0", margin: "8px 0" }} />);
+        result.push(<div key={`step-${i}`} style={{ height: 1, background: "var(--border)", margin: "8px 0" }} />);
         break;
       default:
         if (part.type.startsWith("tool-")) {
@@ -142,10 +143,10 @@ export function MessageItem({
       <div style={{ marginBottom: 24, minWidth: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
           <UserAvatar />
-          <span style={{ fontSize: 14, fontWeight: 600, color: "#1f1f1f" }}>You</span>
+          <span style={{ fontSize: 14, fontWeight: 600, color: "var(--foreground)" }}>You</span>
         </div>
         <div style={{ paddingLeft: 36, minWidth: 0 }}>
-          <div style={{ whiteSpace: "pre-wrap", fontSize: 15, lineHeight: 1.7, color: "#1f1f1f" }}>
+          <div style={{ whiteSpace: "pre-wrap", fontSize: 15, lineHeight: 1.7, color: "var(--foreground)" }}>
             {getMessageText(msg)}
           </div>
         </div>
@@ -154,12 +155,12 @@ export function MessageItem({
   }
 
   return (
-    <div style={{ marginBottom: 24, minWidth: 0 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-        <AIAvatar />
-        <span style={{ fontSize: 14, fontWeight: 600, color: "#1f1f1f" }}>AI 助手</span>
-      </div>
-      <div style={{ paddingLeft: 36, minWidth: 0 }}>
+      <div style={{ marginBottom: 24, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+          <AIAvatar />
+          <span style={{ fontSize: 14, fontWeight: 600, color: "var(--foreground)" }}>AI 助手</span>
+        </div>
+        <div style={{ paddingLeft: 36, minWidth: 0 }}>
         {renderAssistantParts(msg, isStreaming, thinkingOpen, setThinkingOpen)}
         {!isStreaming && isLastAssistantMessage && (
           <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>

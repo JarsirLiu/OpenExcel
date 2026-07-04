@@ -16,7 +16,7 @@ export function SessionHistoryPopover({
   return (
     <>
       {sessions.length === 0 ? (
-        <div style={{ padding: "16px", textAlign: "center", color: "#999", fontSize: 13 }}>暂无历史记录</div>
+        <div style={{ padding: "16px", textAlign: "center", color: "var(--hint-foreground)", fontSize: 13 }}>暂无历史记录</div>
       ) : (
         sessions.map((session) => (
           <div
@@ -25,11 +25,11 @@ export function SessionHistoryPopover({
             style={{
               display: "flex", alignItems: "center", justifyContent: "space-between",
               padding: "10px 14px", cursor: "pointer",
-              background: session.id === currentSessionId ? "#f5f5f5" : "transparent",
-              borderBottom: "1px solid #f0f0f0",
+              background: session.id === currentSessionId ? "var(--muted)" : "transparent",
+              borderBottom: "1px solid var(--border)",
             }}
           >
-            <span style={{ fontSize: 13, color: "#1f1f1f", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+            <span style={{ fontSize: 13, color: "var(--foreground)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
               {session.name}
             </span>
             <div
@@ -37,7 +37,7 @@ export function SessionHistoryPopover({
                 e.stopPropagation();
                 onDeleteSession(session.id);
               }}
-              style={{ padding: "2px 6px", cursor: "pointer", color: "#bbb", fontSize: 14, lineHeight: 1, marginLeft: 8, flexShrink: 0 }}
+              style={{ padding: "2px 6px", cursor: "pointer", color: "var(--hint-foreground)", fontSize: 14, lineHeight: 1, marginLeft: 8, flexShrink: 0 }}
               title="删除"
             >
               ✕

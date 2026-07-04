@@ -16,7 +16,7 @@ export function MessageMarkdown({ content, isStreaming = false }: { content: str
     <div className="md-content" style={{
       fontSize: 15,
       lineHeight: 1.7,
-      color: "#1f1f1f",
+      color: "var(--foreground)",
       maxWidth: "100%",
       minWidth: 0,
     }}>

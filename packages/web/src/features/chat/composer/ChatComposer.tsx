@@ -71,11 +71,11 @@ export function ChatComposer({
   }, [editorText]);
 
   return (
-    <div style={{ padding: "10px 14px", borderTop: "1px solid #f0f0f0", background: "#fff", flexShrink: 0 }}>
+    <div style={{ padding: "10px 14px", borderTop: "1px solid var(--border)", background: "var(--background)", flexShrink: 0 }}>
       <div style={{
-        background: "#fff",
-        border: "1px solid #e0e0e0",
-        borderRadius: 20,
+        background: "var(--background)",
+        border: "1px solid var(--border)",
+        borderRadius: "var(--radius)",
         padding: "12px 16px",
         display: "flex",
         flexDirection: "column",
@@ -83,13 +83,13 @@ export function ChatComposer({
       }}>
         {/* Editor area with overlay placeholder */}
         <div style={{ position: "relative", minHeight: 24 }}>
-          <div style={{ maxHeight: 120, overflowY: "auto", fontSize: 15, lineHeight: 1.5, color: "#1f1f1f" }}>
+          <div style={{ maxHeight: 120, overflowY: "auto", fontSize: 15, lineHeight: 1.5, color: "var(--foreground)" }}>
             {editor && <EditorContent editor={editor} />}
           </div>
           {editorEmpty && (
             <span style={{
               position: "absolute", top: 0, left: 0,
-              fontSize: 13, color: "#c0c0c0", pointerEvents: "none",
+              fontSize: 13, color: "var(--hint-foreground)", pointerEvents: "none",
               transition: "opacity 0.3s",
             }}>
               {PLACEHOLDERS[placeholderIndex]}
@@ -99,13 +99,13 @@ export function ChatComposer({
 
         {/* Bottom bar: toggle + icons + send */}
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", userSelect: "none", color: "#555", fontSize: 13 }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", userSelect: "none", color: "var(--muted-foreground)", fontSize: 13 }}>
             <div style={{
-              width: 30, height: 18, borderRadius: 9,
-              background: "#d9d9d9", position: "relative", transition: "background 0.2s",
+              width: 30, height: 18, borderRadius: "var(--radius-pill)",
+              background: "var(--border)", position: "relative", transition: "background 0.2s",
             }}>
               <div style={{
-                width: 14, height: 14, borderRadius: 7,
+                width: 14, height: 14, borderRadius: "var(--radius-pill)",
                 background: "#fff", position: "absolute", top: 2, left: 2,
                 transition: "left 0.2s",
               }} />
@@ -115,13 +115,13 @@ export function ChatComposer({
           <div style={{ flex: 1 }} />
           <button style={{
             background: "transparent", border: "none", cursor: "pointer",
-            display: "flex", alignItems: "center", color: "#666", padding: 4,
+            display: "flex", alignItems: "center", color: "var(--muted-foreground)", padding: 4, borderRadius: "var(--radius-pill)",
           }}>
             <ScissorsIcon />
           </button>
           <button style={{
             background: "transparent", border: "none", cursor: "pointer",
-            display: "flex", alignItems: "center", color: "#666", padding: 4,
+            display: "flex", alignItems: "center", color: "var(--muted-foreground)", padding: 4, borderRadius: "var(--radius-pill)",
           }}>
             <AttachIcon />
           </button>
@@ -129,8 +129,8 @@ export function ChatComposer({
             onClick={() => (isStreaming ? onStop() : handleSend())}
             style={{
               width: 32, height: 32, borderRadius: "50%",
-              background: "#1f1f1f",
-              color: "#fff", border: "none", cursor: "pointer",
+              background: "var(--primary)",
+              color: "var(--primary-foreground)", border: "none", cursor: "pointer",
               display: "flex", alignItems: "center", justifyContent: "center",
               flexShrink: 0,
             }}
@@ -143,9 +143,9 @@ export function ChatComposer({
       {/* Footer */}
       <div style={{
         marginTop: 10, display: "flex", alignItems: "center", justifyContent: "space-between",
-        fontSize: 12, color: "#aaa",
+        fontSize: 12, color: "var(--hint-foreground)",
       }}>
-        <span style={{ color: "#5b9bd5", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+        <span style={{ color: "var(--accent)", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
           <svg width={12} height={12} viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5Z" />
           </svg>

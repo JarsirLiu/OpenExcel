@@ -24,7 +24,7 @@ export function MessageList({
   return (
     <div style={{ flex: 1, overflowY: "auto", padding: "20px 16px" }}>
       {messages.length === 0 && (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "#bbb", fontSize: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "var(--hint-foreground)", fontSize: 14 }}>
           开始新的对话吧
         </div>
       )}
@@ -49,16 +49,16 @@ export function MessageList({
           <div style={{ marginBottom: 24 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
               <div style={{
-                width: 26, height: 26, borderRadius: "50%", background: "#3b82f6",
+                width: 26, height: 26, borderRadius: "50%", background: "var(--avatar-ai)",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 color: "#fff", fontSize: 11, fontWeight: 600, flexShrink: 0, userSelect: "none",
               }}>AI</div>
-              <span style={{ fontSize: 14, fontWeight: 600, color: "#1f1f1f" }}>AI 助手</span>
+              <span style={{ fontSize: 14, fontWeight: 600, color: "var(--foreground)" }}>AI 助手</span>
             </div>
             <div style={{ paddingLeft: 36, display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#999", animation: "pulse 1.4s infinite", display: "inline-block" }} />
-              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#999", animation: "pulse 1.4s infinite 0.2s", display: "inline-block" }} />
-              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#999", animation: "pulse 1.4s infinite 0.4s", display: "inline-block" }} />
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--hint-foreground)", animation: "pulse 1.4s infinite", display: "inline-block" }} />
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--hint-foreground)", animation: "pulse 1.4s infinite 0.2s", display: "inline-block" }} />
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--hint-foreground)", animation: "pulse 1.4s infinite 0.4s", display: "inline-block" }} />
             </div>
           </div>
         );
