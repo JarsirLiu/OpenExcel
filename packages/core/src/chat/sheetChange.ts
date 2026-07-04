@@ -1,9 +1,12 @@
 import { z } from "zod";
 
+const sheetChangeValueSchema = z.union([z.string(), z.number(), z.boolean()]);
+
 export const sheetChangeCellSchema = z.object({
   row: z.number().int().positive(),
   col: z.number().int().positive(),
-  value: z.string(),
+  value: sheetChangeValueSchema,
+  formula: z.string().trim().min(1).optional(),
 });
 
 export const sheetChangeClearCellSchema = z.object({

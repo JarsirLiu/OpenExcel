@@ -17,6 +17,21 @@ describe("sheetChangePatchOutputSchema", () => {
     expect(result.success).toBe(true);
   });
 
+  it("accepts a write patch output with formulas", () => {
+    const result = sheetChangePatchOutputSchema.safeParse({
+      success: true,
+      updatedCells: 1,
+      delta: {
+        type: "write",
+        cells: [{ row: 1, col: 2, value: 3, formula: "A1+B1" }],
+      },
+      preview: { rows: [] },
+      sheetInfo: { sheetId: 1, sheetName: "Sheet1" },
+    });
+
+    expect(result.success).toBe(true);
+  });
+
   it("accepts a valid clear patch output", () => {
     const result = sheetChangePatchOutputSchema.safeParse({
       success: true,

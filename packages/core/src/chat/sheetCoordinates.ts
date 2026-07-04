@@ -7,7 +7,8 @@ import type {
 export type ZeroBasedSheetChangeCell = {
   row: number;
   col: number;
-  value: string;
+  value: string | number | boolean;
+  formula?: string;
 };
 
 export type ZeroBasedSheetChangeRange = {
@@ -63,6 +64,7 @@ export function sheetChangeCellToZeroBased(cell: SheetChangeCell): ZeroBasedShee
     row: toZeroBasedIndex(cell.row),
     col: toZeroBasedIndex(cell.col),
     value: cell.value,
+    formula: cell.formula,
   };
 }
 
@@ -120,6 +122,7 @@ export function zeroBasedSheetChangeCellToSheetChangeCell(cell: ZeroBasedSheetCh
     row: toOneBasedIndex(cell.row),
     col: toOneBasedIndex(cell.col),
     value: cell.value,
+    formula: cell.formula,
   };
 }
 

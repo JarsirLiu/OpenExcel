@@ -91,7 +91,7 @@ export function ExcelGrid({
           onChange={handleChange}
           showSheetTabs={true}
           showToolbar={true}
-          showFormulaBar={false}
+          showFormulaBar={true}
           toolbarItems={[
             "merge-cell", "|",
             "bold", "italic", "strike-through", "underline", "|",

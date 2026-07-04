@@ -27,20 +27,20 @@ export interface SheetChangeRange {
   endCol: number;
 }
 
+export type CellWriteValue = string | number | boolean;
+
+export type WriteCellOperation =
+  | { type: "cell"; row: number; col: number; value: CellWriteValue; formula?: string }
+  | { type: "range"; startRow: number; startCol: number; endRow: number; endCol: number; value: CellWriteValue; formula?: string };
+
 export type WriteCellsInput = {
   sheetId: number;
-  operations: Array<
-    | { type: "cell"; row: number; col: number; value: string }
-    | { type: "range"; startRow: number; startCol: number; endRow: number; endCol: number; value: string }
-  >;
+  operations: WriteCellOperation[];
 };
 
 export type NormalizedWriteCellsInput = {
   sheetId: number;
-  operations: Array<
-    | { type: "cell"; row: number; col: number; value: string }
-    | { type: "range"; startRow: number; startCol: number; endRow: number; endCol: number; value: string }
-  >;
+  operations: WriteCellOperation[];
 };
 
 export function parseMergesFromCelldata(
@@ -130,7 +130,13 @@ export function normalizeWriteOperations(input: WriteCellsInput): NormalizedWrit
     sheetId: input.sheetId,
     operations: input.operations.map((operation) => (
       operation.type === "cell"
-        ? { type: "cell", row: operation.row, col: operation.col, value: operation.value }
+        ? {
+            type: "cell",
+            row: operation.row,
+            col: operation.col,
+            value: operation.value,
+            formula: operation.formula,
+          }
         : {
             type: "range",
             startRow: operation.startRow,
@@ -138,30 +144,63 @@ export function normalizeWriteOperations(input: WriteCellsInput): NormalizedWrit
             endRow: operation.endRow,
             endCol: operation.endCol,
             value: operation.value,
+            formula: operation.formula,
           }
     )),
   };
 }
 
+function normalizeFormula(formula?: string): string | undefined {
+  if (formula == null) return undefined;
+  const trimmed = formula.trim();
+  if (!trimmed) return undefined;
+  return trimmed.startsWith("=") ? trimmed.slice(1) : trimmed;
+}
+
 export function stripCellContent(value: Record<string, unknown> | undefined | null): Record<string, unknown> | null {
   if (!value) return null;
-  const { v: _cellValue, m: _displayValue, ...rest } = value;
+  const { v: _cellValue, m: _displayValue, f: _formula, ...rest } = value;
   return Object.keys(rest).length > 0 ? rest : null;
 }
 
 export function applyCellWrite(
   cellMap: Map<string, any>,
-  touchedCells: Map<string, { row: number; col: number; value: string }>,
+  touchedCells: Map<string, { row: number; col: number; value: CellWriteValue; formula?: string }>,
   row0: number,
   col0: number,
-  value: string,
+  value: CellWriteValue,
+  formula?: string,
 ) {
   const key = `${row0},${col0}`;
+  const normalizedFormula = normalizeFormula(formula);
   if (cellMap.has(key)) {
     const existing = cellMap.get(key);
-    existing.v = { ...existing.v, v: value, m: String(value) };
+    const nextValue: Record<string, unknown> = { ...(existing.v ?? {}) };
+    if (normalizedFormula) {
+      nextValue.f = normalizedFormula;
+    } else {
+      delete nextValue.f;
+    }
+
+    if (value !== undefined) {
+      nextValue.v = value;
+      nextValue.m = String(value);
+    } else {
+      delete nextValue.v;
+      delete nextValue.m;
+    }
+
+    existing.v = nextValue;
   } else {
-    const newCell = { r: row0, c: col0, v: { v: value, m: String(value) } };
+    const nextValue: Record<string, unknown> = {};
+    if (normalizedFormula) {
+      nextValue.f = normalizedFormula;
+    }
+    if (value !== undefined) {
+      nextValue.v = value;
+      nextValue.m = String(value);
+    }
+    const newCell = { r: row0, c: col0, v: nextValue };
     cellMap.set(key, newCell);
   }
 
@@ -169,6 +208,7 @@ export function applyCellWrite(
     row: row0 + 1,
     col: col0 + 1,
     value,
+    formula: normalizedFormula,
   });
 }
 

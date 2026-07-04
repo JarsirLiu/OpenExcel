@@ -45,11 +45,18 @@ export const writeCells = {
       cellMap.set(`${cell.r},${cell.c}`, cell);
     }
 
-    const touchedCells = new Map<string, { row: number; col: number; value: string }>();
+    const touchedCells = new Map<string, { row: number; col: number; value: string | number | boolean; formula?: string }>();
     for (const operation of operations) {
       if (operation.type === "cell") {
         const storageCell = sheetChangeCellToZeroBased(operation);
-        applyCellWrite(cellMap, touchedCells, storageCell.row, storageCell.col, storageCell.value);
+        applyCellWrite(
+          cellMap,
+          touchedCells,
+          storageCell.row,
+          storageCell.col,
+          storageCell.value,
+          storageCell.formula,
+        );
         continue;
       }
 
@@ -62,7 +69,7 @@ export const writeCells = {
 
       for (let row = storageRange.startRow; row <= storageRange.endRow; row += 1) {
         for (let col = storageRange.startCol; col <= storageRange.endCol; col += 1) {
-          applyCellWrite(cellMap, touchedCells, row, col, operation.value);
+          applyCellWrite(cellMap, touchedCells, row, col, operation.value, operation.formula);
         }
       }
     }

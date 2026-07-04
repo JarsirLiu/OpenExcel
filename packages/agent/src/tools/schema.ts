@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+const writeCellValueSchema = z.union([z.string(), z.number(), z.boolean()]);
+const writeFormulaSchema = z.string().trim().min(1).describe("Excel 公式表达式，支持 A1 引用；可带或不带前导等号，系统会自动规范化");
+
 export type ExcelToolSpec = {
   description: string;
   inputSchema: z.ZodTypeAny;
@@ -45,19 +48,24 @@ export const excelToolSpecs = {
   },
   writeCells: {
     description:
-      "批量写入单元格数据。使用 operations 数组，支持两种操作：cell 用于离散单格写入，range 用于连续区域填充同一个值。行号和列号都从 1 开始；如果要清空内容，请使用 clearCells。",
+      "批量写入单元格数据。使用 operations 数组，支持两种操作：cell 用于离散单格写入，range 用于连续区域填充同一个值。value 可以是字符串、数字或布尔值；如果要写公式，请额外传 formula，并尽量同时提供该公式的当前结果 value 作为缓存显示值。行号和列号都从 1 开始；如果要清空内容，请使用 clearCells。",
     needsRunContext: true,
     inputSchema: z.object({
       sheetId: z.coerce.number().describe("Sheet ID"),
       operations: z
         .array(
           z.discriminatedUnion("type", [
-            z.object({
-              type: z.literal("cell"),
-              row: z.coerce.number().positive().describe("行号，从 1 开始"),
-              col: z.coerce.number().positive().describe("列号，从 1 开始"),
-              value: z.string().describe("写入的值"),
-            }),
+            z
+              .object({
+                type: z.literal("cell"),
+                row: z.coerce.number().positive().describe("行号，从 1 开始"),
+                col: z.coerce.number().positive().describe("列号，从 1 开始"),
+                value: writeCellValueSchema.describe("写入的值"),
+                formula: writeFormulaSchema.optional(),
+              })
+              .refine((value) => value.formula != null || value.value != null, {
+                message: "Cell write requires a value or formula",
+              }),
             z
               .object({
                 type: z.literal("range"),
@@ -65,10 +73,14 @@ export const excelToolSpecs = {
                 startCol: z.coerce.number().positive().describe("起始列号，从 1 开始"),
                 endRow: z.coerce.number().positive().describe("结束行号，从 1 开始"),
                 endCol: z.coerce.number().positive().describe("结束列号，从 1 开始"),
-                value: z.string().describe("写入的值"),
+                value: writeCellValueSchema.describe("写入的值"),
+                formula: writeFormulaSchema.optional(),
               })
               .refine((value) => value.endRow >= value.startRow && value.endCol >= value.startCol, {
                 message: "Invalid sheet range",
+              })
+              .refine((value) => value.formula != null || value.value != null, {
+                message: "Range write requires a value or formula",
               }),
           ]),
         )

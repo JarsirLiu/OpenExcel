@@ -167,6 +167,25 @@ describe("celldataToExcel", () => {
     expect(ws["!rows"]?.[0]?.hpt).toBe(28);
   });
 
+  it("preserves formulas when exporting", () => {
+    const ab = celldataToExcel([
+      {
+        name: "Formula",
+        celldata: [
+          { r: 0, c: 0, v: { v: 1, m: "1" } },
+          { r: 0, c: 1, v: { v: 2, m: "2" } },
+          { r: 0, c: 2, v: { v: 3, m: "3", f: "A1+B1" } },
+        ],
+      },
+    ]);
+
+    const wb = XLSX.read(ab, { type: "array", cellStyles: true, cellFormula: true, cellNF: true });
+    const ws = wb.Sheets.Formula;
+
+    expect(ws["C1"]?.f).toBe("A1+B1");
+    expect(ws["C1"]?.v).toBe(3);
+  });
+
   it("round-trips common styles through export and import", () => {
     const source = [
       {

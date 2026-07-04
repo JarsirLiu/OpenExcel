@@ -58,19 +58,47 @@ export function patchWorkbookWithDelta(
     if (!Array.isArray(cells)) return null;
 
     // Patch cell values
-    for (const { row, col, value } of cells) {
+    for (const { row, col, value, formula } of cells) {
       const key = `${row},${col}`;
       const newVal = value ?? "";
+      const normalizedFormula = typeof formula === "string" ? formula.trim().replace(/^=/, "") : "";
+      const hasFormula = normalizedFormula.length > 0;
+
+      if (hasFormula) {
+        const nextValue = cellMap.has(key) ? { ...(cellMap.get(key).v ?? {}) } : {};
+        nextValue.f = normalizedFormula;
+        if (value !== undefined && newVal !== "") {
+          nextValue.v = newVal;
+          nextValue.m = String(newVal);
+        } else {
+          delete nextValue.v;
+          delete nextValue.m;
+        }
+        if (cellMap.has(key)) {
+          const cell = cellMap.get(key);
+          cell.v = nextValue;
+        } else {
+          cellMap.set(key, { r: row, c: col, v: nextValue });
+        }
+        continue;
+      }
 
       if (newVal === "") {
         cellMap.delete(key);
+        continue;
+      }
+
+      if (cellMap.has(key)) {
+        const cell = cellMap.get(key);
+        const nextValue = { ...(cell.v ?? {}) };
+        delete nextValue.f;
+        cell.v = {
+          ...nextValue,
+          v: newVal,
+          m: String(newVal),
+        };
       } else {
-        if (cellMap.has(key)) {
-          const cell = cellMap.get(key);
-          cell.v = { ...cell.v, v: newVal, m: String(newVal) };
-        } else {
-          cellMap.set(key, { r: row, c: col, v: { v: newVal, m: String(newVal) } });
-        }
+        cellMap.set(key, { r: row, c: col, v: { v: newVal, m: String(newVal) } });
       }
     }
 
@@ -108,7 +136,7 @@ export function patchWorkbookWithDelta(
         const key = `${operation.row},${operation.col}`;
         const cell = cellMap.get(key);
         if (!cell?.v) continue;
-        const { v: _cellValue, m: _displayValue, ...rest } = cell.v;
+        const { v: _cellValue, m: _displayValue, f: _formula, ...rest } = cell.v;
         if (Object.keys(rest).length > 0) {
           cell.v = rest;
         } else {
@@ -125,7 +153,7 @@ export function patchWorkbookWithDelta(
           cell.c <= operation.endCol
         ) {
           if (!cell.v) continue;
-          const { v: _cellValue, m: _displayValue, ...rest } = cell.v;
+          const { v: _cellValue, m: _displayValue, f: _formula, ...rest } = cell.v;
           if (Object.keys(rest).length > 0) {
             cell.v = rest;
           } else {

@@ -67,9 +67,10 @@ function parseConfig(config?: Record<string, any> | string | null): Record<strin
   return config;
 }
 
-function toXlsxCellType(value: FortuneCellValue): XLSX.CellObject["t"] {
+function toXlsxCellType(value: FortuneCellValue): XLSX.CellObject["t"] | undefined {
   if ((value as any).t) return (value as any).t;
   const raw = value.v;
+  if (raw == null) return value.f ? undefined : "s";
   if (raw instanceof Date) return "d";
   switch (typeof raw) {
     case "number":
@@ -193,25 +194,29 @@ function buildWorksheetFromCelldata(
       return;
     }
 
-    const cell: XLSX.CellObject = {
-      t: toXlsxCellType(value),
-      v: value.v ?? "",
-    };
+    const cell: Partial<XLSX.CellObject> = {};
+    const hasFormula = typeof value.f === "string" && value.f.trim().length > 0;
+    const cellType = toXlsxCellType(value);
 
-    if (value.f) cell.f = value.f;
-    if (value.m != null) cell.w = value.m;
+    if (cellType) {
+      cell.t = cellType;
+    }
+    if (value.v != null) {
+      cell.v = value.v;
+    } else if (!hasFormula) {
+      cell.t = "s";
+      cell.v = "";
+    }
+
+    if (hasFormula) cell.f = value.f;
+    if (value.m != null) cell.w = String(value.m);
 
     const style = toXlsxStyle(value);
     if (style) {
       cell.s = style;
     }
 
-    if (value.v == null && !value.f) {
-      cell.t = "s";
-      cell.v = "";
-    }
-
-    ws[ref] = cell;
+    ws[ref] = cell as XLSX.CellObject;
 
     maxRow = Math.max(maxRow, row);
     maxCol = Math.max(maxCol, col);

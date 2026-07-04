@@ -8,13 +8,13 @@ describe("sheet coordinate conversions", () => {
   it("converts a one-based delta to zero-based for storage", () => {
     const delta = sheetChangeDeltaToZeroBased({
       type: "write",
-      cells: [{ row: 1, col: 2, value: "A" }],
+      cells: [{ row: 1, col: 2, value: "A", formula: "SUM(A1:A3)" }],
       merges: [{ startRow: 3, startCol: 4, endRow: 5, endCol: 6 }],
     });
 
     expect(delta).toEqual({
       type: "write",
-      cells: [{ row: 0, col: 1, value: "A" }],
+      cells: [{ row: 0, col: 1, value: "A", formula: "SUM(A1:A3)" }],
       merges: [{ startRow: 2, startCol: 3, endRow: 4, endCol: 5 }],
     });
   });
