@@ -13,7 +13,7 @@ export function ChatPanel({
   onSheetChanged,
   onWorkbookStructureChanged,
   onStreamingChange,
-  sheets,
+  referenceCacheRevision,
 }: {
   sessionId: number;
   initialMessages: any[];
@@ -21,7 +21,7 @@ export function ChatPanel({
   onSheetChanged?: (sheetId: number, delta: SheetChangeDelta | null) => void;
   onWorkbookStructureChanged?: (update: WorkbookStructureUpdate) => void;
   onStreamingChange?: (isStreaming: boolean) => void;
-  sheets: SheetMeta[];
+  referenceCacheRevision: number;
 }) {
   const { messages, error, isStreaming, sendMessage, stop } = useChatConversation({
     sessionId,
@@ -55,10 +55,10 @@ export function ChatPanel({
       )}
 
       <ChatComposer
-        sheets={sheets}
         isStreaming={isStreaming}
         onSend={sendMessage}
         onStop={stop}
+        referenceCacheRevision={referenceCacheRevision}
       />
     </div>
   );

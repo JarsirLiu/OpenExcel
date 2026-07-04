@@ -24,7 +24,7 @@ type Props = {
   handleUndoLatestRun: () => Promise<void>;
   onSheetChanged?: (sheetId: number, delta: SheetChangeDelta | null) => void;
   onWorkbookStructureChanged?: (update: WorkbookStructureUpdate) => void;
-  sheets: { workbookId: number; workbookName: string; id: number; name: string }[];
+  referenceCacheRevision: number;
 };
 
 export function SessionShell({
@@ -45,7 +45,7 @@ export function SessionShell({
   handleUndoLatestRun,
   onSheetChanged,
   onWorkbookStructureChanged,
-  sheets,
+  referenceCacheRevision,
 }: Props) {
   const historyRef = useRef<HTMLDivElement>(null);
 
@@ -102,7 +102,7 @@ export function SessionShell({
           onSheetChanged={onSheetChanged}
           onWorkbookStructureChanged={onWorkbookStructureChanged}
           onStreamingChange={setIsStreaming}
-          sheets={sheets}
+          referenceCacheRevision={referenceCacheRevision}
         />
       ) : (
         <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "#999", fontSize: 13 }}>加载中...</div>

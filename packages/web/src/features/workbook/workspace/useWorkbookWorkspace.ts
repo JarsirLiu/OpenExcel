@@ -9,7 +9,6 @@ import {
 import type { WorkbookFull, WorkbookMeta, SheetSchema } from "../../../api/workbooks";
 import { patchWorkbookWithDelta } from "../utils/patchWorkbook";
 import { useWorkbookImportFlow } from "../import/useWorkbookImportFlow";
-import { useWorkbookSheetSummaries } from "./useWorkbookSheetSummaries";
 import { useWorkbookCatalog } from "./useWorkbookCatalog";
 import type { WorkbookCreatedUpdate, WorkbookStructureUpdate } from "../../chat/hooks/useSheetPatchSync";
 
@@ -54,11 +53,10 @@ export function useWorkbookWorkspace() {
   } = useWorkbookCatalog();
 
   const [currentSheetIndex, setCurrentSheetIndex] = useState(0);
-  const [sheetSummaryRevision, setSheetSummaryRevision] = useState(0);
-  const allSheets = useWorkbookSheetSummaries(sheetSummaryRevision);
+  const [referenceCacheRevision, setReferenceCacheRevision] = useState(0);
 
-  const refreshSheetSummaries = useCallback(() => {
-    setSheetSummaryRevision((revision) => revision + 1);
+  const invalidateReferenceCache = useCallback(() => {
+    setReferenceCacheRevision((revision) => revision + 1);
   }, []);
 
   const refreshCurrentWorkbook = useCallback(async () => {
@@ -93,7 +91,7 @@ export function useWorkbookWorkspace() {
   }, [currentWorkbook, replaceCurrentWorkbook]);
 
   const handleWorkbookStructureChanged = useCallback(async (update: WorkbookStructureUpdate) => {
-    refreshSheetSummaries();
+    invalidateReferenceCache();
 
     if (update.kind === "workbook-created") {
       const list = await fetchWorkbooks();
@@ -132,7 +130,7 @@ export function useWorkbookWorkspace() {
     replaceCurrentWorkbook(nextWorkbook);
     const nextIndex = nextWorkbook.sheets.findIndex((sheet) => sheet.id === update.sheetId);
     setCurrentSheetIndex(nextIndex >= 0 ? nextIndex : Math.min(update.order, nextWorkbook.sheets.length - 1));
-  }, [currentWorkbook?.id, refreshSheetSummaries, replaceCurrentWorkbook, setCurrentSheetIndex, setWorkbookIdx, setWorkbooks]);
+  }, [currentWorkbook?.id, invalidateReferenceCache, replaceCurrentWorkbook, setCurrentSheetIndex, setWorkbookIdx, setWorkbooks]);
 
   const handleSwitchWorkbook = useCallback(async (index: number) => {
     await switchWorkbook(index);
@@ -160,7 +158,7 @@ export function useWorkbookWorkspace() {
       const list = await fetchWorkbooks();
       const safeList = Array.isArray(list) ? sortWorkbooks(list) : [];
       setWorkbooks(safeList);
-      refreshSheetSummaries();
+      invalidateReferenceCache();
       const idx = safeList.findIndex((wb) => wb.id === result.id);
       if (idx >= 0) {
         setWorkbookIdx(idx);
@@ -173,14 +171,14 @@ export function useWorkbookWorkspace() {
       const message = error instanceof Error ? error.message : "上传失败";
       setStatus(`上传失败：${message}`);
     }
-  }, [refreshSheetSummaries, replaceCurrentWorkbook, setStatus, setWorkbooks, setWorkbookIdx]);
+  }, [invalidateReferenceCache, replaceCurrentWorkbook, setStatus, setWorkbooks, setWorkbookIdx]);
 
   const handleWorkbookDelete = useCallback(async (workbookId: number) => {
     await deleteWorkbook(workbookId);
     const list = await fetchWorkbooks();
     const safeList = Array.isArray(list) ? sortWorkbooks(list) : [];
     setWorkbooks(safeList);
-    refreshSheetSummaries();
+    invalidateReferenceCache();
     const remaining = safeList.filter((wb) => wb.id !== workbookId);
     if (remaining.length > 0) {
       setWorkbookIdx(0);
@@ -192,7 +190,7 @@ export function useWorkbookWorkspace() {
       replaceCurrentWorkbook(null);
     }
     setStatus("已删除");
-  }, [refreshSheetSummaries, replaceCurrentWorkbook, setStatus, setWorkbooks, setWorkbookIdx]);
+  }, [invalidateReferenceCache, replaceCurrentWorkbook, setStatus, setWorkbooks, setWorkbookIdx]);
 
   return {
     workbooks,
@@ -205,7 +203,6 @@ export function useWorkbookWorkspace() {
     importPreview,
     importSheetIndex,
     importing,
-    allSheets,
     setCurrentSheetIndex,
     setImportSheetIndex,
     handleSheetChanged,
@@ -217,5 +214,6 @@ export function useWorkbookWorkspace() {
     handleImportCancel,
     handleNewWorkbookFileChange,
     handleWorkbookDelete,
+    referenceCacheRevision,
   };
 }

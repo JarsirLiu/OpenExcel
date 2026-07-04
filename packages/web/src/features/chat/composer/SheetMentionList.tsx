@@ -10,7 +10,7 @@ type MentionItem = {
   workbookName: string;
 };
 
-type WorkbookSource = {
+export type WorkbookSource = {
   workbookId: number;
   workbookName: string;
   sheetId: number;
@@ -457,16 +457,16 @@ export const MentionList = forwardRef<
 });
 
 export function createMentionSuggestion(
-  getSheets: () => WorkbookSource[],
+  loadSheets: (signal: AbortSignal) => Promise<WorkbookSource[]>,
   options?: { onOpenChange?: (open: boolean) => void },
 ) {
   return {
     char: "@",
-    items: ({ query }: { query: string }) => {
+    items: async ({ query, signal }: { query: string; signal: AbortSignal }) => {
       const normalized = query.toLowerCase();
       const grouped = new Map<number, WorkbookSource[]>();
 
-      for (const sheet of getSheets()) {
+      for (const sheet of await loadSheets(signal)) {
         const list = grouped.get(sheet.workbookId);
         if (list) {
           list.push(sheet);

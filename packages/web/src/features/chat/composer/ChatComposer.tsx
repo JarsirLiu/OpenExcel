@@ -14,23 +14,21 @@ const StopIcon = ({ size = 14 }: { size?: number }) => (
   </svg>
 );
 
-type SheetMeta = { workbookId: number; workbookName: string; id: number; name: string };
-
 export function ChatComposer({
-  sheets,
   isStreaming,
   onSend,
   onStop,
+  referenceCacheRevision,
 }: {
-  sheets: SheetMeta[];
   isStreaming: boolean;
   onSend: (text: string) => void;
   onStop: () => void;
+  referenceCacheRevision: number;
 }) {
   const { editor, editorText, handleSend } = useChatComposer({
-    sheets,
     isStreaming,
     onSend,
+    referenceCacheRevision,
   });
 
   return (

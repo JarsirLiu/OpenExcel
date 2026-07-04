@@ -2,24 +2,57 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Mention from "@tiptap/extension-mention";
-import { createMentionSuggestion } from "./SheetMentionList";
-
-type SheetMeta = { workbookId: number; workbookName: string; id: number; name: string };
+import { fetchWorkbookReferenceCandidates } from "../../../api/workbooks";
+import { createMentionSuggestion, type WorkbookSource } from "./SheetMentionList";
 
 export function useChatComposer({
-  sheets,
   isStreaming,
   onSend,
+  referenceCacheRevision,
 }: {
-  sheets: SheetMeta[];
   isStreaming: boolean;
   onSend: (text: string) => void;
+  referenceCacheRevision: number;
 }) {
   const editorRef = useRef<any>(null);
   const [editorText, setEditorText] = useState("");
   const [isMentionOpen, setIsMentionOpen] = useState(false);
   const isMentionOpenRef = useRef(false);
-  const sheetsRef = useRef(sheets);
+  const cachedSheetsRef = useRef<WorkbookSource[] | null>(null);
+  const inflightSheetsRef = useRef<Promise<WorkbookSource[]> | null>(null);
+  const cacheRevisionRef = useRef(referenceCacheRevision);
+
+  useEffect(() => {
+    if (cacheRevisionRef.current === referenceCacheRevision) return;
+    cacheRevisionRef.current = referenceCacheRevision;
+    cachedSheetsRef.current = null;
+    inflightSheetsRef.current = null;
+  }, [referenceCacheRevision]);
+
+  const loadWorkbookSources = useCallback(async (signal: AbortSignal) => {
+    if (cachedSheetsRef.current) {
+      return cachedSheetsRef.current;
+    }
+
+    if (!inflightSheetsRef.current) {
+      inflightSheetsRef.current = fetchWorkbookReferenceCandidates({ signal }).then((workbooks) => {
+        const sheets = workbooks.flatMap((wb) =>
+          wb.sheets.map((sheet) => ({
+            workbookId: wb.id,
+            workbookName: wb.name,
+            sheetId: sheet.id,
+            sheetName: sheet.name,
+          })),
+        );
+        cachedSheetsRef.current = sheets;
+        return sheets;
+      }).finally(() => {
+        inflightSheetsRef.current = null;
+      });
+    }
+
+    return inflightSheetsRef.current;
+  }, []);
 
   const handleSend = useCallback(() => {
     const editor = editorRef.current;
@@ -37,12 +70,7 @@ export function useChatComposer({
       Mention.configure({
         HTMLAttributes: { class: "mention" },
         suggestion: createMentionSuggestion(
-          () => sheetsRef.current.map((sheet) => ({
-            workbookId: sheet.workbookId,
-            workbookName: sheet.workbookName,
-            sheetId: sheet.id,
-            sheetName: sheet.name,
-          })),
+          loadWorkbookSources,
           {
           onOpenChange: setIsMentionOpen,
           },
@@ -78,10 +106,6 @@ export function useChatComposer({
   useEffect(() => {
     isMentionOpenRef.current = isMentionOpen;
   }, [isMentionOpen]);
-
-  useEffect(() => {
-    sheetsRef.current = sheets;
-  }, [sheets]);
 
   return {
     editor,

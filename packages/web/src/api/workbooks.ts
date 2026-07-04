@@ -60,8 +60,8 @@ export async function fetchWorkbooks(): Promise<WorkbookMeta[]> {
   return res.json();
 }
 
-export async function fetchWorkbookReferenceCandidates(): Promise<WorkbookReferenceCandidate[]> {
-  const res = await apiFetch("/workbooks/reference-candidates");
+export async function fetchWorkbookReferenceCandidates(options?: { signal?: AbortSignal }): Promise<WorkbookReferenceCandidate[]> {
+  const res = await apiFetch("/workbooks/reference-candidates", options?.signal ? { signal: options.signal } : {});
   if (!res.ok) throw new Error("加载引用候选失败");
   return res.json();
 }

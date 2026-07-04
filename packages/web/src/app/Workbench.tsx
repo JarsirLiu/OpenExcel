@@ -14,7 +14,7 @@ export function Workbench() {
     importPreview,
     importSheetIndex,
     importing,
-    allSheets,
+    referenceCacheRevision,
     setCurrentSheetIndex,
     setImportSheetIndex,
     handleSheetChanged,
@@ -52,13 +52,13 @@ export function Workbench() {
         handleWorkbookDelete={handleWorkbookDelete}
         handleWorkbookStructureChanged={handleWorkbookStructureChanged}
         handleWorkbookRefresh={handleWorkbookRefresh}
-      />
+        />
       </div>
       <ChatSidebar
         onSheetChanged={handleSheetChanged}
         onWorkbookStructureChanged={handleWorkbookStructureChanged}
         onUndoComplete={handleWorkbookRefresh}
-        sheets={allSheets}
+        referenceCacheRevision={referenceCacheRevision}
       />
     </div>
   );
