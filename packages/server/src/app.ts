@@ -1,6 +1,7 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
+import { workspaceRoutes } from "./modules/workspaces/routes.js";
 import { workbookRoutes } from "./modules/workbooks/routes.js";
 import { sheetRoutes } from "./modules/sheets/routes.js";
 import { sessionRoutes } from "./modules/sessions/routes.js";
@@ -21,6 +22,7 @@ export async function createApp() {
 
   await app.register(cors, { origin: true });
   await app.register(multipart);
+  await app.register(workspaceRoutes);
   await app.register(workbookRoutes);
   await app.register(sheetRoutes);
   await app.register(sessionRoutes);

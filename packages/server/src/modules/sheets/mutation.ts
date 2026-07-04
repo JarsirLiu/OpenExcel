@@ -1,6 +1,6 @@
 import * as repo from "./repository.js";
 
-export async function updateSheetData(sheetId: number, celldata: any[], config?: any) {
+export async function updateSheetData(workspaceId: number, sheetId: number, celldata: any[], config?: any) {
   if (!Array.isArray(celldata)) {
     return { error: "Invalid data format" };
   }
@@ -12,6 +12,9 @@ export async function updateSheetData(sheetId: number, celldata: any[], config?:
     data.config = JSON.stringify(config);
   }
 
-  await repo.updateSheetData(sheetId, data);
+  const updated = await repo.updateSheetData(sheetId, data, workspaceId);
+  if (!updated) {
+    return { error: "Sheet not found" };
+  }
   return { success: true };
 }

@@ -1,12 +1,12 @@
 import * as repo from "./repository.js";
 import { deserializeSheet } from "../../shared/utils/sheetSerialization.js";
 
-export async function getWorkbooks() {
-  return repo.findWorkbooks();
+export async function getWorkbooks(workspaceId: number) {
+  return repo.findWorkbooks(workspaceId);
 }
 
-export async function getReferenceCandidates() {
-  const workbooks = await repo.findWorkbooksWithSheets();
+export async function getReferenceCandidates(workspaceId: number) {
+  const workbooks = await repo.findWorkbooksWithSheets(workspaceId);
   return workbooks.map((workbook) => ({
     id: workbook.id,
     name: workbook.name,
@@ -17,8 +17,8 @@ export async function getReferenceCandidates() {
   }));
 }
 
-export async function getWorkbook(id: number) {
-  const wb = await repo.findWorkbookWithSheets(id);
+export async function getWorkbook(id: number, workspaceId: number) {
+  const wb = await repo.findWorkbookWithSheets(id, workspaceId);
   if (!wb) return null;
   return {
     id: wb.id,

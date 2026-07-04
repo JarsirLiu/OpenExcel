@@ -5,6 +5,7 @@ import { useExcelGridWorkspace } from "./useExcelGridWorkspace";
 import type { WorkbookStructureUpdate } from "../../chat/hooks/useSheetPatchSync";
 
 interface Props {
+  workspaceId: number | null;
   workbook: WorkbookFull | null;
   workbookRevision: number;
   currentSheetIndex: number;
@@ -15,6 +16,7 @@ interface Props {
 }
 
 export function ExcelGrid({
+  workspaceId,
   workbook,
   workbookRevision,
   currentSheetIndex,
@@ -35,6 +37,7 @@ export function ExcelGrid({
     handleDownload,
     handleDeleteWorkbook,
   } = useExcelGridWorkspace({
+    workspaceId,
     workbook,
     workbookRevision,
     currentSheetIndex,

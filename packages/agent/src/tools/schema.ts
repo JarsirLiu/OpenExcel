@@ -6,11 +6,16 @@ export type ExcelToolSpec = {
   needsRunContext?: boolean;
 };
 
-export const sheetMutationContextSchema = z.object({
+export const workspaceToolContextSchema = z.object({
+  workspaceId: z.coerce.number().int().positive(),
+});
+
+export const runToolContextSchema = workspaceToolContextSchema.extend({
   runId: z.coerce.number().int().positive(),
 });
 
-export type SheetMutationContext = z.infer<typeof sheetMutationContextSchema>;
+export type WorkspaceToolContext = z.infer<typeof workspaceToolContextSchema>;
+export type RunToolContext = z.infer<typeof runToolContextSchema>;
 
 export const excelToolSpecs = {
   createWorkbook: {

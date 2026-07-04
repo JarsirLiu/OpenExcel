@@ -1,4 +1,4 @@
-import { excelToolSpecs, sheetMutationContextSchema } from "@openexcel/agent";
+import { excelToolSpecs, runToolContextSchema } from "@openexcel/agent";
 import { prisma } from "../../../infra/db.js";
 import {
   sheetChangeCellToZeroBased,
@@ -17,14 +17,18 @@ import { sheetRecordToCelldata } from "../../../shared/utils/sheetData.js";
 
 export const writeCells = {
   ...excelToolSpecs.writeCells,
-  contextSchema: sheetMutationContextSchema,
+  contextSchema: runToolContextSchema,
   execute: async (
     input: WriteCellsInput,
-    { context }: { context: { runId: number } },
+    { context }: { context: { runId: number; workspaceId: number } },
   ) => {
     const { sheetId, operations } = normalizeWriteOperations(input);
-    const sheet = await prisma.sheet.findUnique({ where: { id: sheetId } });
+    const sheet = await prisma.sheet.findFirst({
+      where: { id: sheetId },
+      include: { workbook: true },
+    });
     if (!sheet) throw new Error(`Sheet ${sheetId} 不存在`);
+    if (sheet.workbook.workspaceId !== context.workspaceId) throw new Error(`Sheet ${sheetId} 不存在`);
 
     await repo.upsertRunSheetSnapshot({
       runId: context.runId,

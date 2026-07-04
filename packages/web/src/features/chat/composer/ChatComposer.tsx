@@ -19,16 +19,19 @@ export function ChatComposer({
   onSend,
   onStop,
   referenceCacheRevision,
+  workspaceId,
 }: {
   isStreaming: boolean;
   onSend: (text: string) => void;
   onStop: () => void;
   referenceCacheRevision: number;
+  workspaceId: number;
 }) {
   const { editor, editorText, handleSend } = useChatComposer({
     isStreaming,
     onSend,
     referenceCacheRevision,
+    workspaceId,
   });
 
   return (

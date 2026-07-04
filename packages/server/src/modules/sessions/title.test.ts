@@ -91,14 +91,14 @@ describe("generateSessionTitleForSession", () => {
       name: "新对话",
     });
 
-    const title = await generateSessionTitleForSession(1, "分析这些数据");
+    const title = await generateSessionTitleForSession(1, 1, "分析这些数据");
 
     expect(mockCreateTitleModel).toHaveBeenCalledWith({
       baseUrl: "http://test.local",
       apiKey: "test-key",
       modelName: "test-model",
     });
-    expect(mockUpdateSession).toHaveBeenCalledWith(1, { name: "数据分析" });
+    expect(mockUpdateSession).toHaveBeenCalledWith(1, { name: "数据分析" }, 1);
     expect(title).toBe("数据分析");
   });
 
@@ -108,7 +108,7 @@ describe("generateSessionTitleForSession", () => {
       name: "已有标题",
     });
 
-    const title = await generateSessionTitleForSession(1, "分析这些数据");
+    const title = await generateSessionTitleForSession(1, 1, "分析这些数据");
 
     expect(title).toBe("已有标题");
     expect(mockGenerateText).not.toHaveBeenCalled();

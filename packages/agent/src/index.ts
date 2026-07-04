@@ -9,9 +9,13 @@ export { historyFromRuns } from "./session/transcript.js";
 export {
   buildExcelToolCatalog,
   buildExcelToolContext,
+  buildRunToolContext,
+  buildWorkspaceToolContext,
   excelToolSpecs,
-  sheetMutationContextSchema,
+  runToolContextSchema,
+  workspaceToolContextSchema,
   type ExcelToolName,
-  type SheetMutationContext,
+  type RunToolContext,
+  type WorkspaceToolContext,
 } from "./tools/index.js";
 export { streamChat, type StreamChatInput } from "./runtime/streamChat.js";

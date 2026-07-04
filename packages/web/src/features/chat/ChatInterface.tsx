@@ -8,17 +8,20 @@ export function ChatInterface({
   onWorkbookStructureChanged,
   onUndoComplete,
   referenceCacheRevision,
+  workspaceId,
 }: {
   onSheetChanged?: (sheetId: number, delta: SheetChangeDelta | null) => void;
   onWorkbookStructureChanged?: (update: WorkbookStructureUpdate) => void;
   onUndoComplete?: () => void;
   referenceCacheRevision: number;
+  workspaceId: number | null;
 }) {
-  const sessionWorkspace = useSessionWorkspace(onUndoComplete);
+  const sessionWorkspace = useSessionWorkspace(workspaceId, onUndoComplete);
 
   return (
     <SessionShell
       {...sessionWorkspace}
+      workspaceId={workspaceId}
       onSheetChanged={onSheetChanged}
       onWorkbookStructureChanged={onWorkbookStructureChanged}
       referenceCacheRevision={referenceCacheRevision}

@@ -8,12 +8,16 @@ datasource db {
 }
 
 model Workbook {
-  id        Int      @id @default(autoincrement())
-  name      String
-  order     Int
-  sheets    Sheet[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          Int       @id @default(autoincrement())
+  workspaceId Int
+  name        String
+  order       Int
+  sheets      Sheet[]
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([workspaceId])
 }
 
 model Sheet {
@@ -32,14 +36,30 @@ model Sheet {
   updatedAt    DateTime @updatedAt
 }
 
-model Session {
+model Workspace {
   id        Int       @id @default(autoincrement())
-  sheetId   Int?
   name      String
-  chatMessages String? @default("[]")
-  sheet     Sheet?    @relation(fields: [sheetId], references: [id], onDelete: Cascade)
-  runs      AgentRun[]
+  order     Int
+  workbooks Workbook[]
+  sessions  Session[]
   createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([order])
+}
+
+model Session {
+  id            Int       @id @default(autoincrement())
+  workspaceId   Int
+  sheetId       Int?
+  name          String
+  chatMessages  String?   @default("[]")
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  sheet         Sheet?    @relation(fields: [sheetId], references: [id], onDelete: SetNull)
+  runs          AgentRun[]
+  createdAt     DateTime  @default(now())
+
+  @@index([workspaceId])
 }
 
 model AgentRun {

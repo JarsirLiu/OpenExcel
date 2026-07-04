@@ -1,12 +1,13 @@
 import {
   buildSystemPrompt,
   buildExcelToolCatalog,
-  buildExcelToolContext,
+  buildRunToolContext,
+  buildWorkspaceToolContext,
   streamChat as streamAgentChat,
 } from "@openexcel/agent";
 import * as repo from "../repository.js";
 import * as runRepo from "../runs/repository.js";
-import { buildWorkplaceContext } from "./context.js";
+import { buildWorkspaceContext } from "./context.js";
 import { persistSessionMessages } from "../transcript.js";
 import { workbookTools } from "../../workbooks/tools/index.js";
 import { excelTools } from "../../sheets/tools/index.js";
@@ -47,16 +48,17 @@ function serializeJson(value: unknown): string | null {
 }
 
 export async function streamChat(
+  workspaceId: number,
   sessionId: number,
   messages: any[],
   abortSignal?: AbortSignal,
 ) {
-  const session = await repo.findSession(sessionId);
+  const session = await repo.findSession(sessionId, workspaceId);
   if (!session) throw new Error("Session not found");
 
   const config = loadModelConfig();
-  const workplaceContext = await buildWorkplaceContext();
-  const systemPrompt = buildSystemPrompt(workplaceContext, buildExcelToolCatalog());
+  const workspaceContext = await buildWorkspaceContext(workspaceId);
+  const systemPrompt = buildSystemPrompt(workspaceContext, buildExcelToolCatalog());
   const inputText = extractLatestUserText(messages);
 
   const run = await runRepo.createRun({
@@ -66,7 +68,10 @@ export async function streamChat(
     systemPrompt,
     inputText,
   });
-  const toolsContext = buildExcelToolContext(run.id);
+  const toolsContext = {
+    ...buildWorkspaceToolContext(workspaceId),
+    ...buildRunToolContext(run.id, workspaceId),
+  };
 
   let finalized = false;
   let stepOrder = 0;
@@ -134,13 +139,13 @@ export async function streamChat(
       },
       onEnd: async ({ messages: newMessages }) => {
         try {
-          await persistSessionMessages(sessionId, newMessages);
+          await persistSessionMessages(workspaceId, sessionId, newMessages);
         } catch (error) {
           console.error(`[session] Failed to persist transcript for session ${sessionId}:`, error);
         }
 
         try {
-          await runRepo.pruneUndoSnapshots(sessionId);
+          await runRepo.pruneUndoSnapshots(workspaceId, sessionId);
         } catch (error) {
           console.error(`[session] Failed to prune undo snapshots for session ${sessionId}:`, error);
         }

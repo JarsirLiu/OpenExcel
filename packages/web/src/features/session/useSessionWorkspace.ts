@@ -11,7 +11,7 @@ import { getFirstUserText } from "./utils";
 
 type UndoState = "idle" | "loading" | "success" | "error";
 
-export function useSessionWorkspace(onUndoComplete?: () => void) {
+export function useSessionWorkspace(workspaceId: number | null, onUndoComplete?: () => void) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<number | null>(null);
   const [initialMessages, setInitialMessages] = useState<any[]>([]);
@@ -22,13 +22,13 @@ export function useSessionWorkspace(onUndoComplete?: () => void) {
   const [isStreaming, setIsStreaming] = useState(false);
 
   const refreshSessions = useCallback(async () => {
-    const list = await fetchSessions();
-    if (list.length === 0) {
-      const session = await createSession();
-      setSessions([session]);
-      setCurrentSessionId(session.id);
-      return [session];
+    if (workspaceId == null) {
+      setSessions([]);
+      setCurrentSessionId(null);
+      return [];
     }
+
+    const list = await fetchSessions(workspaceId);
 
     setSessions(list);
     setCurrentSessionId((prev) => {
@@ -38,7 +38,7 @@ export function useSessionWorkspace(onUndoComplete?: () => void) {
       return list[0]?.id ?? null;
     });
     return list;
-  }, []);
+  }, [workspaceId]);
 
   useEffect(() => {
     void refreshSessions();
@@ -50,8 +50,8 @@ export function useSessionWorkspace(onUndoComplete?: () => void) {
 
     const loadInitialMessages = async () => {
       try {
-        if (currentSessionId) {
-          const msgs = await fetchChatMessages(currentSessionId);
+        if (workspaceId != null && currentSessionId) {
+          const msgs = await fetchChatMessages(workspaceId, currentSessionId);
           if (!cancelled) {
             setInitialMessages(msgs);
           }
@@ -69,7 +69,7 @@ export function useSessionWorkspace(onUndoComplete?: () => void) {
     return () => {
       cancelled = true;
     };
-  }, [currentSessionId]);
+  }, [currentSessionId, workspaceId]);
 
   useEffect(() => {
     setUndoState("idle");
@@ -83,11 +83,12 @@ export function useSessionWorkspace(onUndoComplete?: () => void) {
   }, [undoState]);
 
   const handleNewSession = useCallback(async () => {
-    const session = await createSession();
+    if (workspaceId == null) return;
+    const session = await createSession(workspaceId);
     setSessions((prev) => [session, ...prev.filter((item) => item.id !== session.id)]);
     setCurrentSessionId(session.id);
     setHistoryOpen(false);
-  }, []);
+  }, [workspaceId]);
 
   const handleSelectSession = useCallback((id: number) => {
     setCurrentSessionId(id);
@@ -95,15 +96,18 @@ export function useSessionWorkspace(onUndoComplete?: () => void) {
   }, []);
 
   const handleDeleteSession = useCallback(async (id: number) => {
-    await deleteSession(id);
+    if (workspaceId == null) return;
+    await deleteSession(workspaceId, id);
     await refreshSessions();
-  }, [refreshSessions]);
+  }, [refreshSessions, workspaceId]);
 
   const handleRunComplete = useCallback(async (sessionId: number, finishedMessages: any[]) => {
     const firstUserText = getFirstUserText(finishedMessages).trim();
     try {
       if (firstUserText) {
-        await generateSessionTitle(sessionId, firstUserText);
+        if (workspaceId != null) {
+          await generateSessionTitle(workspaceId, sessionId, firstUserText);
+        }
       }
     } catch (error) {
       console.error("[session] Failed to generate session title:", error);
@@ -114,21 +118,22 @@ export function useSessionWorkspace(onUndoComplete?: () => void) {
     } catch (error) {
       console.error("[session] Failed to refresh sessions after title update:", error);
     }
-  }, [refreshSessions]);
+  }, [refreshSessions, workspaceId]);
 
   const handleUndoLatestRun = useCallback(async () => {
     if (!currentSessionId || undoState === "loading" || isStreaming) return;
+    if (workspaceId == null) return;
     setUndoState("loading");
     setUndoError("");
     try {
-      await undoLatestChatRun(currentSessionId);
+      await undoLatestChatRun(workspaceId, currentSessionId);
       setUndoState("success");
       onUndoComplete?.();
     } catch (error) {
       setUndoState("error");
       setUndoError(error instanceof Error ? error.message : "撤销本轮修改失败");
     }
-  }, [currentSessionId, isStreaming, onUndoComplete, undoState]);
+  }, [currentSessionId, isStreaming, onUndoComplete, undoState, workspaceId]);
 
   return {
     sessions,

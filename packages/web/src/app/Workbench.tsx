@@ -1,8 +1,10 @@
 import { ChatSidebar } from "../features/chat/ChatSidebar";
 import { WorkbookWorkspace } from "../features/workbook/workspace/WorkbookWorkspace";
 import { useWorkbookWorkspace } from "../features/workbook/workspace/useWorkbookWorkspace";
+import { useWorkspaceState } from "../features/workspace/useWorkspaceState";
 
 export function Workbench() {
+  const { activeWorkspaceId, loading: workspaceLoading } = useWorkspaceState();
   const {
     workbooks,
     workbookIdx,
@@ -26,18 +28,19 @@ export function Workbench() {
     handleImportCancel,
     handleNewWorkbookFileChange,
     handleWorkbookDelete,
-  } = useWorkbookWorkspace();
+  } = useWorkbookWorkspace(activeWorkspaceId);
 
   return (
     <div style={{ height: "100vh", display: "flex", overflow: "hidden" }}>
       <div style={{ flex: 1, minWidth: 0 }}>
         <WorkbookWorkspace
+          workspaceId={activeWorkspaceId}
           workbooks={workbooks}
           workbookIdx={workbookIdx}
           currentWorkbook={currentWorkbook}
           workbookRevision={workbookRevision}
           status={status}
-          loading={loading}
+          loading={loading || workspaceLoading}
           currentSheetIndex={currentSheetIndex}
           importPreview={importPreview}
           importSheetIndex={importSheetIndex}
@@ -55,6 +58,7 @@ export function Workbench() {
         />
       </div>
       <ChatSidebar
+        workspaceId={activeWorkspaceId}
         onSheetChanged={handleSheetChanged}
         onWorkbookStructureChanged={handleWorkbookStructureChanged}
         onUndoComplete={handleWorkbookRefresh}

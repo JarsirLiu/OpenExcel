@@ -20,8 +20,8 @@ function trim(messages: { role: string; content: string }[]): { role: "user" | "
   return messages.slice(-MAX_TURNS * 2) as any;
 }
 
-export async function buildWorkplaceContext(): Promise<string> {
-  const workbooks = await workbookRepo.findWorkbooksWithSheets();
+export async function buildWorkspaceContext(workspaceId: number): Promise<string> {
+  const workbooks = await workbookRepo.findWorkbooksWithSheets(workspaceId);
   return buildAgentWorkspaceContext(
     workbooks.map((workbook: (typeof workbooks)[number]) => ({
       id: workbook.id,

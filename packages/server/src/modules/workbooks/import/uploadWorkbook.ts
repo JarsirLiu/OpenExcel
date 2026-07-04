@@ -82,8 +82,8 @@ export function resolveWorkbookImportTargets(currentSheetNames: string[], upload
   };
 }
 
-export async function uploadExcel(workbookId: number, buffer: Buffer) {
-  const workbook = await repo.findWorkbookWithSheets(workbookId);
+export async function uploadExcel(workspaceId: number, workbookId: number, buffer: Buffer) {
+  const workbook = await repo.findWorkbookWithSheets(workbookId, workspaceId);
   if (!workbook) {
     throw new WorkbookUploadError("当前工作簿不存在", "WORKBOOK_NOT_FOUND", 404);
   }
@@ -129,7 +129,7 @@ export async function uploadExcel(workbookId: number, buffer: Buffer) {
   };
 }
 
-export async function uploadAsNewWorkbook(buffer: Buffer, fileName: string) {
+export async function uploadAsNewWorkbook(workspaceId: number, buffer: Buffer, fileName: string) {
   const wbFile = readWorkbookOrThrow(buffer);
   const sheetNames = wbFile.SheetNames;
   const { excelToGrid } = await import("@openexcel/core");
@@ -137,10 +137,13 @@ export async function uploadAsNewWorkbook(buffer: Buffer, fileName: string) {
   const wbName = fileName.replace(/\.[^.]+$/, "");
 
   return prisma.$transaction(async (tx) => {
-    const maxOrder = await tx.workbook.aggregate({ _max: { order: true } });
+    const maxOrder = await tx.workbook.aggregate({
+      where: { workspaceId },
+      _max: { order: true },
+    });
     const nextOrder = (maxOrder._max.order ?? -1) + 1;
     const wb = await tx.workbook.create({
-      data: { name: wbName, order: nextOrder },
+      data: { workspaceId, name: wbName, order: nextOrder },
     });
 
     for (let i = 0; i < sheetNames.length; i++) {

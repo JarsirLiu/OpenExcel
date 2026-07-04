@@ -1,7 +1,7 @@
 import * as repo from "./repository.js";
 
-export async function undoLatestRun(sessionId: number) {
-  const run = await repo.findLatestUndoableRun(sessionId);
+export async function undoLatestRun(workspaceId: number, sessionId: number) {
+  const run = await repo.findLatestUndoableRun(workspaceId, sessionId);
   if (!run) {
     throw new Error("没有可撤销的本轮修改");
   }

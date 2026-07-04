@@ -543,41 +543,42 @@ The API surface should stay explicit.
 
 ### 8.1 Workbook APIs
 
-- `GET /api/workbooks`
-- `GET /api/workbooks/:id`
-- `POST /api/workbooks/upload`
-- `POST /api/workbooks/:id/upload`
-- `POST /api/workbooks/:id/sheets`
-- `DELETE /api/workbooks/:id/sheets/:sheetId`
+- `GET /api/workspaces/:workspaceId/workbooks`
+- `GET /api/workspaces/:workspaceId/workbooks/:id`
+- `POST /api/workspaces/:workspaceId/workbooks`
+- `POST /api/workspaces/:workspaceId/workbooks/upload`
+- `POST /api/workspaces/:workspaceId/workbooks/:id/upload`
+- `POST /api/workspaces/:workspaceId/workbooks/:workbookId/sheets`
+- `DELETE /api/workspaces/:workspaceId/workbooks/:workbookId/sheets/:sheetId`
 
 ### 8.2 Sheet APIs
 
-- `PATCH /api/sheets/:id`
-- `GET /api/sheets/:id`
+- `PATCH /api/workspaces/:workspaceId/sheets/:id`
+- `GET /api/workspaces/:workspaceId/sheets/:id`
 
 ### 8.3 Session APIs
 
-- `GET /api/sessions`
-- `POST /api/sessions`
-- `DELETE /api/sessions/:id`
-- `PATCH /api/sessions/:id`
+- `GET /api/workspaces/:workspaceId/sessions`
+- `POST /api/workspaces/:workspaceId/sessions`
+- `DELETE /api/workspaces/:workspaceId/sessions/:id`
+- `PATCH /api/workspaces/:workspaceId/sessions/:id`
 
 ### 8.4 Chat APIs
 
-- `GET /api/sessions/:sessionId/messages`
-- `GET /api/sessions/:sessionId/runs`
-- `POST /api/sessions/:sessionId/chat`
-- `POST /api/sessions/:sessionId/runs/undo-latest`
+- `GET /api/workspaces/:workspaceId/sessions/:sessionId/messages`
+- `GET /api/workspaces/:workspaceId/sessions/:sessionId/runs`
+- `POST /api/workspaces/:workspaceId/sessions/:sessionId/chat`
+- `POST /api/workspaces/:workspaceId/sessions/:sessionId/runs/undo-latest`
 
 ### 8.5 Title APIs
 
-- `POST /api/sessions/:sessionId/title`
+- `POST /api/workspaces/:workspaceId/sessions/:sessionId/title`
 
 Title must remain a separate endpoint.
 
 ### 8.6 Workspace Context APIs
 
-- `GET /api/workbooks/reference-candidates`
+- `GET /api/workspaces/:workspaceId/workbooks/reference-candidates`
 
 This endpoint backs `@` mention suggestions in the chat composer.
 It should load on demand instead of being fetched during workbook bootstrap, so ordinary workbook open/delete flows stay fast.

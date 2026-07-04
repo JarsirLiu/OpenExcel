@@ -3,6 +3,7 @@ import type { WorkbookFull } from "../../../api/workbooks";
 import type { WorkbookStructureUpdate } from "../../chat/hooks/useSheetPatchSync";
 
 interface Props {
+  workspaceId: number | null;
   workbook: WorkbookFull | null;
   workbookRevision: number;
   currentSheetIndex: number;
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export function ExcelWorkspace({
+  workspaceId,
   workbook,
   workbookRevision,
   currentSheetIndex,
@@ -24,6 +26,7 @@ export function ExcelWorkspace({
   return (
     <div style={{ flex: 1, minWidth: 0, overflow: "hidden", borderRight: "1px solid #e0e4ea" }}>
       <ExcelGrid
+        workspaceId={workspaceId}
         workbook={workbook}
         workbookRevision={workbookRevision}
         currentSheetIndex={currentSheetIndex}

@@ -6,11 +6,27 @@ export function buildExcelToolCatalog(): string {
     .join("\n");
 }
 
-export function buildExcelToolContext(runId: number): Record<string, { runId: number }> {
+export function buildWorkspaceToolContext(workspaceId: number): Record<string, { workspaceId: number }> {
+  const entries = Object.entries(excelToolSpecs) as Array<[ExcelToolName, ExcelToolSpec]>;
+  return Object.fromEntries(
+    entries
+      .filter(([, tool]) => tool.needsRunContext !== true)
+      .map(([name]) => [name, { workspaceId }]),
+  ) as Record<string, { workspaceId: number }>;
+}
+
+export function buildRunToolContext(runId: number, workspaceId: number): Record<string, { runId: number; workspaceId: number }> {
   const entries = Object.entries(excelToolSpecs) as Array<[ExcelToolName, ExcelToolSpec]>;
   return Object.fromEntries(
     entries
       .filter(([, tool]) => tool.needsRunContext === true)
-      .map(([name]) => [name, { runId }]),
-  ) as Record<string, { runId: number }>;
+      .map(([name]) => [name, { runId, workspaceId }]),
+  ) as Record<string, { runId: number; workspaceId: number }>;
+}
+
+export function buildExcelToolContext(runId: number, workspaceId: number): Record<string, { runId?: number; workspaceId: number }> {
+  return {
+    ...buildWorkspaceToolContext(workspaceId),
+    ...buildRunToolContext(runId, workspaceId),
+  };
 }

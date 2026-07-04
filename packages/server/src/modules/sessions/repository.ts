@@ -1,29 +1,34 @@
 import { prisma } from "../../infra/db.js";
 
-export async function findGlobalSessions() {
+export async function findSessionsByWorkspace(workspaceId: number) {
   return prisma.session.findMany({
+    where: { workspaceId },
     orderBy: { createdAt: "desc" },
   });
 }
 
-export async function createSession(name: string) {
-  return prisma.session.create({ data: { name, sheetId: null } });
+export async function createSession(workspaceId: number, name: string) {
+  return prisma.session.create({ data: { workspaceId, name, sheetId: null } });
 }
 
-export async function ensureGlobalSession() {
-  const existing = await prisma.session.findFirst({ orderBy: { createdAt: "asc" } });
-  if (existing) return existing;
-  return createSession("全局对话");
+export async function deleteSession(id: number, workspaceId: number) {
+  const session = await prisma.session.findFirst({
+    where: { id, workspaceId },
+  });
+  if (!session) return null;
+  return prisma.session.delete({ where: { id: session.id } });
 }
 
-export async function deleteSession(id: number) {
-  return prisma.session.delete({ where: { id } });
+export async function updateSession(id: number, data: { name?: string; chatMessages?: string }, workspaceId: number) {
+  const session = await prisma.session.findFirst({
+    where: { id, workspaceId },
+  });
+  if (!session) return null;
+  return prisma.session.update({ where: { id: session.id }, data });
 }
 
-export async function updateSession(id: number, data: { name?: string; chatMessages?: string }) {
-  return prisma.session.update({ where: { id }, data });
-}
-
-export async function findSession(id: number) {
-  return prisma.session.findUnique({ where: { id } });
+export async function findSession(id: number, workspaceId: number) {
+  return prisma.session.findFirst({
+    where: { id, workspaceId },
+  });
 }

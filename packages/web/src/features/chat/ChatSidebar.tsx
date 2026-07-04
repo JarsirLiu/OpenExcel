@@ -7,11 +7,13 @@ export function ChatSidebar({
   onWorkbookStructureChanged,
   onUndoComplete,
   referenceCacheRevision,
+  workspaceId,
 }: {
   onSheetChanged?: (sheetId: number, delta: SheetChangeDelta | null) => void;
   onWorkbookStructureChanged?: (update: WorkbookStructureUpdate) => void;
   onUndoComplete?: () => void;
   referenceCacheRevision: number;
+  workspaceId: number | null;
 }) {
   return (
     <div style={{ width: 360, flexShrink: 0, minWidth: 0, overflow: "hidden" }}>
@@ -20,6 +22,7 @@ export function ChatSidebar({
         onWorkbookStructureChanged={onWorkbookStructureChanged}
         onUndoComplete={onUndoComplete}
         referenceCacheRevision={referenceCacheRevision}
+        workspaceId={workspaceId}
       />
     </div>
   );

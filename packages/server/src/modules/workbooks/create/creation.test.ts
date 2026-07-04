@@ -18,7 +18,7 @@ describe("workbook creation helpers", () => {
   it("builds a blank sheet payload", () => {
     const payload = buildBlankSheetInitialization();
 
-    expect(payload.columns).toBe(JSON.stringify([{ label: "A" }]));
+    expect(payload.columns).toBe(JSON.stringify([]));
     expect(payload.merges).toBe(JSON.stringify([]));
     expect(JSON.parse(payload.uploadedData)).toEqual([]);
     expect(payload.config).toBeUndefined();

@@ -7,6 +7,7 @@ import type { WorkbookStructureUpdate } from "./useSheetPatchSync";
 
 export function useChatConversation({
   sessionId,
+  workspaceId,
   initialMessages,
   onRunComplete,
   onSheetChanged,
@@ -14,6 +15,7 @@ export function useChatConversation({
   onStreamingChange,
 }: {
   sessionId: number;
+  workspaceId: number;
   initialMessages: any[];
   onRunComplete?: (messages: any[]) => void;
   onSheetChanged?: (sheetId: number, delta: SheetChangeDelta | null) => void;
@@ -21,8 +23,8 @@ export function useChatConversation({
   onStreamingChange?: (isStreaming: boolean) => void;
 }) {
   const transport = useMemo(() => new DefaultChatTransport({
-    api: `/api/sessions/${sessionId}/chat`,
-  }), [sessionId]);
+    api: `/api/workspaces/${workspaceId}/sessions/${sessionId}/chat`,
+  }), [sessionId, workspaceId]);
 
   const { messages, sendMessage, status, stop, error } = useChat({
     id: String(sessionId),

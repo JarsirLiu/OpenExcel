@@ -1,8 +1,8 @@
-import * as repo from "../repository.js";
 import { buildBlankSheetInitialization, buildSourceSheetInitialization, normalizeSheetName, WorkbookCreationError } from "./creation.js";
+import * as repo from "../repository.js";
 
-export async function createSheet(workbookId: number, name?: string, sourceSheetId?: number) {
-  const workbook = await repo.findWorkbookWithSheets(workbookId);
+export async function createSheet(workspaceId: number, workbookId: number, name?: string, sourceSheetId?: number) {
+  const workbook = await repo.findWorkbookWithSheets(workbookId, workspaceId);
   if (!workbook) return null;
 
   const sourceSheet = sourceSheetId != null

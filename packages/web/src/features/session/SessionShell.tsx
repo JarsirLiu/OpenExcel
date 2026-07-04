@@ -7,6 +7,7 @@ import type { Session } from "../../api/sessions";
 import type { WorkbookStructureUpdate } from "../chat/hooks/useSheetPatchSync";
 
 type Props = {
+  workspaceId: number | null;
   sessions: Session[];
   currentSessionId: number | null;
   initialMessages: any[];
@@ -28,6 +29,7 @@ type Props = {
 };
 
 export function SessionShell({
+  workspaceId,
   sessions,
   currentSessionId,
   initialMessages,
@@ -61,6 +63,17 @@ export function SessionShell({
   }, [historyOpen, setHistoryOpen]);
 
   const currentSession = sessions.find((session) => session.id === currentSessionId);
+
+  if (workspaceId == null) {
+    return (
+      <div style={{
+        display: "flex", flexDirection: "column", height: "100%", background: "#fff",
+        borderLeft: "1px solid #e8e8e8", overflow: "hidden", position: "relative",
+      }}>
+        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "#999", fontSize: 13 }}>加载工作区中...</div>
+      </div>
+    );
+  }
 
   return (
     <div style={{
@@ -96,6 +109,7 @@ export function SessionShell({
       {currentSessionId && initialLoaded ? (
         <ChatPanel
           key={currentSessionId}
+          workspaceId={workspaceId}
           sessionId={currentSessionId}
           initialMessages={initialMessages}
           onRunComplete={handleRunComplete}

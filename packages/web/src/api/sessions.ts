@@ -7,25 +7,25 @@ export interface Session {
   createdAt: string;
 }
 
-export async function fetchSessions(): Promise<Session[]> {
-  const res = await apiFetch("/sessions");
+export async function fetchSessions(workspaceId: number): Promise<Session[]> {
+  const res = await apiFetch(`/workspaces/${workspaceId}/sessions`);
   if (!res.ok) throw new Error("加载会话失败");
   return res.json();
 }
 
-export async function createSession(): Promise<Session> {
-  const res = await apiFetch("/sessions", { method: "POST" });
+export async function createSession(workspaceId: number): Promise<Session> {
+  const res = await apiFetch(`/workspaces/${workspaceId}/sessions`, { method: "POST" });
   if (!res.ok) throw new Error("创建会话失败");
   return res.json();
 }
 
-export async function deleteSession(id: number): Promise<void> {
-  const res = await apiFetch(`/sessions/${id}`, { method: "DELETE" });
+export async function deleteSession(workspaceId: number, id: number): Promise<void> {
+  const res = await apiFetch(`/workspaces/${workspaceId}/sessions/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error("删除会话失败");
 }
 
-export async function renameSession(id: number, name: string): Promise<Session> {
-  const res = await apiFetch(`/sessions/${id}`, {
+export async function renameSession(workspaceId: number, id: number, name: string): Promise<Session> {
+  const res = await apiFetch(`/workspaces/${workspaceId}/sessions/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name }),
@@ -34,8 +34,8 @@ export async function renameSession(id: number, name: string): Promise<Session> 
   return res.json();
 }
 
-export async function generateSessionTitle(sessionId: number, firstUserText: string): Promise<{ title: string }> {
-  const res = await apiFetch(`/sessions/${sessionId}/title`, {
+export async function generateSessionTitle(workspaceId: number, sessionId: number, firstUserText: string): Promise<{ title: string }> {
+  const res = await apiFetch(`/workspaces/${workspaceId}/sessions/${sessionId}/title`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ firstUserText }),

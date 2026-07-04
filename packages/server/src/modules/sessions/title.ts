@@ -23,8 +23,8 @@ export async function generateTitle(model: LanguageModel, prompt: string): Promi
   return fallbackTitleFromPrompt(prompt);
 }
 
-export async function generateSessionTitleForSession(sessionId: number, firstUserText: string) {
-  const session = await repo.findSession(sessionId);
+export async function generateSessionTitleForSession(workspaceId: number, sessionId: number, firstUserText: string) {
+  const session = await repo.findSession(sessionId, workspaceId);
   if (!session) throw new Error("会话不存在");
   if (session.name !== "新对话") {
     return session.name;
@@ -32,7 +32,7 @@ export async function generateSessionTitleForSession(sessionId: number, firstUse
 
   const config: ModelConfig = loadModelConfig();
   const title = await generateTitle(createTitleModel(config), firstUserText);
-  await repo.updateSession(sessionId, { name: title });
+  await repo.updateSession(sessionId, { name: title }, workspaceId);
   return title;
 }
 

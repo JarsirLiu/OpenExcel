@@ -1,16 +1,22 @@
 import type { FastifyInstance } from "fastify";
 import * as service from "./service.js";
+import { resolveWorkspaceId } from "../workspaces/context.js";
 
 export async function workbookRoutes(app: FastifyInstance) {
-  app.get("/api/workbooks", async () => {
-    return service.getWorkbooks();
+  app.get<{ Params: { workspaceId: string } }>("/api/workspaces/:workspaceId/workbooks", async (req, reply) => {
+    const workspaceId = await resolveWorkspaceId(req.params.workspaceId, reply);
+    if (workspaceId == null) return;
+    return service.getWorkbooks(workspaceId);
   });
 
   app.post<{
+    Params: { workspaceId: string };
     Body: { name?: string; sheetName?: string; sourceSheetId?: number };
-  }>("/api/workbooks", async (req, reply) => {
+  }>("/api/workspaces/:workspaceId/workbooks", async (req, reply) => {
     try {
-      const result = await service.createWorkbook(req.body.name, req.body.sheetName, req.body.sourceSheetId);
+      const workspaceId = await resolveWorkspaceId(req.params.workspaceId, reply);
+      if (workspaceId == null) return;
+      const result = await service.createWorkbook(workspaceId, req.body.name, req.body.sheetName, req.body.sourceSheetId);
       return reply.status(201).send(result);
     } catch (error) {
       if (error instanceof service.WorkbookUploadError) {
@@ -30,26 +36,35 @@ export async function workbookRoutes(app: FastifyInstance) {
     }
   });
 
-  app.get("/api/workbooks/reference-candidates", async () => {
-    return service.getReferenceCandidates();
+  app.get<{ Params: { workspaceId: string } }>("/api/workspaces/:workspaceId/workbooks/reference-candidates", async (req, reply) => {
+    const workspaceId = await resolveWorkspaceId(req.params.workspaceId, reply);
+    if (workspaceId == null) return;
+    return service.getReferenceCandidates(workspaceId);
   });
 
-  app.get<{ Params: { id: string } }>("/api/workbooks/:id", async (req) => {
-    const wb = await service.getWorkbook(Number(req.params.id));
-    if (!wb) return { error: "Not found" };
-    return wb;
-  });
+  app.get<{ Params: { workspaceId: string; id: string } }>(
+    "/api/workspaces/:workspaceId/workbooks/:id",
+    async (req, reply) => {
+      const workspaceId = await resolveWorkspaceId(req.params.workspaceId, reply);
+      if (workspaceId == null) return;
+      const wb = await service.getWorkbook(Number(req.params.id), workspaceId);
+      if (!wb) return reply.status(404).send({ error: "Not found" });
+      return wb;
+    },
+  );
 
-  app.post<{ Params: { id: string } }>(
-    "/api/workbooks/:id/upload",
+  app.post<{ Params: { workspaceId: string; id: string } }>(
+    "/api/workspaces/:workspaceId/workbooks/:id/upload",
     async (req, reply) => {
       try {
+        const workspaceId = await resolveWorkspaceId(req.params.workspaceId, reply);
+        if (workspaceId == null) return;
         const workbookId = Number(req.params.id);
         const data = await req.file();
         if (!data) return reply.status(400).send({ error: "No file uploaded" });
 
         const buf = await data.toBuffer();
-        const result = await service.uploadExcel(workbookId, buf);
+        const result = await service.uploadExcel(workspaceId, workbookId, buf);
         return { success: true, ...result };
       } catch (error) {
         if (error instanceof service.WorkbookUploadError) {
@@ -64,15 +79,17 @@ export async function workbookRoutes(app: FastifyInstance) {
     },
   );
 
-  app.post(
-    "/api/workbooks/upload",
+  app.post<{ Params: { workspaceId: string } }>(
+    "/api/workspaces/:workspaceId/workbooks/upload",
     async (req, reply) => {
       try {
+        const workspaceId = await resolveWorkspaceId(req.params.workspaceId, reply);
+        if (workspaceId == null) return;
         const data = await req.file();
         if (!data) return reply.status(400).send({ error: "No file uploaded" });
 
         const buf = await data.toBuffer();
-        const result = await service.uploadAsNewWorkbook(buf, data.filename);
+        const result = await service.uploadAsNewWorkbook(workspaceId, buf, data.filename);
         return reply.status(201).send(result);
       } catch (error) {
         if (error instanceof service.WorkbookUploadError) {
@@ -88,11 +105,14 @@ export async function workbookRoutes(app: FastifyInstance) {
   );
 
   app.post<{
-    Params: { workbookId: string };
+    Params: { workspaceId: string; workbookId: string };
     Body: { name?: string; sourceSheetId?: number };
-  }>("/api/workbooks/:workbookId/sheets", async (req, reply) => {
+  }>("/api/workspaces/:workspaceId/workbooks/:workbookId/sheets", async (req, reply) => {
     try {
+      const workspaceId = await resolveWorkspaceId(req.params.workspaceId, reply);
+      if (workspaceId == null) return;
       const result = await service.createSheet(
+        workspaceId,
         Number(req.params.workbookId),
         req.body.name,
         req.body.sourceSheetId,
@@ -111,9 +131,11 @@ export async function workbookRoutes(app: FastifyInstance) {
   });
 
   app.delete<{
-    Params: { workbookId: string; sheetId: string };
-  }>("/api/workbooks/:workbookId/sheets/:sheetId", async (req, reply) => {
-    const result = await service.deleteSheet(Number(req.params.workbookId), Number(req.params.sheetId));
+    Params: { workspaceId: string; workbookId: string; sheetId: string };
+  }>("/api/workspaces/:workspaceId/workbooks/:workbookId/sheets/:sheetId", async (req, reply) => {
+    const workspaceId = await resolveWorkspaceId(req.params.workspaceId, reply);
+    if (workspaceId == null) return;
+    const result = await service.deleteSheet(workspaceId, Number(req.params.workbookId), Number(req.params.sheetId));
     if (!result) return reply.status(404).send({ error: "Workbook not found" });
     if ("error" in result) {
       return reply.status(result.statusCode ?? 500).send({ error: result.error });
@@ -121,16 +143,20 @@ export async function workbookRoutes(app: FastifyInstance) {
     return reply.status(204).send();
   });
 
-  app.delete<{ Params: { id: string } }>("/api/workbooks/:id", async (req, reply) => {
-    const result = await service.deleteWorkbook(Number(req.params.id));
-    if ("error" in result) return reply.status(404).send(result);
+  app.delete<{ Params: { workspaceId: string; id: string } }>("/api/workspaces/:workspaceId/workbooks/:id", async (req, reply) => {
+    const workspaceId = await resolveWorkspaceId(req.params.workspaceId, reply);
+    if (workspaceId == null) return;
+    const result = await service.deleteWorkbook(workspaceId, Number(req.params.id));
+    if ("error" in result) return reply.status(result.statusCode ?? 404).send(result);
     return result;
   });
 
-  app.get<{ Params: { id: string } }>(
-    "/api/workbooks/:id/template",
+  app.get<{ Params: { workspaceId: string; id: string } }>(
+    "/api/workspaces/:workspaceId/workbooks/:id/template",
     async (req, reply) => {
-      const buf = await service.exportTemplate(Number(req.params.id));
+      const workspaceId = await resolveWorkspaceId(req.params.workspaceId, reply);
+      if (workspaceId == null) return;
+      const buf = await service.exportTemplate(workspaceId, Number(req.params.id));
       if (!buf) return reply.status(404).send({ error: "Not found" });
 
       reply.header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");

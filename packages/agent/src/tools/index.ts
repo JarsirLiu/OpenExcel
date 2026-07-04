@@ -1,10 +1,14 @@
 export {
   buildExcelToolCatalog,
   buildExcelToolContext,
+  buildRunToolContext,
+  buildWorkspaceToolContext,
 } from "./catalog.js";
 export {
   excelToolSpecs,
-  sheetMutationContextSchema,
+  runToolContextSchema,
+  workspaceToolContextSchema,
   type ExcelToolName,
-  type SheetMutationContext,
+  type RunToolContext,
+  type WorkspaceToolContext,
 } from "./schema.js";

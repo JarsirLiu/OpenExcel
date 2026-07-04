@@ -9,10 +9,12 @@ export function useChatComposer({
   isStreaming,
   onSend,
   referenceCacheRevision,
+  workspaceId,
 }: {
   isStreaming: boolean;
   onSend: (text: string) => void;
   referenceCacheRevision: number;
+  workspaceId: number;
 }) {
   const editorRef = useRef<any>(null);
   const [editorText, setEditorText] = useState("");
@@ -35,7 +37,7 @@ export function useChatComposer({
     }
 
     if (!inflightSheetsRef.current) {
-      inflightSheetsRef.current = fetchWorkbookReferenceCandidates({ signal }).then((workbooks) => {
+      inflightSheetsRef.current = fetchWorkbookReferenceCandidates(workspaceId, { signal }).then((workbooks) => {
         const sheets = workbooks.flatMap((wb) =>
           wb.sheets.map((sheet) => ({
             workbookId: wb.id,
@@ -52,7 +54,7 @@ export function useChatComposer({
     }
 
     return inflightSheetsRef.current;
-  }, []);
+  }, [workspaceId]);
 
   const handleSend = useCallback(() => {
     const editor = editorRef.current;

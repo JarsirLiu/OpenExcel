@@ -13,16 +13,25 @@ export type CreateWorkbookResult = {
   };
 };
 
-export async function createWorkbook(name?: string, sheetName?: string, sourceSheetId?: number): Promise<CreateWorkbookResult> {
+export async function createWorkbook(
+  workspaceId: number,
+  name?: string,
+  sheetName?: string,
+  sourceSheetId?: number,
+): Promise<CreateWorkbookResult> {
   const workbookName = normalizeWorkbookName(name);
   const initialSheetName = normalizeSheetName(sheetName, 1);
 
   return prisma.$transaction(async (tx) => {
-    const maxOrder = await tx.workbook.aggregate({ _max: { order: true } });
+    const maxOrder = await tx.workbook.aggregate({
+      where: { workspaceId },
+      _max: { order: true },
+    });
     const nextOrder = (maxOrder._max.order ?? -1) + 1;
 
     const workbook = await tx.workbook.create({
       data: {
+        workspaceId,
         name: workbookName,
         order: nextOrder,
       },
@@ -32,9 +41,10 @@ export async function createWorkbook(name?: string, sheetName?: string, sourceSh
       ? null
       : await tx.sheet.findUnique({
           where: { id: sourceSheetId },
+          include: { workbook: true },
         });
 
-    if (sourceSheetId != null && !sourceSheet) {
+    if (sourceSheetId != null && (!sourceSheet || sourceSheet.workbook.workspaceId !== workspaceId)) {
       throw new WorkbookCreationError("源 Sheet 不存在", "SOURCE_SHEET_NOT_FOUND", 404);
     }
 

@@ -8,6 +8,7 @@ type SheetMeta = { workbookId: number; workbookName: string; id: number; name: s
 
 export function ChatPanel({
   sessionId,
+  workspaceId,
   initialMessages,
   onRunComplete,
   onSheetChanged,
@@ -16,6 +17,7 @@ export function ChatPanel({
   referenceCacheRevision,
 }: {
   sessionId: number;
+  workspaceId: number;
   initialMessages: any[];
   onRunComplete?: (sessionId: number, messages: any[]) => void;
   onSheetChanged?: (sheetId: number, delta: SheetChangeDelta | null) => void;
@@ -25,6 +27,7 @@ export function ChatPanel({
 }) {
   const { messages, error, isStreaming, sendMessage, stop } = useChatConversation({
     sessionId,
+    workspaceId,
     initialMessages,
     onRunComplete: (finishedMessages) => {
       onRunComplete?.(sessionId, finishedMessages);
@@ -59,6 +62,7 @@ export function ChatPanel({
         onSend={sendMessage}
         onStop={stop}
         referenceCacheRevision={referenceCacheRevision}
+        workspaceId={workspaceId}
       />
     </div>
   );

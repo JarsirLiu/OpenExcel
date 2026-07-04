@@ -1,23 +1,31 @@
 import { prisma } from "../../infra/db.js";
 import type { Prisma } from "@prisma/client";
-import { deserializeSheet } from "../../shared/utils/sheetSerialization.js";
 
-export async function findWorkbooks(): Promise<Prisma.WorkbookGetPayload<{}>[]> {
-  return prisma.workbook.findMany({ orderBy: { order: "asc" } });
+export async function findWorkbooks(workspaceId: number): Promise<Prisma.WorkbookGetPayload<{}>[]> {
+  return prisma.workbook.findMany({
+    where: { workspaceId },
+    orderBy: { order: "asc" },
+  });
 }
 
-export async function findWorkbooksWithSheets() {
+export async function findWorkbooksWithSheets(workspaceId: number) {
   return prisma.workbook.findMany({
+    where: { workspaceId },
     orderBy: { order: "asc" },
     include: { sheets: { orderBy: { order: "asc" } } },
   });
 }
 
-export async function findWorkbookWithSheets(id: number) {
-  return prisma.workbook.findUnique({
-    where: { id },
+export async function findWorkbookWithSheets(id: number, workspaceId: number) {
+  const workbook = await prisma.workbook.findFirst({
+    where: { id, workspaceId },
     include: { sheets: { orderBy: { order: "asc" } } },
   });
+  return workbook;
+}
+
+export async function findWorkbook(id: number, workspaceId: number) {
+  return prisma.workbook.findFirst({ where: { id, workspaceId } });
 }
 
 export async function createSheet(data: {
@@ -37,8 +45,11 @@ export async function createSheet(data: {
   });
 }
 
-export async function deleteSheetAndReindex(workbookId: number, sheetId: number) {
+export async function deleteSheetAndReindex(workbookId: number, sheetId: number, workspaceId: number) {
   return prisma.$transaction(async (tx) => {
+    const workbook = await tx.workbook.findFirst({ where: { id: workbookId, workspaceId } });
+    if (!workbook) return;
+
     await tx.sheet.delete({ where: { id: sheetId } });
     const sheets = await tx.sheet.findMany({
       where: { workbookId },
@@ -50,6 +61,8 @@ export async function deleteSheetAndReindex(workbookId: number, sheetId: number)
   });
 }
 
-export async function deleteWorkbook(id: number) {
-  return prisma.workbook.delete({ where: { id } });
+export async function deleteWorkbook(id: number, workspaceId: number) {
+  const workbook = await prisma.workbook.findFirst({ where: { id, workspaceId } });
+  if (!workbook) return null;
+  return prisma.workbook.delete({ where: { id: workbook.id } });
 }

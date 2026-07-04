@@ -17,7 +17,7 @@ describe("deleteSheet", () => {
   it("returns null when the workbook is missing", async () => {
     mockedRepo.findWorkbookWithSheets.mockResolvedValue(null as any);
 
-    await expect(deleteSheet(1, 10)).resolves.toBeNull();
+    await expect(deleteSheet(1, 1, 10)).resolves.toBeNull();
     expect(mockedRepo.deleteSheetAndReindex).not.toHaveBeenCalled();
   });
 
@@ -27,7 +27,7 @@ describe("deleteSheet", () => {
       sheets: [{ id: 10, order: 0 }],
     } as any);
 
-    await expect(deleteSheet(1, 10)).resolves.toEqual({
+    await expect(deleteSheet(1, 1, 10)).resolves.toEqual({
       error: "Workbook must keep at least one sheet",
       statusCode: 409,
     });
@@ -45,12 +45,12 @@ describe("deleteSheet", () => {
     } as any);
     mockedRepo.deleteSheetAndReindex.mockResolvedValue(undefined as any);
 
-    await expect(deleteSheet(1, 11)).resolves.toEqual({
+    await expect(deleteSheet(1, 1, 11)).resolves.toEqual({
       success: true,
       workbookId: 1,
       sheetId: 11,
       order: 1,
     });
-    expect(mockedRepo.deleteSheetAndReindex).toHaveBeenCalledWith(1, 11);
+    expect(mockedRepo.deleteSheetAndReindex).toHaveBeenCalledWith(1, 11, 1);
   });
 });

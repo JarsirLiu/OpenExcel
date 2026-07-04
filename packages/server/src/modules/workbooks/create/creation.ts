@@ -36,7 +36,7 @@ export function normalizeSheetName(name: string | undefined, fallbackIndex: numb
 
 export function buildBlankSheetInitialization(): SheetInitializationPayload {
   return {
-    columns: JSON.stringify([{ label: "A" }]),
+    columns: JSON.stringify([]),
     merges: JSON.stringify([]),
     uploadedData: JSON.stringify([]),
   };

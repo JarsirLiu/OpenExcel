@@ -34,6 +34,10 @@ vi.mock("./api/sessions", () => ({
   generateSessionTitle: vi.fn().mockResolvedValue({ title: "新对话" }),
 }));
 
+vi.mock("./api/workspaces", () => ({
+  fetchWorkspaces: vi.fn().mockResolvedValue([{ id: 1, name: "默认工作区", order: 0 }]),
+}));
+
 vi.mock("./api/chat", () => ({
   fetchMessages: vi.fn().mockResolvedValue([]),
   fetchRuns: vi.fn().mockResolvedValue([]),
