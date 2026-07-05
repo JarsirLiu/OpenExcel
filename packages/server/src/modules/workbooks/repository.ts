@@ -30,6 +30,7 @@ export async function findWorkbook(id: number, workspaceId: number) {
 
 export async function createSheet(data: {
   workbookId: number;
+  sheetNo: number;
   name: string;
   order: number;
   columns: string;
@@ -55,9 +56,13 @@ export async function deleteSheetAndReindex(workbookId: number, sheetId: number,
       where: { workbookId },
       orderBy: { order: "asc" },
     });
-    await Promise.all(
-      sheets.map((sheet, index) => tx.sheet.update({ where: { id: sheet.id }, data: { order: index } })),
-    );
+    for (let index = 0; index < sheets.length; index += 1) {
+      const sheet = sheets[index];
+      await tx.sheet.update({
+        where: { id: sheet.id },
+        data: { order: index, sheetNo: index + 1 },
+      });
+    }
   });
 }
 

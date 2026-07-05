@@ -51,9 +51,13 @@ export async function deleteSheetAndReindex(workbookId: number, sheetId: number,
       where: { workbookId },
       orderBy: { order: "asc" },
     });
-    await Promise.all(
-      sheets.map((s, i) => tx.sheet.update({ where: { id: s.id }, data: { order: i } })),
-    );
+    for (let index = 0; index < sheets.length; index += 1) {
+      const currentSheet = sheets[index];
+      await tx.sheet.update({
+        where: { id: currentSheet.id },
+        data: { order: index, sheetNo: index + 1 },
+      });
+    }
   });
 }
 

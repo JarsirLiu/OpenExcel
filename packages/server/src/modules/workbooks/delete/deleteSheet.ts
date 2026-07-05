@@ -19,6 +19,7 @@ export async function deleteSheet(workspaceId: number, workbookId: number, sheet
     success: true as const,
     workbookId,
     sheetId,
+    sheetNo: sheet.sheetNo,
     order: sheet.order,
   };
 }

@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 
 export interface SheetJson {
   id: number;
+  sheetNo: number;
   name: string;
   columns: { label: string; width?: number }[];
   merges: { row: [number, number]; col: [number, number] }[];
@@ -20,6 +21,7 @@ function safeParse<T>(value: string, fallback: T): T {
 export function deserializeSheet(sheet: Prisma.SheetGetPayload<{}>): SheetJson {
   return {
     id: sheet.id,
+    sheetNo: sheet.sheetNo,
     name: sheet.name,
     columns: safeParse(sheet.columns, []),
     merges: safeParse(sheet.merges, []),

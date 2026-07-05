@@ -8,6 +8,7 @@ export type CreateWorkbookResult = {
   sheets: number;
   initialSheet: {
     id: number;
+    sheetNo: number;
     name: string;
     order: number;
   };
@@ -55,6 +56,7 @@ export async function createWorkbook(
     const initialSheet = await tx.sheet.create({
       data: {
         workbookId: workbook.id,
+        sheetNo: 1,
         name: initialSheetName,
         order: 0,
         columns: payload.columns,
@@ -71,6 +73,7 @@ export async function createWorkbook(
       sheets: 1,
       initialSheet: {
         id: initialSheet.id,
+        sheetNo: initialSheet.sheetNo,
         name: initialSheet.name,
         order: initialSheet.order,
       },

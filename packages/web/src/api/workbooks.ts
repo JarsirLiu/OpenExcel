@@ -8,6 +8,7 @@ export interface WorkbookMeta {
 
 export interface WorkbookReferenceCandidateSheet {
   id: number;
+  sheetNo: number;
   name: string;
 }
 
@@ -19,6 +20,7 @@ export interface WorkbookReferenceCandidate {
 
 export interface SheetSchema {
   id: number;
+  sheetNo: number;
   name: string;
   order: number;
   columns: { label: string; width?: number }[];
@@ -49,6 +51,7 @@ export interface WorkbookCreateResult {
   sheets: number;
   initialSheet: {
     id: number;
+    sheetNo: number;
     name: string;
     order: number;
   };
@@ -137,7 +140,7 @@ export async function createSheet(
   workspaceId: number,
   workbookId: number,
   input?: { name?: string; sourceSheetId?: number },
-): Promise<{ workbookId: number; id: number; name: string; order: number }> {
+): Promise<{ workbookId: number; id: number; sheetNo: number; name: string; order: number }> {
   const res = await apiFetch(`/workspaces/${workspaceId}/workbooks/${workbookId}/sheets`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

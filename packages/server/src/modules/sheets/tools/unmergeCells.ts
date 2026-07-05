@@ -83,7 +83,7 @@ export const unmergeCells = {
       unmergedRanges: operations.map((operation) => toA1Range(operation.startRow, operation.startCol, operation.endRow, operation.endCol)),
       delta,
       preview: buildSheetChangePreview(celldata, sheet.name, sheetId, minRow, maxRow),
-      sheetInfo: { sheetId: sheet.id, sheetName: sheet.name },
+      sheetInfo: { sheetId: sheet.id, sheetNo: sheet.sheetNo, sheetName: sheet.name },
     };
 
     sheetChangePatchOutputSchema.parse(output);

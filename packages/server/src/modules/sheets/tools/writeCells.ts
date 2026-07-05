@@ -95,7 +95,7 @@ export const writeCells = {
       updatedCells: touchedValues.length,
       delta,
       preview: buildSheetChangePreview(updatedCelldata, sheet.name, sheetId, minRow, maxRow),
-      sheetInfo: { sheetId: sheet.id, sheetName: sheet.name },
+      sheetInfo: { sheetId: sheet.id, sheetNo: sheet.sheetNo, sheetName: sheet.name },
     };
 
     sheetChangePatchOutputSchema.parse(output);

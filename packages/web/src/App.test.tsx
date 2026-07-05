@@ -63,6 +63,7 @@ describe("SheetSchema type", () => {
   it("has correct structure", () => {
     const sheet: SheetSchema = {
       id: 1,
+      sheetNo: 1,
       name: "TestSheet",
       order: 0,
       columns: [{ label: "Name" }, { label: "Value" }],

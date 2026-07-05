@@ -11,7 +11,7 @@ describe("collectSheetPatchUpdates", () => {
             toolCallId: "tool-1",
             state: "output-available",
             output: {
-              sheetInfo: { sheetId: 11, sheetName: "Budget" },
+              sheetInfo: { sheetId: 11, sheetNo: 2, sheetName: "Budget" },
               delta: {
                 type: "write",
                 cells: [{ row: 1, col: 2, value: "123" }],
@@ -27,7 +27,7 @@ describe("collectSheetPatchUpdates", () => {
             toolCallId: "tool-2",
             state: "output-available",
             output: {
-              sheetInfo: { sheetId: 12, sheetName: "Plan" },
+              sheetInfo: { sheetId: 12, sheetNo: 3, sheetName: "Plan" },
               delta: null,
             },
           },
@@ -41,6 +41,7 @@ describe("collectSheetPatchUpdates", () => {
       {
         toolCallId: "tool-2",
         sheetId: 12,
+        sheetNo: 3,
         delta: null,
       },
     ]);
@@ -55,7 +56,7 @@ describe("collectSheetPatchUpdates", () => {
             toolCallId: "tool-3",
             state: "output-available",
             output: {
-              sheetInfo: { sheetId: 13, sheetName: "Invalid" },
+              sheetInfo: { sheetId: 13, sheetNo: 4, sheetName: "Invalid" },
               delta: {
                 type: "write",
                 cells: [],
@@ -80,7 +81,7 @@ describe("collectSheetPatchUpdates", () => {
             toolCallId: "tool-4",
             state: "output-available",
             output: {
-              sheetInfo: { sheetId: 14, sheetName: "Clear" },
+              sheetInfo: { sheetId: 14, sheetNo: 5, sheetName: "Clear" },
               delta: {
                 type: "clear",
                 operations: [
@@ -100,6 +101,7 @@ describe("collectSheetPatchUpdates", () => {
       {
         toolCallId: "tool-4",
         sheetId: 14,
+        sheetNo: 5,
         delta: {
           type: "clear",
           operations: [
@@ -128,7 +130,7 @@ describe("collectWorkbookStructureUpdates", () => {
               name: "Monthly Plan",
               order: 4,
               sheets: 1,
-              initialSheet: { id: 88, name: "Sheet 1", order: 0 },
+              initialSheet: { id: 88, sheetNo: 1, name: "Sheet 1", order: 0 },
             },
           },
         ],
@@ -144,6 +146,7 @@ describe("collectWorkbookStructureUpdates", () => {
             output: {
               workbookId: 21,
               id: 89,
+              sheetNo: 2,
               name: "Extra",
               order: 1,
             },
@@ -160,6 +163,7 @@ describe("collectWorkbookStructureUpdates", () => {
         kind: "sheet-created",
         workbookId: 21,
         sheetId: 89,
+        sheetNo: 2,
         sheetName: "Extra",
         order: 1,
         sourceSheetId: null,
@@ -181,7 +185,7 @@ describe("collectWorkbookStructureUpdates", () => {
               name: "Broken",
               order: "bad",
               sheets: 1,
-              initialSheet: { id: 90, name: "Sheet 1", order: 0 },
+              initialSheet: { id: 90, sheetNo: 1, name: "Sheet 1", order: 0 },
             },
           },
         ],

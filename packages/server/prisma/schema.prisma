@@ -21,62 +21,66 @@ model Workbook {
 }
 
 model Sheet {
-  id           Int      @id @default(autoincrement())
+  id           Int                     @id @default(autoincrement())
   workbookId   Int
+  sheetNo      Int
   name         String
   order        Int
   columns      String
-  merges       String   @default("[]")
+  merges       String                  @default("[]")
   uploadedData String?
   config       String?
-  workbook     Workbook @relation(fields: [workbookId], references: [id], onDelete: Cascade)
+  workbook     Workbook                @relation(fields: [workbookId], references: [id], onDelete: Cascade)
   sessions     Session[]
   runSnapshots AgentRunSheetSnapshot[]
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+
+  @@unique([workbookId, sheetNo])
+  @@index([workbookId, order])
 }
 
 model Workspace {
-  id        Int       @id @default(autoincrement())
+  id        Int        @id @default(autoincrement())
   name      String
   order     Int
   workbooks Workbook[]
   sessions  Session[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
 
   @@index([order])
 }
 
 model Session {
-  id            Int       @id @default(autoincrement())
-  workspaceId   Int
-  sheetId       Int?
-  name          String
-  chatMessages  String?   @default("[]")
-  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  sheet         Sheet?    @relation(fields: [sheetId], references: [id], onDelete: SetNull)
-  runs          AgentRun[]
-  createdAt     DateTime  @default(now())
+  id           Int        @id @default(autoincrement())
+  workspaceId  Int
+  sheetId      Int?
+  name         String
+  chatMessages String?    @default("[]")
+  workspace    Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  sheet        Sheet?     @relation(fields: [sheetId], references: [id], onDelete: SetNull)
+  runs         AgentRun[]
+  createdAt    DateTime   @default(now())
 
   @@index([workspaceId])
 }
 
 model AgentRun {
-  id        Int      @id @default(autoincrement())
-  sessionId Int
-  status    String
-  model     String?
+  id           Int                     @id @default(autoincrement())
+  sessionId    Int
+  status       String
+  model        String?
   systemPrompt String?
-  inputText String?
-  outputText String?
+  inputText    String?
+  outputText   String?
   errorMessage String?
-  revertedAt DateTime?
-  session   Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  steps     AgentStep[]
-  snapshots AgentRunSheetSnapshot[]
-  startedAt DateTime @default(now())
-  endedAt   DateTime?
+  revertedAt   DateTime?
+  session      Session                 @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  steps        AgentStep[]
+  snapshots    AgentRunSheetSnapshot[]
+  startedAt    DateTime                @default(now())
+  endedAt      DateTime?
 }
 
 model AgentStep {
@@ -97,7 +101,7 @@ model AgentRunSheetSnapshot {
   id           Int      @id @default(autoincrement())
   runId        Int
   sheetId      Int
-  uploadedData  String?
+  uploadedData String?
   config       String?
   createdAt    DateTime @default(now())
   run          AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)

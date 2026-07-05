@@ -1,6 +1,6 @@
 import { excelToolSpecs, workspaceToolContextSchema } from "@openexcel/agent";
 import { prisma } from "../../../infra/db.js";
-import { celldataToGrid, toOneBasedIndex } from "@openexcel/core";
+import { celldataToGrid } from "@openexcel/core";
 import { parseMergesFromCelldata } from "../domain.js";
 import { sheetRecordToCelldata } from "../../../shared/utils/sheetData.js";
 
@@ -26,6 +26,10 @@ export const readSheet = {
       const columnCount = maxCol + 1;
       const grid = celldataToGrid(celldata, columnCount);
       const merges = parseMergesFromCelldata(celldata);
+      const sheetInfo = {
+        sheetNo: sheet.sheetNo,
+        sheetName: sheet.name,
+      };
 
       const firstRow = grid[0] ?? [];
       const secondRow = grid[1] ?? [];
@@ -33,7 +37,9 @@ export const readSheet = {
         && secondRow.some((v: string) => v.length > 0);
 
       return {
+        sheetInfo,
         sheetName: sheet.name,
+        sheetNo: sheet.sheetNo,
         rowCount: grid.length,
         columnCount,
         headers: isFirstRowHeader ? firstRow : [],
@@ -42,8 +48,15 @@ export const readSheet = {
       };
     }
 
-    return {
+    const sheetInfo = {
+      sheetNo: sheet.sheetNo,
       sheetName: sheet.name,
+    };
+
+    return {
+      sheetInfo,
+      sheetName: sheet.name,
+      sheetNo: sheet.sheetNo,
       rowCount: 0,
       columnCount: 0,
       headers: [],

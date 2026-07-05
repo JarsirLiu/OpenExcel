@@ -151,6 +151,7 @@ export async function uploadAsNewWorkbook(workspaceId: number, buffer: Buffer, f
       await tx.sheet.create({
         data: {
           workbookId: wb.id,
+          sheetNo: i + 1,
           name: sheetNames[i],
           order: i,
           columns: JSON.stringify([]),

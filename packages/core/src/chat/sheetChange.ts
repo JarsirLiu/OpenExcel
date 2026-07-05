@@ -78,6 +78,7 @@ export const sheetChangeDeltaSchema = z.discriminatedUnion("type", [
 export const sheetChangePatchOutputSchema = z.object({
   sheetInfo: z.object({
     sheetId: z.number().int(),
+    sheetNo: z.number().int().optional(),
     sheetName: z.string().min(1),
   }),
   delta: sheetChangeDeltaSchema.nullish(),

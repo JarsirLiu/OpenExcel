@@ -8,12 +8,14 @@ type MentionItem = {
   kind: "workbook" | "sheet";
   workbookId: number;
   workbookName: string;
+  sheetNo?: number;
 };
 
 export type WorkbookSource = {
   workbookId: number;
   workbookName: string;
   sheetId: number;
+  sheetNo: number;
   sheetName: string;
 };
 
@@ -365,6 +367,7 @@ export const MentionList = forwardRef<
                       const sheetId = Number(item.id.replace("sheet:", ""));
                       const visibleIndex = getSelectedIndexForSheet(sheetId);
                       const isSelected = activePane === "sheet" && activeGroup.sheets[activeSheetIndex]?.id === item.id;
+                      const sheetBadge = item.sheetNo != null ? `#${item.sheetNo}` : String(index + 1);
 
                       return (
                         <div
@@ -407,7 +410,7 @@ export const MentionList = forwardRef<
                             fontWeight: 700,
                             flexShrink: 0,
                           }}>
-                            {index + 1}
+                            {sheetBadge}
                           </span>
                           <span style={{
                             fontWeight: 600,
@@ -501,6 +504,7 @@ export function createMentionSuggestion(
             kind: "sheet",
             workbookId,
             workbookName,
+            sheetNo: sheet.sheetNo,
           });
         }
       }

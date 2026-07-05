@@ -9,6 +9,7 @@ export type SheetPatchMessageLike = {
 export type SheetPatchUpdate = {
   toolCallId: string;
   sheetId: number;
+  sheetNo?: number;
   delta: SheetChangeDelta | null;
 };
 
@@ -21,6 +22,7 @@ export type WorkbookCreatedUpdate = {
   sourceSheetId: number | null;
   initialSheet: {
     id: number;
+    sheetNo: number;
     name: string;
     order: number;
   };
@@ -31,6 +33,7 @@ export type SheetCreatedUpdate = {
   kind: "sheet-created";
   workbookId: number;
   sheetId: number;
+  sheetNo?: number;
   sheetName: string;
   order: number;
   sourceSheetId: number | null;
@@ -41,6 +44,7 @@ export type SheetDeletedUpdate = {
   kind: "sheet-deleted";
   workbookId: number;
   sheetId: number;
+  sheetNo?: number;
   order: number;
 };
 
@@ -85,6 +89,7 @@ export function collectSheetPatchUpdates(
       updates.push({
         toolCallId: part.toolCallId,
         sheetId: parsed.data.sheetInfo.sheetId,
+        sheetNo: parsed.data.sheetInfo.sheetNo,
         delta: parsed.data.delta ?? null,
       });
     }
@@ -104,7 +109,7 @@ function isWorkbookCreatedOutput(output: unknown): output is {
   name: string;
   order: number;
   sheets: number;
-  initialSheet: { id: number; name: string; order: number };
+  initialSheet: { id: number; sheetNo: number; name: string; order: number };
 } {
   if (!isRecord(output)) return false;
   return typeof output.id === "number"
@@ -113,6 +118,7 @@ function isWorkbookCreatedOutput(output: unknown): output is {
     && typeof output.sheets === "number"
     && isRecord(output.initialSheet)
     && typeof output.initialSheet.id === "number"
+    && typeof output.initialSheet.sheetNo === "number"
     && typeof output.initialSheet.name === "string"
     && typeof output.initialSheet.order === "number";
 }
@@ -120,12 +126,14 @@ function isWorkbookCreatedOutput(output: unknown): output is {
 function isSheetCreatedOutput(output: unknown): output is {
   workbookId: number;
   id: number;
+  sheetNo: number;
   name: string;
   order: number;
 } {
   if (!isRecord(output)) return false;
   return typeof output.workbookId === "number"
     && typeof output.id === "number"
+    && typeof output.sheetNo === "number"
     && typeof output.name === "string"
     && typeof output.order === "number";
 }
@@ -165,6 +173,7 @@ export function collectWorkbookStructureUpdates(
           kind: "sheet-created",
           workbookId: part.output.workbookId,
           sheetId: part.output.id,
+          sheetNo: part.output.sheetNo,
           sheetName: part.output.name,
           order: part.output.order,
           sourceSheetId: typeof input?.sourceSheetId === "number" ? input.sourceSheetId : null,

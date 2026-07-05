@@ -38,9 +38,9 @@ describe("deleteSheet", () => {
     mockedRepo.findWorkbookWithSheets.mockResolvedValue({
       id: 1,
       sheets: [
-        { id: 10, order: 0 },
-        { id: 11, order: 1 },
-        { id: 12, order: 2 },
+        { id: 10, sheetNo: 1, order: 0 },
+        { id: 11, sheetNo: 2, order: 1 },
+        { id: 12, sheetNo: 3, order: 2 },
       ],
     } as any);
     mockedRepo.deleteSheetAndReindex.mockResolvedValue(undefined as any);
@@ -49,6 +49,7 @@ describe("deleteSheet", () => {
       success: true,
       workbookId: 1,
       sheetId: 11,
+      sheetNo: 2,
       order: 1,
     });
     expect(mockedRepo.deleteSheetAndReindex).toHaveBeenCalledWith(1, 11, 1);

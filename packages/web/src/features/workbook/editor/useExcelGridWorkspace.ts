@@ -128,6 +128,7 @@ export function useExcelGridWorkspace({
           kind: "sheet-created",
           workbookId: result.workbookId,
           sheetId: result.id,
+          sheetNo: result.sheetNo,
           sheetName: result.name,
           order: result.order,
           sourceSheetId: null,
@@ -155,6 +156,7 @@ export function useExcelGridWorkspace({
           kind: "sheet-deleted",
           workbookId: workbook.id,
           sheetId: numericSheetId,
+          sheetNo: deletedSheet.sheetNo,
           order: deletedSheet.order,
         });
       } catch (error) {

@@ -56,6 +56,7 @@ export async function createWorkspace(name?: string) {
     const initialSheet = await tx.sheet.create({
       data: {
         workbookId: workbook.id,
+        sheetNo: 1,
         name: "Sheet1",
         order: 0,
         columns: sheetInitialization.columns,
@@ -82,6 +83,7 @@ export async function createWorkspace(name?: string) {
         sheets: 1,
         initialSheet: {
           id: initialSheet.id,
+          sheetNo: initialSheet.sheetNo,
           name: initialSheet.name,
           order: initialSheet.order,
         },

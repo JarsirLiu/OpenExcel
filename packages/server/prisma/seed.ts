@@ -30,6 +30,7 @@ async function main() {
         await prisma.sheet.create({
           data: {
             workbookId: workbook.id,
+            sheetNo: si + 1,
             name: sh.name,
             order: si,
             columns: JSON.stringify(sh.columns),

@@ -33,6 +33,7 @@ describe("buildWorkbookImportPreview", () => {
       sheets: [
         {
           id: 11,
+          sheetNo: 1,
           name: "Sheet1",
           order: 0,
           columns: [{ label: "Name" }, { label: "Age" }],
@@ -47,6 +48,7 @@ describe("buildWorkbookImportPreview", () => {
         },
         {
           id: 12,
+          sheetNo: 2,
           name: "MissingSheet",
           order: 1,
           columns: [{ label: "A" }],

@@ -43,6 +43,7 @@ export function useChatComposer({
             workbookId: wb.id,
             workbookName: wb.name,
             sheetId: sheet.id,
+            sheetNo: sheet.sheetNo,
             sheetName: sheet.name,
           })),
         );

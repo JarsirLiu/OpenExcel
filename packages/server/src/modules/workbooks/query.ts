@@ -12,6 +12,7 @@ export async function getReferenceCandidates(workspaceId: number) {
     name: workbook.name,
     sheets: workbook.sheets.map((sheet) => ({
       id: sheet.id,
+      sheetNo: sheet.sheetNo,
       name: sheet.name,
     })),
   }));

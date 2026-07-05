@@ -51,7 +51,7 @@ describe("fetchWorkbookReferenceCandidates", () => {
       {
         id: 1,
         name: "WB1",
-        sheets: [{ id: 11, name: "Sheet1" }],
+        sheets: [{ id: 11, sheetNo: 1, name: "Sheet1" }],
       },
     ];
     mockFetch.mockResolvedValue(new Response(JSON.stringify(data), { status: 200 }));
@@ -79,11 +79,12 @@ describe("updateSheetData", () => {
 
 describe("createSheet", () => {
   it("sends POST with sourceSheetId", async () => {
-    mockFetch.mockResolvedValue(new Response(JSON.stringify({ workbookId: 1, id: 10, name: "New", order: 2 }), { status: 200 }));
+    mockFetch.mockResolvedValue(new Response(JSON.stringify({ workbookId: 1, id: 10, sheetNo: 4, name: "New", order: 2 }), { status: 200 }));
 
     const result = await createSheet(9, 1, { sourceSheetId: 3 });
     expect(result.workbookId).toBe(1);
     expect(result.id).toBe(10);
+    expect(result.sheetNo).toBe(4);
     expect(mockFetch).toHaveBeenCalledWith("/api/workspaces/9/workbooks/1/sheets", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

@@ -14,13 +14,15 @@ export async function createSheet(workspaceId: number, workbookId: number, name?
   }
 
   const nextOrder = workbook.sheets.length;
-  const nextName = normalizeSheetName(name, nextOrder + 1);
+  const nextSheetNo = workbook.sheets.reduce((max, sheet) => Math.max(max, sheet.sheetNo), 0) + 1;
+  const nextName = normalizeSheetName(name, nextSheetNo);
   const payload = sourceSheet
     ? buildSourceSheetInitialization(sourceSheet)
     : buildBlankSheetInitialization();
 
   const sheet = await repo.createSheet({
     workbookId,
+    sheetNo: nextSheetNo,
     name: nextName,
     order: nextOrder,
     columns: payload.columns,
@@ -29,5 +31,5 @@ export async function createSheet(workspaceId: number, workbookId: number, name?
     config: payload.config,
   });
 
-  return { workbookId, id: sheet.id, name: sheet.name, order: sheet.order };
+  return { workbookId, id: sheet.id, sheetNo: sheet.sheetNo, name: sheet.name, order: sheet.order };
 }
