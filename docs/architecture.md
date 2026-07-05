@@ -136,6 +136,7 @@ Responsibilities:
 The server's database layer should be selectable at startup by configuration.
 The current implementation can keep multiple Prisma clients available and pick one from `DATABASE_PROVIDER` and `DATABASE_URL` when the process starts.
 That gives us restart-based switching between database sources without runtime hot-swapping.
+Schema changes must land through explicit Prisma migrations, not runtime `db push`, so each provider can apply the same reviewed history in a controlled way.
 
 Server code may depend on `agent`, but should not duplicate agent logic.
 
@@ -227,6 +228,15 @@ For multi-user support, the ownership chain should become:
 - step
 
 That means the server should eventually treat `workspaceId` and `ownerUserId` as first-class scoping fields on session/workbook records, not as ad hoc filters added later.
+
+The current implementation follows that direction with a cookie-backed email/password session identity:
+
+- each browser gets an opaque session token stored in an HttpOnly cookie
+- the server resolves it to a current user at request time
+- registration or login provisions a private workspace for that user
+- workspace, workbook, sheet, and session reads are filtered by the current user
+
+This keeps the SQLite development path usable for multi-user demos without changing the workbook model or exposing internal sheet identifiers as a permission boundary, while leaving room for password reset, logout-all, and future SSO-style auth later.
 
 ### 3.4 `packages/web`
 

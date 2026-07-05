@@ -1,10 +1,10 @@
 import type { FastifyInstance } from "fastify";
 import * as service from "./service.js";
-import { resolveWorkspaceId } from "../workspaces/context.js";
+import { resolveWorkspaceIdForRequest as resolveWorkspaceId } from "../workspaces/access.js";
 
 export async function workbookRoutes(app: FastifyInstance) {
   app.get<{ Params: { workspaceId: string } }>("/api/workspaces/:workspaceId/workbooks", async (req, reply) => {
-    const workspaceId = await resolveWorkspaceId(req.params.workspaceId, reply);
+    const workspaceId = await resolveWorkspaceId(req, req.params.workspaceId, reply);
     if (workspaceId == null) return;
     return service.getWorkbooks(workspaceId);
   });
@@ -14,7 +14,7 @@ export async function workbookRoutes(app: FastifyInstance) {
     Body: { name?: string; sheetName?: string; sourceSheetId?: number };
   }>("/api/workspaces/:workspaceId/workbooks", async (req, reply) => {
     try {
-      const workspaceId = await resolveWorkspaceId(req.params.workspaceId, reply);
+      const workspaceId = await resolveWorkspaceId(req, req.params.workspaceId, reply);
       if (workspaceId == null) return;
       const result = await service.createWorkbook(workspaceId, req.body.name, req.body.sheetName, req.body.sourceSheetId);
       return reply.status(201).send(result);
@@ -37,7 +37,7 @@ export async function workbookRoutes(app: FastifyInstance) {
   });
 
   app.get<{ Params: { workspaceId: string } }>("/api/workspaces/:workspaceId/workbooks/reference-candidates", async (req, reply) => {
-    const workspaceId = await resolveWorkspaceId(req.params.workspaceId, reply);
+    const workspaceId = await resolveWorkspaceId(req, req.params.workspaceId, reply);
     if (workspaceId == null) return;
     return service.getReferenceCandidates(workspaceId);
   });
@@ -45,7 +45,7 @@ export async function workbookRoutes(app: FastifyInstance) {
   app.get<{ Params: { workspaceId: string; id: string } }>(
     "/api/workspaces/:workspaceId/workbooks/:id",
     async (req, reply) => {
-      const workspaceId = await resolveWorkspaceId(req.params.workspaceId, reply);
+      const workspaceId = await resolveWorkspaceId(req, req.params.workspaceId, reply);
       if (workspaceId == null) return;
       const wb = await service.getWorkbook(Number(req.params.id), workspaceId);
       if (!wb) return reply.status(404).send({ error: "Not found" });
@@ -57,7 +57,7 @@ export async function workbookRoutes(app: FastifyInstance) {
     "/api/workspaces/:workspaceId/workbooks/:id/upload",
     async (req, reply) => {
       try {
-        const workspaceId = await resolveWorkspaceId(req.params.workspaceId, reply);
+        const workspaceId = await resolveWorkspaceId(req, req.params.workspaceId, reply);
         if (workspaceId == null) return;
         const workbookId = Number(req.params.id);
         const data = await req.file();
@@ -83,7 +83,7 @@ export async function workbookRoutes(app: FastifyInstance) {
     "/api/workspaces/:workspaceId/workbooks/upload",
     async (req, reply) => {
       try {
-        const workspaceId = await resolveWorkspaceId(req.params.workspaceId, reply);
+        const workspaceId = await resolveWorkspaceId(req, req.params.workspaceId, reply);
         if (workspaceId == null) return;
         const data = await req.file();
         if (!data) return reply.status(400).send({ error: "No file uploaded" });
@@ -109,7 +109,7 @@ export async function workbookRoutes(app: FastifyInstance) {
     Body: { name?: string; sourceSheetId?: number };
   }>("/api/workspaces/:workspaceId/workbooks/:workbookId/sheets", async (req, reply) => {
     try {
-      const workspaceId = await resolveWorkspaceId(req.params.workspaceId, reply);
+      const workspaceId = await resolveWorkspaceId(req, req.params.workspaceId, reply);
       if (workspaceId == null) return;
       const result = await service.createSheet(
         workspaceId,
@@ -133,7 +133,7 @@ export async function workbookRoutes(app: FastifyInstance) {
   app.delete<{
     Params: { workspaceId: string; workbookId: string; sheetId: string };
   }>("/api/workspaces/:workspaceId/workbooks/:workbookId/sheets/:sheetId", async (req, reply) => {
-    const workspaceId = await resolveWorkspaceId(req.params.workspaceId, reply);
+    const workspaceId = await resolveWorkspaceId(req, req.params.workspaceId, reply);
     if (workspaceId == null) return;
     const result = await service.deleteSheet(workspaceId, Number(req.params.workbookId), Number(req.params.sheetId));
     if (!result) return reply.status(404).send({ error: "Workbook not found" });
@@ -144,7 +144,7 @@ export async function workbookRoutes(app: FastifyInstance) {
   });
 
   app.delete<{ Params: { workspaceId: string; id: string } }>("/api/workspaces/:workspaceId/workbooks/:id", async (req, reply) => {
-    const workspaceId = await resolveWorkspaceId(req.params.workspaceId, reply);
+    const workspaceId = await resolveWorkspaceId(req, req.params.workspaceId, reply);
     if (workspaceId == null) return;
     const result = await service.deleteWorkbook(workspaceId, Number(req.params.id));
     if ("error" in result) return reply.status(result.statusCode ?? 404).send(result);
@@ -154,7 +154,7 @@ export async function workbookRoutes(app: FastifyInstance) {
   app.get<{ Params: { workspaceId: string; id: string } }>(
     "/api/workspaces/:workspaceId/workbooks/:id/template",
     async (req, reply) => {
-      const workspaceId = await resolveWorkspaceId(req.params.workspaceId, reply);
+      const workspaceId = await resolveWorkspaceId(req, req.params.workspaceId, reply);
       if (workspaceId == null) return;
       const buf = await service.exportTemplate(workspaceId, Number(req.params.id));
       if (!buf) return reply.status(404).send({ error: "Not found" });

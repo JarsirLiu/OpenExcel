@@ -21,6 +21,33 @@ model Workbook {
   @@index([workspaceId])
 }
 
+model User {
+  id           Int            @id @default(autoincrement())
+  email        String         @unique
+  displayName  String
+  passwordHash String
+  workspaces   Workspace[]
+  authSessions AuthSession[]
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+}
+
+model AuthSession {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  tokenHash  String   @unique
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  lastSeenAt DateTime?
+  userAgent  String?
+  ipAddress  String?
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
 model Sheet {
   id           Int                     @id @default(autoincrement())
   workbookId   Int
@@ -42,14 +69,17 @@ model Sheet {
 }
 
 model Workspace {
-  id        Int        @id @default(autoincrement())
-  name      String
-  order     Int
-  workbooks Workbook[]
-  sessions  Session[]
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  id          Int        @id @default(autoincrement())
+  ownerUserId Int
+  name        String
+  order       Int
+  owner       User       @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  workbooks   Workbook[]
+  sessions    Session[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 
+  @@index([ownerUserId])
   @@index([order])
 }
 

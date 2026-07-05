@@ -1,7 +1,15 @@
-import type { FastifyReply } from "fastify";
+import type { FastifyReply, FastifyRequest } from "fastify";
 import { WorkspaceNotFoundError, requireWorkspace } from "./service.js";
+import { requireCurrentUser } from "../../infra/requestContext.js";
 
-export async function resolveWorkspaceId(workspaceIdParam: string, reply: FastifyReply): Promise<number | null> {
+export async function resolveWorkspaceIdForRequest(
+  req: FastifyRequest,
+  workspaceIdParam: string,
+  reply: FastifyReply,
+): Promise<number | null> {
+  const currentUser = requireCurrentUser(req, reply);
+  if (!currentUser) return null;
+
   const workspaceId = Number(workspaceIdParam);
   if (!Number.isInteger(workspaceId) || workspaceId <= 0) {
     reply.status(400).send({ error: "Invalid workspace id" });
@@ -9,7 +17,7 @@ export async function resolveWorkspaceId(workspaceIdParam: string, reply: Fastif
   }
 
   try {
-    await requireWorkspace(workspaceId);
+    await requireWorkspace(workspaceId, currentUser.id);
     return workspaceId;
   } catch (error) {
     if (error instanceof WorkspaceNotFoundError) {

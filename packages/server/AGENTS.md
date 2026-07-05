@@ -263,8 +263,7 @@ Common package-level commands:
 - `pnpm --filter @openexcel/server test`
 - `pnpm --filter @openexcel/server build`
 - `pnpm --filter @openexcel/server dev`
-- `pnpm --filter @openexcel/server db:push`
-- `pnpm --filter @openexcel/server db:seed`
+- `pnpm --filter @openexcel/server db:migrate`
 
 ## 13. When in doubt
 

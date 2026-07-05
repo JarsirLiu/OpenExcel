@@ -14,7 +14,7 @@ Keep feature code inside the owning package’s `src/` tree. Avoid generated out
 - `pnpm build` - typecheck and build the web app
 - `pnpm test` - run tests across all packages
 - `pnpm test:web`, `pnpm test:server`, `pnpm test:core` - run one package’s test suite
-- `pnpm db:push` / `pnpm db:seed` - sync and seed the server database
+- `pnpm db:migrate` - apply the server database migrations
 
 ## Coding Style & Naming Conventions
 This repo uses TypeScript ESM. Follow the existing style: 2-space indentation, small modules, explicit exports/imports, `PascalCase` for components, and `camelCase` for functions and variables.

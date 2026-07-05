@@ -1,4 +1,3 @@
-import * as XLSX from "xlsx";
 import { celldataToGrid, excelToGrid, isCelldata, type FortuneCell } from "@openexcel/core";
 import type { WorkbookFull, SheetSchema } from "../../../api/workbooks";
 
@@ -168,6 +167,7 @@ function buildSheetPreview(
 
 export async function buildWorkbookImportPreview(workbook: WorkbookFull, file: File): Promise<WorkbookImportPreview> {
   const buffer = await file.arrayBuffer();
+  const XLSX = await import("xlsx");
   const sheetWorkbook = XLSX.read(buffer, { type: "array" });
   const uploadedSheetNames = sheetWorkbook.SheetNames;
   const parsedSheets = excelToGrid(buffer, uploadedSheetNames);
