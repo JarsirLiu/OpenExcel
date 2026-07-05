@@ -4,4 +4,5 @@ dist/
 *.local
 .data/
 packages/.data/
+packages/server/prisma/generated/
 config/config.toml

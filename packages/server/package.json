@@ -4,16 +4,18 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "predev": "prisma db push && tsx prisma/seed.ts",
+    "predev": "tsx scripts/prisma-database.ts sync && tsx prisma/seed.ts",
+    "postinstall": "tsx scripts/prisma-database.ts generate",
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "tsx src/index.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "db:generate": "prisma generate",
-    "db:push": "prisma db push",
+    "db:generate": "tsx scripts/prisma-database.ts generate",
+    "db:push": "tsx scripts/prisma-database.ts push",
+    "db:sync": "tsx scripts/prisma-database.ts sync",
     "db:seed": "tsx prisma/seed.ts",
-    "db:init": "prisma db push && tsx prisma/seed.ts"
+    "db:init": "tsx scripts/prisma-database.ts sync && tsx prisma/seed.ts"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.2",

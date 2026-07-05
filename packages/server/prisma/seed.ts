@@ -1,8 +1,6 @@
-import { PrismaClient } from "@prisma/client";
 import initData from "../../../templates/init.json" assert { type: "json" };
 import { gridToCelldata } from "@openexcel/core";
-
-const prisma = new PrismaClient();
+import { prisma } from "../src/infra/db.js";
 
 async function main() {
   const workspace = await prisma.workspace.upsert({

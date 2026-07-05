@@ -133,6 +133,10 @@ Responsibilities:
 - Session title generation
 - Authentication, if needed
 
+The server's database layer should be selectable at startup by configuration.
+The current implementation can keep multiple Prisma clients available and pick one from `DATABASE_PROVIDER` and `DATABASE_URL` when the process starts.
+That gives us restart-based switching between database sources without runtime hot-swapping.
+
 Server code may depend on `agent`, but should not duplicate agent logic.
 
 #### 3.3.1 Recommended server directory layout
