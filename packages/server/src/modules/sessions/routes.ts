@@ -33,12 +33,14 @@ export async function sessionRoutes(app: FastifyInstance) {
     return session;
   });
 
-  app.get<{ Params: { workspaceId: string; sessionId: string } }>("/api/workspaces/:workspaceId/sessions/:sessionId/messages", async (req, reply) => {
+  app.get<{ Params: { workspaceId: string; sessionId: string }; Querystring: { limit?: string; offset?: string } }>("/api/workspaces/:workspaceId/sessions/:sessionId/messages", async (req, reply) => {
     const workspaceId = await resolveWorkspaceId(req, req.params.workspaceId, reply);
     if (workspaceId == null) return;
     const session = await service.getSession(workspaceId, Number(req.params.sessionId));
     if (!session) return reply.status(404).send({ error: "Session not found" });
-    return service.getMessages(workspaceId, Number(req.params.sessionId));
+    const limit = Math.min(Number(req.query.limit) || 40, 200);
+    const offset = Number(req.query.offset) || 0;
+    return service.getMessages(workspaceId, Number(req.params.sessionId), limit, offset);
   });
 
   app.get<{ Params: { workspaceId: string; sessionId: string } }>("/api/workspaces/:workspaceId/sessions/:sessionId/runs", async (req, reply) => {

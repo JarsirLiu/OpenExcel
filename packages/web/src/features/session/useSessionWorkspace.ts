@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   createSession,
   deleteSession,
@@ -9,17 +9,23 @@ import {
 import { fetchMessages as fetchChatMessages, undoLatestRun as undoLatestChatRun } from "@/api/chat";
 import { getFirstUserText } from "./utils";
 
+const PAGE_SIZE = 40;
+
 type UndoState = "idle" | "loading" | "success" | "error";
 
 export function useSessionWorkspace(workspaceId: number | null, onUndoComplete?: () => void) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<number | null>(null);
-  const [initialMessages, setInitialMessages] = useState<any[]>([]);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [messageTotal, setMessageTotal] = useState(0);
   const [initialLoaded, setInitialLoaded] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [undoState, setUndoState] = useState<UndoState>("idle");
   const [undoError, setUndoError] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
+  const [draftPendingText, setDraftPendingText] = useState<string | null>(null);
+  const loadedOffsetRef = useRef(0);
 
   const refreshSessions = useCallback(async () => {
     if (workspaceId == null) {
@@ -47,16 +53,19 @@ export function useSessionWorkspace(workspaceId: number | null, onUndoComplete?:
   useEffect(() => {
     let cancelled = false;
     setInitialLoaded(false);
+    setMessages([]);
+    setMessageTotal(0);
+    loadedOffsetRef.current = 0;
 
     const loadInitialMessages = async () => {
       try {
         if (workspaceId != null && currentSessionId) {
-          const msgs = await fetchChatMessages(workspaceId, currentSessionId);
+          const { messages: msgs, total } = await fetchChatMessages(workspaceId, currentSessionId, PAGE_SIZE, 0);
           if (!cancelled) {
-            setInitialMessages(msgs);
+            setMessages(msgs);
+            setMessageTotal(total);
+            loadedOffsetRef.current = msgs.length;
           }
-        } else if (!cancelled) {
-          setInitialMessages([]);
         }
       } finally {
         if (!cancelled) {
@@ -71,6 +80,44 @@ export function useSessionWorkspace(workspaceId: number | null, onUndoComplete?:
     };
   }, [currentSessionId, workspaceId]);
 
+  const loadMoreMessages = useCallback(async () => {
+    if (!currentSessionId || workspaceId == null || loadingMore) return;
+    if (loadedOffsetRef.current >= messageTotal) return;
+
+    setLoadingMore(true);
+    try {
+      const { messages: olderMsgs } = await fetchChatMessages(
+        workspaceId, currentSessionId, PAGE_SIZE, loadedOffsetRef.current,
+      );
+      setMessages((prev) => [...olderMsgs, ...prev]);
+      loadedOffsetRef.current += olderMsgs.length;
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [currentSessionId, loadingMore, messageTotal, workspaceId]);
+
+  const ensureSession = useCallback(async () => {
+    if (currentSessionId != null) return currentSessionId;
+    if (workspaceId == null) throw new Error("No workspace");
+    const session = await createSession(workspaceId);
+    setCurrentSessionId(session.id);
+    setSessions((prev) => [session, ...prev]);
+    return session.id;
+  }, [currentSessionId, workspaceId]);
+
+  const handleSendInDraft = useCallback(async (text: string) => {
+    setDraftPendingText(text);
+    if (workspaceId == null) throw new Error("No workspace");
+    const session = await createSession(workspaceId);
+    setCurrentSessionId(session.id);
+    setSessions((prev) => [session, ...prev]);
+    return session.id;
+  }, [workspaceId]);
+
+  const clearDraftPendingText = useCallback(() => {
+    setDraftPendingText(null);
+  }, []);
+
   useEffect(() => {
     setUndoState("idle");
     setUndoError("");
@@ -82,17 +129,19 @@ export function useSessionWorkspace(workspaceId: number | null, onUndoComplete?:
     return () => window.clearTimeout(timer);
   }, [undoState]);
 
-  const handleNewSession = useCallback(async () => {
-    if (workspaceId == null) return;
-    const session = await createSession(workspaceId);
-    setSessions((prev) => [session, ...prev.filter((item) => item.id !== session.id)]);
-    setCurrentSessionId(session.id);
+  const handleNewSession = useCallback(() => {
+    setCurrentSessionId(null);
+    setMessages([]);
+    setMessageTotal(0);
+    setInitialLoaded(true);
     setHistoryOpen(false);
-  }, [workspaceId]);
+    setDraftPendingText(null);
+  }, []);
 
   const handleSelectSession = useCallback((id: number) => {
     setCurrentSessionId(id);
     setHistoryOpen(false);
+    setDraftPendingText(null);
   }, []);
 
   const handleDeleteSession = useCallback(async (id: number) => {
@@ -118,6 +167,10 @@ export function useSessionWorkspace(workspaceId: number | null, onUndoComplete?:
     } catch (error) {
       console.error("[session] Failed to refresh sessions after title update:", error);
     }
+
+    setMessages(finishedMessages);
+    setMessageTotal(finishedMessages.length);
+    loadedOffsetRef.current = finishedMessages.length;
   }, [refreshSessions, workspaceId]);
 
   const handleUndoLatestRun = useCallback(async () => {
@@ -138,8 +191,10 @@ export function useSessionWorkspace(workspaceId: number | null, onUndoComplete?:
   return {
     sessions,
     currentSessionId,
-    initialMessages,
+    messages,
+    messageTotal,
     initialLoaded,
+    loadingMore,
     historyOpen,
     setHistoryOpen,
     undoState,
@@ -147,6 +202,11 @@ export function useSessionWorkspace(workspaceId: number | null, onUndoComplete?:
     isStreaming,
     setIsStreaming,
     refreshSessions,
+    ensureSession,
+    loadMoreMessages,
+    handleSendInDraft,
+    draftPendingText,
+    clearDraftPendingText,
     handleRunComplete,
     handleNewSession,
     handleSelectSession,

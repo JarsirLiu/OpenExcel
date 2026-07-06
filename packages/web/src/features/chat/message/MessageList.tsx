@@ -1,16 +1,24 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { MessageItem } from "./MessageItem";
 
 export function MessageList({
   messages,
   isStreaming,
   onRegenerate,
+  loadingOlder,
+  hasOlder,
+  onLoadOlder,
 }: {
   messages: any[];
   isStreaming: boolean;
   onRegenerate?: () => void;
+  loadingOlder?: boolean;
+  hasOlder?: boolean;
+  onLoadOlder?: () => void;
 }) {
+  const containerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const prevMessageCount = useRef(messages.length);
 
   useEffect(() => {
     const el = messagesEndRef.current;
@@ -19,10 +27,37 @@ export function MessageList({
     }
   }, [messages, isStreaming]);
 
+  const handleScroll = useCallback(() => {
+    const el = containerRef.current;
+    if (!el || !hasOlder || loadingOlder || !onLoadOlder) return;
+    if (el.scrollTop <= 60) {
+      onLoadOlder();
+    }
+  }, [hasOlder, loadingOlder, onLoadOlder]);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || !hasOlder || !onLoadOlder) return;
+    el.addEventListener("scroll", handleScroll);
+    return () => el.removeEventListener("scroll", handleScroll);
+  }, [handleScroll, hasOlder, onLoadOlder]);
+
   const lastAssistantMsg = [...messages].reverse().find((m) => m.role === "assistant");
 
   return (
-    <div style={{ flex: 1, overflowY: "auto", padding: "20px 16px" }}>
+    <div ref={containerRef} style={{ flex: 1, overflowY: "auto", padding: "20px 16px" }}>
+      {loadingOlder && (
+        <div style={{ textAlign: "center", padding: 12, color: "var(--hint-foreground)", fontSize: 13 }}>
+          加载更早消息...
+        </div>
+      )}
+
+      {!loadingOlder && hasOlder && (
+        <div style={{ textAlign: "center", padding: 12, color: "var(--hint-foreground)", fontSize: 13 }}>
+          向上滚动加载更早消息
+        </div>
+      )}
+
       {messages.length === 0 && (
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", padding: "0 24px" }}>
           <div style={{ color: "var(--muted-foreground)", fontSize: 14, fontWeight: 500, marginBottom: 6 }}>
@@ -33,9 +68,9 @@ export function MessageList({
           </div>
         </div>
       )}
-      {messages.map((msg) => (
+      {messages.map((msg: any, idx: number) => (
         <MessageItem
-          key={msg.id}
+          key={msg.id ?? idx}
           msg={msg}
           isStreaming={isStreaming}
           isLastAssistantMessage={!isStreaming && msg.role === "assistant" && msg.id === lastAssistantMsg?.id}

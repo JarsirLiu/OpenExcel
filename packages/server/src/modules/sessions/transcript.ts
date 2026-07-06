@@ -13,3 +13,13 @@ export async function getSessionMessages(workspaceId: number, sessionId: number)
     return [];
   }
 }
+
+export async function getSessionMessagesPaginated(
+  workspaceId: number, sessionId: number, limit: number, offset: number,
+): Promise<{ messages: any[]; total: number }> {
+  const all = await getSessionMessages(workspaceId, sessionId);
+  const total = all.length;
+  const start = Math.max(0, total - offset - limit);
+  const end = total - offset;
+  return { messages: all.slice(start, end), total };
+}

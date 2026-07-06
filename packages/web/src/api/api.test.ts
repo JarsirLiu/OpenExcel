@@ -102,13 +102,14 @@ describe("deleteSheet", () => {
 });
 
 describe("fetchMessages", () => {
-  it("returns parsed messages", async () => {
+  it("returns paginated messages", async () => {
     const msgs = [{ id: "1", role: "user", content: "hi" }];
-    mockFetch.mockResolvedValue(new Response(JSON.stringify(msgs), { status: 200 }));
+    const body = { messages: msgs, total: 1 };
+    mockFetch.mockResolvedValue(new Response(JSON.stringify(body), { status: 200 }));
 
     const result = await fetchMessages(9, 3);
-    expect(result).toEqual(msgs);
-    expect(mockFetch).toHaveBeenCalledWith("/api/workspaces/9/sessions/3/messages", {});
+    expect(result).toEqual(body);
+    expect(mockFetch).toHaveBeenCalledWith("/api/workspaces/9/sessions/3/messages?limit=40&offset=0", {});
   });
 });
 

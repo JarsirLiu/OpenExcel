@@ -17,16 +17,21 @@ type Props = {
   workspaceId: number | null;
   sessions: Session[];
   currentSessionId: number | null;
-  initialMessages: any[];
+  messages: any[];
+  messageTotal: number;
   initialLoaded: boolean;
+  loadingMore: boolean;
   historyOpen: boolean;
   setHistoryOpen: (next: boolean) => void;
   undoState: "idle" | "loading" | "success" | "error";
   undoError: string;
   isStreaming: boolean;
   setIsStreaming: (next: boolean) => void;
+  handleSendInDraft: (text: string) => Promise<number>;
+  draftPendingText: string | null;
+  clearDraftPendingText: () => void;
   handleRunComplete: (sessionId: number, messages: any[]) => Promise<void>;
-  handleNewSession: () => Promise<void>;
+  handleNewSession: () => void;
   handleSelectSession: (id: number) => void;
   handleDeleteSession: (id: number) => Promise<void>;
   handleUndoLatestRun: () => Promise<void>;
@@ -42,14 +47,19 @@ export function SessionShell({
   workspaceId,
   sessions,
   currentSessionId,
-  initialMessages,
+  messages,
+  messageTotal,
   initialLoaded,
+  loadingMore,
   historyOpen,
   setHistoryOpen,
   undoState,
   undoError,
   isStreaming,
   setIsStreaming,
+  handleSendInDraft,
+  draftPendingText,
+  clearDraftPendingText,
   handleRunComplete,
   handleNewSession,
   handleSelectSession,
@@ -75,7 +85,9 @@ export function SessionShell({
     return () => document.removeEventListener("mousedown", handler);
   }, [historyOpen, setHistoryOpen]);
 
-  const currentSession = sessions.find((session) => session.id === currentSessionId);
+  const currentSession = currentSessionId != null
+    ? sessions.find((session) => session.id === currentSessionId)
+    : null;
 
   if (workspaceId == null) {
     return (
@@ -111,12 +123,16 @@ export function SessionShell({
         </div>
       )}
 
-      {currentSessionId && initialLoaded ? (
+      {initialLoaded ? (
         <ChatPanel
-          key={currentSessionId}
+          key={currentSessionId ?? "draft"}
           workspaceId={workspaceId}
           sessionId={currentSessionId}
-          initialMessages={initialMessages}
+          messages={messages}
+          messageTotal={messageTotal}
+          onSendInDraft={handleSendInDraft}
+          draftPendingText={draftPendingText}
+          onDraftSent={clearDraftPendingText}
           onRunComplete={handleRunComplete}
           onSheetChanged={onSheetChanged}
           onWorkbookStructureChanged={onWorkbookStructureChanged}
