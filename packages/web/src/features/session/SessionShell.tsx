@@ -6,6 +6,11 @@ import { SessionHistoryPopover } from "./components/SessionHistoryPopover";
 import type { Session } from "../../api/sessions";
 import type { WorkbookStructureUpdate } from "../chat/hooks/useSheetPatchSync";
 
+type CurrentUser = {
+  email: string;
+  displayName: string;
+};
+
 type Props = {
   workspaceId: number | null;
   sessions: Session[];
@@ -27,6 +32,8 @@ type Props = {
   onSheetChanged?: (sheetId: number, delta: SheetChangeDelta | null) => void;
   onWorkbookStructureChanged?: (update: WorkbookStructureUpdate) => void;
   referenceCacheRevision: number;
+  currentUser: CurrentUser;
+  onLogout: () => void;
 };
 
 export function SessionShell({
@@ -50,6 +57,8 @@ export function SessionShell({
   onSheetChanged,
   onWorkbookStructureChanged,
   referenceCacheRevision,
+  currentUser,
+  onLogout,
 }: Props) {
   const historyRef = useRef<HTMLDivElement>(null);
 
@@ -91,6 +100,8 @@ export function SessionShell({
         onUndoLatestRun={handleUndoLatestRun}
         onToggleHistory={() => setHistoryOpen(!historyOpen)}
         onNewSession={() => void handleNewSession()}
+        currentUser={currentUser}
+        onLogout={onLogout}
       />
 
       {historyOpen && (

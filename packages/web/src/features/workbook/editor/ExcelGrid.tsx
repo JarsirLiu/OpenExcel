@@ -50,39 +50,7 @@ export function ExcelGrid({
   if (!workbook) return null;
 
   return (
-    <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0, position: "relative" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 8px", background: "#f5f5f5", borderBottom: "1px solid #e0e4ea" }}>
-        <span style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{workbook.name}</span>
-        <button
-          onClick={handleDownload}
-          style={{
-            fontSize: 12,
-            padding: "2px 10px",
-            cursor: "pointer",
-            border: "1px solid #ccc",
-            borderRadius: 4,
-            background: "#fff",
-          }}
-        >
-          下载 Excel
-        </button>
-        <button
-          onClick={() => void handleDeleteWorkbook()}
-          style={{
-            fontSize: 12,
-            padding: "2px 10px",
-            cursor: "pointer",
-            border: "1px solid #ccc",
-            borderRadius: 4,
-            background: "#fff",
-            color: "#d32f2f",
-          }}
-        >
-          删除 Excel
-        </button>
-        {saveStatus === "saving" && <span style={{ fontSize: 12, color: "#f0ad4e" }}>保存中...</span>}
-        {saveStatus === "saved" && <span style={{ fontSize: 12, color: "#5cb85c" }}>已保存</span>}
-      </div>
+    <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0 }}>
       <div style={{ flex: 1, minHeight: 0 }}>
         <Workbook
           key={`${workbook.id}:${sessionKey}`}

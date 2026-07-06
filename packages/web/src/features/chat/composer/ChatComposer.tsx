@@ -139,21 +139,6 @@ export function ChatComposer({
           </button>
         </div>
       </div>
-
-      {/* Footer */}
-      <div style={{
-        marginTop: 10, display: "flex", alignItems: "center", justifyContent: "space-between",
-        fontSize: 12, color: "var(--hint-foreground)",
-      }}>
-        <span style={{ color: "var(--accent)", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
-          <svg width={12} height={12} viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5Z" />
-          </svg>
-          升级
-        </span>
-        <span>以上内容均由AI生成，仅供参考和借鉴</span>
-        <span>GB ENG</span>
-      </div>
     </div>
   );
 }

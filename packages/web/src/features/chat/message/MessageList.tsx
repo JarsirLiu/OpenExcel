@@ -24,8 +24,13 @@ export function MessageList({
   return (
     <div style={{ flex: 1, overflowY: "auto", padding: "20px 16px" }}>
       {messages.length === 0 && (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "var(--hint-foreground)", fontSize: 14 }}>
-          开始新的对话吧
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", padding: "0 24px" }}>
+          <div style={{ color: "var(--muted-foreground)", fontSize: 14, fontWeight: 500, marginBottom: 6 }}>
+            开始新的对话
+          </div>
+          <div style={{ color: "var(--hint-foreground)", fontSize: 12, lineHeight: 1.6, textAlign: "center" }}>
+            使用 @ 来引用表格内容，让 AI 帮你修改
+          </div>
         </div>
       )}
       {messages.map((msg) => (
