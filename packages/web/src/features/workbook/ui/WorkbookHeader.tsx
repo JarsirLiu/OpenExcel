@@ -40,6 +40,9 @@ export function WorkbookHeader({
 }: Props) {
   return (
     <div className={styles.header}>
+      <span className={styles.brandMark}>
+        <span className={styles.brandMarkLine} />
+      </span>
       <div className={styles.tabList}>
         {workbooks.map((wb, i) => (
           <div

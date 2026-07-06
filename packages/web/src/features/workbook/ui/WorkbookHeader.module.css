@@ -7,6 +7,33 @@
   border-bottom: 1px solid var(--border-default);
 }
 
+.brandMark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  position: relative;
+}
+
+.brandMark::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 2px solid var(--text-primary);
+  border-radius: 4px;
+}
+
+.brandMarkLine {
+  display: inline-block;
+  width: 6px;
+  height: 2px;
+  background: var(--text-primary);
+  border-radius: 1px;
+  position: relative;
+  z-index: 1;
+}
+
 .tabList {
   display: flex;
   gap: 4px;
@@ -21,6 +48,7 @@
   cursor: pointer;
   border-radius: 8px 8px 0 0;
   font-size: 12px;
+  font-family: Georgia, "Times New Roman", serif;
   white-space: nowrap;
   border: 1px solid transparent;
   border-bottom: none;

@@ -125,7 +125,7 @@ export function SessionHeader({
           </div>
           <div
             onClick={onNewSession}
-            className={`${styles.pillBtn} ${styles.plusBtn}`}
+            className={`${styles.pillBtn} ${styles.plusBtn} ${styles.plusBtnSolid}`}
             title={t("new_chat", "新建对话")}
           >
             +
