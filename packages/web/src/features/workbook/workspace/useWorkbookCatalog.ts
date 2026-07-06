@@ -1,13 +1,34 @@
-import { useState, useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchWorkbooks, fetchWorkbook, uploadExcel, type WorkbookFull } from "@/api/workbooks";
+
+const STORAGE_KEY_IDX = "openexcel:workbookIdx";
+
+function loadStoredIdx(): number {
+  try {
+    const stored = sessionStorage.getItem(STORAGE_KEY_IDX);
+    return stored !== null ? Math.max(0, Number(stored)) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function saveIdx(idx: number) {
+  try {
+    sessionStorage.setItem(STORAGE_KEY_IDX, String(idx));
+  } catch {
+    // ignore
+  }
+}
 
 export function useWorkbookCatalog(workspaceId: number | null) {
   const [workbooks, setWorkbooks] = useState<{ id: number; name: string }[]>([]);
-  const [workbookIdx, setWorkbookIdx] = useState(0);
+  const [workbookIdx, setWorkbookIdx] = useState(loadStoredIdx);
   const [currentWorkbook, setCurrentWorkbook] = useState<WorkbookFull | null>(null);
   const [workbookRevision, setWorkbookRevision] = useState(0);
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(true);
+
+  const initialIdxRef = useRef(loadStoredIdx());
 
   const replaceCurrentWorkbook = useCallback((next: WorkbookFull | null) => {
     setCurrentWorkbook(next);
@@ -26,13 +47,18 @@ export function useWorkbookCatalog(workspaceId: number | null) {
 
     setLoading(true);
     let cancelled = false;
+    const intendedIdx = initialIdxRef.current;
 
     fetchWorkbooks(workspaceId)
       .then((list) => {
         if (cancelled) return;
         const safeList = Array.isArray(list) ? list : [];
         setWorkbooks(safeList);
-        if (safeList.length > 0) return fetchWorkbook(workspaceId, safeList[0].id);
+        if (safeList.length > 0) {
+          const targetIdx = Math.min(intendedIdx, safeList.length - 1);
+          setWorkbookIdx(targetIdx);
+          return fetchWorkbook(workspaceId, safeList[targetIdx].id);
+        }
         return null;
       })
       .then((wb) => {
@@ -50,6 +76,10 @@ export function useWorkbookCatalog(workspaceId: number | null) {
 
     return () => { cancelled = true; };
   }, [replaceCurrentWorkbook, workspaceId]);
+
+  useEffect(() => {
+    saveIdx(workbookIdx);
+  }, [workbookIdx]);
 
   const switchWorkbook = useCallback(async (idx: number) => {
     setWorkbookIdx(idx);

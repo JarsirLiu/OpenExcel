@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, waitFor } from "@testing-library/react";
+import { HashRouter } from "react-router-dom";
 import type { SheetSchema } from "./api/workbooks";
 
 vi.mock("./app/Workbench.js", () => ({
@@ -31,7 +32,7 @@ describe("App", () => {
   });
 
   it("renders the workbench when authenticated", async () => {
-    const { container } = render(<App />);
+    const { container } = render(<HashRouter><App /></HashRouter>);
     await waitFor(() => {
       expect(container.querySelector('[data-testid="workbench"]')).toBeTruthy();
     });

@@ -1,9 +1,32 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchWorkspaces, type Workspace } from "@/api/workspaces";
 
+const STORAGE_KEY = "openexcel:activeWorkspaceId";
+
+function loadStoredWorkspaceId(): number | null {
+  try {
+    const stored = sessionStorage.getItem(STORAGE_KEY);
+    return stored !== null ? Number(stored) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveWorkspaceId(id: number | null) {
+  try {
+    if (id != null) {
+      sessionStorage.setItem(STORAGE_KEY, String(id));
+    } else {
+      sessionStorage.removeItem(STORAGE_KEY);
+    }
+  } catch {
+    // sessionStorage may be unavailable
+  }
+}
+
 export function useWorkspaceState() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
-  const [activeWorkspaceId, setActiveWorkspaceId] = useState<number | null>(null);
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState<number | null>(loadStoredWorkspaceId);
   const [loading, setLoading] = useState(true);
   const cancelledRef = useRef(false);
 
@@ -37,6 +60,10 @@ export function useWorkspaceState() {
       cancelledRef.current = true;
     };
   }, [load]);
+
+  useEffect(() => {
+    saveWorkspaceId(activeWorkspaceId);
+  }, [activeWorkspaceId]);
 
   const activeWorkspace = useMemo(
     () => workspaces.find((workspace) => workspace.id === activeWorkspaceId) ?? null,

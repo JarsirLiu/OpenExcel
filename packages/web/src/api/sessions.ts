@@ -2,6 +2,7 @@ import { apiFetch, readErrorMessage } from "./http";
 
 export interface Session {
   id: number;
+  publicId: string;
   sheetId: number | null;
   name: string;
   createdAt: string;

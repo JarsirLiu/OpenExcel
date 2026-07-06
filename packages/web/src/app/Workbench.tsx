@@ -1,4 +1,5 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { ChatSidebar } from "@/features/chat/ChatSidebar";
 import { WorkbookWorkspace } from "@/features/workbook/workspace/WorkbookWorkspace";
 import { useWorkbookWorkspace } from "@/features/workbook/workspace/useWorkbookWorkspace";
@@ -19,9 +20,28 @@ type Props = {
 const MIN_SIDEBAR_WIDTH = 300;
 
 export function Workbench({ currentUser, onLogout }: Props) {
-  const { activeWorkspaceId, setActiveWorkspaceId, loading: workspaceLoading } = useWorkspaceState();
+  const navigate = useNavigate();
+  const params = useParams<{ workspacePublicId?: string; workbookPublicId?: string; sessionPublicId?: string }>();
+  const { workspaces, activeWorkspaceId, setActiveWorkspaceId, loading: workspaceLoading } = useWorkspaceState();
   const [sidebarWidth, setSidebarWidth] = useState(MIN_SIDEBAR_WIDTH);
   const rafRef = useRef<number | null>(null);
+
+  const activeWorkspacePublicId = workspaces.find((w) => w.id === activeWorkspaceId)?.publicId ?? null;
+
+  useEffect(() => {
+    if (params.workspacePublicId && workspaces.length > 0) {
+      const matched = workspaces.find((w) => w.publicId === params.workspacePublicId);
+      if (matched && matched.id !== activeWorkspaceId) {
+        setActiveWorkspaceId(matched.id);
+      }
+    }
+  }, [params.workspacePublicId, workspaces, activeWorkspaceId, setActiveWorkspaceId]);
+
+  useEffect(() => {
+    if (activeWorkspacePublicId && activeWorkspacePublicId !== params.workspacePublicId) {
+      navigate(`/workspaces/${activeWorkspacePublicId}`, { replace: true });
+    }
+  }, [activeWorkspacePublicId, params.workspacePublicId, navigate]);
 
   const handleResizeMouseDown = useCallback(
     (e: React.MouseEvent) => {
@@ -59,6 +79,7 @@ export function Workbench({ currentUser, onLogout }: Props) {
     },
     [sidebarWidth],
   );
+
   const {
     workbooks,
     workbookIdx,

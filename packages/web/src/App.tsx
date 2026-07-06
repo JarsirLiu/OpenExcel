@@ -1,4 +1,5 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { AuthScreen } from "@/features/auth/AuthScreen";
 import { useAuthState } from "@/features/auth/useAuthState";
 import { ConfirmDialog } from "@/shared/ui";
@@ -24,6 +25,20 @@ function LoadingScreen() {
 
 export default function App() {
   const auth = useAuthState();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const authMode = location.pathname === "/register" ? "register" : "login";
+
+  useEffect(() => {
+    if (auth.loading) return;
+    if (auth.currentUser && (location.pathname === "/login" || location.pathname === "/register")) {
+      navigate("/", { replace: true });
+    }
+    if (!auth.currentUser && location.pathname !== "/login" && location.pathname !== "/register") {
+      navigate("/login", { replace: true });
+    }
+  }, [auth.currentUser, auth.loading, location.pathname, navigate]);
 
   if (auth.loading) {
     return <LoadingScreen />;
@@ -32,10 +47,12 @@ export default function App() {
   if (!auth.currentUser) {
     return (
       <AuthScreen
+        mode={authMode}
         submitting={auth.submitting}
         error={auth.error}
         onLogin={auth.signIn}
         onRegister={auth.signUp}
+        onSwitchMode={() => navigate(authMode === "login" ? "/register" : "/login")}
       />
     );
   }

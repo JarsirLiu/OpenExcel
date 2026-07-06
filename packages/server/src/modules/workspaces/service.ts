@@ -1,6 +1,7 @@
 import { prisma } from "../../infra/database/db.js";
 import * as repo from "./repository.js";
 import { buildBlankSheetInitialization, normalizeWorkbookName } from "../workbooks/create/creation.js";
+import { generateWorkspacePublicId, generateWorkbookPublicId, generateSessionPublicId } from "../../shared/utils/publicId.js";
 
 export class WorkspaceNotFoundError extends Error {
   statusCode: number;
@@ -14,6 +15,10 @@ export class WorkspaceNotFoundError extends Error {
 
 export async function getWorkspaces(ownerUserId: number) {
   return repo.findWorkspaces(ownerUserId);
+}
+
+export async function getWorkspaceById(id: number) {
+  return repo.findWorkspaceById(id);
 }
 
 export async function getWorkspace(id: number, ownerUserId: number) {
@@ -49,6 +54,7 @@ export async function createWorkspace(ownerUserId: number, name?: string) {
 
     const workspace = await tx.workspace.create({
       data: {
+        publicId: generateWorkspacePublicId(),
         ownerUserId,
         name: workspaceName,
         order: nextOrder,
@@ -57,6 +63,7 @@ export async function createWorkspace(ownerUserId: number, name?: string) {
 
     const workbook = await tx.workbook.create({
       data: {
+        publicId: generateWorkbookPublicId(),
         workspaceId: workspace.id,
         name: normalizeWorkbookName(),
         order: 0,
@@ -79,6 +86,7 @@ export async function createWorkspace(ownerUserId: number, name?: string) {
 
     const session = await tx.session.create({
       data: {
+        publicId: generateSessionPublicId(),
         workspaceId: workspace.id,
         name: "新对话",
         sheetId: null,
@@ -89,6 +97,7 @@ export async function createWorkspace(ownerUserId: number, name?: string) {
       workspace,
       workbook: {
         id: workbook.id,
+        publicId: workbook.publicId,
         name: workbook.name,
         order: workbook.order,
         sheets: 1,

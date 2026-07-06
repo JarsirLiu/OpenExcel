@@ -1,6 +1,7 @@
 import * as XLSX from "xlsx";
 import { prisma } from "../../../infra/database/db.js";
 import * as repo from "../repository.js";
+import { generateWorkbookPublicId } from "../../../shared/utils/publicId.js";
 
 function bufferToArrayBuffer(buffer: Buffer): ArrayBuffer | SharedArrayBuffer {
   return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
@@ -143,7 +144,7 @@ export async function uploadAsNewWorkbook(workspaceId: number, buffer: Buffer, f
     });
     const nextOrder = (maxOrder._max.order ?? -1) + 1;
     const wb = await tx.workbook.create({
-      data: { workspaceId, name: wbName, order: nextOrder },
+      data: { publicId: generateWorkbookPublicId(), workspaceId, name: wbName, order: nextOrder },
     });
 
     for (let i = 0; i < sheetNames.length; i++) {
@@ -162,6 +163,6 @@ export async function uploadAsNewWorkbook(workspaceId: number, buffer: Buffer, f
       });
     }
 
-    return { id: wb.id, name: wbName, sheets: sheetNames.length };
+    return { id: wb.id, publicId: wb.publicId, name: wbName, sheets: sheetNames.length };
   });
 }

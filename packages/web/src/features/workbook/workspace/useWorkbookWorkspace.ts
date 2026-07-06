@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { SheetChangeDelta } from "@openexcel/core";
 import {
   deleteWorkbook,
@@ -14,6 +14,17 @@ import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatc
 
 function sortWorkbooks(list: WorkbookMeta[]): WorkbookMeta[] {
   return [...list].sort((a, b) => a.order - b.order || a.id - b.id);
+}
+
+const SHEET_STORAGE_KEY = "openexcel:sheetIdx";
+
+function loadStoredSheetIdx(): number {
+  try {
+    const stored = sessionStorage.getItem(SHEET_STORAGE_KEY);
+    return stored !== null ? Math.max(0, Number(stored)) : 0;
+  } catch {
+    return 0;
+  }
 }
 
 export function useWorkbookWorkspace(workspaceId: number | null) {
@@ -32,12 +43,20 @@ export function useWorkbookWorkspace(workspaceId: number | null) {
     workbookRevision,
   } = useWorkbookCatalog(workspaceId);
 
-  const [currentSheetIndex, setCurrentSheetIndex] = useState(0);
+  const [currentSheetIndex, setCurrentSheetIndex] = useState(loadStoredSheetIdx);
   const [referenceCacheRevision, setReferenceCacheRevision] = useState(0);
 
   const invalidateReferenceCache = useCallback(() => {
     setReferenceCacheRevision((revision) => revision + 1);
   }, []);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(SHEET_STORAGE_KEY, String(currentSheetIndex));
+    } catch {
+      // ignore
+    }
+  }, [currentSheetIndex]);
 
   const refreshCurrentWorkbook = useCallback(async () => {
     if (!currentWorkbook || workspaceId == null) return;

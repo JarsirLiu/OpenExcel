@@ -2,6 +2,7 @@ import { apiFetch } from "./http";
 
 export interface Workspace {
   id: number;
+  publicId: string;
   name: string;
   order: number;
 }

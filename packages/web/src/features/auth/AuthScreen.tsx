@@ -4,17 +4,18 @@ import { Button } from "@/components/ui/Button/Button";
 import { Input } from "@/components/ui/Input/Input";
 import styles from "./AuthScreen.module.css";
 
-type AuthMode = "login" | "register";
+export type AuthMode = "login" | "register";
 
 type Props = {
+  mode: AuthMode;
   submitting: boolean;
   error: string | null;
   onLogin: (input: { email: string; password: string }) => Promise<unknown>;
   onRegister: (input: { email: string; password: string; displayName?: string }) => Promise<unknown>;
+  onSwitchMode: () => void;
 };
 
-export function AuthScreen({ submitting, error, onLogin, onRegister }: Props) {
-  const [mode, setMode] = useState<AuthMode>("login");
+export function AuthScreen({ mode, submitting, error, onLogin, onRegister, onSwitchMode }: Props) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -111,7 +112,7 @@ export function AuthScreen({ submitting, error, onLogin, onRegister }: Props) {
             <button
               type="button"
               className={styles.switchLink}
-              onClick={() => setMode(mode === "login" ? "register" : "login")}
+              onClick={onSwitchMode}
             >
               {mode === "login" ? t("sign_up", "注册") : t("sign_in", "登录")}
             </button>

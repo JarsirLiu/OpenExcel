@@ -1,0 +1,4 @@
+-- publicId columns already exist and are populated from the previous migration.
+-- This migration marks the constraint changes (NOT NULL + DEFAULT) for Prisma's schema tracking.
+-- SQLite does not support ALTER TABLE ADD NOT NULL, so the NOT NULL constraint
+-- is enforced at the Prisma Client level rather than the database level.

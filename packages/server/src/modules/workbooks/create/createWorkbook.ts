@@ -1,8 +1,10 @@
 import { prisma } from "../../../infra/database/db.js";
 import { normalizeSheetName, normalizeWorkbookName, buildBlankSheetInitialization, buildSourceSheetInitialization, WorkbookCreationError } from "./creation.js";
+import { generateWorkbookPublicId } from "../../../shared/utils/publicId.js";
 
 export type CreateWorkbookResult = {
   id: number;
+  publicId: string;
   name: string;
   order: number;
   sheets: number;
@@ -32,6 +34,7 @@ export async function createWorkbook(
 
     const workbook = await tx.workbook.create({
       data: {
+        publicId: generateWorkbookPublicId(),
         workspaceId,
         name: workbookName,
         order: nextOrder,
@@ -68,6 +71,7 @@ export async function createWorkbook(
 
     return {
       id: workbook.id,
+      publicId: workbook.publicId,
       name: workbook.name,
       order: workbook.order,
       sheets: 1,

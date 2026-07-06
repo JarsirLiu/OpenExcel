@@ -11,11 +11,34 @@ import { getFirstUserText } from "./utils";
 
 const PAGE_SIZE = 40;
 
+const SESSION_STORAGE_KEY = "openexcel:sessionId";
+
+function loadStoredSessionId(): number | null {
+  try {
+    const stored = sessionStorage.getItem(SESSION_STORAGE_KEY);
+    return stored !== null ? Number(stored) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveSessionId(id: number | null) {
+  try {
+    if (id != null) {
+      sessionStorage.setItem(SESSION_STORAGE_KEY, String(id));
+    } else {
+      sessionStorage.removeItem(SESSION_STORAGE_KEY);
+    }
+  } catch {
+    // ignore
+  }
+}
+
 type UndoState = "idle" | "loading" | "success" | "error";
 
 export function useSessionWorkspace(workspaceId: number | null, onUndoComplete?: () => void) {
   const [sessions, setSessions] = useState<Session[]>([]);
-  const [currentSessionId, setCurrentSessionId] = useState<number | null>(null);
+  const [currentSessionId, setCurrentSessionId] = useState<number | null>(loadStoredSessionId);
   const [messages, setMessages] = useState<any[]>([]);
   const [messageTotal, setMessageTotal] = useState(0);
   const [initialLoaded, setInitialLoaded] = useState(false);
@@ -79,6 +102,10 @@ export function useSessionWorkspace(workspaceId: number | null, onUndoComplete?:
       cancelled = true;
     };
   }, [currentSessionId, workspaceId]);
+
+  useEffect(() => {
+    saveSessionId(currentSessionId);
+  }, [currentSessionId]);
 
   const loadMoreMessages = useCallback(async () => {
     if (!currentSessionId || workspaceId == null || loadingMore) return;

@@ -1,4 +1,5 @@
 import { prisma } from "../../infra/database/db.js";
+import { generateSessionPublicId } from "../../shared/utils/publicId.js";
 
 export async function findSessionsByWorkspace(workspaceId: number) {
   return prisma.session.findMany({
@@ -8,7 +9,7 @@ export async function findSessionsByWorkspace(workspaceId: number) {
 }
 
 export async function createSession(workspaceId: number, name: string) {
-  return prisma.session.create({ data: { workspaceId, name, sheetId: null } });
+  return prisma.session.create({ data: { publicId: generateSessionPublicId(), workspaceId, name, sheetId: null } });
 }
 
 export async function deleteSession(id: number, workspaceId: number) {

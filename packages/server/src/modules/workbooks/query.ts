@@ -9,6 +9,7 @@ export async function getReferenceCandidates(workspaceId: number) {
   const workbooks = await repo.findWorkbooksWithSheets(workspaceId);
   return workbooks.map((workbook) => ({
     id: workbook.id,
+    publicId: workbook.publicId,
     name: workbook.name,
     sheets: workbook.sheets.map((sheet) => ({
       id: sheet.id,
@@ -23,6 +24,7 @@ export async function getWorkbook(id: number, workspaceId: number) {
   if (!wb) return null;
   return {
     id: wb.id,
+    publicId: wb.publicId,
     name: wb.name,
     sheets: wb.sheets.map((s) => deserializeSheet(s)),
   };

@@ -10,6 +10,7 @@ datasource db {
 
 model Workbook {
   id          Int       @id @default(autoincrement())
+  publicId    String    @unique
   workspaceId Int
   name        String
   order       Int
@@ -71,6 +72,7 @@ model Sheet {
 
 model Workspace {
   id          Int        @id @default(autoincrement())
+  publicId    String     @unique
   ownerUserId Int
   name        String
   order       Int
@@ -86,6 +88,7 @@ model Workspace {
 
 model Session {
   id           Int        @id @default(autoincrement())
+  publicId     String     @unique
   workspaceId  Int
   sheetId      Int?
   name         String

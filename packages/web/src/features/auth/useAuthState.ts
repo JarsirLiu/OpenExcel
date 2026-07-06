@@ -1,6 +1,23 @@
 import { useEffect, useState } from "react";
 import { fetchCurrentUser, login, logout, register, type CurrentUser } from "@/api/auth";
 
+const SESSION_KEYS = [
+  "openexcel:activeWorkspaceId",
+  "openexcel:workbookIdx",
+  "openexcel:sheetIdx",
+  "openexcel:sessionId",
+];
+
+function clearAllSessionStorage() {
+  try {
+    for (const key of SESSION_KEYS) {
+      sessionStorage.removeItem(key);
+    }
+  } catch {
+    // ignore
+  }
+}
+
 export function useAuthState() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [loading, setLoading] = useState(true);
@@ -70,6 +87,7 @@ export function useAuthState() {
     try {
       await logout();
       setCurrentUser(null);
+      clearAllSessionStorage();
     } catch (err) {
       const message = err instanceof Error ? err.message : "退出失败";
       setError(message);

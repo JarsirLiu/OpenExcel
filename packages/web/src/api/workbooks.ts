@@ -2,6 +2,7 @@ import { API_BASE, apiFetch, readErrorMessage } from "./http";
 
 export interface WorkbookMeta {
   id: number;
+  publicId: string;
   name: string;
   order: number;
 }
@@ -31,6 +32,7 @@ export interface SheetSchema {
 
 export interface WorkbookFull {
   id: number;
+  publicId: string;
   name: string;
   sheets: SheetSchema[];
 }
@@ -46,6 +48,7 @@ export interface WorkbookImportResult {
 
 export interface WorkbookCreateResult {
   id: number;
+  publicId: string;
   name: string;
   order: number;
   sheets: number;
@@ -89,7 +92,7 @@ export async function uploadExcel(workspaceId: number, workbookId: number, file:
   return res.json();
 }
 
-export async function uploadNewWorkbook(workspaceId: number, file: File): Promise<{ id: number; name: string; sheets: number }> {
+export async function uploadNewWorkbook(workspaceId: number, file: File): Promise<{ id: number; publicId: string; name: string; sheets: number }> {
   const form = new FormData();
   form.append("file", file);
   const res = await apiFetch(`/workspaces/${workspaceId}/workbooks/upload`, {

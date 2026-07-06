@@ -29,6 +29,7 @@ describe("buildWorkbookImportPreview", () => {
   it("summarizes matched, missing and extra sheets", async () => {
     const workbook: WorkbookFull = {
       id: 1,
+      publicId: "wb_test",
       name: "Demo",
       sheets: [
         {
