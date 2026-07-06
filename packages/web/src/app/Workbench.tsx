@@ -87,6 +87,7 @@ export function Workbench({ currentUser, onLogout }: Props) {
   return (
     <div className={styles.layout}>
       <WorkspaceSidebar
+        activeWorkspaceId={activeWorkspaceId}
         onActiveWorkspaceChange={setActiveWorkspaceId}
       />
       <div className={styles.main}>

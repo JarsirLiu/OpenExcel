@@ -26,10 +26,16 @@
   justify-content: space-between;
   padding: 0 16px 12px;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+.serif {
+  font-family: Georgia, "Times New Roman", serif;
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 .toggleBtn {
@@ -86,7 +92,7 @@
   cursor: pointer;
   font-size: 14px;
   color: var(--text-primary);
-  transition: background 0.12s ease;
+  transition: background 0.12s ease, color 0.12s ease, transform 0.12s ease;
   border: none;
   background: transparent;
   width: 100%;
@@ -95,11 +101,16 @@
 
 .item:hover {
   background: var(--bg-muted);
+  transform: translateX(2px);
 }
 
 .itemActive {
   background: var(--bg-muted);
   font-weight: 600;
+}
+
+.itemActive:hover {
+  background: var(--bg-muted);
 }
 
 .itemIcon {
@@ -115,7 +126,7 @@
 .createBtn {
   margin: 8px 12px 0;
   padding: 8px;
-  border: 1px dashed var(--border-default);
+  border: 1px dashed var(--border-strong);
   border-radius: 6px;
   background: transparent;
   cursor: pointer;
@@ -131,7 +142,7 @@
 .createBtn:hover {
   background: var(--bg-muted);
   color: var(--text-primary);
-  border-color: var(--text-tertiary);
+  border-color: var(--text-secondary);
 }
 
 .resizeHandle {

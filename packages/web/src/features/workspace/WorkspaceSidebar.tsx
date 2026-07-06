@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from "react";
+import { t } from "@/lib/i18n";
 import { createWorkspace } from "@/api/workspaces";
 import { useWorkspaceState } from "./useWorkspaceState";
 import styles from "./WorkspaceSidebar.module.css";
@@ -8,11 +9,12 @@ const DEFAULT_WIDTH = 220;
 const COLLAPSED_WIDTH = 32;
 
 type Props = {
+  activeWorkspaceId: number | null;
   onActiveWorkspaceChange: (id: number) => void;
 };
 
-export function WorkspaceSidebar({ onActiveWorkspaceChange }: Props) {
-  const { workspaces, activeWorkspaceId, refresh: refreshWorkspaces } = useWorkspaceState();
+export function WorkspaceSidebar({ activeWorkspaceId, onActiveWorkspaceChange }: Props) {
+  const { workspaces, refresh: refreshWorkspaces } = useWorkspaceState();
   const [collapsed, setCollapsed] = useState(true);
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_WIDTH);
   const [isResizing, setIsResizing] = useState(false);
@@ -20,7 +22,7 @@ export function WorkspaceSidebar({ onActiveWorkspaceChange }: Props) {
 
   const handleCreate = useCallback(async () => {
     try {
-      const ws = await createWorkspace();
+      const ws = await createWorkspace(t("new_project", "新项目"));
       onActiveWorkspaceChange(ws.id);
       void refreshWorkspaces();
     } catch (e) {
@@ -88,7 +90,7 @@ export function WorkspaceSidebar({ onActiveWorkspaceChange }: Props) {
     <div className={styles.sidebar} style={{ width, ...transitionStyle }}>
       <div className={styles.inner} style={{ width }}>
         <div className={styles.header}>
-          <span>Workspaces</span>
+          <span className={styles.serif}>{t("workspaces", "工作区")}</span>
           <button
             className={styles.toggleBtn}
             onClick={() => setCollapsed(true)}
@@ -118,11 +120,11 @@ export function WorkspaceSidebar({ onActiveWorkspaceChange }: Props) {
           ))}
         </div>
 
-        <button className={styles.createBtn} onClick={handleCreate}>
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
-          New Workspace
+        <button className={`${styles.createBtn} ${styles.serif}`} onClick={handleCreate}>
+<svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+            {t("new_workspace", "新建工作区")}
         </button>
       </div>
       <div className={styles.resizeHandle} onMouseDown={handleResizeMouseDown} />

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { SheetChangeDelta } from "@openexcel/core";
 import { ChatComposer } from "@/features/chat/composer/ChatComposer";
 import { MessageList } from "@/features/chat/message/MessageList";
@@ -6,6 +6,7 @@ import { useChatConversation } from "@/features/chat/hooks/useChatConversation";
 import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatchSync";
 import { t } from "@/lib/i18n";
 import styles from "./ChatPanel.module.css";
+import msgStyles from "@/features/chat/message/MessageList.module.css";
 
 export function ChatPanel({
   sessionId,
@@ -113,12 +114,35 @@ function RealChat({
     onStreamingChange,
   });
 
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+
   useEffect(() => {
     if (draftPendingText) {
       sendMessage(draftPendingText);
       onDraftSent();
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleScroll = useCallback(() => {
+    const el = document.querySelector(`.${msgStyles.messageList}`) as HTMLElement | null;
+    if (!el) return;
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= 80;
+    setShowScrollToBottom(!nearBottom);
+  }, []);
+
+  // Hide when new messages arrive (auto-scroll kicks in)
+  useEffect(() => {
+    setShowScrollToBottom(false);
+  }, [messages, isStreaming]);
+
+  const handleScrollToBottom = useCallback(() => {
+    setShowScrollToBottom(false);
+    // Force scroll to bottom
+    const el = document.querySelector(`.${msgStyles.messageList}`) as HTMLElement | null;
+    if (el) {
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    }
+  }, []);
 
   return (
     <div className={styles.container}>
@@ -129,6 +153,7 @@ function RealChat({
         loadingOlder={loadingOlder}
         hasOlder={hasOlder}
         onLoadOlder={loadOlderMessages}
+        onScroll={handleScroll}
       />
 
       {error && (
@@ -136,6 +161,17 @@ function RealChat({
           <div className={styles.errorBox}>
             {t("chat_failed", "对话失败")}：{error.message}
           </div>
+        </div>
+      )}
+
+      {showScrollToBottom && (
+        <div className={msgStyles.scrollToBottom}>
+          <button className={msgStyles.scrollToBottomBtn} onClick={handleScrollToBottom}>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M6 2v8M2 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            {t("scroll_to_bottom", "回到底部")}
+          </button>
         </div>
       )}
 

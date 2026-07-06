@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import { MessageItem } from "./MessageItem";
+import styles from "./MessageList.module.css";
 
 export function MessageList({
   messages,
@@ -8,6 +9,7 @@ export function MessageList({
   loadingOlder,
   hasOlder,
   onLoadOlder,
+  onScroll,
 }: {
   messages: any[];
   isStreaming: boolean;
@@ -15,6 +17,7 @@ export function MessageList({
   loadingOlder?: boolean;
   hasOlder?: boolean;
   onLoadOlder?: () => void;
+  onScroll?: () => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -33,7 +36,8 @@ export function MessageList({
     if (el.scrollTop <= 60) {
       onLoadOlder();
     }
-  }, [hasOlder, loadingOlder, onLoadOlder]);
+    onScroll?.();
+  }, [hasOlder, loadingOlder, onLoadOlder, onScroll]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -45,7 +49,7 @@ export function MessageList({
   const lastAssistantMsg = [...messages].reverse().find((m) => m.role === "assistant");
 
   return (
-    <div ref={containerRef} style={{ flex: 1, overflowY: "auto", padding: "20px 16px" }}>
+    <div ref={containerRef} className={styles.messageList}>
       {loadingOlder && (
         <div style={{ textAlign: "center", padding: 12, color: "var(--hint-foreground)", fontSize: 13 }}>
           加载更早消息...
