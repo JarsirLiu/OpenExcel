@@ -1,7 +1,13 @@
 import { Writable } from "node:stream";
 
 function localTimeISO() {
-  return new Date().toISOString();
+  const d = new Date();
+  const pad = (n: number, len = 2) => n.toString().padStart(len, "0");
+  const offset = -d.getTimezoneOffset();
+  const offsetHours = Math.floor(Math.abs(offset) / 60);
+  const offsetMins = Math.abs(offset) % 60;
+  const offsetSign = offset >= 0 ? "+" : "-";
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${pad(d.getMilliseconds(), 3)}${offsetSign}${pad(offsetHours)}:${pad(offsetMins)}`;
 }
 
 /* ───── 非请求日志 ───── */
