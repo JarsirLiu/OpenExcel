@@ -14,6 +14,17 @@ export async function sheetRoutes(app: FastifyInstance) {
     return result;
   });
 
+  app.patch<{
+    Params: { workspaceId: string; id: string };
+    Body: { name: string };
+  }>("/api/workspaces/:workspaceId/sheets/:id/name", async (req, reply) => {
+    const workspaceId = await resolveWorkspaceId(req, req.params.workspaceId, reply);
+    if (workspaceId == null) return;
+    const result = await service.updateSheetName(workspaceId, Number(req.params.id), req.body.name);
+    if ("error" in result) return reply.status(400).send(result);
+    return result;
+  });
+
   app.get<{ Params: { workspaceId: string; id: string } }>("/api/workspaces/:workspaceId/sheets/:id", async (req, reply) => {
     const workspaceId = await resolveWorkspaceId(req, req.params.workspaceId, reply);
     if (workspaceId == null) return;

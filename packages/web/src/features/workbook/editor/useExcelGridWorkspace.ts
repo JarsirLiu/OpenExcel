@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { celldataToExcel, extractSheetConfig, matrixToCelldata } from "@openexcel/core";
 import type { WorkbookInstance } from "@fortune-sheet/react";
 import type { WorkbookFull } from "@/api/workbooks";
-import { createSheet, deleteSheet, deleteWorkbook, updateSheetData } from "@/api/workbooks";
+import { createSheet, deleteSheet, deleteWorkbook, updateSheetData, updateSheetName } from "@/api/workbooks";
 import { confirm } from "@/shared/lib";
 import { useWorkbookEditorSession } from "./useWorkbookEditorSession";
 import { toFortuneSheetData } from "./fortuneSheet";
@@ -167,6 +167,18 @@ export function useExcelGridWorkspace({
     return false;
   }, [onWorkbookRefresh, onWorkbookStructureChanged, workbook, workspaceId]);
 
+  const handleBeforeUpdateSheetName = useCallback((sheetId: string, _oldName: string, newName: string) => {
+    void (async () => {
+      try {
+        if (workspaceId == null) return;
+        await updateSheetName(workspaceId, Number(sheetId), newName);
+      } catch (error) {
+        console.error("重命名 Sheet 失败:", error);
+      }
+    })();
+    return true;
+  }, [workspaceId]);
+
   const handleDownload = useCallback(() => {
     const inst = workbookRef.current;
     if (!inst) return;
@@ -213,6 +225,7 @@ export function useExcelGridWorkspace({
     handleActivateSheet,
     handleBeforeAddSheet,
     handleBeforeDeleteSheet,
+    handleBeforeUpdateSheetName,
     handleDownload,
     handleDeleteWorkbook,
   };

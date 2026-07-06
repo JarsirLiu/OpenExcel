@@ -35,6 +35,7 @@ export function ExcelGrid({
     handleActivateSheet,
     handleBeforeAddSheet,
     handleBeforeDeleteSheet,
+    handleBeforeUpdateSheetName,
     handleDownload,
     handleDeleteWorkbook,
   } = useExcelGridWorkspace({
@@ -81,6 +82,7 @@ export function ExcelGrid({
             afterActivateSheet: handleActivateSheet,
             beforeAddSheet: handleBeforeAddSheet,
             beforeDeleteSheet: handleBeforeDeleteSheet,
+            beforeUpdateSheetName: handleBeforeUpdateSheetName,
           }}
         />
       </div>

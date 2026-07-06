@@ -136,6 +136,15 @@ export async function updateSheetData(workspaceId: number, sheetId: number, cell
   if (!res.ok) throw new Error("保存失败");
 }
 
+export async function updateSheetName(workspaceId: number, sheetId: number, name: string): Promise<void> {
+  const res = await apiFetch(`/workspaces/${workspaceId}/sheets/${sheetId}/name`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok) throw new Error(await readErrorMessage(res, "重命名失败"));
+}
+
 export async function createSheet(
   workspaceId: number,
   workbookId: number,
