@@ -17,6 +17,7 @@ export function ChatSidebar({
   workspaceId,
   currentUser,
   onLogout,
+  style,
 }: {
   onSheetChanged?: (sheetId: number, delta: SheetChangeDelta | null) => void;
   onWorkbookStructureChanged?: (update: WorkbookStructureUpdate) => void;
@@ -26,9 +27,10 @@ export function ChatSidebar({
   workspaceId: number | null;
   currentUser: CurrentUser;
   onLogout: () => void;
+  style?: React.CSSProperties;
 }) {
   return (
-    <div className={styles.sidebar}>
+    <div className={styles.sidebar} style={style}>
       <ChatInterface
         onSheetChanged={onSheetChanged}
         onWorkbookStructureChanged={onWorkbookStructureChanged}

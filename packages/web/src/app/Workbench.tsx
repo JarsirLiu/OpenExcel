@@ -1,3 +1,4 @@
+import { useCallback, useRef, useState } from "react";
 import { t } from "@/lib/i18n";
 import { ChatSidebar } from "@/features/chat/ChatSidebar";
 import { WorkbookWorkspace } from "@/features/workbook/workspace/WorkbookWorkspace";
@@ -15,8 +16,51 @@ type Props = {
   onLogout: () => void;
 };
 
+const MIN_SIDEBAR_WIDTH = 300;
+
 export function Workbench({ currentUser, onLogout }: Props) {
   const { activeWorkspaceId, loading: workspaceLoading } = useWorkspaceState();
+  const [sidebarWidth, setSidebarWidth] = useState(
+    Math.min(400, window.innerWidth * 0.32)
+  );
+  const rafRef = useRef<number | null>(null);
+
+  const handleResizeMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      const startX = e.clientX;
+      const startWidth = sidebarWidth;
+
+      const onMouseMove = (e: MouseEvent) => {
+        const newWidth = startWidth + (startX - e.clientX);
+        setSidebarWidth(Math.max(MIN_SIDEBAR_WIDTH, newWidth));
+        if (rafRef.current == null) {
+          rafRef.current = requestAnimationFrame(() => {
+            rafRef.current = null;
+            window.dispatchEvent(new Event("resize"));
+          });
+        }
+      };
+
+      const onMouseUp = () => {
+        document.removeEventListener("mousemove", onMouseMove);
+        document.removeEventListener("mouseup", onMouseUp);
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+        if (rafRef.current != null) {
+          cancelAnimationFrame(rafRef.current);
+          rafRef.current = null;
+        }
+        window.dispatchEvent(new Event("resize"));
+      };
+
+      document.addEventListener("mousemove", onMouseMove);
+      document.addEventListener("mouseup", onMouseUp);
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+    },
+    [sidebarWidth],
+  );
   const {
     workbooks,
     workbookIdx,
@@ -69,6 +113,10 @@ export function Workbench({ currentUser, onLogout }: Props) {
           handleWorkbookRefresh={handleWorkbookRefresh}
         />
       </div>
+      <div
+        className={styles.resizeHandle}
+        onMouseDown={handleResizeMouseDown}
+      />
       <ChatSidebar
         workspaceId={activeWorkspaceId}
         onSheetChanged={handleSheetChanged}
@@ -78,6 +126,7 @@ export function Workbench({ currentUser, onLogout }: Props) {
         referenceCacheRevision={referenceCacheRevision}
         currentUser={currentUser}
         onLogout={onLogout}
+        style={{ width: sidebarWidth }}
       />
     </div>
   );

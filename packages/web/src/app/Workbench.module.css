@@ -12,3 +12,17 @@
   flex: 1;
   min-width: 0;
 }
+
+.resizeHandle {
+  width: 6px;
+  cursor: col-resize;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+  transition: background 0.15s ease;
+}
+
+.resizeHandle:hover,
+.resizeHandle:active {
+  background: var(--border-default);
+}
