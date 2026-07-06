@@ -7,32 +7,13 @@ const Workbench = lazy(() => import("./app/Workbench").then((module) => ({ defau
 
 function LoadingScreen() {
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "grid",
-        placeItems: "center",
-        padding: 24,
-        background:
-          "radial-gradient(circle at top left, rgba(59, 130, 246, 0.08), transparent 26%), radial-gradient(circle at 90% 100%, rgba(16, 185, 129, 0.08), transparent 28%), linear-gradient(180deg, #f8fafc 0%, #eef3f9 100%)",
-      }}
-    >
-      <div
-        style={{
-          width: "min(440px, 100%)",
-          padding: "28px 30px",
-          borderRadius: 24,
-          border: "1px solid var(--border)",
-          background: "rgba(255, 255, 255, 0.9)",
-          boxShadow: "0 18px 50px rgba(15, 23, 42, 0.08)",
-          color: "var(--foreground)",
-        }}
-      >
-        <div style={{ fontSize: 14, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase" }}>OpenExcel</div>
-        <div style={{ marginTop: 10, fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em" }}>正在校验登录状态</div>
-        <div style={{ marginTop: 8, color: "var(--muted-foreground)", fontSize: 14, lineHeight: 1.7 }}>
-          我们正在恢复你的工作区上下文，马上就能继续编辑。
+    <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "var(--background)" }}>
+      <div style={{ textAlign: "center" }}>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 18, fontWeight: 700, color: "var(--foreground)", letterSpacing: "-0.02em" }}>
+          <span style={{ display: "inline-block", width: 20, height: 20, border: "2px solid var(--foreground)", borderRadius: 4, backgroundImage: "linear-gradient(to right, transparent 0, transparent calc(33.33% - 1px), var(--foreground) calc(33.33% - 1px), var(--foreground) 33.33%, transparent 33.33%), linear-gradient(to right, transparent 0, transparent calc(66.66% - 1px), var(--foreground) calc(66.66% - 1px), var(--foreground) 66.66%, transparent 66.66%)", backgroundSize: "100% 100%", backgroundRepeat: "no-repeat" }}></span>
+          OpenExcel
         </div>
+        <div style={{ marginTop: 12, color: "var(--muted-foreground)", fontSize: 13 }}>加载中…</div>
       </div>
     </div>
   );
