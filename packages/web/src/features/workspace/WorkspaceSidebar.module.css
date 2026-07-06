@@ -87,7 +87,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 10px;
+  padding: 6px 10px;
   border-radius: 6px;
   cursor: pointer;
   font-size: 14px;
@@ -97,20 +97,119 @@
   background: transparent;
   width: 100%;
   text-align: left;
+  position: relative;
 }
 
 .item:hover {
-  background: var(--bg-muted);
-  transform: translateX(2px);
+  background: #e8e4df;
 }
 
 .itemActive {
-  background: var(--bg-muted);
+  background: #e0dcd7;
   font-weight: 600;
 }
 
 .itemActive:hover {
-  background: var(--bg-muted);
+  background: #e0dcd7;
+}
+
+.itemName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.itemActions {
+  display: none;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.item:hover .itemActions {
+  display: flex;
+}
+
+.editBtn,
+.deleteBtn {
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+  border-radius: 4px;
+  padding: 0;
+}
+
+.editBtn:hover {
+  background: #e8e4df;
+  color: var(--text-primary);
+}
+
+.deleteBtn:hover {
+  background: rgba(220, 38, 38, 0.1);
+  color: #dc2626;
+}
+
+.editInput {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 14px;
+  font-family: inherit;
+  background: white;
+  color: var(--text-primary);
+  outline: none;
+}
+
+.editInput:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgb(59 130 246 / 0.15);
+}
+
+.deleteConfirm {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.deleteConfirm span {
+  color: var(--text-primary);
+}
+
+.deleteConfirm button {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.deleteConfirm button:first-of-type:hover {
+  background: rgba(22, 163, 74, 0.1);
+  color: #16a34a;
+}
+
+.deleteConfirm button:last-of-type:hover {
+  background: rgba(220, 38, 38, 0.1);
+  color: #dc2626;
 }
 
 .itemIcon {

@@ -38,7 +38,7 @@ export async function ensureWorkspaceForUser(ownerUserId: number) {
 }
 
 export async function createWorkspace(ownerUserId: number, name?: string) {
-  const workspaceName = name?.trim() || "新工作区";
+  const workspaceName = name?.trim() || "新项目";
 
   return prisma.$transaction(async (tx) => {
     const maxOrder = await tx.workspace.aggregate({
@@ -102,4 +102,32 @@ export async function createWorkspace(ownerUserId: number, name?: string) {
       session,
     };
   });
+}
+
+export async function renameWorkspace(id: number, ownerUserId: number, name: string) {
+  const trimmed = name?.trim();
+  if (!trimmed) {
+    throw new WorkspaceNotFoundError("Name is required", 400);
+  }
+  const workspace = await repo.findWorkspace(id, ownerUserId);
+  if (!workspace) {
+    throw new WorkspaceNotFoundError();
+  }
+  return prisma.workspace.update({
+    where: { id },
+    data: { name: trimmed },
+  });
+}
+
+export async function deleteWorkspace(id: number, ownerUserId: number) {
+  const workspace = await repo.findWorkspace(id, ownerUserId);
+  if (!workspace) {
+    throw new WorkspaceNotFoundError();
+  }
+  const count = await prisma.workspace.count({ where: { ownerUserId } });
+  if (count <= 1) {
+    throw new WorkspaceNotFoundError("Cannot delete the last workspace", 400);
+  }
+  await prisma.workspace.delete({ where: { id } });
+  return { success: true };
 }

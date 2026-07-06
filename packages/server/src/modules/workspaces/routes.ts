@@ -23,4 +23,32 @@ export async function workspaceRoutes(app: FastifyInstance) {
     if (!workspace) return reply.status(404).send({ error: "Workspace not found" });
     return workspace;
   });
+
+  app.patch<{ Params: { id: string }; Body: { name: string } }>("/api/workspaces/:id", async (req, reply) => {
+    const currentUser = requireCurrentUser(req, reply);
+    if (!currentUser) return;
+    try {
+      const workspace = await service.renameWorkspace(Number(req.params.id), currentUser.id, req.body.name);
+      return workspace;
+    } catch (error) {
+      if (error instanceof service.WorkspaceNotFoundError) {
+        return reply.status(error.statusCode).send({ error: error.message });
+      }
+      throw error;
+    }
+  });
+
+  app.delete<{ Params: { id: string } }>("/api/workspaces/:id", async (req, reply) => {
+    const currentUser = requireCurrentUser(req, reply);
+    if (!currentUser) return;
+    try {
+      const result = await service.deleteWorkspace(Number(req.params.id), currentUser.id);
+      return result;
+    } catch (error) {
+      if (error instanceof service.WorkspaceNotFoundError) {
+        return reply.status(error.statusCode).send({ error: error.message });
+      }
+      throw error;
+    }
+  });
 }
