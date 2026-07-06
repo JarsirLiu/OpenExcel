@@ -1,10 +1,12 @@
 import { useRef } from "react";
-import type { WorkbookFull } from "../../../api/workbooks";
+import type { WorkbookFull } from "@/api/workbooks";
 import { WorkbookHeader } from "../ui/WorkbookHeader";
 import { ExcelWorkspace } from "../ui/ExcelWorkspace";
 import { ImportPreviewDialog } from "../import/ImportPreviewDialog";
 import type { WorkbookImportPreview } from "../import/importPreview";
-import type { WorkbookStructureUpdate } from "../../chat/hooks/useSheetPatchSync";
+import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatchSync";
+import { t } from "@/lib/i18n";
+import styles from "./WorkbookWorkspace.module.css";
 
 type WorkbookMeta = {
   id: number;
@@ -62,11 +64,11 @@ export function WorkbookWorkspace({
   const newWbInputRef = useRef<HTMLInputElement>(null);
 
   if (loading) {
-    return <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#666" }}>加载中...</div>;
+    return <div className={styles.loading}>{t("loading", "加载中...")}</div>;
   }
 
   return (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+    <div className={styles.container}>
       <WorkbookHeader
         workbooks={workbooks}
         activeWorkbookIdx={workbookIdx}
@@ -100,7 +102,7 @@ export function WorkbookWorkspace({
         }}
       />
 
-      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+      <div className={styles.excelArea}>
       <ExcelWorkspace
         workspaceId={workspaceId}
         workbook={currentWorkbook}

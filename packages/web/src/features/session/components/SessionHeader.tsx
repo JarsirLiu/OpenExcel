@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from "react";
+import { t } from "@/lib/i18n";
+import styles from "./SessionHeader.module.css";
 
 type CurrentUser = {
   email: string;
@@ -34,25 +36,12 @@ const UserMenu = ({ currentUser, onLogout }: { currentUser: CurrentUser; onLogou
   }, [open]);
 
   return (
-    <div ref={ref} style={{ position: "relative" }}>
+    <div ref={ref} className={styles.userMenu}>
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        style={{
-          width: 30,
-          height: 30,
-          border: "1px solid var(--border)",
-          borderRadius: "var(--radius)",
-          background: "var(--background)",
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: "var(--foreground)",
-          padding: 0,
-          flexShrink: 0,
-        }}
-        title="账号"
+        className={styles.hamburger}
+        title={t("account", "账号")}
       >
         <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
           <line x1="3" y1="6" x2="21" y2="6"/>
@@ -62,97 +51,35 @@ const UserMenu = ({ currentUser, onLogout }: { currentUser: CurrentUser; onLogou
       </button>
 
       {open && (
-        <div style={{
-          position: "absolute",
-          top: "calc(100% + 6px)",
-          right: 0,
-          width: 200,
-          background: "var(--background)",
-          border: "1px solid var(--border)",
-          borderRadius: "var(--radius)",
-          boxShadow: "0 4px 16px rgba(15,23,42,0.12), 0 1px 3px rgba(15,23,42,0.08)",
-          padding: "6px",
-          zIndex: 200,
-        }}>
-          {/* User info */}
-          <div style={{
-            padding: "10px 12px",
-            borderBottom: "1px solid var(--border)",
-            marginBottom: 4,
-          }}>
-            <div style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-            }}>
-              <div style={{
-                width: 32,
-                height: 32,
-                borderRadius: "50%",
-                background: "linear-gradient(135deg, #3b82f6 0%, #10b981 100%)",
-                color: "#fff",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 13,
-                fontWeight: 700,
-                flexShrink: 0,
-              }}>
+        <div className={styles.dropdown}>
+          <div className={styles.userInfo}>
+            <div className={styles.userInfoRow}>
+              <div className={styles.avatar}>
                 {(currentUser.displayName || currentUser.email)[0].toUpperCase()}
               </div>
               <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: "var(--foreground)",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}>
+                <div className={styles.userName}>
                   {currentUser.displayName}
                 </div>
-                <div style={{
-                  fontSize: 11,
-                  color: "var(--muted-foreground)",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}>
+                <div className={styles.userEmail}>
                   {currentUser.email}
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Menu items */}
-          <div style={{ padding: "4px 0" }}>
+          <div className={styles.menuSection}>
             <button
               type="button"
-              style={{
-                width: "100%",
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                padding: "8px 12px",
-                border: "none",
-                background: "transparent",
-                color: "var(--foreground)",
-                fontSize: 13,
-                fontWeight: 500,
-                cursor: "pointer",
-                borderRadius: "var(--radius-sm)",
-                transition: "background 0.15s",
-              }}
+              className={styles.menuItem}
               onClick={() => { setOpen(false); onLogout(); }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "var(--muted)")}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
             >
               <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
                 <polyline points="16 17 21 12 16 7"/>
                 <line x1="21" y1="12" x2="9" y2="12"/>
               </svg>
-              退出登录
+              {t("sign_out", "退出登录")}
             </button>
           </div>
         </div>
@@ -173,73 +100,33 @@ export function SessionHeader({
   currentUser,
   onLogout,
 }: Props) {
+  const undoDisabled = !currentSessionId || undoState === "loading" || isStreaming;
+
   return (
     <>
-      <div style={{
-        padding: "10px 12px",
-        borderBottom: "1px solid var(--border)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        flexShrink: 0,
-      }}>
-        <span style={{
-          fontWeight: 600,
-          fontSize: 14,
-          color: "var(--foreground)",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-          flex: 1,
-          marginRight: 8,
-        }}>
+      <div className={styles.header}>
+        <span className={styles.sessionName}>
           {sessionName}
         </span>
-        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+        <div className={styles.actions}>
           <div
-            onClick={onUndoLatestRun}
-            style={{
-              padding: "4px 8px",
-              cursor: currentSessionId && undoState !== "loading" && !isStreaming ? "pointer" : "not-allowed",
-              color: currentSessionId && !isStreaming ? "var(--muted-foreground)" : "var(--hint-foreground)",
-              fontSize: 12,
-              border: "1px solid var(--border)",
-              borderRadius: "var(--radius-pill)",
-              background: "var(--background)",
-              opacity: undoState === "loading" || isStreaming ? 0.7 : 1,
-            }}
-            title={isStreaming ? "对话进行中，无法撤销" : undoState === "loading" ? "撤销中..." : "撤销本轮修改"}
+            onClick={undoDisabled ? undefined : onUndoLatestRun}
+            className={`${styles.pillBtn} ${undoDisabled ? styles.pillBtnDisabled : styles.pillBtnEnabled}`}
+            title={isStreaming ? t("undo_streaming_hint", "对话进行中，无法撤销") : t("undo", "撤销本轮修改")}
           >
-            {isStreaming ? "撤销" : (undoState === "loading" ? "撤销中" : "撤销")}
+            {isStreaming ? t("undo", "撤销") : (undoState === "loading" ? t("undoing", "撤销中...") : t("undo", "撤销"))}
           </div>
           <div
             onClick={onToggleHistory}
-            style={{
-              padding: "4px 8px",
-              cursor: "pointer",
-              color: "var(--muted-foreground)",
-              fontSize: 12,
-              border: "1px solid var(--border)",
-              borderRadius: "var(--radius-pill)",
-              background: "var(--background)",
-            }}
-            title="历史记录"
+            className={styles.pillBtn}
+            title={t("history", "历史")}
           >
-            历史
+            {t("history", "历史")}
           </div>
           <div
             onClick={onNewSession}
-            style={{
-              padding: "4px 8px",
-              cursor: "pointer",
-              color: "var(--muted-foreground)",
-              fontSize: 16,
-              border: "1px solid var(--border)",
-              borderRadius: "var(--radius-pill)",
-              background: "var(--background)",
-              lineHeight: 1,
-            }}
-            title="新建对话"
+            className={`${styles.pillBtn} ${styles.plusBtn}`}
+            title={t("new_chat", "新建对话")}
           >
             +
           </div>
@@ -247,32 +134,16 @@ export function SessionHeader({
         </div>
       </div>
       {undoError && (
-        <div style={{ padding: "10px 14px 0" }}>
-          <div style={{
-            border: "1px solid var(--border)",
-            background: "var(--muted)",
-            color: "var(--muted-foreground)",
-            borderRadius: "var(--radius-sm)",
-            padding: "8px 12px",
-            fontSize: 13,
-            lineHeight: 1.5,
-          }}>
-            撤销失败：{undoError}
+        <div className={styles.bannerWrap}>
+          <div className={styles.banner}>
+            {t("undo_failed", "撤销失败")}: {undoError}
           </div>
         </div>
       )}
       {undoState === "success" && (
-        <div style={{ padding: "10px 14px 0" }}>
-          <div style={{
-            border: "1px solid var(--border)",
-            background: "var(--muted)",
-            color: "var(--muted-foreground)",
-            borderRadius: "var(--radius-sm)",
-            padding: "8px 12px",
-            fontSize: 13,
-            lineHeight: 1.5,
-          }}>
-            已撤销本轮修改
+        <div className={styles.bannerWrap}>
+          <div className={styles.banner}>
+            {t("undo_success", "已撤销本轮修改")}
           </div>
         </div>
       )}

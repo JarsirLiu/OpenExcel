@@ -1,6 +1,9 @@
 import { useState, useCallback, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { clearConfirmDialog, resolveConfirmDialog, type ConfirmOptions } from "../lib/confirmDialog";
+import { t } from "@/lib/i18n";
+import { Button } from "@/components/ui/Button/Button";
+import { clearConfirmDialog, resolveConfirmDialog, type ConfirmOptions } from "@/shared/lib/confirmDialog";
+import styles from "./ConfirmDialog.module.css";
 
 export function ConfirmDialog() {
   const [visible, setVisible] = useState(false);
@@ -45,63 +48,17 @@ export function ConfirmDialog() {
   if (!visible) return null;
 
   return createPortal(
-    <div
-      onClick={handleOverlayClick}
-      style={{
-        position: "fixed",
-        inset: 0,
-        backgroundColor: "rgba(0, 0, 0, 0.4)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 9999,
-      }}
-    >
-      <div
-        style={{
-          background: "#fff",
-          borderRadius: 8,
-          padding: "24px 28px",
-          minWidth: 320,
-          maxWidth: 440,
-          boxShadow: "0 4px 24px rgba(0, 0, 0, 0.15)",
-        }}
-      >
-        <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 12, color: "#1f2a37" }}>
-          {options.title}
-        </div>
-        <div style={{ fontSize: 14, color: "#5b6473", lineHeight: 1.6, marginBottom: 24 }}>
-          {options.message}
-        </div>
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
-          <button
-            onClick={() => handleClose(false)}
-            style={{
-              fontSize: 13,
-              padding: "6px 18px",
-              border: "1px solid #d8dee9",
-              borderRadius: 4,
-              background: "#fff",
-              cursor: "pointer",
-              color: "#5b6473",
-            }}
-          >
-            {options.cancelText ?? "取消"}
-          </button>
-          <button
-            onClick={() => handleClose(true)}
-            style={{
-              fontSize: 13,
-              padding: "6px 18px",
-              border: "1px solid #d32f2f",
-              borderRadius: 4,
-              background: "#d32f2f",
-              cursor: "pointer",
-              color: "#fff",
-            }}
-          >
-            {options.confirmText ?? "确认"}
-          </button>
+    <div className={styles.overlay} onClick={handleOverlayClick}>
+      <div className={styles.panel}>
+        <div className={styles.title}>{options.title}</div>
+        <div className={styles.message}>{options.message}</div>
+        <div className={styles.actions}>
+          <Button variant="ghost" onClick={() => handleClose(false)}>
+            {options.cancelText ?? t("cancel", "取消")}
+          </Button>
+          <Button variant="danger" onClick={() => handleClose(true)}>
+            {options.confirmText ?? t("confirm", "确认")}
+          </Button>
         </div>
       </div>
     </div>,

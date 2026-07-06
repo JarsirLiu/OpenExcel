@@ -1,8 +1,9 @@
 import { Workbook } from "@fortune-sheet/react";
 import "@fortune-sheet/react/dist/index.css";
-import type { WorkbookFull } from "../../../api/workbooks";
+import type { WorkbookFull } from "@/api/workbooks";
 import { useExcelGridWorkspace } from "./useExcelGridWorkspace";
-import type { WorkbookStructureUpdate } from "../../chat/hooks/useSheetPatchSync";
+import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatchSync";
+import styles from "./ExcelGrid.module.css";
 
 interface Props {
   workspaceId: number | null;
@@ -50,8 +51,8 @@ export function ExcelGrid({
   if (!workbook) return null;
 
   return (
-    <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0 }}>
-      <div style={{ flex: 1, minHeight: 0 }}>
+    <div className={styles.container}>
+      <div className={styles.inner}>
         <Workbook
           key={`${workbook.id}:${sessionKey}`}
           ref={workbookRef}

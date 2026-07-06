@@ -1,6 +1,7 @@
 import type { SheetChangeDelta } from "@openexcel/core";
 import { ChatInterface } from "./ChatInterface";
 import type { WorkbookStructureUpdate } from "./hooks/useSheetPatchSync";
+import styles from "./ChatSidebar.module.css";
 
 type CurrentUser = {
   email: string;
@@ -27,7 +28,7 @@ export function ChatSidebar({
   onLogout: () => void;
 }) {
   return (
-    <div style={{ width: "min(400px, 32vw)", flexShrink: 0, minWidth: 0, overflow: "hidden" }}>
+    <div className={styles.sidebar}>
       <ChatInterface
         onSheetChanged={onSheetChanged}
         onWorkbookStructureChanged={onWorkbookStructureChanged}

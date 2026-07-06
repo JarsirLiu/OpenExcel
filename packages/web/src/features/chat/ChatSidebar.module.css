@@ -1,0 +1,6 @@
+.sidebar {
+  width: min(400px, 32vw);
+  flex-shrink: 0;
+  min-width: 0;
+  overflow: hidden;
+}

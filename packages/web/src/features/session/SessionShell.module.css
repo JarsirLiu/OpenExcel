@@ -1,0 +1,32 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg-surface);
+  border-left: 1px solid var(--border-default);
+  overflow: hidden;
+  position: relative;
+}
+
+.emptyState {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-hint);
+  font-size: 13px;
+}
+
+.historyPanel {
+  position: absolute;
+  top: 44px;
+  left: 8px;
+  right: 8px;
+  z-index: 100;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  max-height: 300px;
+  overflow-y: auto;
+}

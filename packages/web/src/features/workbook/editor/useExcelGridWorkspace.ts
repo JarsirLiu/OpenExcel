@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { celldataToExcel, extractSheetConfig, matrixToCelldata } from "@openexcel/core";
 import type { WorkbookInstance } from "@fortune-sheet/react";
-import type { WorkbookFull } from "../../../api/workbooks";
-import { createSheet, deleteSheet, deleteWorkbook, updateSheetData } from "../../../api/workbooks";
-import { confirm } from "../../../shared/lib";
+import type { WorkbookFull } from "@/api/workbooks";
+import { createSheet, deleteSheet, deleteWorkbook, updateSheetData } from "@/api/workbooks";
+import { confirm } from "@/shared/lib";
 import { useWorkbookEditorSession } from "./useWorkbookEditorSession";
 import { toFortuneSheetData } from "./fortuneSheet";
-import type { WorkbookStructureUpdate } from "../../chat/hooks/useSheetPatchSync";
+import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatchSync";
 
 type UseExcelGridWorkspaceProps = {
   workspaceId: number | null;

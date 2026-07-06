@@ -1,24 +1,17 @@
 import { useState } from "react";
 import type { JSX } from "react";
-import { getMessageText } from "../utils";
+import { getMessageText } from "@/features/chat/utils";
 import { MessageMarkdown } from "./MessageMarkdown";
 import { ReasoningCard } from "./ReasoningCard";
 import { ToolCallCard } from "./ToolCallCard";
+import styles from "./MessageItem.module.css";
 
 const UserAvatar = () => (
-  <div style={{
-    width: 26, height: 26, borderRadius: "50%", background: "var(--avatar-user)",
-    display: "flex", alignItems: "center", justifyContent: "center",
-    color: "#fff", fontSize: 11, fontWeight: 600, flexShrink: 0, userSelect: "none",
-  }}>Y</div>
+  <div className={`${styles.avatar} ${styles.avatarUser}`}>Y</div>
 );
 
 const AIAvatar = () => (
-  <div style={{
-    width: 26, height: 26, borderRadius: "50%", background: "var(--avatar-ai)",
-    display: "flex", alignItems: "center", justifyContent: "center",
-    color: "#fff", fontSize: 11, fontWeight: 600, flexShrink: 0, userSelect: "none",
-  }}>AI</div>
+  <div className={`${styles.avatar} ${styles.avatarAi}`}>AI</div>
 );
 
 const CopyIcon = ({ size = 14 }: { size?: number }) => (
@@ -56,14 +49,6 @@ const DownloadIcon = ({ size = 14 }: { size?: number }) => (
     <line x1="12" y1="15" x2="12" y2="3" />
   </svg>
 );
-
-const actionButtonStyle: React.CSSProperties = {
-  display: "flex", alignItems: "center", gap: 4,
-  fontSize: 12, color: "var(--muted-foreground)",
-  background: "transparent", border: "none", cursor: "pointer",
-  padding: "4px 8px", borderRadius: "var(--radius-pill)",
-  transition: "background 0.15s",
-};
 
 function renderAssistantParts(
   msg: any,
@@ -106,13 +91,13 @@ function renderAssistantParts(
         break;
       case "step-start":
         flushText(`step-${i}-flush`);
-        result.push(<div key={`step-${i}`} style={{ height: 1, background: "var(--border)", margin: "8px 0" }} />);
+        result.push(<div key={`step-${i}`} className={styles.stepDivider} />);
         break;
       default:
         if (part.type.startsWith("tool-")) {
           flushText(`tool-${i}-flush`);
           result.push(
-            <div key={`tool-${i}`} style={{ marginBottom: 6 }}>
+            <div key={`tool-${i}`} className={styles.toolWrap}>
               <ToolCallCard part={part} />
             </div>,
           );
@@ -140,13 +125,13 @@ export function MessageItem({
 
   if (msg.role === "user") {
     return (
-      <div style={{ marginBottom: 24, minWidth: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+      <div className={styles.userMsg}>
+        <div className={styles.msgHeader}>
           <UserAvatar />
-          <span style={{ fontSize: 14, fontWeight: 600, color: "var(--foreground)" }}>You</span>
+          <span className={styles.roleName}>You</span>
         </div>
-        <div style={{ paddingLeft: 36, minWidth: 0 }}>
-          <div style={{ whiteSpace: "pre-wrap", fontSize: 15, lineHeight: 1.7, color: "var(--foreground)" }}>
+        <div className={styles.msgBody}>
+          <div className={styles.userText}>
             {getMessageText(msg)}
           </div>
         </div>
@@ -155,36 +140,36 @@ export function MessageItem({
   }
 
   return (
-      <div style={{ marginBottom: 24, minWidth: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+      <div className={styles.assistantMsg}>
+        <div className={styles.msgHeader}>
           <AIAvatar />
-          <span style={{ fontSize: 14, fontWeight: 600, color: "var(--foreground)" }}>AI 助手</span>
+          <span className={styles.roleName}>AI 助手</span>
         </div>
-        <div style={{ paddingLeft: 36, minWidth: 0 }}>
+        <div className={styles.msgBody}>
         {renderAssistantParts(msg, isStreaming, thinkingOpen, setThinkingOpen)}
         {!isStreaming && isLastAssistantMessage && (
-          <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+          <div className={styles.actions}>
             {onRegenerate && (
               <button
                 onClick={onRegenerate}
-                style={actionButtonStyle}
+                className={styles.actionBtn}
                 title="重新生成"
               >
                 <RefreshIcon size={14} />
                 重新生成
               </button>
             )}
-            <button style={actionButtonStyle} title="赞">
+            <button className={styles.actionBtn} title="赞">
               <ThumbUpIcon size={14} />
             </button>
-            <button style={actionButtonStyle} title="踩">
+            <button className={styles.actionBtn} title="踩">
               <ThumbDownIcon size={14} />
             </button>
-            <button style={actionButtonStyle} title="下载">
+            <button className={styles.actionBtn} title="下载">
               <DownloadIcon size={14} />
             </button>
             <button
-              style={actionButtonStyle}
+              className={styles.actionBtn}
               onClick={() => navigator.clipboard.writeText(getMessageText(msg) || "")}
               title="复制"
             >

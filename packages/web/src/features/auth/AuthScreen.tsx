@@ -1,4 +1,8 @@
 import { useState, type FormEvent } from "react";
+import { t } from "@/lib/i18n";
+import { Button } from "@/components/ui/Button/Button";
+import { Input } from "@/components/ui/Input/Input";
+import styles from "./AuthScreen.module.css";
 
 type AuthMode = "login" | "register";
 
@@ -33,90 +37,98 @@ export function AuthScreen({ submitting, error, onLogin, onRegister }: Props) {
   }
 
   return (
-    <div className="auth-shell">
-      <nav className="auth-nav">
-        <span className="auth-brand">
-          <span className="brand-mark">
-            <span className="mark-line"></span>
-            <span className="mark-line"></span>
-            <span className="mark-line"></span>
+    <div className={styles.shell}>
+      <nav className={styles.nav}>
+        <span className={styles.brand}>
+          <span className={styles.brandMark}>
+            <span className={styles.markLine}></span>
+            <span className={styles.markLine}></span>
+            <span className={styles.markLine}></span>
           </span>
           OpenExcel
         </span>
       </nav>
 
-      <div className="auth-hero">
-        <div className="auth-content">
-          <h1 className="auth-headline">
-            {mode === "login" ? "Welcome back." : "Get started."}
+      <div className={styles.hero}>
+        <div className={styles.content}>
+          <h1 className={styles.headline}>
+            {mode === "login" ? t("welcome_back", "欢迎回来。") : t("get_started", "开始使用。")}
           </h1>
-          <p className="auth-subtitle">
+          <p className={styles.subtitle}>
             {mode === "login"
-              ? "Sign in to your workspace and pick up where you left off."
-              : "Create your free account and start building intelligent spreadsheets."}
+              ? t("sign_in_desc", "登录你的工作区，继续之前的工作。")
+              : t("sign_up_desc", "创建免费账号，开始使用智能表格。")}
           </p>
 
-          <form className="auth-form" onSubmit={(event) => void handleSubmit(event)}>
+          <form className={styles.form} onSubmit={(event) => void handleSubmit(event)}>
             {mode === "register" && (
-              <input
+              <Input
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="Display name"
+                placeholder={t("display_name", "显示名称")}
                 autoComplete="name"
-                className="auth-input"
               />
             )}
 
-            <input
+            <Input
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="Email address"
+              placeholder={t("email", "邮箱地址")}
               type="email"
               autoComplete="email"
               required
-              className="auth-input"
             />
 
-            <input
+            <Input
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Password"
+              placeholder={t("password", "密码")}
               type="password"
               autoComplete={mode === "login" ? "current-password" : "new-password"}
               required
-              className="auth-input"
             />
 
-            {error && <div className="auth-error">{error}</div>}
+            {error && <div className={styles.error}>{error}</div>}
 
-            <button className="auth-submit" type="submit" disabled={submitting}>
-              {submitting ? "Processing…" : mode === "login" ? "Sign in" : "Create account"}
-            </button>
+            <Button
+              variant="primary"
+              type="submit"
+              disabled={submitting}
+              className={styles.submit}
+            >
+              {submitting
+                ? t("processing", "处理中…")
+                : mode === "login"
+                  ? t("sign_in", "登录")
+                  : t("create_account", "创建账号")}
+            </Button>
           </form>
 
-          <p className="auth-switch">
-            {mode === "login" ? "Don't have an account? " : "Already have an account? "}
+          <p className={styles.switch}>
+            {mode === "login"
+              ? t("no_account", "还没有账号？")
+              : t("has_account", "已有账号？")}
             <button
               type="button"
-              className="auth-switch-link"
+              className={styles.switchLink}
               onClick={() => setMode(mode === "login" ? "register" : "login")}
             >
-              {mode === "login" ? "Sign up" : "Sign in"}
+              {mode === "login" ? t("sign_up", "注册") : t("sign_in", "登录")}
             </button>
           </p>
         </div>
 
-        <div className="auth-visual">
-          <div className="visual-card">
-            <div className="visual-toolbar">
-              <span className="tool-dot"></span>
-              <span className="tool-dot"></span>
-              <span className="tool-dot"></span>
-              <span className="tool-tab active">Sheet1</span>
-              <span className="tool-tab">Chart</span>
+        <div className={styles.visual}>
+          <div className={styles.visualCard}>
+            <div className={styles.visualToolbar}>
+              <span className={styles.toolDot}></span>
+              <span className={styles.toolDot}></span>
+              <span className={styles.toolDot}></span>
+              <span className={`${styles.toolTab} ${styles.toolTabActive}`}>Sheet1</span>
+              <span className={styles.toolTab}>Chart</span>
             </div>
-            <div className="visual-grid">
-              <div className="grid-row grid-head">
+            <div className={styles.visualGrid}>
+              <div className={`${styles.gridRow} ${styles.gridHead}`}>
                 <div></div>
                 <div>A</div>
                 <div>B</div>
@@ -124,20 +136,20 @@ export function AuthScreen({ submitting, error, onLogin, onRegister }: Props) {
                 <div>D</div>
               </div>
               {Array.from({ length: 5 }).map((_, row) => (
-                <div key={row} className="grid-row">
-                  <div className="row-num">{row + 1}</div>
-                  <div className={row === 1 ? "cell filled-a" : "cell"}></div>
-                  <div className={row === 0 ? "cell filled-b" : row === 2 ? "cell filled-a" : "cell"}></div>
-                  <div className={row === 3 ? "cell filled-c" : "cell"}></div>
-                  <div className={row === 4 ? "cell filled-b" : "cell"}></div>
+                <div key={row} className={styles.gridRow}>
+                  <div className={styles.rowNum}>{row + 1}</div>
+                  <div className={`${styles.cell} ${row === 1 ? styles.cellFilledA : ""}`}></div>
+                  <div className={`${styles.cell} ${row === 0 ? styles.cellFilledB : row === 2 ? styles.cellFilledA : ""}`}></div>
+                  <div className={`${styles.cell} ${row === 3 ? styles.cellFilledC : ""}`}></div>
+                  <div className={`${styles.cell} ${row === 4 ? styles.cellFilledB : ""}`}></div>
                 </div>
               ))}
             </div>
-            <div className="visual-sidebar">
-              <div className="sidebar-line"></div>
-              <div className="sidebar-line"></div>
-              <div className="sidebar-line"></div>
-              <div className="sidebar-line"></div>
+            <div className={styles.visualSidebar}>
+              <div className={styles.sidebarLine}></div>
+              <div className={styles.sidebarLine}></div>
+              <div className={styles.sidebarLine}></div>
+              <div className={styles.sidebarLine}></div>
             </div>
           </div>
         </div>

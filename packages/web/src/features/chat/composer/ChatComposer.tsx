@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 import { EditorContent } from "@tiptap/react";
 import { useChatComposer } from "./useChatComposer";
+import { t } from "@/lib/i18n";
+import styles from "./ChatComposer.module.css";
 
 const SendIcon = () => (
   <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -22,8 +24,8 @@ const AttachIcon = () => (
 );
 
 const PLACEHOLDERS = [
-  "使用 @来引用表格",
-  "让AI来帮你修改表格",
+  "使用 @ 来引用表格",
+  "让 AI 来帮你修改表格",
 ];
 
 export function ChatComposer({
@@ -76,34 +78,20 @@ export function ChatComposer({
   }, [onAttachExcel]);
 
   return (
-    <div style={{ padding: "10px 14px", borderTop: "1px solid var(--border)", background: "var(--background)", flexShrink: 0 }}>
-      <div style={{
-        background: "var(--background)",
-        border: "1px solid var(--border)",
-        borderRadius: "var(--radius)",
-        padding: "12px 16px",
-        display: "flex",
-        flexDirection: "column",
-        gap: 10,
-      }}>
-        {/* Editor area with overlay placeholder */}
-        <div style={{ position: "relative", minHeight: 24 }}>
-          <div style={{ maxHeight: 120, overflowY: "auto", fontSize: 15, lineHeight: 1.5, color: "var(--foreground)" }}>
+    <div className={styles.wrapper}>
+      <div className={styles.inputCard}>
+        <div className={styles.editorWrap}>
+          <div className={styles.editorScroll}>
             {editor && <EditorContent editor={editor} />}
           </div>
           {editorEmpty && (
-            <span style={{
-              position: "absolute", top: 0, left: 0,
-              fontSize: 13, color: "var(--hint-foreground)", pointerEvents: "none",
-              transition: "opacity 0.3s",
-            }}>
+            <span className={styles.placeholder}>
               {PLACEHOLDERS[placeholderIndex]}
             </span>
           )}
         </div>
 
-        {/* Bottom bar: attach + send */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div className={styles.bottomBar}>
           <input
             ref={attachmentInputRef}
             type="file"
@@ -114,26 +102,16 @@ export function ChatComposer({
           <button
             type="button"
             onClick={handleAttachClick}
-            style={{
-              background: "transparent", border: "none", cursor: "pointer",
-              display: "flex", alignItems: "center", color: "var(--muted-foreground)",
-              padding: 4,
-            }}
-            title="上传文件"
+            className={styles.attachBtn}
+            title={t("upload_file", "上传文件")}
           >
             <AttachIcon />
           </button>
-          <div style={{ flex: 1 }} />
+          <div className={styles.spacer} />
           <button
             type="button"
             onClick={() => (isStreaming ? onStop() : handleSend())}
-            style={{
-              width: 28, height: 28, borderRadius: "50%",
-              background: "var(--primary)",
-              color: "var(--primary-foreground)", border: "none", cursor: "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              flexShrink: 0,
-            }}
+            className={styles.sendBtn}
           >
             {isStreaming ? <StopIcon /> : <SendIcon />}
           </button>

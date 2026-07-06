@@ -1,7 +1,9 @@
-import { ChatSidebar } from "../features/chat/ChatSidebar";
-import { WorkbookWorkspace } from "../features/workbook/workspace/WorkbookWorkspace";
-import { useWorkbookWorkspace } from "../features/workbook/workspace/useWorkbookWorkspace";
-import { useWorkspaceState } from "../features/workspace/useWorkspaceState";
+import { t } from "@/lib/i18n";
+import { ChatSidebar } from "@/features/chat/ChatSidebar";
+import { WorkbookWorkspace } from "@/features/workbook/workspace/WorkbookWorkspace";
+import { useWorkbookWorkspace } from "@/features/workbook/workspace/useWorkbookWorkspace";
+import { useWorkspaceState } from "@/features/workspace/useWorkspaceState";
+import styles from "./Workbench.module.css";
 
 type CurrentUser = {
   email: string;
@@ -41,8 +43,8 @@ export function Workbench({ currentUser, onLogout }: Props) {
   } = useWorkbookWorkspace(activeWorkspaceId);
 
   return (
-    <div style={{ height: "100vh", display: "flex", overflow: "hidden" }}>
-      <div style={{ flex: 1, minWidth: 0 }}>
+    <div className={styles.layout}>
+      <div className={styles.main}>
         <WorkbookWorkspace
           workspaceId={activeWorkspaceId}
           workbooks={workbooks}

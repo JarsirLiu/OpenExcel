@@ -1,3 +1,6 @@
+import { t } from "@/lib/i18n";
+import styles from "./WorkbookHeader.module.css";
+
 const UploadIcon = () => (
   <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -36,64 +39,30 @@ export function WorkbookHeader({
   onUploadNewWorkbookClick,
 }: Props) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 12px 0", background: "var(--muted)", borderBottom: "1px solid var(--border)" }}>
-      <div style={{ display: "flex", gap: 4, flex: 1, alignItems: "stretch", overflowX: "auto", paddingBottom: 4 }}>
+    <div className={styles.header}>
+      <div className={styles.tabList}>
         {workbooks.map((wb, i) => (
           <div
             key={wb.id}
             onClick={() => onSwitchWorkbook(i)}
-            style={{
-              padding: "6px 12px",
-              cursor: "pointer",
-              borderRadius: "8px 8px 0 0",
-              background: i === activeWorkbookIdx ? "var(--background)" : "var(--muted)",
-              border: i === activeWorkbookIdx ? "1px solid var(--border) 1px solid var(--border) 1px solid var(--background)" : "1px solid transparent",
-              borderRightColor: i === activeWorkbookIdx ? "var(--border)" : "transparent",
-              borderLeftColor: i === activeWorkbookIdx ? "var(--border)" : "transparent",
-              fontWeight: i === activeWorkbookIdx ? 600 : 500,
-              color: i === activeWorkbookIdx ? "var(--foreground)" : "var(--muted-foreground)",
-              fontSize: 12,
-              whiteSpace: "nowrap",
-            }}
+            className={`${styles.tab} ${i === activeWorkbookIdx ? styles.tabActive : styles.tabInactive}`}
           >
             {wb.name}
           </div>
         ))}
       </div>
-      <div style={{ display: "flex", gap: 4, paddingBottom: 4 }}>
-        <button
-          onClick={onUploadClick}
-          style={{
-            display: "inline-flex", alignItems: "center", gap: 4,
-            padding: "3px 8px",
-            border: "1px solid var(--border)",
-            borderRadius: "var(--radius-pill)",
-            background: "var(--background)",
-            color: "var(--foreground)",
-            fontSize: 11, fontWeight: 500,
-            cursor: "pointer",
-            lineHeight: 1,
-          }}
-        >
-          <UploadIcon /> 导入
+      <div className={styles.actions}>
+        <button onClick={onUploadClick} className={styles.pillBtn}>
+          <UploadIcon /> {t("import", "导入")}
         </button>
-        <button
-          onClick={onUploadNewWorkbookClick}
-          style={{
-            display: "inline-flex", alignItems: "center", gap: 4,
-            padding: "3px 8px",
-            border: "1px solid var(--border)",
-            borderRadius: "var(--radius-pill)",
-            background: "var(--background)",
-            color: "var(--foreground)",
-            fontSize: 11, fontWeight: 500,
-            cursor: "pointer",
-            lineHeight: 1,
-          }}
-        >
-          <FileIcon /> 上传
+        <button onClick={onUploadNewWorkbookClick} className={styles.pillBtn}>
+          <FileIcon /> {t("upload", "上传")}
         </button>
-        {status && <span style={{ fontSize: 11, color: status.includes("失败") ? "#ef4444" : "#22c55e", fontWeight: 500 }}>{status}</span>}
+        {status && (
+          <span className={`${styles.status} ${status.includes("失败") ? styles.statusError : styles.statusOk}`}>
+            {status}
+          </span>
+        )}
       </div>
     </div>
   );

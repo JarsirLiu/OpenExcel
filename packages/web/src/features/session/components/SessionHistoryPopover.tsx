@@ -1,4 +1,6 @@
-import type { Session } from "../../../api/sessions";
+import type { Session } from "@/api/sessions";
+import { t } from "@/lib/i18n";
+import styles from "./SessionHistoryPopover.module.css";
 
 type Props = {
   sessions: Session[];
@@ -16,32 +18,27 @@ export function SessionHistoryPopover({
   return (
     <>
       {sessions.length === 0 ? (
-        <div style={{ padding: "16px", textAlign: "center", color: "var(--hint-foreground)", fontSize: 13 }}>暂无历史记录</div>
+        <div className={styles.empty}>{t("no_history", "暂无历史记录")}</div>
       ) : (
         sessions.map((session) => (
           <div
             key={session.id}
             onClick={() => onSelectSession(session.id)}
-            style={{
-              display: "flex", alignItems: "center", justifyContent: "space-between",
-              padding: "10px 14px", cursor: "pointer",
-              background: session.id === currentSessionId ? "var(--muted)" : "transparent",
-              borderBottom: "1px solid var(--border)",
-            }}
+            className={`${styles.item} ${session.id === currentSessionId ? styles.itemActive : styles.itemInactive}`}
           >
-            <span style={{ fontSize: 13, color: "var(--foreground)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+            <span className={styles.itemName}>
               {session.name}
             </span>
-            <div
+            <button
               onClick={(e) => {
                 e.stopPropagation();
                 onDeleteSession(session.id);
               }}
-              style={{ padding: "2px 6px", cursor: "pointer", color: "var(--hint-foreground)", fontSize: 14, lineHeight: 1, marginLeft: 8, flexShrink: 0 }}
-              title="删除"
+              className={styles.deleteBtn}
+              title={t("delete", "删除")}
             >
               ✕
-            </div>
+            </button>
           </div>
         ))
       )}

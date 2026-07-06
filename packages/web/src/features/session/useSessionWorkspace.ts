@@ -5,8 +5,8 @@ import {
   fetchSessions,
   generateSessionTitle,
   type Session,
-} from "../../api/sessions";
-import { fetchMessages as fetchChatMessages, undoLatestRun as undoLatestChatRun } from "../../api/chat";
+} from "@/api/sessions";
+import { fetchMessages as fetchChatMessages, undoLatestRun as undoLatestChatRun } from "@/api/chat";
 import { getFirstUserText } from "./utils";
 
 type UndoState = "idle" | "loading" | "success" | "error";

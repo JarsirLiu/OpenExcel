@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Mention from "@tiptap/extension-mention";
-import { fetchWorkbookReferenceCandidates } from "../../../api/workbooks";
+import { fetchWorkbookReferenceCandidates } from "@/api/workbooks";
 import { createMentionSuggestion, type WorkbookSource } from "./SheetMentionList";
 
 export function useChatComposer({

@@ -1,0 +1,11 @@
+[data-theme="light"],
+:root {
+  --bg-page: var(--color-surface);
+  --bg-surface: var(--color-surface);
+  --bg-muted: var(--color-muted);
+  --text-primary: var(--color-text);
+  --text-secondary: var(--color-text-secondary);
+  --text-hint: var(--color-text-hint);
+  --border-default: var(--color-border);
+  --border-strong: var(--color-border-strong);
+}

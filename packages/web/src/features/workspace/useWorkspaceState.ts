@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { fetchWorkspaces, type Workspace } from "../../api/workspaces";
+import { fetchWorkspaces, type Workspace } from "@/api/workspaces";
 
 export function useWorkspaceState() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);

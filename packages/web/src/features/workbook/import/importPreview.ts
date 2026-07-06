@@ -1,5 +1,5 @@
 import { celldataToGrid, excelToGrid, isCelldata, type FortuneCell } from "@openexcel/core";
-import type { WorkbookFull, SheetSchema } from "../../../api/workbooks";
+import type { WorkbookFull, SheetSchema } from "@/api/workbooks";
 
 export type ImportSheetStatus = "matched" | "missing" | "extra";
 

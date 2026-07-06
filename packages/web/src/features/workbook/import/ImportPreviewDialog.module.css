@@ -1,0 +1,316 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.48);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.dialog {
+  width: min(1280px, 100%);
+  max-height: 100%;
+  overflow: hidden;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 18px 60px rgba(15, 23, 42, 0.24);
+  display: flex;
+  flex-direction: column;
+}
+
+.dialogHeader {
+  padding: 18px 20px 12px;
+  border-bottom: 1px solid #e6ebf2;
+  background: linear-gradient(180deg, #fbfcfe 0%, #f4f7fb 100%);
+}
+
+.dialogHeaderRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.dialogTitle {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.dialogDesc {
+  margin-top: 4px;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.dialogActions {
+  display: flex;
+  gap: 8px;
+}
+
+.btnCancel {
+  font-size: 13px;
+  padding: 6px 14px;
+  border: 1px solid #d1d7e0;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.btnCancel:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.btnConfirm {
+  font-size: 13px;
+  padding: 6px 14px;
+  border: 1px solid #1f6feb;
+  border-radius: 8px;
+  background: #1f6feb;
+  color: #fff;
+  cursor: pointer;
+}
+
+.btnConfirm:disabled {
+  background: #7ca7f7;
+  cursor: not-allowed;
+}
+
+.badgeRow {
+  display: flex;
+  gap: 12px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+.badge {
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.badgeBlue { background: #eef4ff; color: #2448a7; }
+.badgeGreen { background: #eefbf2; color: #1b7f3a; }
+.badgeYellow { background: #fff7e8; color: #a96b00; }
+.badgePurple { background: #edf4ff; color: #2457c5; }
+.badgeGray { background: #f4f6fb; color: #475569; }
+
+.warning {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #7c5c00;
+  line-height: 1.6;
+}
+
+.body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+}
+
+.sidebar {
+  width: 280px;
+  border-right: 1px solid #e6ebf2;
+  background: #f8fafc;
+  overflow: auto;
+}
+
+.sheetBtn {
+  width: 100%;
+  padding: 14px 16px;
+  border: none;
+  border-bottom: 1px solid #e6ebf2;
+  text-align: left;
+  cursor: pointer;
+  background: transparent;
+  display: block;
+}
+
+.sheetBtnActive {
+  background: #fff;
+}
+
+.sheetBtnRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sheetName {
+  font-size: 13px;
+  color: #111827;
+}
+
+.sheetNameActive {
+  font-weight: 700;
+}
+
+.sheetNameInactive {
+  font-weight: 600;
+}
+
+.statusPill {
+  font-size: 11px;
+  border-radius: 999px;
+  padding: 3px 8px;
+}
+
+.sheetStats {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #6b7280;
+  line-height: 1.6;
+}
+
+.content {
+  flex: 1;
+  min-width: 0;
+  padding: 18px;
+  overflow: auto;
+}
+
+.contentHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.contentSheetName {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.contentSheetDesc {
+  margin-top: 6px;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.contentStats {
+  font-size: 12px;
+  color: #475569;
+  text-align: right;
+  line-height: 1.7;
+}
+
+.gridWrap {
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
+}
+
+.gridCol {
+  flex: 1;
+  min-width: 0;
+}
+
+.gridLabel {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #1f2a37;
+}
+
+.gridBox {
+  max-height: 52vh;
+  overflow: auto;
+  border: 1px solid #d7dee8;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.gridTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.gridTh {
+  position: sticky;
+  top: 0;
+  background: #f7f9fc;
+  border-bottom: 1px solid #d7dee8;
+  padding: 6px 8px;
+  min-width: 92px;
+  z-index: 1;
+}
+
+.gridThNum {
+  width: 48px;
+  z-index: 1;
+}
+
+.gridRowNum {
+  position: sticky;
+  left: 0;
+  background: #f7f9fc;
+  border-right: 1px solid #d7dee8;
+  border-bottom: 1px solid #edf1f5;
+  padding: 6px 8px;
+  text-align: right;
+  min-width: 48px;
+  z-index: 0;
+}
+
+.gridCell {
+  border-bottom: 1px solid #edf1f5;
+  border-left: 1px solid #edf1f5;
+  padding: 6px 8px;
+  min-width: 92px;
+  white-space: nowrap;
+}
+
+.gridFooter {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.diffSection {
+  margin-top: 16px;
+}
+
+.diffTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 8px;
+}
+
+.diffBox {
+  border: 1px solid #e6ebf2;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.diffTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.diffTh {
+  padding: 8px 10px;
+  text-align: left;
+  background: #f8fafc;
+  color: #475569;
+}
+
+.diffTd {
+  padding: 8px 10px;
+}
+
+.diffRow {
+  border-top: 1px solid #edf1f5;
+}
+
+.diffValueRed { color: #b23b3b; }
+.diffValueGreen { color: #1b7f3a; }

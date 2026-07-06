@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { WorkbookFull } from "../../../api/workbooks";
+import type { WorkbookFull } from "@/api/workbooks";
 import { toFortuneSheetData, type FortuneSheetData } from "./fortuneSheet";
 
 type WorkbookEditorSession = {

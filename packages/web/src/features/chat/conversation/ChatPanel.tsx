@@ -1,8 +1,10 @@
 import type { SheetChangeDelta } from "@openexcel/core";
-import { ChatComposer } from "../composer/ChatComposer";
-import { MessageList } from "../message/MessageList";
-import { useChatConversation } from "../hooks/useChatConversation";
-import type { WorkbookStructureUpdate } from "../hooks/useSheetPatchSync";
+import { ChatComposer } from "@/features/chat/composer/ChatComposer";
+import { MessageList } from "@/features/chat/message/MessageList";
+import { useChatConversation } from "@/features/chat/hooks/useChatConversation";
+import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatchSync";
+import { t } from "@/lib/i18n";
+import styles from "./ChatPanel.module.css";
 
 export function ChatPanel({
   sessionId,
@@ -40,7 +42,7 @@ export function ChatPanel({
   });
 
   return (
-    <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0, background: "var(--background)", position: "relative" }}>
+    <div className={styles.container}>
       <MessageList
         messages={messages}
         isStreaming={isStreaming}
@@ -48,17 +50,9 @@ export function ChatPanel({
       />
 
       {error && (
-        <div style={{ padding: "0 14px 10px" }}>
-          <div style={{
-            border: "1px solid var(--border)",
-            background: "var(--muted)",
-            color: "var(--muted-foreground)",
-            borderRadius: "var(--radius-sm)",
-            padding: "8px 12px",
-            fontSize: 13,
-            lineHeight: 1.5,
-          }}>
-            对话失败：{error.message}
+        <div className={styles.error}>
+          <div className={styles.errorBox}>
+            {t("chat_failed", "对话失败")}：{error.message}
           </div>
         </div>
       )}

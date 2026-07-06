@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { fetchCurrentUser, login, logout, register, type CurrentUser } from "../../api/auth";
+import { fetchCurrentUser, login, logout, register, type CurrentUser } from "@/api/auth";
 
 export function useAuthState() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);

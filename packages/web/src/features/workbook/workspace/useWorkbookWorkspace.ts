@@ -5,12 +5,12 @@ import {
   fetchWorkbook,
   fetchWorkbooks,
   uploadNewWorkbook,
-} from "../../../api/workbooks";
-import type { WorkbookMeta } from "../../../api/workbooks";
+} from "@/api/workbooks";
+import type { WorkbookMeta } from "@/api/workbooks";
 import { patchWorkbookWithDelta } from "../utils/patchWorkbook";
 import { useWorkbookImportFlow } from "../import/useWorkbookImportFlow";
 import { useWorkbookCatalog } from "./useWorkbookCatalog";
-import type { WorkbookStructureUpdate } from "../../chat/hooks/useSheetPatchSync";
+import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatchSync";
 
 function sortWorkbooks(list: WorkbookMeta[]): WorkbookMeta[] {
   return [...list].sort((a, b) => a.order - b.order || a.id - b.id);

@@ -1,10 +1,12 @@
 import { useEffect, useRef } from "react";
 import type { SheetChangeDelta } from "@openexcel/core";
-import { ChatPanel } from "../chat/conversation/ChatPanel";
+import { ChatPanel } from "@/features/chat/conversation/ChatPanel";
 import { SessionHeader } from "./components/SessionHeader";
 import { SessionHistoryPopover } from "./components/SessionHistoryPopover";
-import type { Session } from "../../api/sessions";
-import type { WorkbookStructureUpdate } from "../chat/hooks/useSheetPatchSync";
+import type { Session } from "@/api/sessions";
+import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatchSync";
+import { t } from "@/lib/i18n";
+import styles from "./SessionShell.module.css";
 
 type CurrentUser = {
   email: string;
@@ -77,22 +79,16 @@ export function SessionShell({
 
   if (workspaceId == null) {
     return (
-    <div style={{
-      display: "flex", flexDirection: "column", height: "100%", background: "var(--background)",
-      borderLeft: "1px solid var(--border)", overflow: "hidden", position: "relative",
-    }}>
-      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--hint-foreground)", fontSize: 13 }}>加载工作区中...</div>
+    <div className={styles.container}>
+      <div className={styles.emptyState}>{t("loading_workspace", "加载工作区中...")}</div>
       </div>
     );
   }
 
   return (
-    <div style={{
-      display: "flex", flexDirection: "column", height: "100%", background: "var(--background)",
-      borderLeft: "1px solid var(--border)", overflow: "hidden", position: "relative",
-    }}>
+    <div className={styles.container}>
       <SessionHeader
-        sessionName={currentSession?.name ?? "AI 对话"}
+        sessionName={currentSession?.name ?? t("ai_chat", "AI 对话")}
         currentSessionId={currentSessionId}
         undoState={undoState}
         undoError={undoError}
@@ -105,11 +101,7 @@ export function SessionShell({
       />
 
       {historyOpen && (
-        <div ref={historyRef} style={{
-          position: "absolute", top: 44, left: 8, right: 8, zIndex: 100,
-          background: "var(--background)", border: "1px solid var(--border)", borderRadius: "var(--radius)",
-          boxShadow: "var(--shadow)", maxHeight: 300, overflowY: "auto",
-        }}>
+        <div ref={historyRef} className={styles.historyPanel}>
           <SessionHistoryPopover
             sessions={sessions}
             currentSessionId={currentSessionId}
@@ -133,7 +125,7 @@ export function SessionShell({
           referenceCacheRevision={referenceCacheRevision}
         />
       ) : (
-        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--hint-foreground)", fontSize: 13 }}>加载中...</div>
+        <div className={styles.emptyState}>{t("loading", "加载中...")}</div>
       )}
     </div>
   );

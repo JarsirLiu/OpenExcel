@@ -1,6 +1,7 @@
-import { ExcelGrid } from "../editor/ExcelGrid";
-import type { WorkbookFull } from "../../../api/workbooks";
-import type { WorkbookStructureUpdate } from "../../chat/hooks/useSheetPatchSync";
+import { ExcelGrid } from "@/features/workbook/editor/ExcelGrid";
+import type { WorkbookFull } from "@/api/workbooks";
+import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatchSync";
+import styles from "./ExcelWorkspace.module.css";
 
 interface Props {
   workspaceId: number | null;
@@ -24,7 +25,7 @@ export function ExcelWorkspace({
   onWorkbookRefresh,
 }: Props) {
   return (
-    <div style={{ flex: 1, minWidth: 0, overflow: "hidden", borderRight: "1px solid var(--border)" }}>
+    <div className={styles.container}>
       <ExcelGrid
         workspaceId={workspaceId}
         workbook={workbook}

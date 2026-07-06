@@ -1,7 +1,7 @@
 import type { SheetChangeDelta } from "@openexcel/core";
-import { useSessionWorkspace } from "../session/useSessionWorkspace";
-import { SessionShell } from "../session/SessionShell";
-import type { WorkbookStructureUpdate } from "./hooks/useSheetPatchSync";
+import { useSessionWorkspace } from "@/features/session/useSessionWorkspace";
+import { SessionShell } from "@/features/session/SessionShell";
+import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatchSync";
 
 type CurrentUser = {
   email: string;

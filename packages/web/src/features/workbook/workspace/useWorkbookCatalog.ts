@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import { fetchWorkbooks, fetchWorkbook, uploadExcel, type WorkbookFull } from "../../../api/workbooks";
+import { fetchWorkbooks, fetchWorkbook, uploadExcel, type WorkbookFull } from "@/api/workbooks";
 
 export function useWorkbookCatalog(workspaceId: number | null) {
   const [workbooks, setWorkbooks] = useState<{ id: number; name: string }[]>([]);
