@@ -26,6 +26,7 @@ model User {
   email        String         @unique
   displayName  String
   passwordHash String
+  exampleWorkspaceSeededAt DateTime?
   workspaces   Workspace[]
   authSessions AuthSession[]
   createdAt    DateTime       @default(now())

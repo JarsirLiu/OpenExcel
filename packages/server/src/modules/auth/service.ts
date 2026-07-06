@@ -2,7 +2,7 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 import * as authRepo from "./repository.js";
 import { AUTH_SESSION_MAX_AGE_SECONDS, buildClearedSessionCookie, buildSessionCookie, createSessionToken, extractSessionTokenFromCookie, hashSessionToken } from "./session.js";
 import { PASSWORD_MIN_LENGTH, hashPassword, verifyPassword } from "./password.js";
-import * as workspaceService from "../workspaces/service.js";
+import { seedExampleWorkspaceForUser } from "../workspaces/exampleSeed.js";
 
 export interface CurrentUserContext {
   id: number;
@@ -119,7 +119,7 @@ export async function registerWithPassword(input: AuthCredentialsInput, req: Fas
     passwordHash,
   });
 
-  await workspaceService.ensureWorkspaceForUser(user.id);
+  await seedExampleWorkspaceForUser(user.id);
   await issueSessionForUser(user.id, req, reply);
   return toCurrentUser(user);
 }
@@ -136,7 +136,7 @@ export async function loginWithPassword(input: AuthCredentialsInput, req: Fastif
     throw new AuthError("邮箱或密码错误", "INVALID_CREDENTIALS", 401);
   }
 
-  await workspaceService.ensureWorkspaceForUser(user.id);
+  await seedExampleWorkspaceForUser(user.id);
   await issueSessionForUser(user.id, req, reply);
   return toCurrentUser(user);
 }

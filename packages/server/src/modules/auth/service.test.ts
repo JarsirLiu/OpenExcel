@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
   createSession: vi.fn(),
   revokeSessionByTokenHash: vi.fn(),
   revokeAllSessionsByUser: vi.fn(),
-  ensureWorkspaceForUser: vi.fn(),
+  seedExampleWorkspaceForUser: vi.fn(),
   hashPassword: vi.fn(),
   verifyPassword: vi.fn(),
   createSessionToken: vi.fn(),
@@ -26,8 +26,8 @@ vi.mock("./repository.js", () => ({
   revokeAllSessionsByUser: mocks.revokeAllSessionsByUser,
 }));
 
-vi.mock("../workspaces/service.js", () => ({
-  ensureWorkspaceForUser: mocks.ensureWorkspaceForUser,
+vi.mock("../workspaces/exampleSeed.js", () => ({
+  seedExampleWorkspaceForUser: mocks.seedExampleWorkspaceForUser,
 }));
 
 vi.mock("./password.js", () => ({
@@ -61,7 +61,7 @@ describe("auth service", () => {
     mocks.createSession.mockReset();
     mocks.revokeSessionByTokenHash.mockReset();
     mocks.revokeAllSessionsByUser.mockReset();
-    mocks.ensureWorkspaceForUser.mockReset();
+    mocks.seedExampleWorkspaceForUser.mockReset();
     mocks.hashPassword.mockReset();
     mocks.verifyPassword.mockReset();
     mocks.createSessionToken.mockReset();
@@ -87,7 +87,7 @@ describe("auth service", () => {
     mocks.findUserByEmail.mockResolvedValue(null);
     mocks.hashPassword.mockResolvedValue("hashed-password");
     mocks.createUser.mockResolvedValue({ id: 12, email: "new@example.com", displayName: "New User" });
-    mocks.ensureWorkspaceForUser.mockResolvedValue({ id: 99 });
+    mocks.seedExampleWorkspaceForUser.mockResolvedValue({ seeded: true, workspaceId: 99 });
     mocks.createSessionToken.mockReturnValue("session-token");
     mocks.hashSessionToken.mockReturnValue("session-hash");
     mocks.buildSessionCookie.mockReturnValue("cookie-value");
@@ -105,7 +105,7 @@ describe("auth service", () => {
       displayName: "New User",
       passwordHash: "hashed-password",
     });
-    expect(mocks.ensureWorkspaceForUser).toHaveBeenCalledWith(12);
+    expect(mocks.seedExampleWorkspaceForUser).toHaveBeenCalledWith(12);
     expect(mocks.createSession).toHaveBeenCalledWith({
       userId: 12,
       tokenHash: "session-hash",
@@ -124,7 +124,7 @@ describe("auth service", () => {
       passwordHash: "stored-hash",
     });
     mocks.verifyPassword.mockResolvedValue(true);
-    mocks.ensureWorkspaceForUser.mockResolvedValue({ id: 101 });
+    mocks.seedExampleWorkspaceForUser.mockResolvedValue({ seeded: true, workspaceId: 101 });
     mocks.createSessionToken.mockReturnValue("login-token");
     mocks.hashSessionToken.mockReturnValue("login-hash");
     mocks.buildSessionCookie.mockReturnValue("login-cookie");
@@ -138,7 +138,7 @@ describe("auth service", () => {
 
     expect(user).toEqual({ id: 44, email: "bob@example.com", displayName: "Bob" });
     expect(mocks.verifyPassword).toHaveBeenCalledWith("password123", "stored-hash");
-    expect(mocks.ensureWorkspaceForUser).toHaveBeenCalledWith(44);
+    expect(mocks.seedExampleWorkspaceForUser).toHaveBeenCalledWith(44);
     expect(reply.header).toHaveBeenCalledWith("Set-Cookie", "login-cookie");
   });
 
