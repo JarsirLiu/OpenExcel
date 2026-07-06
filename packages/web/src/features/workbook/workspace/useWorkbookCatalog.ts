@@ -20,10 +20,7 @@ function saveIdx(idx: number) {
   }
 }
 
-export function useWorkbookCatalog(
-  workspaceId: number | null,
-  initial?: { workbooks: WorkbookMeta[]; currentWorkbook: WorkbookFull | null },
-) {
+export function useWorkbookCatalog(workspaceId: number | null) {
   const [workbooks, setWorkbooks] = useState<WorkbookMeta[]>([]);
   const [workbookIdx, setWorkbookIdx] = useState(loadStoredIdx);
   const [currentWorkbook, setCurrentWorkbook] = useState<WorkbookFull | null>(null);
@@ -32,24 +29,11 @@ export function useWorkbookCatalog(
   const [loading, setLoading] = useState(true);
 
   const initialIdxRef = useRef(loadStoredIdx());
-  const seededRef = useRef(false);
 
   const replaceCurrentWorkbook = useCallback((next: WorkbookFull | null) => {
     setCurrentWorkbook(next);
     setWorkbookRevision((revision) => revision + 1);
   }, []);
-
-  useEffect(() => {
-    if (!initial || seededRef.current) return;
-    seededRef.current = true;
-    setWorkbooks(initial.workbooks);
-    setCurrentWorkbook(initial.currentWorkbook);
-    if (initial.workbooks.length > 0) {
-      const targetIdx = Math.min(initialIdxRef.current, initial.workbooks.length - 1);
-      setWorkbookIdx(targetIdx);
-    }
-    setLoading(false);
-  }, [initial]);
 
   useEffect(() => {
     if (workspaceId == null) {
@@ -60,8 +44,6 @@ export function useWorkbookCatalog(
       setLoading(false);
       return;
     }
-
-    if (seededRef.current) return;
 
     setLoading(true);
     let cancelled = false;

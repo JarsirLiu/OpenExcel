@@ -36,48 +36,19 @@ function saveSessionId(id: number | null) {
 
 type UndoState = "idle" | "loading" | "success" | "error";
 
-export function useSessionWorkspace(
-  workspaceId: number | null,
-  onUndoComplete?: () => void,
-  initial?: { sessions: Session[]; messages?: unknown[]; messageTotal?: number },
-) {
-  const [sessions, setSessions] = useState<Session[]>(initial?.sessions ?? []);
-  const [currentSessionId, setCurrentSessionId] = useState<number | null>(() => {
-    const stored = loadStoredSessionId();
-    if (initial && stored !== null && initial.sessions.some((s) => s.id === stored)) {
-      return stored;
-    }
-    if (initial && initial.sessions.length > 0) return initial.sessions[0].id;
-    return stored;
-  });
-  const [messages, setMessages] = useState<unknown[]>(initial?.messages ?? []);
-  const [messageTotal, setMessageTotal] = useState(initial?.messageTotal ?? 0);
-  const [initialLoaded, setInitialLoaded] = useState(!!initial);
+export function useSessionWorkspace(workspaceId: number | null, onUndoComplete?: () => void) {
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<number | null>(loadStoredSessionId);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [messageTotal, setMessageTotal] = useState(0);
+  const [initialLoaded, setInitialLoaded] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [undoState, setUndoState] = useState<UndoState>("idle");
   const [undoError, setUndoError] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [draftPendingText, setDraftPendingText] = useState<string | null>(null);
-  const loadedOffsetRef = useRef(initial?.messages?.length ?? 0);
-  const seededRef = useRef(false);
-
-  useEffect(() => {
-    if (!initial || seededRef.current) return;
-    seededRef.current = true;
-    setSessions(initial.sessions);
-    const stored = loadStoredSessionId();
-    const targetId = stored !== null && initial.sessions.some((s) => s.id === stored)
-      ? stored
-      : initial.sessions[0]?.id ?? null;
-    setCurrentSessionId(targetId);
-    if (initial.messages) {
-      setMessages(initial.messages);
-      setMessageTotal(initial.messageTotal ?? initial.messages.length);
-      loadedOffsetRef.current = initial.messages.length;
-    }
-    setInitialLoaded(true);
-  }, [initial]);
+  const loadedOffsetRef = useRef(0);
 
   const refreshSessions = useCallback(async () => {
     if (workspaceId == null) {
@@ -99,21 +70,10 @@ export function useSessionWorkspace(
   }, [workspaceId]);
 
   useEffect(() => {
-    if (seededRef.current) {
-      seededRef.current = false;
-      return;
-    }
     void refreshSessions();
   }, [refreshSessions]);
 
-  const messagesSeededRef = useRef(!!initial?.messages);
-
   useEffect(() => {
-    if (messagesSeededRef.current) {
-      messagesSeededRef.current = false;
-      return;
-    }
-
     let cancelled = false;
     setInitialLoaded(false);
     setMessages([]);

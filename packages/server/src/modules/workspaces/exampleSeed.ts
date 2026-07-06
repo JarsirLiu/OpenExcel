@@ -2,7 +2,6 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gridToCelldata, type InitConfig } from "@openexcel/core";
-import { generateSessionPublicId, generateWorkbookPublicId, generateWorkspacePublicId } from "../../shared/utils/publicId.js";
 import { prisma } from "../../infra/database/db.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -60,7 +59,6 @@ export async function seedExampleWorkspaceForUser(ownerUserId: number, template 
     const workspace = await tx.workspace.create({
       data: {
         ownerUserId,
-        publicId: generateWorkspacePublicId(),
         name: "示例工作区",
         order: nextOrder,
       },
@@ -70,7 +68,6 @@ export async function seedExampleWorkspaceForUser(ownerUserId: number, template 
       const workbook = await tx.workbook.create({
         data: {
           workspaceId: workspace.id,
-          publicId: generateWorkbookPublicId(),
           name: normalizeName(workbookDef.name, `Workbook ${workbookIndex + 1}`),
           order: workbookIndex,
         },
@@ -95,7 +92,6 @@ export async function seedExampleWorkspaceForUser(ownerUserId: number, template 
     await tx.session.create({
       data: {
         workspaceId: workspace.id,
-        publicId: generateSessionPublicId(),
         name: "新对话",
         sheetId: null,
       },
