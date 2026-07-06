@@ -8,7 +8,7 @@ const SESSION_KEYS = [
   "openexcel:sessionId",
 ];
 
-function clearAllSessionStorage() {
+export function clearAllSessionStorage() {
   try {
     for (const key of SESSION_KEYS) {
       sessionStorage.removeItem(key);

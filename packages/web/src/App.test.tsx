@@ -11,24 +11,46 @@ vi.mock("./features/auth/AuthScreen.js", () => ({
   AuthScreen: () => <div data-testid="auth-screen">AuthScreen</div>,
 }));
 
-vi.mock("./features/auth/useAuthState.js", () => ({
-  useAuthState: () => ({
-    currentUser: { id: 1, email: "user@example.com", displayName: "User" },
-    loading: false,
-    submitting: false,
-    error: null,
-    signIn: vi.fn(),
-    signUp: vi.fn(),
-    signOut: vi.fn(),
-    setError: vi.fn(),
-  }),
+vi.mock("./api/auth.js", () => ({
+  fetchCurrentUser: vi.fn().mockResolvedValue({ id: 1, email: "user@example.com", displayName: "User" }),
+  logout: vi.fn(),
+}));
+
+vi.mock("./api/workspaces.js", () => ({
+  fetchWorkspaces: vi.fn().mockResolvedValue([]),
+}));
+
+vi.mock("./api/workbooks.js", () => ({
+  fetchWorkbooks: vi.fn().mockResolvedValue([]),
+}));
+
+vi.mock("./api/sessions.js", () => ({
+  fetchSessions: vi.fn().mockResolvedValue([]),
+}));
+
+vi.mock("./api/chat.js", () => ({
+  fetchMessages: vi.fn().mockResolvedValue({ messages: [], total: 0 }),
 }));
 
 import App from "./App";
 
 const testRouter = createHashRouter([
   {
-    path: "/",
+    id: "protected",
+    loader: async () => ({ currentUser: { id: 1, email: "user@example.com", displayName: "User" } }),
+    children: [
+      {
+        path: "*",
+        element: <App />,
+      },
+    ],
+  },
+  {
+    path: "/login",
+    element: <App />,
+  },
+  {
+    path: "/register",
     element: <App />,
   },
 ]);

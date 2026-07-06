@@ -7,6 +7,8 @@ import { useSessionWorkspace } from "@/features/session/useSessionWorkspace";
 import { useWorkspaceState } from "@/features/workspace/useWorkspaceState";
 import { WorkspaceSidebar } from "@/features/workspace/WorkspaceSidebar";
 import type { Workspace } from "@/api/workspaces";
+import type { WorkbookMeta, WorkbookFull } from "@/api/workbooks";
+import type { Session } from "@/api/sessions";
 import styles from "./Workbench.module.css";
 
 type CurrentUser = {
@@ -14,19 +16,29 @@ type CurrentUser = {
   displayName: string;
 };
 
+export type RouteData = {
+  workspaces: Workspace[];
+  workspace: Workspace;
+  workbooks: WorkbookMeta[];
+  sessions: Session[];
+  currentWorkbook?: WorkbookFull;
+  messages?: unknown[];
+  messageTotal?: number;
+};
+
 type Props = {
   currentUser: CurrentUser;
   onLogout: () => void;
-  initialWorkspaces?: Workspace[];
+  routeData?: RouteData;
 };
 
 const MIN_SIDEBAR_WIDTH = 300;
 
-export function Workbench({ currentUser, onLogout, initialWorkspaces }: Props) {
+export function Workbench({ currentUser, onLogout, routeData }: Props) {
   const navigate = useNavigate();
   const params = useParams<{ workspacePublicId?: string; workbookPublicId?: string; sessionPublicId?: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { workspaces, activeWorkspaceId, setActiveWorkspaceId, loading: workspaceLoading } = useWorkspaceState(initialWorkspaces);
+  const { workspaces, activeWorkspaceId, setActiveWorkspaceId, loading: workspaceLoading } = useWorkspaceState(routeData?.workspaces);
   const [sidebarWidth, setSidebarWidth] = useState(MIN_SIDEBAR_WIDTH);
   const rafRef = useRef<number | null>(null);
 
@@ -46,6 +58,10 @@ export function Workbench({ currentUser, onLogout, initialWorkspaces }: Props) {
       navigate(`/workspaces/${activeWorkspacePublicId}`, { replace: true });
     }
   }, [activeWorkspacePublicId, params.workspacePublicId, navigate]);
+
+  const workbookInitial = routeData?.workbooks
+    ? { workbooks: routeData.workbooks, currentWorkbook: routeData.currentWorkbook ?? null }
+    : undefined;
 
   const {
     workbooks,
@@ -70,9 +86,13 @@ export function Workbench({ currentUser, onLogout, initialWorkspaces }: Props) {
     handleImportCancel,
     handleNewWorkbookFileChange,
     handleWorkbookDelete,
-  } = useWorkbookWorkspace(activeWorkspaceId);
+  } = useWorkbookWorkspace(activeWorkspaceId, workbookInitial);
 
-  const sessionWorkspace = useSessionWorkspace(activeWorkspaceId, handleWorkbookRefresh);
+  const sessionInitial = routeData?.sessions
+    ? { sessions: routeData.sessions, messages: routeData.messages, messageTotal: routeData.messageTotal }
+    : undefined;
+
+  const sessionWorkspace = useSessionWorkspace(activeWorkspaceId, handleWorkbookRefresh, sessionInitial);
 
   const currentWbPublicId = workbooks[workbookIdx]?.publicId ?? null;
 

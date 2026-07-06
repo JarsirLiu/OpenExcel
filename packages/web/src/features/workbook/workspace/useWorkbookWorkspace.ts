@@ -6,7 +6,7 @@ import {
   fetchWorkbooks,
   uploadNewWorkbook,
 } from "@/api/workbooks";
-import type { WorkbookMeta } from "@/api/workbooks";
+import type { WorkbookFull, WorkbookMeta } from "@/api/workbooks";
 import { patchWorkbookWithDelta } from "../utils/patchWorkbook";
 import { useWorkbookImportFlow } from "../import/useWorkbookImportFlow";
 import { useWorkbookCatalog } from "./useWorkbookCatalog";
@@ -27,7 +27,12 @@ function loadStoredSheetIdx(): number {
   }
 }
 
-export function useWorkbookWorkspace(workspaceId: number | null) {
+type WorkbookInitial = {
+  workbooks: WorkbookMeta[];
+  currentWorkbook?: WorkbookFull | null;
+};
+
+export function useWorkbookWorkspace(workspaceId: number | null, initial?: WorkbookInitial) {
   const {
     workbooks,
     workbookIdx,
@@ -41,7 +46,7 @@ export function useWorkbookWorkspace(workspaceId: number | null) {
     setStatus,
     uploadExcel,
     workbookRevision,
-  } = useWorkbookCatalog(workspaceId);
+  } = useWorkbookCatalog(workspaceId, initial);
 
   const [currentSheetIndex, setCurrentSheetIndex] = useState(loadStoredSheetIdx);
   const [referenceCacheRevision, setReferenceCacheRevision] = useState(0);

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { fetchWorkbooks, fetchWorkbook, uploadExcel, type WorkbookFull, type WorkbookMeta } from "@/api/workbooks";
+import { fetchWorkbook, uploadExcel, type WorkbookFull, type WorkbookMeta } from "@/api/workbooks";
 
 const STORAGE_KEY_IDX = "openexcel:workbookIdx";
 
@@ -20,62 +20,43 @@ function saveIdx(idx: number) {
   }
 }
 
-export function useWorkbookCatalog(workspaceId: number | null) {
-  const [workbooks, setWorkbooks] = useState<WorkbookMeta[]>([]);
+type WorkbookInitial = {
+  workbooks: WorkbookMeta[];
+  currentWorkbook?: WorkbookFull | null;
+};
+
+export function useWorkbookCatalog(workspaceId: number | null, initial?: WorkbookInitial) {
+  const [workbooks, setWorkbooks] = useState<WorkbookMeta[]>(initial?.workbooks ?? []);
   const [workbookIdx, setWorkbookIdx] = useState(loadStoredIdx);
-  const [currentWorkbook, setCurrentWorkbook] = useState<WorkbookFull | null>(null);
+  const [currentWorkbook, setCurrentWorkbook] = useState<WorkbookFull | null>(initial?.currentWorkbook ?? null);
   const [workbookRevision, setWorkbookRevision] = useState(0);
   const [status, setStatus] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initial);
 
-  const initialIdxRef = useRef(loadStoredIdx());
+  useEffect(() => {
+    if (!initial) return;
+    setWorkbooks(initial.workbooks);
+    const idx = Math.min(loadStoredIdx(), initial.workbooks.length - 1);
+    setWorkbookIdx(idx >= 0 ? idx : 0);
+    if (initial.currentWorkbook) {
+      setCurrentWorkbook(initial.currentWorkbook);
+    }
+    setLoading(false);
+  }, [initial]);
+
+  useEffect(() => {
+    if (workspaceId != null) return;
+    setWorkbooks([]);
+    setWorkbookIdx(0);
+    setCurrentWorkbook(null);
+    setStatus("");
+    setLoading(false);
+  }, [workspaceId]);
 
   const replaceCurrentWorkbook = useCallback((next: WorkbookFull | null) => {
     setCurrentWorkbook(next);
     setWorkbookRevision((revision) => revision + 1);
   }, []);
-
-  useEffect(() => {
-    if (workspaceId == null) {
-      setWorkbooks([]);
-      setWorkbookIdx(0);
-      replaceCurrentWorkbook(null);
-      setStatus("");
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    let cancelled = false;
-    const intendedIdx = initialIdxRef.current;
-
-    fetchWorkbooks(workspaceId)
-      .then((list) => {
-        if (cancelled) return;
-        const safeList = Array.isArray(list) ? list : [];
-        setWorkbooks(safeList);
-        if (safeList.length > 0) {
-          const targetIdx = Math.min(intendedIdx, safeList.length - 1);
-          setWorkbookIdx(targetIdx);
-          return fetchWorkbook(workspaceId, safeList[targetIdx].id);
-        }
-        return null;
-      })
-      .then((wb) => {
-        if (cancelled) return;
-        replaceCurrentWorkbook(wb ?? null);
-        setLoading(false);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setWorkbooks([]);
-        replaceCurrentWorkbook(null);
-        setStatus(err instanceof Error ? err.message : "加载失败");
-        setLoading(false);
-      });
-
-    return () => { cancelled = true; };
-  }, [replaceCurrentWorkbook, workspaceId]);
 
   useEffect(() => {
     saveIdx(workbookIdx);
