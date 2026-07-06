@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { fetchWorkbooks, fetchWorkbook, uploadExcel, type WorkbookFull } from "@/api/workbooks";
+import { fetchWorkbooks, fetchWorkbook, uploadExcel, type WorkbookFull, type WorkbookMeta } from "@/api/workbooks";
 
 const STORAGE_KEY_IDX = "openexcel:workbookIdx";
 
@@ -21,7 +21,7 @@ function saveIdx(idx: number) {
 }
 
 export function useWorkbookCatalog(workspaceId: number | null) {
-  const [workbooks, setWorkbooks] = useState<{ id: number; name: string }[]>([]);
+  const [workbooks, setWorkbooks] = useState<WorkbookMeta[]>([]);
   const [workbookIdx, setWorkbookIdx] = useState(loadStoredIdx);
   const [currentWorkbook, setCurrentWorkbook] = useState<WorkbookFull | null>(null);
   const [workbookRevision, setWorkbookRevision] = useState(0);

@@ -31,20 +31,13 @@ export default function App() {
   const authMode = location.pathname === "/register" ? "register" : "login";
 
   useEffect(() => {
-    if (auth.loading) return;
-    if (auth.currentUser && (location.pathname === "/login" || location.pathname === "/register")) {
+    if (!auth.loading && auth.currentUser && (location.pathname === "/login" || location.pathname === "/register")) {
       navigate("/", { replace: true });
-    }
-    if (!auth.currentUser && location.pathname !== "/login" && location.pathname !== "/register") {
-      navigate("/login", { replace: true });
     }
   }, [auth.currentUser, auth.loading, location.pathname, navigate]);
 
-  if (auth.loading) {
-    return <LoadingScreen />;
-  }
-
-  if (!auth.currentUser) {
+  if (location.pathname === "/login" || location.pathname === "/register") {
+    if (auth.loading) return <LoadingScreen />;
     return (
       <AuthScreen
         mode={authMode}
@@ -60,7 +53,7 @@ export default function App() {
   return (
     <>
       <Suspense fallback={<LoadingScreen />}>
-        <Workbench currentUser={auth.currentUser} onLogout={() => void auth.signOut()} />
+        <Workbench currentUser={auth.currentUser!} onLogout={() => void auth.signOut()} />
       </Suspense>
       <ConfirmDialog />
     </>
