@@ -79,6 +79,18 @@ export function useSessionWorkspace(
     setInitialLoaded(true);
   }, [initial]);
 
+  // Invalidate session when workspace changes to prevent stale fetch
+  const workspaceRef = useRef(workspaceId);
+  useEffect(() => {
+    if (workspaceRef.current !== workspaceId) {
+      workspaceRef.current = workspaceId;
+      setCurrentSessionId(null);
+      setMessages([]);
+      setMessageTotal(0);
+      loadedOffsetRef.current = 0;
+    }
+  }, [workspaceId]);
+
   const refreshSessions = useCallback(async () => {
     if (workspaceId == null) {
       setSessions([]);
