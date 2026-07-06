@@ -20,9 +20,7 @@ const MIN_SIDEBAR_WIDTH = 300;
 
 export function Workbench({ currentUser, onLogout }: Props) {
   const { activeWorkspaceId, setActiveWorkspaceId, loading: workspaceLoading } = useWorkspaceState();
-  const [sidebarWidth, setSidebarWidth] = useState(
-    Math.min(400, window.innerWidth * 0.32)
-  );
+  const [sidebarWidth, setSidebarWidth] = useState(MIN_SIDEBAR_WIDTH);
   const rafRef = useRef<number | null>(null);
 
   const handleResizeMouseDown = useCallback(
