@@ -128,7 +128,12 @@ export function SessionHeader({
             className={`${styles.pillBtn} ${styles.plusBtn} ${styles.plusBtnSolid}`}
             title={t("new_chat", "新建对话")}
           >
-            +
+            <span className={styles.plusBtnIcon}>
+              <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+                <line x1="12" y1="3" x2="12" y2="21" />
+                <line x1="3" y1="12" x2="21" y2="12" />
+              </svg>
+            </span>
           </div>
           <UserMenu currentUser={currentUser} onLogout={onLogout} />
         </div>
