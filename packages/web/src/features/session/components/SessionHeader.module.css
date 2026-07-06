@@ -66,6 +66,7 @@
 }
 
 .plusBtnSolid:hover {
+  background: var(--text-primary);
   opacity: 0.85;
 }
 
