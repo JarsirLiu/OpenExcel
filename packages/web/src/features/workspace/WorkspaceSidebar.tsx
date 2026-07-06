@@ -4,7 +4,7 @@ import { createWorkspace, deleteWorkspace, renameWorkspace } from "@/api/workspa
 import { useWorkspaceState } from "./useWorkspaceState";
 import styles from "./WorkspaceSidebar.module.css";
 
-const MIN_WIDTH = 160;
+const MIN_WIDTH = 210;
 const DEFAULT_WIDTH = 220;
 const COLLAPSED_WIDTH = 32;
 
