@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
 import { fetchCurrentUser, login, logout, register, type CurrentUser } from "@/api/auth";
 
-const SESSION_KEYS = [
+export const SESSION_KEYS = [
   "openexcel:activeWorkspaceId",
   "openexcel:workbookIdx",
   "openexcel:sheetIdx",
   "openexcel:sessionId",
 ];
 
-function clearAllSessionStorage() {
+export function clearAllSessionStorage() {
   try {
     for (const key of SESSION_KEYS) {
       sessionStorage.removeItem(key);

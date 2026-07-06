@@ -28,7 +28,21 @@ import App from "./App";
 
 const testRouter = createHashRouter([
   {
-    path: "/",
+    id: "protected",
+    loader: async () => ({ currentUser: { id: 1, email: "user@example.com", displayName: "User" } }),
+    children: [
+      {
+        path: "*",
+        element: <App />,
+      },
+    ],
+  },
+  {
+    path: "/login",
+    element: <App />,
+  },
+  {
+    path: "/register",
     element: <App />,
   },
 ]);

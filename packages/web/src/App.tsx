@@ -1,10 +1,19 @@
 import { lazy, Suspense, useEffect } from "react";
-import { useNavigate, useLocation, useRouteLoaderData } from "react-router-dom";
+import { useLocation, useNavigate, useRouteLoaderData } from "react-router-dom";
+import { logout, type CurrentUser } from "@/api/auth";
 import { AuthScreen } from "@/features/auth/AuthScreen";
-import { useAuthState } from "@/features/auth/useAuthState";
+import { clearAllSessionStorage, useAuthState } from "@/features/auth/useAuthState";
 import { ConfirmDialog } from "@/shared/ui";
 import { t } from "@/lib/i18n";
-import type { Workspace } from "@/api/workspaces";
+import type { RouteData } from "@/app/Workbench";
+
+type ProtectedLoaderData = {
+  currentUser: CurrentUser;
+};
+
+function useRouteData<T>(routeId: string) {
+  return useRouteLoaderData(routeId) as T | undefined;
+}
 
 const Workbench = lazy(() =>
   import("@/app/Workbench").then((module) => ({ default: module.Workbench }))
@@ -24,11 +33,10 @@ function LoadingScreen() {
   );
 }
 
-export default function App() {
+function AuthPage() {
   const auth = useAuthState();
   const navigate = useNavigate();
   const location = useLocation();
-  const loaderData = useRouteLoaderData("protected") as { workspaces: Workspace[] } | undefined;
 
   const authMode = location.pathname === "/register" ? "register" : "login";
 
@@ -38,26 +46,60 @@ export default function App() {
     }
   }, [auth.currentUser, auth.loading, location.pathname, navigate]);
 
-  if (location.pathname === "/login" || location.pathname === "/register") {
-    if (auth.loading) return <LoadingScreen />;
-    return (
-      <AuthScreen
-        mode={authMode}
-        submitting={auth.submitting}
-        error={auth.error}
-        onLogin={auth.signIn}
-        onRegister={auth.signUp}
-        onSwitchMode={() => navigate(authMode === "login" ? "/register" : "/login")}
-      />
-    );
+  if (auth.loading) return <LoadingScreen />;
+  return (
+    <AuthScreen
+      mode={authMode}
+      submitting={auth.submitting}
+      error={auth.error}
+      onLogin={auth.signIn}
+      onRegister={auth.signUp}
+      onSwitchMode={() => navigate(authMode === "login" ? "/register" : "/login")}
+    />
+  );
+}
+
+function useWorkbenchRouteData() {
+  const workspaceData = useRouteData<RouteData>("workspace-route");
+  const workbookData = useRouteData<RouteData>("workbook-route");
+  const sessionData = useRouteData<RouteData>("session-route");
+
+  return sessionData ?? workbookData ?? workspaceData;
+}
+
+function WorkbenchPage() {
+  const navigate = useNavigate();
+  const protectedData = useRouteData<ProtectedLoaderData>("protected");
+
+  if (!protectedData) {
+    return <LoadingScreen />;
   }
+
+  const user = protectedData.currentUser;
+  const routeData = useWorkbenchRouteData();
+
+  const handleLogout = async () => {
+    await logout();
+    clearAllSessionStorage();
+    navigate("/login", { replace: true });
+  };
 
   return (
     <>
       <Suspense fallback={<LoadingScreen />}>
-        <Workbench currentUser={auth.currentUser!} onLogout={() => void auth.signOut()} initialWorkspaces={loaderData?.workspaces} />
+        <Workbench currentUser={user} onLogout={handleLogout} routeData={routeData} />
       </Suspense>
       <ConfirmDialog />
     </>
   );
+}
+
+export default function App() {
+  const location = useLocation();
+
+  if (location.pathname === "/login" || location.pathname === "/register") {
+    return <AuthPage />;
+  }
+
+  return <WorkbenchPage />;
 }
