@@ -4,9 +4,5 @@
   min-width: 0;
   overflow: hidden;
   background: var(--bg-surface);
-  border-left: 1px solid var(--border-default);
-  border-radius: 16px 0 0 16px;
-  box-shadow:
-    -4px 0 24px rgba(0, 0, 0, 0.04),
-    -12px 0 60px rgba(0, 0, 0, 0.06);
+  border-left: 1px solid rgb(0 0 0 / 8%);
 }

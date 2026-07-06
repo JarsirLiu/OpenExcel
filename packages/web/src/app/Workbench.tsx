@@ -1,9 +1,9 @@
 import { useCallback, useRef, useState } from "react";
-import { t } from "@/lib/i18n";
 import { ChatSidebar } from "@/features/chat/ChatSidebar";
 import { WorkbookWorkspace } from "@/features/workbook/workspace/WorkbookWorkspace";
 import { useWorkbookWorkspace } from "@/features/workbook/workspace/useWorkbookWorkspace";
 import { useWorkspaceState } from "@/features/workspace/useWorkspaceState";
+import { WorkspaceSidebar } from "@/features/workspace/WorkspaceSidebar";
 import styles from "./Workbench.module.css";
 
 type CurrentUser = {
@@ -19,7 +19,7 @@ type Props = {
 const MIN_SIDEBAR_WIDTH = 300;
 
 export function Workbench({ currentUser, onLogout }: Props) {
-  const { activeWorkspaceId, loading: workspaceLoading } = useWorkspaceState();
+  const { activeWorkspaceId, setActiveWorkspaceId, loading: workspaceLoading } = useWorkspaceState();
   const [sidebarWidth, setSidebarWidth] = useState(
     Math.min(400, window.innerWidth * 0.32)
   );
@@ -88,6 +88,9 @@ export function Workbench({ currentUser, onLogout }: Props) {
 
   return (
     <div className={styles.layout}>
+      <WorkspaceSidebar
+        onActiveWorkspaceChange={setActiveWorkspaceId}
+      />
       <div className={styles.main}>
         <WorkbookWorkspace
           workspaceId={activeWorkspaceId}
@@ -112,11 +115,11 @@ export function Workbench({ currentUser, onLogout }: Props) {
           handleWorkbookStructureChanged={handleWorkbookStructureChanged}
           handleWorkbookRefresh={handleWorkbookRefresh}
         />
+        <div
+          className={styles.resizeHandle}
+          onMouseDown={handleResizeMouseDown}
+        />
       </div>
-      <div
-        className={styles.resizeHandle}
-        onMouseDown={handleResizeMouseDown}
-      />
       <ChatSidebar
         workspaceId={activeWorkspaceId}
         onSheetChanged={handleSheetChanged}

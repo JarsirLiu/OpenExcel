@@ -11,18 +11,21 @@
 .main {
   flex: 1;
   min-width: 0;
+  position: relative;
 }
 
 .resizeHandle {
+  position: absolute;
+  right: -3px;
+  top: 0;
+  bottom: 0;
   width: 6px;
   cursor: col-resize;
-  flex-shrink: 0;
-  position: relative;
   z-index: 1;
   transition: background 0.15s ease;
 }
 
 .resizeHandle:hover,
 .resizeHandle:active {
-  background: var(--border-default);
+  background: rgb(0 0 0 / 6%);
 }

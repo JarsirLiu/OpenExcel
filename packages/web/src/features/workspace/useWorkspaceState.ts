@@ -1,40 +1,42 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchWorkspaces, type Workspace } from "@/api/workspaces";
 
 export function useWorkspaceState() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const cancelledRef = useRef(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const list = await fetchWorkspaces();
+      if (cancelledRef.current) return;
+      setWorkspaces(list);
+      setActiveWorkspaceId((prev) => {
+        if (prev != null && list.some((workspace) => workspace.id === prev)) {
+          return prev;
+        }
+        return list[0]?.id ?? null;
+      });
+    } catch {
+      if (cancelledRef.current) return;
+      setWorkspaces([]);
+      setActiveWorkspaceId(null);
+    } finally {
+      if (!cancelledRef.current) {
+        setLoading(false);
+      }
+    }
+  }, []);
 
   useEffect(() => {
-    let cancelled = false;
-
-    void fetchWorkspaces()
-      .then((list) => {
-        if (cancelled) return;
-        setWorkspaces(list);
-        setActiveWorkspaceId((prev) => {
-          if (prev != null && list.some((workspace) => workspace.id === prev)) {
-            return prev;
-          }
-          return list[0]?.id ?? null;
-        });
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setWorkspaces([]);
-        setActiveWorkspaceId(null);
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      });
-
+    cancelledRef.current = false;
+    void load();
     return () => {
-      cancelled = true;
+      cancelledRef.current = true;
     };
-  }, []);
+  }, [load]);
 
   const activeWorkspace = useMemo(
     () => workspaces.find((workspace) => workspace.id === activeWorkspaceId) ?? null,
@@ -47,5 +49,6 @@ export function useWorkspaceState() {
     activeWorkspaceId,
     setActiveWorkspaceId,
     loading,
+    refresh: load,
   };
 }
