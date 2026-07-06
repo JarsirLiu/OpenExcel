@@ -6,6 +6,7 @@ import { useWorkbookWorkspace } from "@/features/workbook/workspace/useWorkbookW
 import { useSessionWorkspace } from "@/features/session/useSessionWorkspace";
 import { useWorkspaceState } from "@/features/workspace/useWorkspaceState";
 import { WorkspaceSidebar } from "@/features/workspace/WorkspaceSidebar";
+import type { Workspace } from "@/api/workspaces";
 import styles from "./Workbench.module.css";
 
 type CurrentUser = {
@@ -16,15 +17,16 @@ type CurrentUser = {
 type Props = {
   currentUser: CurrentUser;
   onLogout: () => void;
+  initialWorkspaces?: Workspace[];
 };
 
 const MIN_SIDEBAR_WIDTH = 300;
 
-export function Workbench({ currentUser, onLogout }: Props) {
+export function Workbench({ currentUser, onLogout, initialWorkspaces }: Props) {
   const navigate = useNavigate();
   const params = useParams<{ workspacePublicId?: string; workbookPublicId?: string; sessionPublicId?: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { workspaces, activeWorkspaceId, setActiveWorkspaceId, loading: workspaceLoading } = useWorkspaceState();
+  const { workspaces, activeWorkspaceId, setActiveWorkspaceId, loading: workspaceLoading } = useWorkspaceState(initialWorkspaces);
   const [sidebarWidth, setSidebarWidth] = useState(MIN_SIDEBAR_WIDTH);
   const rafRef = useRef<number | null>(null);
 

@@ -1,9 +1,10 @@
 import { lazy, Suspense, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, useRouteLoaderData } from "react-router-dom";
 import { AuthScreen } from "@/features/auth/AuthScreen";
 import { useAuthState } from "@/features/auth/useAuthState";
 import { ConfirmDialog } from "@/shared/ui";
 import { t } from "@/lib/i18n";
+import type { Workspace } from "@/api/workspaces";
 
 const Workbench = lazy(() =>
   import("@/app/Workbench").then((module) => ({ default: module.Workbench }))
@@ -27,6 +28,7 @@ export default function App() {
   const auth = useAuthState();
   const navigate = useNavigate();
   const location = useLocation();
+  const loaderData = useRouteLoaderData("protected") as { workspaces: Workspace[] } | undefined;
 
   const authMode = location.pathname === "/register" ? "register" : "login";
 
@@ -53,7 +55,7 @@ export default function App() {
   return (
     <>
       <Suspense fallback={<LoadingScreen />}>
-        <Workbench currentUser={auth.currentUser!} onLogout={() => void auth.signOut()} />
+        <Workbench currentUser={auth.currentUser!} onLogout={() => void auth.signOut()} initialWorkspaces={loaderData?.workspaces} />
       </Suspense>
       <ConfirmDialog />
     </>

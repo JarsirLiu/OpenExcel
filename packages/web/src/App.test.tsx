@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, waitFor } from "@testing-library/react";
-import { HashRouter } from "react-router-dom";
+import { createHashRouter, RouterProvider } from "react-router-dom";
 import type { SheetSchema } from "./api/workbooks";
 
 vi.mock("./app/Workbench.js", () => ({
@@ -26,13 +26,20 @@ vi.mock("./features/auth/useAuthState.js", () => ({
 
 import App from "./App";
 
+const testRouter = createHashRouter([
+  {
+    path: "/",
+    element: <App />,
+  },
+]);
+
 describe("App", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it("renders the workbench when authenticated", async () => {
-    const { container } = render(<HashRouter><App /></HashRouter>);
+    const { container } = render(<RouterProvider router={testRouter} />);
     await waitFor(() => {
       expect(container.querySelector('[data-testid="workbench"]')).toBeTruthy();
     });

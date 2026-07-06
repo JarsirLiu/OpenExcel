@@ -24,13 +24,27 @@ function saveWorkspaceId(id: number | null) {
   }
 }
 
-export function useWorkspaceState() {
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+export function useWorkspaceState(initialWorkspaces?: Workspace[]) {
+  const [workspaces, setWorkspaces] = useState<Workspace[]>(initialWorkspaces ?? []);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<number | null>(loadStoredWorkspaceId);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initialWorkspaces);
   const cancelledRef = useRef(false);
+  const seededRef = useRef(false);
+
+  useEffect(() => {
+    if (!initialWorkspaces || seededRef.current) return;
+    seededRef.current = true;
+    setActiveWorkspaceId((prev) => {
+      if (prev != null && initialWorkspaces.some((w) => w.id === prev)) {
+        return prev;
+      }
+      return initialWorkspaces[0]?.id ?? null;
+    });
+    setLoading(false);
+  }, [initialWorkspaces]);
 
   const load = useCallback(async () => {
+    if (seededRef.current) return;
     setLoading(true);
     try {
       const list = await fetchWorkspaces();
@@ -54,6 +68,7 @@ export function useWorkspaceState() {
   }, []);
 
   useEffect(() => {
+    if (seededRef.current) return;
     cancelledRef.current = false;
     void load();
     return () => {
