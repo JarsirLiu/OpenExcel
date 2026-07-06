@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
-import { requireCurrentUser } from "../../infra/requestContext.js";
+import { requireCurrentUser } from "../../middleware/requestContext.js";
 import * as service from "./service.js";
 import { PASSWORD_MIN_LENGTH } from "./password.js";
 

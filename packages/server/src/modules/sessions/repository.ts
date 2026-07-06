@@ -1,4 +1,4 @@
-import { prisma } from "../../infra/db.js";
+import { prisma } from "../../infra/database/db.js";
 
 export async function findSessionsByWorkspace(workspaceId: number) {
   return prisma.session.findMany({

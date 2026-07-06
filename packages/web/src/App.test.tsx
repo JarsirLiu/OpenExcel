@@ -2,15 +2,15 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, waitFor } from "@testing-library/react";
 import type { SheetSchema } from "./api/workbooks";
 
-vi.mock("./app/Workbench", () => ({
+vi.mock("./app/Workbench.js", () => ({
   Workbench: () => <div data-testid="workbench">Workbench</div>,
 }));
 
-vi.mock("./features/auth/AuthScreen", () => ({
+vi.mock("./features/auth/AuthScreen.js", () => ({
   AuthScreen: () => <div data-testid="auth-screen">AuthScreen</div>,
 }));
 
-vi.mock("./features/auth/useAuthState", () => ({
+vi.mock("./features/auth/useAuthState.js", () => ({
   useAuthState: () => ({
     currentUser: { id: 1, email: "user@example.com", displayName: "User" },
     loading: false,

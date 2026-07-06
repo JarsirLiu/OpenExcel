@@ -1,4 +1,4 @@
-import { prisma } from "../../infra/db.js";
+import { prisma } from "../../infra/database/db.js";
 import * as repo from "./repository.js";
 import { buildBlankSheetInitialization, normalizeWorkbookName } from "../workbooks/create/creation.js";
 

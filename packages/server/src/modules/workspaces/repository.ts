@@ -1,4 +1,4 @@
-import { prisma } from "../../infra/db.js";
+import { prisma } from "../../infra/database/db.js";
 
 export async function findWorkspaces(ownerUserId: number) {
   return prisma.workspace.findMany({

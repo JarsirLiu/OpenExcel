@@ -1,5 +1,5 @@
 import { excelToolSpecs, workspaceToolContextSchema } from "@openexcel/agent";
-import { prisma } from "../../../infra/db.js";
+import { prisma } from "../../../infra/database/db.js";
 import { celldataToGrid } from "@openexcel/core";
 import { parseMergesFromCelldata } from "../domain.js";
 import { sheetRecordToCelldata } from "../../../shared/utils/sheetData.js";

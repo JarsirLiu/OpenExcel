@@ -1,4 +1,4 @@
-import type { Prisma } from "../../infra/prismaTypes.js";
+import type { Prisma } from "../../infra/database/prismaTypes.js";
 
 export interface SheetJson {
   id: number;

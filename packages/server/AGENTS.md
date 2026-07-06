@@ -30,9 +30,10 @@ The current codebase is still transitional. The important source areas are:
 
 - `src/app.ts` - Fastify composition and plugin registration
 - `src/index.ts` - process entrypoint
-- `src/infra/db.ts` - Prisma client wiring
 - `src/config.ts` - environment parsing and runtime config
+- `src/infra/database/` - Prisma client wiring (`db.ts`), config (`databaseConfig.ts`), schema management (`prismaDatabase.ts`), and Prisma type re-exports (`prismaTypes.ts`)
 - `src/infra/observability/logger.ts` - logging helpers
+- `src/middleware/requestContext.ts` - Fastify request augmentation and `requireCurrentUser` helper
 - `src/modules/sessions/*` - session chat, history, title, transcript, and session orchestration
 - `src/modules/sessions/chat/*` - chat streaming and workspace-context assembly
 - `src/modules/sessions/runs/*` - run persistence and undo logic
@@ -232,18 +233,56 @@ Do not move spreadsheet core transforms into server if they already belong in `@
 
 ## 10. Testing expectations
 
+See [docs/testing-guidelines.md](../../docs/testing-guidelines.md) for the full specification.
+
 Before landing server changes, update or add tests for the changed behavior.
 
-Focus on:
+### 10.1 Test framework and file placement
 
-- session title generation
-- chat streaming and abort handling
-- session history reconstruction
-- workbook import/export
-- sheet update/delete behavior
-- undo restore behavior
+- Framework: **Vitest** (use `vitest --run` to execute).
+- Test file naming: `*.test.ts` (not `.spec.ts`).
+- Test file placement: **co-located next to the source file**. Tests live in the same directory as the code they test (e.g., `src/infra/database/databaseConfig.test.ts` for `databaseConfig.ts`).
+- Exception: cross-cutting integration or E2E tests may live under `src/tests/`.
 
-Prefer tests that cover the service boundary, not just tiny helpers.
+### 10.2 Test structure and naming
+
+- Use `describe` / `it` blocks (imported explicitly from `vitest`, even though `globals: true` is common).
+- Outer `describe("ModuleName")`, inner `describe("function name or scenario")`.
+- `it` descriptions use present tense verbs: `it("should do something")`, `it("handles edge case")`.
+- Prefer Arrange-Act-Assert layout with blank-line separation.
+
+### 10.3 Coverage and focus
+
+```typescript
+import { describe, expect, it } from "vitest";
+import { myFunction } from "../my-module.js";
+
+describe("myFunction", () => {
+  it("should return expected result", () => {
+    expect(myFunction(input)).toBe(expected);
+  });
+});
+```
+
+- Focus tests on the **service boundary** (not on tiny helpers or implementation details).
+- Critical areas: title generation, chat streaming/abort, session history, workbook import/export, sheet update/delete, undo restore.
+- Use `expect().toBe()`, `.toEqual()`, `.toContain()`, `.rejects.toThrow()` for assertions.
+
+### 10.4 Mocking patterns
+
+- Prefer hand-rolled mock objects with `vi.fn()` over auto-mocking.
+- Use `vi.mock()` + `vi.hoisted()` sparingly, only for module-level mocking when necessary.
+- For environment variable tests, save/restore `process.env` in `try/finally` (or use `vi.stubEnv`/`vi.unstubEnv`).
+
+### 10.5 Temporary test data
+
+- Use `os.tmpdir()` + random suffix for temp directories; clean up in `afterEach`/`afterAll`.
+- Avoid sharing mutable state between test cases — use `beforeEach` to reset state.
+
+### 10.6 Test scripts
+
+- `pnpm --filter @openexcel/server test` — runs `vitest run`.
+- Coverage is not enforced, but consider adding `--coverage` for critical modules.
 
 ## 11. Safe change checklist
 

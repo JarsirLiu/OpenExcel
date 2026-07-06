@@ -25,7 +25,7 @@ describe("fetchWorkbooks", () => {
 
     const result = await fetchWorkbooks(9);
     expect(result).toEqual(data);
-    expect(mockFetch).toHaveBeenCalledWith("/api/workspaces/9/workbooks");
+    expect(mockFetch).toHaveBeenCalledWith("/api/workspaces/9/workbooks", {});
   });
 
   it("throws on non-ok response", async () => {
@@ -41,7 +41,7 @@ describe("fetchWorkbook", () => {
 
     const result = await fetchWorkbook(9, 1);
     expect(result).toEqual(data);
-    expect(mockFetch).toHaveBeenCalledWith("/api/workspaces/9/workbooks/1");
+    expect(mockFetch).toHaveBeenCalledWith("/api/workspaces/9/workbooks/1", {});
   });
 });
 
@@ -58,7 +58,7 @@ describe("fetchWorkbookReferenceCandidates", () => {
 
     const result = await fetchWorkbookReferenceCandidates(9);
     expect(result).toEqual(data);
-    expect(mockFetch).toHaveBeenCalledWith("/api/workspaces/9/workbooks/reference-candidates");
+    expect(mockFetch).toHaveBeenCalledWith("/api/workspaces/9/workbooks/reference-candidates", {});
   });
 });
 
@@ -108,7 +108,7 @@ describe("fetchMessages", () => {
 
     const result = await fetchMessages(9, 3);
     expect(result).toEqual(msgs);
-    expect(mockFetch).toHaveBeenCalledWith("/api/workspaces/9/sessions/3/messages");
+    expect(mockFetch).toHaveBeenCalledWith("/api/workspaces/9/sessions/3/messages", {});
   });
 });
 
@@ -119,7 +119,7 @@ describe("fetchRuns", () => {
 
     const result = await fetchRuns(9, 3);
     expect(result).toEqual(runs);
-    expect(mockFetch).toHaveBeenCalledWith("/api/workspaces/9/sessions/3/runs");
+    expect(mockFetch).toHaveBeenCalledWith("/api/workspaces/9/sessions/3/runs", {});
   });
 });
 

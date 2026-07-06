@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { getDefaultDatabaseUrl, loadDatabaseConfig, type DatabaseProvider } from "./databaseConfig.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const packageRoot = resolve(__dirname, "../..");
+const packageRoot = resolve(__dirname, "../../..");
 const require = createRequire(import.meta.url);
 const prismaCliPath = require.resolve("prisma/build/index.js");
 

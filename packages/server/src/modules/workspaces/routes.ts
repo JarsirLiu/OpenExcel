@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import * as service from "./service.js";
-import { requireCurrentUser } from "../../infra/requestContext.js";
+import { requireCurrentUser } from "../../middleware/requestContext.js";
 
 export async function workspaceRoutes(app: FastifyInstance) {
   app.get("/api/workspaces", async (req, reply) => {

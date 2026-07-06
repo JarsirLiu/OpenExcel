@@ -1,4 +1,4 @@
-import { generateAllClients, migrateSelectedDatabase } from "../src/infra/prismaDatabase.js";
+import { generateAllClients, migrateSelectedDatabase } from "../src/infra/database/prismaDatabase.js";
 
 type PrismaCommand = "generate" | "migrate";
 

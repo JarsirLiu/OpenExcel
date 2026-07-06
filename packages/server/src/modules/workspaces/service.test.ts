@@ -16,7 +16,7 @@ vi.mock("./repository.js", () => ({
   findWorkspace: mocks.findWorkspace,
 }));
 
-vi.mock("../../infra/db.js", () => ({
+vi.mock("../../infra/database/db.js", () => ({
   prisma: {
     $transaction: mocks.transaction,
   },

@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const packageRoot = resolve(__dirname, "../..");
+const packageRoot = resolve(__dirname, "../../..");
 
 const schemaFiles = [
   {

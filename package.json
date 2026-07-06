@@ -4,7 +4,6 @@
   "version": "0.1.0",
   "description": "OpenExcel - JSON driven multi-sheet Excel workbench",
   "scripts": {
-    "predev": "pnpm db:migrate",
     "dev": "concurrently --raw \"pnpm --filter @openexcel/web dev\" \"pnpm --filter @openexcel/server dev\"",
     "build": "pnpm --filter @openexcel/web build",
     "preview": "pnpm --filter @openexcel/web preview",

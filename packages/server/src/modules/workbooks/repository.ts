@@ -1,5 +1,5 @@
-import { prisma } from "../../infra/db.js";
-import type { Prisma } from "../../infra/prismaTypes.js";
+import { prisma } from "../../infra/database/db.js";
+import type { Prisma } from "../../infra/database/prismaTypes.js";
 
 export async function findWorkbooks(workspaceId: number): Promise<Prisma.WorkbookGetPayload<{}>[]> {
   return prisma.workbook.findMany({

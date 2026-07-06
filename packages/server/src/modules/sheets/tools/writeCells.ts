@@ -1,5 +1,5 @@
 import { excelToolSpecs, runToolContextSchema } from "@openexcel/agent";
-import { prisma } from "../../../infra/db.js";
+import { prisma } from "../../../infra/database/db.js";
 import {
   sheetChangeCellToZeroBased,
   sheetChangePatchOutputSchema,

@@ -1,5 +1,5 @@
 import { deserializeSheet } from "../../shared/utils/sheetSerialization.js";
-import { prisma } from "../../infra/db.js";
+import { prisma } from "../../infra/database/db.js";
 
 export async function findSheetWithWorkbook(id: number, workspaceId: number) {
   const sheet = await prisma.sheet.findFirst({

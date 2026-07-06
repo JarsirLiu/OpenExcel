@@ -1,6 +1,6 @@
-import { PrismaClient as SqlitePrismaClient } from "../../prisma/generated/sqlite/client/index.js";
-import { PrismaClient as PostgreSQLPrismaClient } from "../../prisma/generated/postgresql/client/index.js";
-import { PrismaClient as MySQLPrismaClient } from "../../prisma/generated/mysql/client/index.js";
+import { PrismaClient as SqlitePrismaClient } from "../../../prisma/generated/sqlite/client/index.js";
+import { PrismaClient as PostgreSQLPrismaClient } from "../../../prisma/generated/postgresql/client/index.js";
+import { PrismaClient as MySQLPrismaClient } from "../../../prisma/generated/mysql/client/index.js";
 import { loadDatabaseConfig } from "./databaseConfig.js";
 
 type PrismaClientLike = InstanceType<typeof SqlitePrismaClient>;

@@ -20,7 +20,24 @@ Keep feature code inside the owning package’s `src/` tree. Avoid generated out
 This repo uses TypeScript ESM. Follow the existing style: 2-space indentation, small modules, explicit exports/imports, `PascalCase` for components, and `camelCase` for functions and variables.
 
 ## Testing Guidelines
-Tests use Vitest. Prefer focused tests next to the code they cover, for example `*.test.ts` or `*.test.tsx`. When changing workbook behavior, test the affected module first, then widen if needed.
+
+See [docs/testing-guidelines.md](docs/testing-guidelines.md) for the full specification.
+
+### Quick Reference
+- **Vitest** is the test framework across all packages.
+- Test file naming: `*.test.ts` (preferred) or `*.test.tsx` for components.
+- Test file placement: **co-located next to the source file** (e.g., `src/modules/sheets/domain.test.ts` for `domain.ts`).
+- Cross-cutting integration tests may live in `src/tests/` at the package level.
+- Use `describe` / `it` blocks, imported explicitly from `vitest`.
+- Outer `describe("ModuleName")`, inner `describe("scenario")`, `it("should do ...")`.
+- Use original Vitest matchers: `.toBe()`, `.toEqual()`, `.toContain()`, `.rejects.toThrow()`, etc.
+- Prefer hand-rolled mock objects with `vi.fn()` over auto-mocking.
+- Use `vi.mock()` + `vi.hoisted()` sparingly, only when module-level mocking is unavoidable.
+- Save/restore `process.env` in `try/finally` for env-dependent tests.
+
+### Commands
+- `pnpm test` — run all tests across all packages.
+- `pnpm test:web`, `pnpm test:server`, `pnpm test:core` — run one package's suite.
 
 ## Commit & Pull Request Guidelines
 Use **Conventional Commits** for all commits and prefer the same style for PR titles.

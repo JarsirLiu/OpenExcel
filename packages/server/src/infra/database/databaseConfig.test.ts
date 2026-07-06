@@ -1,14 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { getDefaultDatabaseUrl, loadDatabaseConfig } from "./databaseConfig.js";
 
-function restoreEnv() {
-  delete process.env.DATABASE_PROVIDER;
-  delete process.env.DATABASE_URL;
-}
-
 describe("databaseConfig", () => {
   afterEach(() => {
-    restoreEnv();
     vi.unstubAllEnvs();
   });
 
@@ -20,8 +14,8 @@ describe("databaseConfig", () => {
   });
 
   it("uses the configured provider and url", () => {
-    process.env.DATABASE_PROVIDER = "postgresql";
-    process.env.DATABASE_URL = "postgresql://user:pass@localhost:5432/openexcel";
+    vi.stubEnv("DATABASE_PROVIDER", "postgresql");
+    vi.stubEnv("DATABASE_URL", "postgresql://user:pass@localhost:5432/openexcel");
 
     const config = loadDatabaseConfig();
 
@@ -32,7 +26,7 @@ describe("databaseConfig", () => {
   });
 
   it("rejects unsupported providers", () => {
-    process.env.DATABASE_PROVIDER = "oracle";
+    vi.stubEnv("DATABASE_PROVIDER", "oracle");
 
     expect(() => loadDatabaseConfig()).toThrow("Unsupported database provider: oracle");
   });

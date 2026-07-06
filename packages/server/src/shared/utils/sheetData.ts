@@ -1,5 +1,5 @@
 import type { FortuneCell } from "@openexcel/core";
-import type { Prisma } from "../../infra/prismaTypes.js";
+import type { Prisma } from "../../infra/database/prismaTypes.js";
 
 export type SheetRecord = Prisma.SheetGetPayload<{}>;
 
