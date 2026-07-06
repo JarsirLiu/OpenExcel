@@ -90,6 +90,8 @@ export function useSessionWorkspace(workspaceId: number | null, onUndoComplete?:
             loadedOffsetRef.current = msgs.length;
           }
         }
+      } catch {
+        // Expected: session invalidated by workspace switch
       } finally {
         if (!cancelled) {
           setInitialLoaded(true);
