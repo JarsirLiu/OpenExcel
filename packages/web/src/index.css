@@ -44,6 +44,33 @@ body {
 }
 .md-content th { background: var(--bg-muted); }
 
+.md-content h1,
+.md-content h2,
+.md-content h3,
+.md-content h4,
+.md-content h5,
+.md-content h6 {
+  margin: 12px 0 6px;
+  line-height: 1.4;
+  font-weight: 600;
+}
+
+.md-content h1 {
+  font-size: 17px;
+}
+
+.md-content h2 {
+  font-size: 16px;
+}
+
+.md-content h3 {
+  font-size: 16px;
+}
+
+.md-content h4 {
+  font-size: 15px;
+}
+
 /* ---- Chat input ---- */
 .chat-input::placeholder {
   color: var(--text-hint);
