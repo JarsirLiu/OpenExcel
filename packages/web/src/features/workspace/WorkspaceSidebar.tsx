@@ -1,7 +1,8 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState, useMemo } from "react";
 import { t } from "@/lib/i18n";
 import { createWorkspace, deleteWorkspace, renameWorkspace } from "@/api/workspaces";
 import type { Workspace } from "@/api/workspaces";
+import type { WorkbookMeta } from "@/api/workbooks";
 import styles from "./WorkspaceSidebar.module.css";
 
 const MIN_WIDTH = 210;
@@ -13,17 +14,48 @@ type Props = {
   onActiveWorkspaceChange: (id: number) => void;
   workspaces: Workspace[];
   onRefresh: () => void;
+  workbooksMap: Map<number, WorkbookMeta[]>;
+  activeWorkbookId: number | null;
+  onWorkbookSelect: (workspaceId: number, workbookId: number) => void;
 };
 
-export function WorkspaceSidebar({ activeWorkspaceId, onActiveWorkspaceChange, workspaces, onRefresh }: Props) {
+export function WorkspaceSidebar({
+  activeWorkspaceId,
+  onActiveWorkspaceChange,
+  workspaces,
+  onRefresh,
+  workbooksMap,
+  activeWorkbookId,
+  onWorkbookSelect,
+}: Props) {
   const [collapsed, setCollapsed] = useState(true);
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_WIDTH);
   const [isResizing, setIsResizing] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editValue, setEditValue] = useState("");
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [expandedWorkspaces, setExpandedWorkspaces] = useState<Set<number>>(new Set());
   const rafRef = useRef<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-expand the active workspace
+  const expandedSet = useMemo(() => {
+    const next = new Set(expandedWorkspaces);
+    if (activeWorkspaceId != null && workbooksMap.has(activeWorkspaceId)) {
+      next.add(activeWorkspaceId);
+    }
+    return next;
+  }, [expandedWorkspaces, activeWorkspaceId, workbooksMap]);
+
+  const toggleExpand = useCallback((id: number) => {
+    const next = new Set(expandedWorkspaces);
+    if (next.has(id)) {
+      next.delete(id);
+    } else {
+      next.add(id);
+    }
+    setExpandedWorkspaces(next);
+  }, [expandedWorkspaces]);
 
   const handleCreate = useCallback(async () => {
     try {
@@ -183,62 +215,106 @@ export function WorkspaceSidebar({ activeWorkspaceId, onActiveWorkspaceChange, w
         </div>
 
         <div className={styles.list}>
-          {workspaces.map((ws) => (
-            <div
-              key={ws.id}
-              className={`${styles.item} ${ws.id === activeWorkspaceId ? styles.itemActive : ""}`}
-              onClick={() => handleSelect(ws.id)}
-            >
-              <span className={styles.itemIcon}>
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <rect x="1.5" y="1.5" width="13" height="13" rx="2" stroke="currentColor" strokeWidth="1.5" />
-                  <path d="M4 5h8M4 8h8M4 11h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                </svg>
-              </span>
-{deletingId === ws.id ? (
-                  <span className={styles.deleteConfirm}>
-                    <span>确认删除?</span>
-                    <button onClick={(e) => void handleConfirmDelete(e, ws.id)}>
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                        <path d="M2.5 7.5l3 3 6-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </button>
-                    <button onClick={handleCancelDelete}>
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                        <path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                      </svg>
-                    </button>
+          {workspaces.map((ws) => {
+            const workbooks = workbooksMap.get(ws.id) ?? [];
+            const isExpanded = expandedSet.has(ws.id);
+            const isActive = ws.id === activeWorkspaceId;
+
+            return (
+              <div key={ws.id}>
+                <div
+                  className={`${styles.item} ${isActive ? styles.itemActive : ""}`}
+                  onClick={() => handleSelect(ws.id)}
+                >
+                  <span className={styles.itemIcon}>
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                      <rect x="1.5" y="1.5" width="13" height="13" rx="2" stroke="currentColor" strokeWidth="1.5" />
+                      <path d="M4 5h8M4 8h8M4 11h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    </svg>
                   </span>
-              ) : editingId === ws.id ? (
-                <input
-                  ref={inputRef}
-                  className={styles.editInput}
-                  value={editValue}
-                  onChange={(e) => setEditValue(e.target.value)}
-                  onBlur={() => void handleSaveEdit()}
-                  onKeyDown={handleKeyDown}
-                  onClick={(e) => e.stopPropagation()}
-                />
-              ) : (
-                <>
-                  <span className={styles.itemName}>{ws.name}</span>
-                  <span className={styles.itemActions}>
-                    <button className={styles.editBtn} onClick={(e) => handleStartEdit(e, ws)} title="重命名">
-                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                        <path d="M8.5 1.5l2 2L4 10H2V8l6.5-6.5z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </button>
-                    <button className={styles.deleteBtn} onClick={(e) => handleDelete(e, ws.id)} title="删除">
-                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                        <path d="M2 3h8M4.5 3V2a1 1 0 011-1h1a1 1 0 011 1v1M9.5 3v7a1 1 0 01-1 1h-5a1 1 0 01-1-1V3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-                        <path d="M5 5.5v3M7 5.5v3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-                      </svg>
-                    </button>
-                  </span>
-                </>
-              )}
-            </div>
-          ))}
+                  {deletingId === ws.id ? (
+                    <span className={styles.deleteConfirm}>
+                      <span>确认删除?</span>
+                      <button onClick={(e) => void handleConfirmDelete(e, ws.id)}>
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                          <path d="M2.5 7.5l3 3 6-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </button>
+                      <button onClick={handleCancelDelete}>
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                          <path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                        </svg>
+                      </button>
+                    </span>
+                  ) : editingId === ws.id ? (
+                    <input
+                      ref={inputRef}
+                      className={styles.editInput}
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      onBlur={() => void handleSaveEdit()}
+                      onKeyDown={handleKeyDown}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  ) : (
+                    <>
+                      <span className={styles.itemName}>{ws.name}</span>
+                      {workbooks.length > 0 && (
+                        <span
+                          className={`${styles.chevron} ${isExpanded ? styles.chevronExpanded : ""}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleExpand(ws.id);
+                          }}
+                        >
+                          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                            <path d="M2 3l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </span>
+                      )}
+                      <span className={styles.itemActions}>
+                        <button className={styles.editBtn} onClick={(e) => handleStartEdit(e, ws)} title="重命名">
+                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                            <path d="M8.5 1.5l2 2L4 10H2V8l6.5-6.5z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </button>
+                        <button className={styles.deleteBtn} onClick={(e) => handleDelete(e, ws.id)} title="删除">
+                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                            <path d="M2 3h8M4.5 3V2a1 1 0 011-1h1a1 1 0 011 1v1M9.5 3v7a1 1 0 01-1 1h-5a1 1 0 01-1-1V3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                            <path d="M5 5.5v3M7 5.5v3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                          </svg>
+                        </button>
+                      </span>
+                    </>
+                  )}
+                </div>
+                {isExpanded && workbooks.length > 0 && (
+                  <div className={styles.workbookList}>
+                    {workbooks.map((wb) => (
+                      <div
+                        key={wb.id}
+                        className={`${styles.workbookItem} ${
+                          wb.id === activeWorkbookId && ws.id === activeWorkspaceId ? styles.workbookActive : ""
+                        }`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onWorkbookSelect(ws.id, wb.id);
+                        }}
+                      >
+                        <span className={styles.workbookIcon}>
+                          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                            <rect x="1.5" y="2" width="11" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.3" />
+                            <path d="M4 5h6M4 7h6M4 9h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                          </svg>
+                        </span>
+                        <span className={styles.workbookName}>{wb.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         <button className={`${styles.createBtn} ${styles.serif}`} onClick={handleCreate}>

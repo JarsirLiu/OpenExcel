@@ -92,7 +92,7 @@
   cursor: pointer;
   font-size: 14px;
   color: var(--text-primary);
-  transition: background 0.12s ease, color 0.12s ease, transform 0.12s ease;
+  transition: background 0.15s ease;
   border: none;
   background: transparent;
   width: 100%;
@@ -101,16 +101,23 @@
 }
 
 .item:hover {
-  background: #e8e4df;
+  background: #efebe6;
 }
 
 .itemActive {
-  background: #e0dcd7;
+  background: #efebe6;
   font-weight: 600;
 }
 
-.itemActive:hover {
-  background: #e0dcd7;
+.itemActive::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: #6b5b4e;
 }
 
 .itemName {
@@ -122,14 +129,18 @@
 }
 
 .itemActions {
-  display: none;
+  display: flex;
   align-items: center;
   gap: 2px;
   flex-shrink: 0;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s ease, visibility 0.15s ease;
 }
 
 .item:hover .itemActions {
-  display: flex;
+  opacity: 1;
+  visibility: visible;
 }
 
 .editBtn,
@@ -258,4 +269,100 @@
 .resizeHandle:hover,
 .resizeHandle:active {
   background: rgb(0 0 0 / 6%);
+}
+
+.chevron {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: transform 0.15s ease, color 0.12s ease;
+}
+
+.chevron:hover {
+  color: var(--text-primary);
+  background: var(--bg-muted);
+}
+
+.chevronExpanded {
+  transform: rotate(180deg);
+}
+
+.workbookList {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-left: 16px;
+  margin-top: 1px;
+  margin-bottom: 1px;
+}
+
+.workbookItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-secondary);
+  transition: background 0.12s ease, color 0.12s ease;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  position: relative;
+}
+
+.workbookItem:hover {
+  background: #efebe6;
+  color: var(--text-primary);
+}
+
+.workbookActive {
+  background: transparent;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.workbookActive::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: #6b5b4e;
+}
+
+.workbookActive:hover {
+  background: #efebe6;
+}
+
+.workbookActive:hover {
+  background: #d4cfc9;
+}
+
+.workbookIcon {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+}
+
+.workbookName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
