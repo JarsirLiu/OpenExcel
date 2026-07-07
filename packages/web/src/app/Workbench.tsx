@@ -33,7 +33,7 @@ type Props = {
 const MIN_SIDEBAR_WIDTH = 300;
 
 export function Workbench({ currentUser, onLogout, routeData }: Props) {
-  const { workspaces, activeWorkspaceId, setActiveWorkspaceId, loading: workspaceLoading, refresh: workspaceRefresh, workbooksMap } = useWorkspaceState(routeData?.workspaces);
+  const { workspaces, activeWorkspaceId, setActiveWorkspaceId, loading: workspaceLoading, refresh: workspaceRefresh, workbooksMap, refreshWorkbooks } = useWorkspaceState(routeData?.workspaces);
   const [sidebarWidth, setSidebarWidth] = useState(MIN_SIDEBAR_WIDTH);
   const rafRef = useRef<number | null>(null);
 
@@ -60,6 +60,17 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
     () => workbook.currentWorkbook?.id ?? workbook.workbooks[workbook.workbookIdx]?.id ?? null,
     [workbook.currentWorkbook?.id, workbook.workbooks, workbook.workbookIdx],
   );
+
+  // Wrappers that refresh sidebar workbooksMap after workbook mutations
+  const wrappedWorkbookCreate = useCallback(async (workspaceId: number) => {
+    await workbook.handleCreateWorkbook(workspaceId);
+    await refreshWorkbooks(workspaces);
+  }, [workbook.handleCreateWorkbook, refreshWorkbooks, workspaces]);
+
+  const wrappedWorkbookDelete = useCallback(async (workbookId: number) => {
+    await workbook.handleWorkbookDelete(workbookId);
+    await refreshWorkbooks(workspaces);
+  }, [workbook.handleWorkbookDelete, refreshWorkbooks, workspaces]);
 
   const pendingWorkbookSwitch = useRef<number | null>(null);
 
@@ -134,6 +145,8 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
         workbooksMap={workbooksMap}
         activeWorkbookId={activeWorkbookId}
         onWorkbookSelect={handleWorkbookSelect}
+        onWorkbookDelete={wrappedWorkbookDelete}
+        onWorkbookCreate={wrappedWorkbookCreate}
       />
       <div className={styles.main}>
         <WorkspaceView

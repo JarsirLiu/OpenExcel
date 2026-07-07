@@ -366,3 +366,73 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.workbookActions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s ease, visibility 0.15s ease;
+}
+
+.workbookItem:hover .workbookActions {
+  opacity: 1;
+  visibility: visible;
+}
+
+.workbookDeleteBtn {
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+  border-radius: 4px;
+  padding: 0;
+}
+
+.workbookDeleteBtn:hover {
+  background: rgba(220, 38, 38, 0.1);
+  color: #dc2626;
+}
+
+.workbookCreateBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-tertiary);
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+  width: 100%;
+  margin: 4px 0 2px 0;
+}
+
+.workbookCreateBtn:hover {
+  background: #efebe6;
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+}
+
+.workbookCreateBtn .plusIcon {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+}
+
+.workbookCreateBtn:hover .plusIcon {
+  color: var(--text-primary);
+}

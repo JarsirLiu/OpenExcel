@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { SheetChangeDelta } from "@openexcel/core";
 import {
+  createWorkbook,
   deleteWorkbook,
   fetchWorkbook,
   fetchWorkbooks,
@@ -189,6 +190,27 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
     setStatus("已删除");
   }, [invalidateReferenceCache, replaceCurrentWorkbook, setWorkbookIdx, setWorkbooks, workspaceId]);
 
+  const handleCreateWorkbook = useCallback(async (workspaceId: number) => {
+    if (workspaceId == null) return;
+    setStatus("创建中...");
+    try {
+      const result = await createWorkbook(workspaceId);
+      const list = await fetchWorkbooks(workspaceId);
+      const safeList = Array.isArray(list) ? sortWorkbooks(list) : [];
+      setWorkbooks(safeList);
+      invalidateReferenceCache();
+      const idx = safeList.findIndex((wb) => wb.id === result.id);
+      if (idx >= 0) {
+        setWorkbookIdx(idx);
+        setCurrentSheetIndex(0);
+      }
+      setStatus("已创建");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "创建失败";
+      setStatus(`创建失败：${message}`);
+    }
+  }, [invalidateReferenceCache, setStatus, setWorkbookIdx, setWorkbooks, workspaceId]);
+
   return {
     workbooks,
     workbookIdx,
@@ -211,6 +233,7 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
     handleImportCancel,
     handleNewWorkbookFileChange,
     handleWorkbookDelete,
+    handleCreateWorkbook,
     referenceCacheRevision,
   };
 }

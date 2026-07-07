@@ -17,6 +17,8 @@ type Props = {
   workbooksMap: Map<number, WorkbookMeta[]>;
   activeWorkbookId: number | null;
   onWorkbookSelect: (workspaceId: number, workbookId: number) => void;
+  onWorkbookDelete: (workbookId: number) => Promise<void>;
+  onWorkbookCreate: (workspaceId: number) => Promise<void>;
 };
 
 export function WorkspaceSidebar({
@@ -27,6 +29,8 @@ export function WorkspaceSidebar({
   workbooksMap,
   activeWorkbookId,
   onWorkbookSelect,
+  onWorkbookDelete,
+  onWorkbookCreate,
 }: Props) {
   const [collapsed, setCollapsed] = useState(true);
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_WIDTH);
@@ -34,6 +38,7 @@ export function WorkspaceSidebar({
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editValue, setEditValue] = useState("");
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [deletingWbId, setDeletingWbId] = useState<number | null>(null);
   const [expandedWorkspaces, setExpandedWorkspaces] = useState<Set<number>>(new Set());
   const rafRef = useRef<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -142,6 +147,38 @@ export function WorkspaceSidebar({
     e.stopPropagation();
     setDeletingId(null);
   }, []);
+
+  const handleWorkbookDeleteClick = useCallback((e: React.MouseEvent, wbId: number) => {
+    e.stopPropagation();
+    setDeletingWbId(wbId);
+  }, []);
+
+  const handleConfirmWbDelete = useCallback(
+    async (e: React.MouseEvent, wbId: number) => {
+      e.stopPropagation();
+      try {
+        await onWorkbookDelete(wbId);
+        setDeletingWbId(null);
+      } catch (e) {
+        console.error("删除工作簿失败:", e);
+        setDeletingWbId(null);
+      }
+    },
+    [onWorkbookDelete],
+  );
+
+  const handleCancelWbDelete = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDeletingWbId(null);
+  }, []);
+
+  const handleCreateWorkbook = useCallback(
+    (e: React.MouseEvent, workspaceId: number) => {
+      e.stopPropagation();
+      void onWorkbookCreate(workspaceId);
+    },
+    [onWorkbookCreate],
+  );
 
   const handleResizeMouseDown = useCallback(
     (e: React.MouseEvent) => {
@@ -284,26 +321,69 @@ export function WorkspaceSidebar({
                 </div>
                 {isExpanded && workbooks.length > 0 && (
                   <div className={styles.workbookList}>
-                    {workbooks.map((wb) => (
-                      <div
-                        key={wb.id}
-                        className={`${styles.workbookItem} ${
-                          wb.id === activeWorkbookId && ws.id === activeWorkspaceId ? styles.workbookActive : ""
-                        }`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onWorkbookSelect(ws.id, wb.id);
-                        }}
-                      >
-                        <span className={styles.workbookIcon}>
-                          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                            <rect x="1.5" y="2" width="11" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.3" />
-                            <path d="M4 5h6M4 7h6M4 9h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-                          </svg>
-                        </span>
-                        <span className={styles.workbookName}>{wb.name}</span>
-                      </div>
-                    ))}
+                    {workbooks.map((wb) => {
+                      const wbActive = wb.id === activeWorkbookId && ws.id === activeWorkspaceId;
+                      return (
+                        <div
+                          key={wb.id}
+                          className={`${styles.workbookItem} ${wbActive ? styles.workbookActive : ""}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onWorkbookSelect(ws.id, wb.id);
+                          }}
+                        >
+                          <span className={styles.workbookIcon}>
+                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                              <rect x="1.5" y="2" width="11" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.3" />
+                              <path d="M4 5h6M4 7h6M4 9h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                            </svg>
+                          </span>
+                          {deletingWbId === wb.id ? (
+                            <span className={styles.deleteConfirm}>
+                              <span>确认删除?</span>
+                              <button onClick={(e) => void handleConfirmWbDelete(e, wb.id)}>
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                                  <path d="M2.5 7.5l3 3 6-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                              </button>
+                              <button onClick={handleCancelWbDelete}>
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                                  <path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                                </svg>
+                              </button>
+                            </span>
+                          ) : (
+                            <>
+                              <span className={styles.workbookName}>{wb.name}</span>
+                              <span className={styles.workbookActions}>
+                                <button
+                                  className={styles.workbookDeleteBtn}
+                                  onClick={(e) => handleWorkbookDeleteClick(e, wb.id)}
+                                  title="删除"
+                                >
+                                  <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                                    <path d="M2 2.5h7M4 2.5V1.5a1 1 0 011-1h1a1 1 0 011 1v1M8.5 2.5v6a1 1 0 01-1 1h-4a1 1 0 01-1-1v-6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                                    <path d="M4.5 4v4M6.5 4v4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                                  </svg>
+                                </button>
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
+                    <button
+                      className={styles.workbookCreateBtn}
+                      onClick={(e) => handleCreateWorkbook(e, ws.id)}
+                      title="新建工作簿"
+                    >
+                      <span className={styles.plusIcon}>
+                        <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                          <path d="M5.5 1v9M1 5.5h9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                        </svg>
+                      </span>
+                      新建工作簿
+                    </button>
                   </div>
                 )}
               </div>
