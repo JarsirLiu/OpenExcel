@@ -80,7 +80,7 @@ describe("sheet domain helpers", () => {
     applyMergeOperation(cellMap, { startRow: 1, startCol: 1, endRow: 2, endCol: 2 });
     expect(cellMap.get("1,1").v.mc).toEqual({ r: 1, c: 1, rs: 2, cs: 2 });
 
-    const touched = applyClearOperation(cellMap, { type: "cell", row: 4, col: 4 } as any);
+    const touched = applyClearOperation(cellMap, { type: "cell", row: 3, col: 3 } as any);
     expect(touched).toEqual(["3,3"]);
     expect(cellMap.has("3,3")).toBe(false);
   });

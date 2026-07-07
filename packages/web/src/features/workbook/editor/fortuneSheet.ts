@@ -48,7 +48,7 @@ export function toFortuneSheetData(
   } else {
     celldata = [];
     merges = (sheet.merges || []).map((m) => ({
-      row: [m.row[0] + 1, m.row[1] + 1],
+      row: [m.row[0], m.row[1]],
       col: [m.col[0], m.col[1]],
     }));
   }

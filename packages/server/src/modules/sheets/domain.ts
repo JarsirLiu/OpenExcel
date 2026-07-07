@@ -1,6 +1,5 @@
 import {
   celldataToGrid,
-  sheetChangeRangeToZeroBased,
   toOneBasedIndex,
   type FortuneCell,
 } from "@openexcel/core";
@@ -233,13 +232,12 @@ export function applyClearOperation(
   };
 
   if (operation.type === "cell") {
-    clearCell(operation.row - 1, operation.col - 1);
+    clearCell(operation.row, operation.col);
     return touchedKeys;
   }
 
-  const range = sheetChangeRangeToZeroBased(operation as any);
-  for (let r = range.startRow; r <= range.endRow; r += 1) {
-    for (let c = range.startCol; c <= range.endCol; c += 1) {
+  for (let r = operation.startRow; r <= operation.endRow; r += 1) {
+    for (let c = operation.startCol; c <= operation.endCol; c += 1) {
       clearCell(r, c);
     }
   }

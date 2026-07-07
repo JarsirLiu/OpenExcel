@@ -52,6 +52,7 @@ export function patchWorkbookWithDelta(
   }
 
   const config = parseConfig(sheet.config);
+  if (!config.merge) config.merge = {};
 
   if (internalDelta.type === "write") {
     const { cells, merges } = internalDelta;
