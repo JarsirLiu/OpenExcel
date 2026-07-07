@@ -24,7 +24,7 @@ function buildMergeMap(merges: PreviewMerge[]): Map<string, { rs: number; cs: nu
   return map;
 }
 
-export function SheetPreview({ preview }: { preview: PreviewData }) {
+export function SheetPreview({ preview, changedCells }: { preview: PreviewData; changedCells?: ReadonlySet<string> }) {
   const mergeMap = buildMergeMap(preview.merges);
   const skipped = new Set<string>();
   const rowBase = preview.range.startRow;
@@ -68,7 +68,11 @@ export function SheetPreview({ preview }: { preview: PreviewData }) {
                         padding: "4px 8px",
                         whiteSpace: "nowrap",
                         minWidth: 60,
-                        background: ri === 0 ? "var(--muted)" : "var(--background)",
+                        background: changedCells?.has(`${ri + rowBase},${ci + colBase}`)
+                          ? "#d4edda"
+                          : ri === 0
+                            ? "var(--muted)"
+                            : "var(--background)",
                         fontWeight: ri === 0 ? 600 : 400,
                         color: "var(--foreground)",
                         fontSize: 12,

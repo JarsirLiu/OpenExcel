@@ -84,6 +84,37 @@ function getSheetActionLabel(toolName: string): string {
   }
 }
 
+function computeChangedCells(delta: unknown): Set<string> | undefined {
+  if (!delta || typeof delta !== "object") return undefined;
+
+  const d = delta as Record<string, unknown>;
+  const cells: string[] = [];
+
+  if (d.type === "write" && Array.isArray(d.cells)) {
+    for (const c of d.cells) {
+      if (c && typeof c === "object" && typeof (c as any).row === "number" && typeof (c as any).col === "number") {
+        cells.push(`${(c as any).row},${(c as any).col}`);
+      }
+    }
+  } else if ((d.type === "clear" || d.type === "merge" || d.type === "unmerge") && Array.isArray(d.operations)) {
+    for (const op of d.operations) {
+      if (!op || typeof op !== "object") continue;
+      const o = op as Record<string, unknown>;
+      if (o.type === "cell" && typeof o.row === "number" && typeof o.col === "number") {
+        cells.push(`${o.row},${o.col}`);
+      } else if (typeof o.startRow === "number" && typeof o.startCol === "number" && typeof o.endRow === "number" && typeof o.endCol === "number") {
+        for (let r = o.startRow; r <= o.endRow; r++) {
+          for (let c = o.startCol; c <= o.endCol; c++) {
+            cells.push(`${r},${c}`);
+          }
+        }
+      }
+    }
+  }
+
+  return cells.length > 0 ? new Set(cells) : undefined;
+}
+
 export function ToolCallCard({ part }: { part: any }) {
   const toolName = part.type.startsWith("tool-") ? part.type.slice(5) : part.toolName;
   const state = part.state || "input-streaming";
@@ -94,6 +125,7 @@ export function ToolCallCard({ part }: { part: any }) {
   const summary = getToolSummary(toolName, output, input);
   const preview = output?.preview ?? null;
   const sheetInfo = output?.sheetInfo ?? null;
+  const changedCells = computeChangedCells(output?.delta);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
@@ -121,7 +153,7 @@ export function ToolCallCard({ part }: { part: any }) {
       </div>
       {isComplete && !isError && preview?.rows?.length > 0 && (
         <div style={{ paddingLeft: 22, marginTop: 4 }}>
-          <SheetPreview preview={preview} />
+          <SheetPreview preview={preview} changedCells={changedCells} />
         </div>
       )}
       {isComplete && sheetInfo && (
