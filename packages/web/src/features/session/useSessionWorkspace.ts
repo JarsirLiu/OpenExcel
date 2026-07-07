@@ -77,14 +77,25 @@ export function useSessionWorkspace(
     setInitialLoaded(true);
   }, [initial]);
 
+  const prevWorkspaceIdRef = useRef(workspaceId);
+
   useEffect(() => {
-    if (workspaceId != null) return;
-    setSessions([]);
-    setCurrentSessionId(null);
-    setMessages([]);
-    setMessageTotal(0);
-    loadedOffsetRef.current = 0;
-    setInitialLoaded(true);
+    if (workspaceId == null) {
+      setSessions([]);
+      setCurrentSessionId(null);
+      setMessages([]);
+      setMessageTotal(0);
+      loadedOffsetRef.current = 0;
+      setInitialLoaded(true);
+    } else if (prevWorkspaceIdRef.current != null && prevWorkspaceIdRef.current !== workspaceId) {
+      setCurrentSessionId(null);
+      setMessages([]);
+      setMessageTotal(0);
+      loadedOffsetRef.current = 0;
+      setInitialLoaded(false);
+      refreshSessions();
+    }
+    prevWorkspaceIdRef.current = workspaceId;
   }, [workspaceId]);
 
   const refreshSessions = useCallback(async () => {
