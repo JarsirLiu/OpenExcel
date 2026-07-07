@@ -102,10 +102,6 @@ export function useWorkbookWorkspace(workspaceId: number | null, initial?: Workb
       const list = await fetchWorkbooks(workspaceId);
       const safeList = Array.isArray(list) ? sortWorkbooks(list) : [];
       setWorkbooks(safeList);
-
-      const nextWorkbook = await fetchWorkbook(workspaceId, update.workbookId);
-
-      replaceCurrentWorkbook(nextWorkbook);
       const nextIndex = safeList.findIndex((wb) => wb.id === update.workbookId);
       setWorkbookIdx(nextIndex >= 0 ? nextIndex : 0);
       setCurrentSheetIndex(0);
@@ -166,8 +162,6 @@ export function useWorkbookWorkspace(workspaceId: number | null, initial?: Workb
       const idx = safeList.findIndex((wb) => wb.id === result.id);
       if (idx >= 0) {
         setWorkbookIdx(idx);
-        const full = await fetchWorkbook(workspaceId, result.id);
-        replaceCurrentWorkbook(full);
         setCurrentSheetIndex(0);
       }
       setStatus("上传完成");
@@ -175,7 +169,7 @@ export function useWorkbookWorkspace(workspaceId: number | null, initial?: Workb
       const message = error instanceof Error ? error.message : "上传失败";
       setStatus(`上传失败：${message}`);
     }
-  }, [invalidateReferenceCache, replaceCurrentWorkbook, setStatus, setWorkbooks, setWorkbookIdx, workspaceId]);
+  }, [invalidateReferenceCache, setStatus, setWorkbooks, setWorkbookIdx, workspaceId]);
 
   const handleWorkbookDelete = useCallback(async (workbookId: number) => {
     if (workspaceId == null) return;
@@ -187,15 +181,13 @@ export function useWorkbookWorkspace(workspaceId: number | null, initial?: Workb
     const remaining = safeList.filter((wb) => wb.id !== workbookId);
     if (remaining.length > 0) {
       setWorkbookIdx(0);
-      const full = await fetchWorkbook(workspaceId, remaining[0].id);
-      replaceCurrentWorkbook(full);
       setCurrentSheetIndex(0);
     } else {
       setWorkbookIdx(0);
       replaceCurrentWorkbook(null);
     }
     setStatus("已删除");
-  }, [invalidateReferenceCache, replaceCurrentWorkbook, setStatus, setWorkbooks, setWorkbookIdx, workspaceId]);
+  }, [invalidateReferenceCache, replaceCurrentWorkbook, setWorkbookIdx, setWorkbooks, workspaceId]);
 
   return {
     workbooks,

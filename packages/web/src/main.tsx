@@ -3,16 +3,31 @@ import ReactDOM from "react-dom/client";
 import { createHashRouter, Outlet, RouterProvider, type LoaderFunctionArgs, redirect } from "react-router-dom";
 import { RouteErrorBoundary } from "./app/RouteErrorBoundary";
 import { fetchCurrentUser } from "./api/auth";
+import { getCachedUser } from "./api/authCache";
 import { fetchWorkspaces } from "./api/workspaces";
-import { fetchWorkbooks, fetchWorkbook } from "./api/workbooks";
+import { fetchWorkbooks } from "./api/workbooks";
 import { fetchSessions } from "./api/sessions";
-import { fetchMessages } from "./api/chat";
+import type { Workspace } from "./api/workspaces";
 import "./styles/tokens.css";
 import "./styles/theme.css";
 import "./index.css";
 import App from "./App";
 
+type WorkspaceData = {
+  workspaces: Workspace[];
+  workspace: Workspace;
+};
+
+async function resolveWorkspace(publicId: string): Promise<WorkspaceData> {
+  const workspaces = await fetchWorkspaces();
+  const workspace = workspaces.find((w) => w.publicId === publicId);
+  if (!workspace) throw new Response(null, { status: 404, statusText: "Workspace not found" });
+  return { workspaces, workspace };
+}
+
 async function protectedLoader() {
+  const cached = getCachedUser();
+  if (cached) return { currentUser: cached };
   try {
     const currentUser = await fetchCurrentUser();
     return { currentUser };
@@ -22,50 +37,13 @@ async function protectedLoader() {
 }
 
 async function workspaceLoader({ params }: LoaderFunctionArgs) {
-  const workspaces = await fetchWorkspaces();
-  const ws = workspaces.find((w) => w.publicId === params.workspacePublicId);
-  if (!ws) throw new Response(null, { status: 404 });
-  const [workbooks, sessions] = await Promise.all([
-    fetchWorkbooks(ws.id),
-    fetchSessions(ws.id),
+  if (!params.workspacePublicId) throw new Response(null, { status: 400 });
+  const { workspaces, workspace } = await resolveWorkspace(params.workspacePublicId);
+  const [workbookResult, sessionResult] = await Promise.all([
+    fetchWorkbooks(workspace.id),
+    fetchSessions(workspace.id),
   ]);
-  return { workspaces, workspace: ws, workbooks, sessions };
-}
-
-async function workbookLoader({ params }: LoaderFunctionArgs) {
-  const workspaces = await fetchWorkspaces();
-  const ws = workspaces.find((w) => w.publicId === params.workspacePublicId);
-  if (!ws) throw new Response(null, { status: 404 });
-  const workbooks = await fetchWorkbooks(ws.id);
-  const wb = workbooks.find((w) => w.publicId === params.workbookPublicId);
-  if (!wb) throw new Response(null, { status: 404 });
-  const [currentWorkbook, sessions] = await Promise.all([
-    fetchWorkbook(ws.id, wb.id),
-    fetchSessions(ws.id),
-  ]);
-  return { workspaces, workspace: ws, workbooks, currentWorkbook, sessions };
-}
-
-async function sessionLoader({ params }: LoaderFunctionArgs) {
-  const workspaces = await fetchWorkspaces();
-  const ws = workspaces.find((w) => w.publicId === params.workspacePublicId);
-  if (!ws) throw new Response(null, { status: 404 });
-  const workbooks = await fetchWorkbooks(ws.id);
-  const wb = workbooks.find((w) => w.publicId === params.workbookPublicId);
-  if (!wb) throw new Response(null, { status: 404 });
-  const [currentWorkbook, sessions] = await Promise.all([
-    fetchWorkbook(ws.id, wb.id),
-    fetchSessions(ws.id),
-  ]);
-  const session = sessions.find((s) => s.publicId === params.sessionPublicId);
-  let messages: unknown[] = [];
-  let messageTotal = 0;
-  if (session) {
-    const result = await fetchMessages(ws.id, session.id);
-    messages = result.messages;
-    messageTotal = result.total;
-  }
-  return { workspaces, workspace: ws, workbooks, currentWorkbook, sessions, messages, messageTotal };
+  return { workspaces, workspace, workbooks: workbookResult, sessions: sessionResult };
 }
 
 const router = createHashRouter([
@@ -83,18 +61,6 @@ const router = createHashRouter([
     errorElement: <RouteErrorBoundary />,
     loader: protectedLoader,
     children: [
-      {
-        id: "session-route",
-        path: "workspaces/:workspacePublicId/workbooks/:workbookPublicId/sessions/:sessionPublicId",
-        element: <App />,
-        loader: sessionLoader,
-      },
-      {
-        id: "workbook-route",
-        path: "workspaces/:workspacePublicId/workbooks/:workbookPublicId",
-        element: <App />,
-        loader: workbookLoader,
-      },
       {
         id: "workspace-route",
         path: "workspaces/:workspacePublicId",

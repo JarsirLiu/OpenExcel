@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { t } from "@/lib/i18n";
 import { createWorkspace, deleteWorkspace, renameWorkspace } from "@/api/workspaces";
-import { useWorkspaceState } from "./useWorkspaceState";
+import type { Workspace } from "@/api/workspaces";
 import styles from "./WorkspaceSidebar.module.css";
 
 const MIN_WIDTH = 210;
@@ -11,10 +11,11 @@ const COLLAPSED_WIDTH = 32;
 type Props = {
   activeWorkspaceId: number | null;
   onActiveWorkspaceChange: (id: number) => void;
+  workspaces: Workspace[];
+  onRefresh: () => void;
 };
 
-export function WorkspaceSidebar({ activeWorkspaceId, onActiveWorkspaceChange }: Props) {
-  const { workspaces, refresh: refreshWorkspaces } = useWorkspaceState();
+export function WorkspaceSidebar({ activeWorkspaceId, onActiveWorkspaceChange, workspaces, onRefresh }: Props) {
   const [collapsed, setCollapsed] = useState(true);
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_WIDTH);
   const [isResizing, setIsResizing] = useState(false);
@@ -28,11 +29,11 @@ export function WorkspaceSidebar({ activeWorkspaceId, onActiveWorkspaceChange }:
     try {
       const ws = await createWorkspace(t("new_project", "新项目"));
       onActiveWorkspaceChange(ws.id);
-      void refreshWorkspaces();
+      void onRefresh();
     } catch (e) {
       console.error("创建项目失败:", e);
     }
-  }, [onActiveWorkspaceChange, refreshWorkspaces]);
+  }, [onActiveWorkspaceChange, onRefresh]);
 
   const handleSelect = useCallback(
     (id: number) => {
@@ -60,11 +61,11 @@ export function WorkspaceSidebar({ activeWorkspaceId, onActiveWorkspaceChange }:
     try {
       await renameWorkspace(id, trimmed);
       setEditingId(null);
-      void refreshWorkspaces();
+      void onRefresh();
     } catch (e) {
       console.error("修改项目名称失败:", e);
     }
-  }, [editingId, editValue, refreshWorkspaces]);
+  }, [editingId, editValue, onRefresh]);
 
   const handleCancelEdit = useCallback(() => {
     setEditingId(null);
@@ -102,13 +103,13 @@ export function WorkspaceSidebar({ activeWorkspaceId, onActiveWorkspaceChange }:
             onActiveWorkspaceChange(remaining[0].id);
           }
         }
-        void refreshWorkspaces();
+        void onRefresh();
       } catch (e) {
         console.error("删除项目失败:", e);
         setDeletingId(null);
       }
     },
-    [activeWorkspaceId, onActiveWorkspaceChange, refreshWorkspaces, workspaces],
+    [activeWorkspaceId, onActiveWorkspaceChange, onRefresh, workspaces],
   );
 
   const handleCancelDelete = useCallback((e: React.MouseEvent) => {

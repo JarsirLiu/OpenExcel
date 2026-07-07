@@ -1,22 +1,7 @@
 import { useEffect, useState } from "react";
 import { fetchCurrentUser, login, logout, register, type CurrentUser } from "@/api/auth";
-
-const SESSION_KEYS = [
-  "openexcel:activeWorkspaceId",
-  "openexcel:workbookIdx",
-  "openexcel:sheetIdx",
-  "openexcel:sessionId",
-];
-
-export function clearAllSessionStorage() {
-  try {
-    for (const key of SESSION_KEYS) {
-      sessionStorage.removeItem(key);
-    }
-  } catch {
-    // ignore
-  }
-}
+import { setCachedUser, clearCachedUser } from "@/api/authCache";
+import { clearSessionStorage } from "@/shared/utils/storage";
 
 export function useAuthState() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
@@ -55,6 +40,7 @@ export function useAuthState() {
     try {
       const user = await login(input);
       setCurrentUser(user);
+      setCachedUser(user);
       return user;
     } catch (err) {
       const message = err instanceof Error ? err.message : "登录失败";
@@ -71,6 +57,7 @@ export function useAuthState() {
     try {
       const user = await register(input);
       setCurrentUser(user);
+      setCachedUser(user);
       return user;
     } catch (err) {
       const message = err instanceof Error ? err.message : "注册失败";
@@ -87,7 +74,8 @@ export function useAuthState() {
     try {
       await logout();
       setCurrentUser(null);
-      clearAllSessionStorage();
+      clearCachedUser();
+      clearSessionStorage();
     } catch (err) {
       const message = err instanceof Error ? err.message : "退出失败";
       setError(message);

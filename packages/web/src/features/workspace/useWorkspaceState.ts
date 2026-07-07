@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { fetchWorkspaces, type Workspace } from "@/api/workspaces";
 
 const STORAGE_KEY = "openexcel:activeWorkspaceId";
@@ -20,68 +20,62 @@ function saveWorkspaceId(id: number | null) {
       sessionStorage.removeItem(STORAGE_KEY);
     }
   } catch {
-    // sessionStorage may be unavailable
   }
 }
 
 export function useWorkspaceState(initialWorkspaces?: Workspace[]) {
-  const [workspaces, setWorkspaces] = useState<Workspace[]>(initialWorkspaces ?? []);
-  const [activeWorkspaceId, setActiveWorkspaceId] = useState<number | null>(loadStoredWorkspaceId);
+  const [workspaces, setWorkspaces] = useState(initialWorkspaces ?? []);
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState<number | null>(() => {
+    const stored = loadStoredWorkspaceId();
+    if (initialWorkspaces && stored !== null && initialWorkspaces.some((w) => w.id === stored))
+      return stored;
+    return initialWorkspaces?.[0]?.id ?? stored ?? null;
+  });
   const [loading, setLoading] = useState(!initialWorkspaces);
-  const cancelledRef = useRef(false);
-  const seededRef = useRef(false);
 
   useEffect(() => {
-    if (!initialWorkspaces || seededRef.current) return;
-    seededRef.current = true;
-    setActiveWorkspaceId((prev) => {
-      if (prev != null && initialWorkspaces.some((w) => w.id === prev)) {
-        return prev;
-      }
-      return initialWorkspaces[0]?.id ?? null;
-    });
-    setLoading(false);
-  }, [initialWorkspaces]);
-
-  const load = useCallback(async () => {
-    if (seededRef.current) return;
+    if (initialWorkspaces) {
+      setWorkspaces(initialWorkspaces);
+      setActiveWorkspaceId((prev) => {
+        if (prev != null && initialWorkspaces.some((w) => w.id === prev)) return prev;
+        return initialWorkspaces[0]?.id ?? null;
+      });
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
     setLoading(true);
-    try {
-      const list = await fetchWorkspaces();
-      if (cancelledRef.current) return;
+    fetchWorkspaces().then((list) => {
+      if (cancelled) return;
       setWorkspaces(list);
       setActiveWorkspaceId((prev) => {
-        if (prev != null && list.some((workspace) => workspace.id === prev)) {
-          return prev;
-        }
+        if (prev != null && list.some((w) => w.id === prev)) return prev;
         return list[0]?.id ?? null;
       });
-    } catch {
-      if (cancelledRef.current) return;
-      setWorkspaces([]);
-      setActiveWorkspaceId(null);
-    } finally {
-      if (!cancelledRef.current) {
-        setLoading(false);
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    if (seededRef.current) return;
-    cancelledRef.current = false;
-    void load();
+      setLoading(false);
+    });
     return () => {
-      cancelledRef.current = true;
+      cancelled = true;
     };
-  }, [load]);
+  }, [initialWorkspaces]);
 
   useEffect(() => {
     saveWorkspaceId(activeWorkspaceId);
   }, [activeWorkspaceId]);
 
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    const list = await fetchWorkspaces();
+    setWorkspaces(list);
+    setActiveWorkspaceId((prev) => {
+      if (prev != null && list.some((w) => w.id === prev)) return prev;
+      return list[0]?.id ?? null;
+    });
+    setLoading(false);
+  }, []);
+
   const activeWorkspace = useMemo(
-    () => workspaces.find((workspace) => workspace.id === activeWorkspaceId) ?? null,
+    () => workspaces.find((w) => w.id === activeWorkspaceId) ?? null,
     [activeWorkspaceId, workspaces],
   );
 
@@ -91,6 +85,6 @@ export function useWorkspaceState(initialWorkspaces?: Workspace[]) {
     activeWorkspaceId,
     setActiveWorkspaceId,
     loading,
-    refresh: load,
+    refresh,
   };
 }

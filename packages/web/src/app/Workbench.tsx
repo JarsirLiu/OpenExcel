@@ -1,20 +1,17 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { ChatSidebar } from "@/features/chat/ChatSidebar";
 import { WorkbookWorkspace } from "@/features/workbook/workspace/WorkbookWorkspace";
 import { useWorkbookWorkspace } from "@/features/workbook/workspace/useWorkbookWorkspace";
 import { useSessionWorkspace } from "@/features/session/useSessionWorkspace";
 import { useWorkspaceState } from "@/features/workspace/useWorkspaceState";
 import { WorkspaceSidebar } from "@/features/workspace/WorkspaceSidebar";
+import { useUrlSync } from "./useUrlSync";
 import type { Workspace } from "@/api/workspaces";
 import type { WorkbookMeta, WorkbookFull } from "@/api/workbooks";
 import type { Session } from "@/api/sessions";
 import styles from "./Workbench.module.css";
 
-type CurrentUser = {
-  email: string;
-  displayName: string;
-};
+type CurrentUser = { email: string; displayName: string };
 
 export type RouteData = {
   workspaces: Workspace[];
@@ -35,118 +32,28 @@ type Props = {
 const MIN_SIDEBAR_WIDTH = 300;
 
 export function Workbench({ currentUser, onLogout, routeData }: Props) {
-  const navigate = useNavigate();
-  const params = useParams<{ workspacePublicId?: string; workbookPublicId?: string; sessionPublicId?: string }>();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const { workspaces, activeWorkspaceId, setActiveWorkspaceId, loading: workspaceLoading } = useWorkspaceState(routeData?.workspaces);
+  const { workspaces, activeWorkspaceId, setActiveWorkspaceId, loading: workspaceLoading, refresh: workspaceRefresh } = useWorkspaceState(routeData?.workspaces);
   const [sidebarWidth, setSidebarWidth] = useState(MIN_SIDEBAR_WIDTH);
   const rafRef = useRef<number | null>(null);
 
-  const activeWorkspacePublicId = workspaces.find((w) => w.id === activeWorkspaceId)?.publicId ?? null;
+  const activeWorkspacePublicId = useMemo(
+    () => workspaces.find((w) => w.id === activeWorkspaceId)?.publicId ?? null,
+    [workspaces, activeWorkspaceId],
+  );
 
-  useEffect(() => {
-    if (params.workspacePublicId && workspaces.length > 0) {
-      const matched = workspaces.find((w) => w.publicId === params.workspacePublicId);
-      if (matched && matched.id !== activeWorkspaceId) {
-        setActiveWorkspaceId(matched.id);
-      }
-    }
-  }, [params.workspacePublicId, workspaces, activeWorkspaceId, setActiveWorkspaceId]);
+  const domainInitial = useMemo(() => ({
+    workbook: routeData?.workbooks
+      ? { workbooks: routeData.workbooks, currentWorkbook: routeData.currentWorkbook ?? null }
+      : undefined,
+    session: routeData?.sessions
+      ? { sessions: routeData.sessions, messages: routeData.messages, messageTotal: routeData.messageTotal }
+      : undefined,
+  }), [routeData]);
 
-  useEffect(() => {
-    if (activeWorkspacePublicId && activeWorkspacePublicId !== params.workspacePublicId) {
-      navigate(`/workspaces/${activeWorkspacePublicId}`, { replace: true });
-    }
-  }, [activeWorkspacePublicId, params.workspacePublicId, navigate]);
+  const workbook = useWorkbookWorkspace(activeWorkspaceId, domainInitial.workbook);
+  const session = useSessionWorkspace(activeWorkspaceId, workbook.handleWorkbookRefresh, domainInitial.session);
 
-  const workbookInitial = routeData?.workbooks
-    ? { workbooks: routeData.workbooks, currentWorkbook: routeData.currentWorkbook ?? null }
-    : undefined;
-
-  const {
-    workbooks,
-    workbookIdx,
-    currentWorkbook,
-    workbookRevision,
-    status,
-    loading,
-    currentSheetIndex,
-    importPreview,
-    importSheetIndex,
-    importing,
-    referenceCacheRevision,
-    setCurrentSheetIndex,
-    setImportSheetIndex,
-    handleSheetChanged,
-    handleWorkbookStructureChanged,
-    handleWorkbookRefresh,
-    handleSwitchWorkbook,
-    handleUploadFileChange,
-    handleImportConfirm,
-    handleImportCancel,
-    handleNewWorkbookFileChange,
-    handleWorkbookDelete,
-  } = useWorkbookWorkspace(activeWorkspaceId, workbookInitial);
-
-  const sessionInitial = routeData?.sessions
-    ? { sessions: routeData.sessions, messages: routeData.messages, messageTotal: routeData.messageTotal }
-    : undefined;
-
-  const sessionWorkspace = useSessionWorkspace(activeWorkspaceId, handleWorkbookRefresh, sessionInitial);
-
-  const currentWbPublicId = workbooks[workbookIdx]?.publicId ?? null;
-
-  useEffect(() => {
-    if (params.workbookPublicId && workbooks.length > 0) {
-      const matchIdx = workbooks.findIndex((wb) => wb.publicId === params.workbookPublicId);
-      if (matchIdx >= 0 && matchIdx !== workbookIdx) {
-        handleSwitchWorkbook(matchIdx);
-      }
-    }
-  }, [params.workbookPublicId, workbooks, workbookIdx, handleSwitchWorkbook]);
-
-  useEffect(() => {
-    if (currentWbPublicId && currentWbPublicId !== params.workbookPublicId) {
-      navigate(`/workspaces/${activeWorkspacePublicId}/workbooks/${currentWbPublicId}`, { replace: true });
-    }
-  }, [currentWbPublicId, params.workbookPublicId, activeWorkspacePublicId, navigate]);
-
-  useEffect(() => {
-    const sheetParam = searchParams.get("sheet");
-    if (sheetParam !== null && currentWorkbook) {
-      const idx = parseInt(sheetParam, 10);
-      if (!isNaN(idx) && idx >= 0 && idx < currentWorkbook.sheets.length && idx !== currentSheetIndex) {
-        setCurrentSheetIndex(idx);
-      }
-    }
-  }, [searchParams, currentWorkbook, currentSheetIndex, setCurrentSheetIndex]);
-
-  useEffect(() => {
-    const currentSheetParam = searchParams.get("sheet");
-    const expectedSheetParam = String(currentSheetIndex);
-    if (currentSheetParam !== expectedSheetParam) {
-      const newParams = new URLSearchParams(searchParams);
-      newParams.set("sheet", expectedSheetParam);
-      setSearchParams(newParams, { replace: true });
-    }
-  }, [currentSheetIndex, searchParams, setSearchParams]);
-
-  useEffect(() => {
-    if (params.sessionPublicId && sessionWorkspace.sessions.length > 0) {
-      const match = sessionWorkspace.sessions.find((s) => s.publicId === params.sessionPublicId);
-      if (match && match.id !== sessionWorkspace.currentSessionId) {
-        sessionWorkspace.handleSelectSession(match.id);
-      }
-    }
-  }, [params.sessionPublicId, sessionWorkspace.sessions, sessionWorkspace.currentSessionId, sessionWorkspace.handleSelectSession]);
-
-  useEffect(() => {
-    const currentSession = sessionWorkspace.sessions.find((s) => s.id === sessionWorkspace.currentSessionId);
-    if (currentSession?.publicId && currentSession.publicId !== params.sessionPublicId) {
-      const workbookSegment = currentWbPublicId ? `/workbooks/${currentWbPublicId}` : "";
-      navigate(`/workspaces/${activeWorkspacePublicId}${workbookSegment}/sessions/${currentSession.publicId}`, { replace: true });
-    }
-  }, [sessionWorkspace.currentSessionId, sessionWorkspace.sessions, currentWbPublicId, activeWorkspacePublicId, params.sessionPublicId, navigate]);
+  useUrlSync(activeWorkspacePublicId);
 
   const handleResizeMouseDown = useCallback(
     (e: React.MouseEvent) => {
@@ -185,35 +92,39 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
     [sidebarWidth],
   );
 
+  const loading = workbook.loading || workspaceLoading;
+
   return (
     <div className={styles.layout}>
       <WorkspaceSidebar
         activeWorkspaceId={activeWorkspaceId}
         onActiveWorkspaceChange={setActiveWorkspaceId}
+        workspaces={workspaces}
+        onRefresh={workspaceRefresh}
       />
       <div className={styles.main}>
         <WorkbookWorkspace
           workspaceId={activeWorkspaceId}
-          workbooks={workbooks}
-          workbookIdx={workbookIdx}
-          currentWorkbook={currentWorkbook}
-          workbookRevision={workbookRevision}
-          status={status}
-          loading={loading || workspaceLoading}
-          currentSheetIndex={currentSheetIndex}
-          importPreview={importPreview}
-          importSheetIndex={importSheetIndex}
-          importing={importing}
-          setCurrentSheetIndex={setCurrentSheetIndex}
-          setImportSheetIndex={setImportSheetIndex}
-          handleSwitchWorkbook={handleSwitchWorkbook}
-          handleUploadFileChange={handleUploadFileChange}
-          handleImportConfirm={handleImportConfirm}
-          handleImportCancel={handleImportCancel}
-          handleNewWorkbookFileChange={handleNewWorkbookFileChange}
-          handleWorkbookDelete={handleWorkbookDelete}
-          handleWorkbookStructureChanged={handleWorkbookStructureChanged}
-          handleWorkbookRefresh={handleWorkbookRefresh}
+          workbooks={workbook.workbooks}
+          workbookIdx={workbook.workbookIdx}
+          currentWorkbook={workbook.currentWorkbook}
+          workbookRevision={workbook.workbookRevision}
+          status={workbook.status}
+          loading={loading}
+          currentSheetIndex={workbook.currentSheetIndex}
+          importPreview={workbook.importPreview}
+          importSheetIndex={workbook.importSheetIndex}
+          importing={workbook.importing}
+          setCurrentSheetIndex={workbook.setCurrentSheetIndex}
+          setImportSheetIndex={workbook.setImportSheetIndex}
+          handleSwitchWorkbook={workbook.handleSwitchWorkbook}
+          handleUploadFileChange={workbook.handleUploadFileChange}
+          handleImportConfirm={workbook.handleImportConfirm}
+          handleImportCancel={workbook.handleImportCancel}
+          handleNewWorkbookFileChange={workbook.handleNewWorkbookFileChange}
+          handleWorkbookDelete={workbook.handleWorkbookDelete}
+          handleWorkbookStructureChanged={workbook.handleWorkbookStructureChanged}
+          handleWorkbookRefresh={workbook.handleWorkbookRefresh}
         />
         <div
           className={styles.resizeHandle}
@@ -222,14 +133,14 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
       </div>
       <ChatSidebar
         workspaceId={activeWorkspaceId}
-        onSheetChanged={handleSheetChanged}
-        onWorkbookStructureChanged={handleWorkbookStructureChanged}
-        onAttachExcel={handleNewWorkbookFileChange}
-        referenceCacheRevision={referenceCacheRevision}
+        onSheetChanged={workbook.handleSheetChanged}
+        onWorkbookStructureChanged={workbook.handleWorkbookStructureChanged}
+        onAttachExcel={workbook.handleNewWorkbookFileChange}
+        referenceCacheRevision={workbook.referenceCacheRevision}
         currentUser={currentUser}
         onLogout={onLogout}
         style={{ width: sidebarWidth }}
-        sessionWorkspace={sessionWorkspace}
+        sessionWorkspace={session}
       />
     </div>
   );

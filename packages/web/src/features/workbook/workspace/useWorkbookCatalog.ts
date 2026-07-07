@@ -16,7 +16,6 @@ function saveIdx(idx: number) {
   try {
     sessionStorage.setItem(STORAGE_KEY_IDX, String(idx));
   } catch {
-    // ignore
   }
 }
 
@@ -38,10 +37,7 @@ export function useWorkbookCatalog(workspaceId: number | null, initial?: Workboo
     setWorkbooks(initial.workbooks);
     const idx = Math.min(loadStoredIdx(), initial.workbooks.length - 1);
     setWorkbookIdx(idx >= 0 ? idx : 0);
-    if (initial.currentWorkbook) {
-      setCurrentWorkbook(initial.currentWorkbook);
-    }
-    setLoading(false);
+    setLoading(!initial.currentWorkbook);
   }, [initial]);
 
   useEffect(() => {
@@ -52,6 +48,18 @@ export function useWorkbookCatalog(workspaceId: number | null, initial?: Workboo
     setStatus("");
     setLoading(false);
   }, [workspaceId]);
+
+  useEffect(() => {
+    if (workspaceId == null || workbooks.length === 0) return;
+    const wb = workbooks[workbookIdx];
+    if (!wb) return;
+    if (currentWorkbook?.id === wb.id) return;
+    setLoading(true);
+    fetchWorkbook(workspaceId, wb.id).then((full) => {
+      setCurrentWorkbook(full);
+      setLoading(false);
+    });
+  }, [workspaceId, workbookIdx, workbooks, currentWorkbook?.id]);
 
   const replaceCurrentWorkbook = useCallback((next: WorkbookFull | null) => {
     setCurrentWorkbook(next);
@@ -64,11 +72,7 @@ export function useWorkbookCatalog(workspaceId: number | null, initial?: Workboo
 
   const switchWorkbook = useCallback(async (idx: number) => {
     setWorkbookIdx(idx);
-    const wb = workbooks[idx];
-    if (!wb || workspaceId == null) return;
-    const full = await fetchWorkbook(workspaceId, wb.id);
-    replaceCurrentWorkbook(full);
-  }, [replaceCurrentWorkbook, workbooks, workspaceId]);
+  }, []);
 
   const handleUpload = useCallback(async (file: File) => {
     if (!currentWorkbook || workspaceId == null) return;

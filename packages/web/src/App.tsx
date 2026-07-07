@@ -2,7 +2,8 @@ import { lazy, Suspense, useEffect } from "react";
 import { useLocation, useNavigate, useRouteLoaderData } from "react-router-dom";
 import { logout, type CurrentUser } from "@/api/auth";
 import { AuthScreen } from "@/features/auth/AuthScreen";
-import { clearAllSessionStorage, useAuthState } from "@/features/auth/useAuthState";
+import { useAuthState } from "@/features/auth/useAuthState";
+import { clearSessionStorage } from "@/shared/utils/storage";
 import { ConfirmDialog } from "@/shared/ui";
 import { t } from "@/lib/i18n";
 import type { RouteData } from "@/app/Workbench";
@@ -52,11 +53,7 @@ function AuthPage() {
 }
 
 function useWorkbenchRouteData() {
-  const workspaceData = useRouteLoaderData("workspace-route") as RouteData | undefined;
-  const workbookData = useRouteLoaderData("workbook-route") as RouteData | undefined;
-  const sessionData = useRouteLoaderData("session-route") as RouteData | undefined;
-
-  return sessionData ?? workbookData ?? workspaceData;
+  return useRouteLoaderData("workspace-route") as RouteData | undefined;
 }
 
 function WorkbenchPage() {
@@ -72,7 +69,7 @@ function WorkbenchPage() {
 
   const handleLogout = async () => {
     await logout();
-    clearAllSessionStorage();
+    clearSessionStorage();
     navigate("/login", { replace: true });
   };
 

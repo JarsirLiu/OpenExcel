@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, waitFor } from "@testing-library/react";
-import { createHashRouter, RouterProvider } from "react-router-dom";
+import { HashRouter } from "react-router-dom";
 import type { SheetSchema } from "./api/workbooks";
 
 vi.mock("./app/Workbench.js", () => ({
@@ -32,28 +32,21 @@ vi.mock("./api/chat.js", () => ({
   fetchMessages: vi.fn().mockResolvedValue({ messages: [], total: 0 }),
 }));
 
-import App from "./App";
+// Mock useRouteLoaderData for protected route (createHashRouter not compatible with jsdom)
+vi.mock("react-router-dom", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("react-router-dom")>();
+  return {
+    ...actual,
+    useRouteLoaderData: (routeId: string) => {
+      if (routeId === "protected") {
+        return { currentUser: { id: 1, email: "user@example.com", displayName: "User" } };
+      }
+      return undefined;
+    },
+  };
+});
 
-const testRouter = createHashRouter([
-  {
-    id: "protected",
-    loader: async () => ({ currentUser: { id: 1, email: "user@example.com", displayName: "User" } }),
-    children: [
-      {
-        path: "*",
-        element: <App />,
-      },
-    ],
-  },
-  {
-    path: "/login",
-    element: <App />,
-  },
-  {
-    path: "/register",
-    element: <App />,
-  },
-]);
+import App from "./App";
 
 describe("App", () => {
   beforeEach(() => {
@@ -61,7 +54,7 @@ describe("App", () => {
   });
 
   it("renders the workbench when authenticated", async () => {
-    const { container } = render(<RouterProvider router={testRouter} />);
+    const { container } = render(<HashRouter><App /></HashRouter>);
     await waitFor(() => {
       expect(container.querySelector('[data-testid="workbench"]')).toBeTruthy();
     });
