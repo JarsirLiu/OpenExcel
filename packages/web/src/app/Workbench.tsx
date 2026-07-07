@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { ChatSidebar } from "@/features/chat/ChatSidebar";
-import { WorkbookWorkspace } from "@/features/workbook/workspace/WorkbookWorkspace";
-import { useWorkbookWorkspace } from "@/features/workbook/workspace/useWorkbookWorkspace";
+import { WorkspaceView } from "@/features/workspace/WorkspaceView";
+import { useWorkspaceView } from "@/features/workspace/useWorkspaceView";
 import { useSessionWorkspace } from "@/features/session/useSessionWorkspace";
 import { useWorkspaceState } from "@/features/workspace/useWorkspaceState";
 import { WorkspaceSidebar } from "@/features/workspace/WorkspaceSidebar";
@@ -50,7 +50,7 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
       : undefined,
   }), [routeData]);
 
-  const workbook = useWorkbookWorkspace(activeWorkspaceId, domainInitial.workbook);
+  const workbook = useWorkspaceView(activeWorkspaceId, domainInitial.workbook);
   const session = useSessionWorkspace(activeWorkspaceId, workbook.handleWorkbookRefresh, domainInitial.session);
 
   useUrlSync(activeWorkspacePublicId);
@@ -103,7 +103,7 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
         onRefresh={workspaceRefresh}
       />
       <div className={styles.main}>
-        <WorkbookWorkspace
+        <WorkspaceView
           workspaceId={activeWorkspaceId}
           workbooks={workbook.workbooks}
           workbookIdx={workbook.workbookIdx}

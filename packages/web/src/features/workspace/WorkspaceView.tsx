@@ -1,12 +1,12 @@
 import { useRef } from "react";
 import type { WorkbookFull } from "@/api/workbooks";
-import { WorkbookHeader } from "../ui/WorkbookHeader";
-import { ExcelWorkspace } from "../ui/ExcelWorkspace";
-import { ImportPreviewDialog } from "../import/ImportPreviewDialog";
-import type { WorkbookImportPreview } from "../import/importPreview";
+import { WorkbookHeader } from "../workbook/ui/WorkbookHeader";
+import { ExcelWorkspace } from "../workbook/ui/ExcelWorkspace";
+import { ImportPreviewDialog } from "../workbook/import/ImportPreviewDialog";
+import type { WorkbookImportPreview } from "../workbook/import/importPreview";
 import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatchSync";
 import { t } from "@/lib/i18n";
-import styles from "./WorkbookWorkspace.module.css";
+import styles from "./WorkspaceView.module.css";
 
 type WorkbookMeta = {
   id: number;
@@ -37,7 +37,7 @@ type Props = {
   handleWorkbookRefresh: () => Promise<void>;
 };
 
-export function WorkbookWorkspace({
+export function WorkspaceView({
   workspaceId,
   workbooks,
   workbookIdx,

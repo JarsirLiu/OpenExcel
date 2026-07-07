@@ -7,8 +7,8 @@ import {
   uploadNewWorkbook,
 } from "@/api/workbooks";
 import type { WorkbookFull, WorkbookMeta } from "@/api/workbooks";
-import { patchWorkbookWithDelta } from "../utils/patchWorkbook";
-import { useWorkbookImportFlow } from "../import/useWorkbookImportFlow";
+import { patchWorkbookWithDelta } from "../workbook/utils/patchWorkbook";
+import { useWorkbookImportFlow } from "../workbook/import/useWorkbookImportFlow";
 import { useWorkbookCatalog } from "./useWorkbookCatalog";
 import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatchSync";
 
@@ -32,7 +32,7 @@ type WorkbookInitial = {
   currentWorkbook?: WorkbookFull | null;
 };
 
-export function useWorkbookWorkspace(workspaceId: number | null, initial?: WorkbookInitial) {
+export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookInitial) {
   const {
     workbooks,
     workbookIdx,
