@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, useMemo } from "react";
+import { useCallback, useRef, useState, useMemo, useEffect } from "react";
 import { t } from "@/lib/i18n";
 import { createWorkspace, deleteWorkspace, renameWorkspace } from "@/api/workspaces";
 import type { Workspace } from "@/api/workspaces";
@@ -8,6 +8,8 @@ import styles from "./WorkspaceSidebar.module.css";
 const MIN_WIDTH = 210;
 const DEFAULT_WIDTH = 220;
 const COLLAPSED_WIDTH = 32;
+const SIDEBAR_COLLAPSED_KEY = "openexcel:sidebarCollapsed";
+const SIDEBAR_WIDTH_KEY = "openexcel:sidebarWidth";
 
 type Props = {
   activeWorkspaceId: number | null;
@@ -32,8 +34,14 @@ export function WorkspaceSidebar({
   onWorkbookDelete,
   onWorkbookCreate,
 }: Props) {
-  const [collapsed, setCollapsed] = useState(true);
-  const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_WIDTH);
+  const [collapsed, setCollapsed] = useState(() => {
+    const stored = sessionStorage.getItem(SIDEBAR_COLLAPSED_KEY);
+    return stored !== null ? stored === "true" : true;
+  });
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    const stored = sessionStorage.getItem(SIDEBAR_WIDTH_KEY);
+    return stored !== null ? Number(stored) : DEFAULT_WIDTH;
+  });
   const [isResizing, setIsResizing] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editValue, setEditValue] = useState("");
@@ -42,6 +50,14 @@ export function WorkspaceSidebar({
   const [expandedWorkspaces, setExpandedWorkspaces] = useState<Set<number>>(new Set());
   const rafRef = useRef<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    sessionStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(collapsed));
+  }, [collapsed]);
+
+  useEffect(() => {
+    sessionStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarWidth));
+  }, [sidebarWidth]);
 
   // No auto-expand — user controls expand/collapse manually.
   const expandedSet = expandedWorkspaces;
