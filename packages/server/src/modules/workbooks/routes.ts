@@ -53,6 +53,17 @@ export async function workbookRoutes(app: FastifyInstance) {
     },
   );
 
+  app.patch<{
+    Params: { workspacePublicId: string; workbookPublicId: string };
+    Body: { name: string };
+  }>("/api/workspaces/:workspacePublicId/workbooks/:workbookPublicId", async (req, reply) => {
+    const ids = await resolveWorkbookIdForRequest(req, req.params.workspacePublicId, req.params.workbookPublicId, reply);
+    if (ids == null) return;
+    const result = await service.renameWorkbook(ids.workbookId, req.body.name, ids.workspaceId);
+    if (!result) return reply.status(404).send({ error: "Not found" });
+    return result;
+  });
+
   app.post<{ Params: { workspacePublicId: string; workbookPublicId: string } }>(
     "/api/workspaces/:workspacePublicId/workbooks/:workbookPublicId/upload",
     async (req, reply) => {

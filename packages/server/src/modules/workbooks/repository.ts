@@ -66,6 +66,12 @@ export async function deleteSheetAndReindex(workbookId: number, sheetId: number,
   });
 }
 
+export async function updateWorkbookName(id: number, name: string, workspaceId: number) {
+  const workbook = await prisma.workbook.findFirst({ where: { id, workspaceId } });
+  if (!workbook) return null;
+  return prisma.workbook.update({ where: { id }, data: { name } });
+}
+
 export async function deleteWorkbook(id: number, workspaceId: number) {
   const workbook = await prisma.workbook.findFirst({ where: { id, workspaceId } });
   if (!workbook) return null;

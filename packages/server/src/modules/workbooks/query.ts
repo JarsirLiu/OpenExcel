@@ -29,3 +29,9 @@ export async function getWorkbook(id: number, workspaceId: number) {
     sheets: wb.sheets.map((s) => deserializeSheet(s)),
   };
 }
+
+export async function renameWorkbook(id: number, name: string, workspaceId: number) {
+  const wb = await repo.updateWorkbookName(id, name, workspaceId);
+  if (!wb) return null;
+  return { id: wb.id, publicId: wb.publicId, name: wb.name };
+}

@@ -92,6 +92,7 @@ describe("seedExampleWorkspaceForUser", () => {
         ownerUserId: 8,
         name: "示例工作区",
         order: 0,
+        publicId: expect.stringMatching(/^ws_[0-9a-f]{12}$/),
       },
     });
     expect(mocks.workbookCreate).toHaveBeenCalledTimes(2);
@@ -101,6 +102,7 @@ describe("seedExampleWorkspaceForUser", () => {
         workspaceId: 100,
         name: "新对话",
         sheetId: null,
+        publicId: expect.stringMatching(/^ss_[0-9a-f]{12}$/),
       },
     });
     expect(mocks.userUpdate).toHaveBeenCalledWith({

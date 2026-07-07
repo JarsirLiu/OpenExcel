@@ -3,6 +3,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gridToCelldata, type InitConfig } from "@openexcel/core";
 import { prisma } from "../../infra/database/db.js";
+import { generateWorkspacePublicId, generateWorkbookPublicId, generateSessionPublicId } from "../../shared/utils/publicId.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const exampleTemplatePath = resolve(__dirname, "../../../../../templates/init.json");
@@ -61,6 +62,7 @@ export async function seedExampleWorkspaceForUser(ownerUserId: number, template 
         ownerUserId,
         name: "示例工作区",
         order: nextOrder,
+        publicId: generateWorkspacePublicId(),
       },
     });
 
@@ -70,6 +72,7 @@ export async function seedExampleWorkspaceForUser(ownerUserId: number, template 
           workspaceId: workspace.id,
           name: normalizeName(workbookDef.name, `Workbook ${workbookIndex + 1}`),
           order: workbookIndex,
+          publicId: generateWorkbookPublicId(),
         },
       });
 
@@ -94,6 +97,7 @@ export async function seedExampleWorkspaceForUser(ownerUserId: number, template 
         workspaceId: workspace.id,
         name: "新对话",
         sheetId: null,
+        publicId: generateSessionPublicId(),
       },
     });
 
