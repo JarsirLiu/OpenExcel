@@ -6,3 +6,6 @@ dist/
 packages/.data/
 packages/server/prisma/generated/
 config/config.toml
+
+# macOS
+.DS_Store
