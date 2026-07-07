@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { SheetChangeDelta } from "@openexcel/core";
 import {
   createWorkbook,
@@ -52,6 +52,11 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
 
   const [currentSheetIndex, setCurrentSheetIndex] = useState(loadStoredSheetIdx);
   const [referenceCacheRevision, setReferenceCacheRevision] = useState(0);
+  const currentWorkbookRef = useRef(currentWorkbook);
+
+  useEffect(() => {
+    currentWorkbookRef.current = currentWorkbook;
+  }, [currentWorkbook]);
 
   const invalidateReferenceCache = useCallback(() => {
     setReferenceCacheRevision((revision) => revision + 1);
@@ -75,26 +80,73 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
     }
   }, [currentWorkbook, replaceCurrentWorkbook, workspaceId]);
 
+  const refreshWorkspace = useCallback(async () => {
+    if (workspaceId == null) return;
+
+    try {
+      const list = await fetchWorkbooks(workspaceId);
+      const safeList = Array.isArray(list) ? sortWorkbooks(list) : [];
+      setWorkbooks(safeList);
+      invalidateReferenceCache();
+
+      const nextWorkbookId = currentWorkbook && safeList.some((workbook) => workbook.id === currentWorkbook.id)
+        ? currentWorkbook.id
+        : safeList[workbookIdx]?.id ?? safeList[0]?.id ?? null;
+
+      if (nextWorkbookId == null) {
+        replaceCurrentWorkbook(null);
+        setWorkbookIdx(0);
+        setCurrentSheetIndex(0);
+        return;
+      }
+
+      const nextWorkbook = await fetchWorkbook(workspaceId, nextWorkbookId);
+      replaceCurrentWorkbook(nextWorkbook);
+      const nextIndex = safeList.findIndex((workbook) => workbook.id === nextWorkbookId);
+      setWorkbookIdx(nextIndex >= 0 ? nextIndex : 0);
+
+      const nextSheetIndex = currentWorkbook?.id === nextWorkbookId
+        ? Math.min(currentSheetIndex, Math.max(0, nextWorkbook.sheets.length - 1))
+        : 0;
+      setCurrentSheetIndex(nextSheetIndex);
+    } catch {
+      // ignore
+    }
+  }, [
+    currentSheetIndex,
+    currentWorkbook,
+    invalidateReferenceCache,
+    replaceCurrentWorkbook,
+    setCurrentSheetIndex,
+    setWorkbookIdx,
+    setWorkbooks,
+    workbookIdx,
+    workspaceId,
+  ]);
+
   const handleSheetChanged = useCallback(async (sheetId: number, delta: SheetChangeDelta | null) => {
-    if (!currentWorkbook || workspaceId == null) return;
-    const hasSheet = currentWorkbook.sheets.some((sheet) => sheet.id === sheetId);
+    const workbook = currentWorkbookRef.current;
+    if (!workbook || workspaceId == null) return;
+    const hasSheet = workbook.sheets.some((sheet) => sheet.id === sheetId);
     if (!hasSheet) return;
 
     if (delta) {
-      const patched = patchWorkbookWithDelta(currentWorkbook, sheetId, delta);
+      const patched = patchWorkbookWithDelta(workbook, sheetId, delta);
       if (patched) {
+        currentWorkbookRef.current = patched;
         replaceCurrentWorkbook(patched);
         return;
       }
     }
 
     try {
-      const full = await fetchWorkbook(workspaceId, currentWorkbook.id);
+      const full = await fetchWorkbook(workspaceId, workbook.id);
+      currentWorkbookRef.current = full;
       replaceCurrentWorkbook(full);
     } catch {
       // ignore
     }
-  }, [currentWorkbook, replaceCurrentWorkbook, workspaceId]);
+  }, [replaceCurrentWorkbook, workspaceId]);
 
   const handleWorkbookStructureChanged = useCallback(async (update: WorkbookStructureUpdate) => {
     if (workspaceId == null) return;
@@ -247,6 +299,7 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
     handleSheetChanged,
     handleWorkbookStructureChanged,
     handleWorkbookRefresh: refreshCurrentWorkbook,
+    handleWorkspaceRefresh: refreshWorkspace,
     handleSwitchWorkbook,
     handleUploadFileChange,
     handleImportConfirm,

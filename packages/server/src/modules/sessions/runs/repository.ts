@@ -1,6 +1,6 @@
 import { prisma } from "../../../infra/database/db.js";
 
-const DEFAULT_UNDO_SNAPSHOT_RETENTION = 5;
+const DEFAULT_UNDO_SNAPSHOT_RETENTION = 1;
 
 export async function createRun(data: {
   sessionId: number;
@@ -31,7 +31,27 @@ export async function findLatestUndoableRun(workspaceId: number, sessionId: numb
     where: {
       sessionId: session.id,
       status: { in: ["completed", "aborted", "error"] },
-      snapshots: { some: {} },
+      OR: [
+        { snapshots: { some: {} } },
+        {
+          steps: {
+            some: {
+              OR: [
+                { toolName: { contains: "createWorkbook" } },
+                { toolName: { contains: "createSheet" } },
+              ],
+            },
+          },
+        },
+      ],
+    },
+    include: {
+      steps: {
+        orderBy: { order: "asc" },
+      },
+      snapshots: {
+        orderBy: { id: "asc" },
+      },
     },
     orderBy: [{ startedAt: "desc" }, { id: "desc" }],
   });

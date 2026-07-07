@@ -1,7 +1,5 @@
-import type { SheetChangeDelta } from "@openexcel/core";
 import type { useSessionWorkspace } from "@/features/session/useSessionWorkspace";
 import { SessionShell } from "@/features/session/SessionShell";
-import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatchSync";
 
 type CurrentUser = {
   email: string;
@@ -11,8 +9,7 @@ type CurrentUser = {
 type SessionWorkspaceState = ReturnType<typeof useSessionWorkspace>;
 
 export function ChatInterface({
-  onSheetChanged,
-  onWorkbookStructureChanged,
+  onWorkspaceRefresh,
   onAttachExcel,
   referenceCacheRevision,
   workspaceId,
@@ -20,8 +17,7 @@ export function ChatInterface({
   onLogout,
   sessionWorkspace,
 }: {
-  onSheetChanged?: (sheetId: number, delta: SheetChangeDelta | null) => void;
-  onWorkbookStructureChanged?: (update: WorkbookStructureUpdate) => void;
+  onWorkspaceRefresh?: () => Promise<void> | void;
   onAttachExcel: (file: File) => Promise<void> | void;
   referenceCacheRevision: number;
   workspaceId: number | null;
@@ -33,8 +29,7 @@ export function ChatInterface({
     <SessionShell
       {...sessionWorkspace}
       workspaceId={workspaceId}
-      onSheetChanged={onSheetChanged}
-      onWorkbookStructureChanged={onWorkbookStructureChanged}
+      onWorkspaceRefresh={onWorkspaceRefresh}
       referenceCacheRevision={referenceCacheRevision}
       onAttachExcel={onAttachExcel}
       currentUser={currentUser}

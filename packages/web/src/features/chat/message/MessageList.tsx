@@ -6,6 +6,8 @@ export function MessageList({
   messages,
   isStreaming,
   onRegenerate,
+  onUndo,
+  isUndoing,
   loadingOlder,
   hasOlder,
   onLoadOlder,
@@ -14,6 +16,8 @@ export function MessageList({
   messages: any[];
   isStreaming: boolean;
   onRegenerate?: () => void;
+  onUndo?: () => void;
+  isUndoing?: boolean;
   loadingOlder?: boolean;
   hasOlder?: boolean;
   onLoadOlder?: () => void;
@@ -47,6 +51,7 @@ export function MessageList({
   }, [handleScroll, hasOlder, onLoadOlder]);
 
   const lastAssistantMsg = [...messages].reverse().find((m) => m.role === "assistant");
+  const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");
 
   return (
     <div ref={containerRef} className={styles.messageList}>
@@ -78,7 +83,10 @@ export function MessageList({
           msg={msg}
           isStreaming={isStreaming}
           isLastAssistantMessage={!isStreaming && msg.role === "assistant" && msg.id === lastAssistantMsg?.id}
+          isLastUserMessage={!isStreaming && msg.role === "user" && msg.id === lastUserMsg?.id}
           onRegenerate={onRegenerate}
+          onUndo={onUndo}
+          isUndoing={isUndoing}
         />
       ))}
       <div ref={messagesEndRef} />

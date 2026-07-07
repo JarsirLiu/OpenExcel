@@ -132,10 +132,18 @@ describe("downloadTemplateUrl", () => {
 
 describe("undoLatestRun", () => {
   it("posts undo request for latest run", async () => {
-    mockFetch.mockResolvedValue(new Response(JSON.stringify({ runId: 8, restoredSheetIds: [1, 2] }), { status: 200 }));
+    mockFetch.mockResolvedValue(new Response(JSON.stringify({
+      runId: 8,
+      restoredSheetIds: [1, 2],
+      undoneUserText: "分析这些数据",
+    }), { status: 200 }));
 
     const result = await undoLatestRun(9, 3);
-    expect(result).toEqual({ runId: 8, restoredSheetIds: [1, 2] });
+    expect(result).toEqual({
+      runId: 8,
+      restoredSheetIds: [1, 2],
+      undoneUserText: "分析这些数据",
+    });
     expect(mockFetch).toHaveBeenCalledWith("/api/workspaces/9/sessions/3/runs/undo-latest", { method: "POST" });
   });
 });

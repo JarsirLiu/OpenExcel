@@ -1,10 +1,8 @@
 import { useEffect, useRef } from "react";
-import type { SheetChangeDelta } from "@openexcel/core";
 import { ChatPanel } from "@/features/chat/conversation/ChatPanel";
 import { SessionHeader } from "./components/SessionHeader";
 import { SessionHistoryPopover } from "./components/SessionHistoryPopover";
 import type { Session } from "@/api/sessions";
-import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatchSync";
 import { t } from "@/lib/i18n";
 import styles from "./SessionShell.module.css";
 
@@ -23,8 +21,6 @@ type Props = {
   loadingMore: boolean;
   historyOpen: boolean;
   setHistoryOpen: (next: boolean) => void;
-  undoState: "idle" | "loading" | "success" | "error";
-  undoError: string;
   isStreaming: boolean;
   setIsStreaming: (next: boolean) => void;
   handleSendInDraft: (text: string) => Promise<number>;
@@ -34,10 +30,9 @@ type Props = {
   handleNewSession: () => void;
   handleSelectSession: (id: number) => void;
   handleDeleteSession: (id: number) => Promise<void>;
-  handleUndoLatestRun: () => Promise<void>;
+  handleUndoComplete: () => Promise<void>;
   onAttachExcel: (file: File) => Promise<void> | void;
-  onSheetChanged?: (sheetId: number, delta: SheetChangeDelta | null) => void;
-  onWorkbookStructureChanged?: (update: WorkbookStructureUpdate) => void;
+  onWorkspaceRefresh?: () => Promise<void> | void;
   referenceCacheRevision: number;
   currentUser: CurrentUser;
   onLogout: () => void;
@@ -53,8 +48,6 @@ export function SessionShell({
   loadingMore,
   historyOpen,
   setHistoryOpen,
-  undoState,
-  undoError,
   isStreaming,
   setIsStreaming,
   handleSendInDraft,
@@ -64,10 +57,9 @@ export function SessionShell({
   handleNewSession,
   handleSelectSession,
   handleDeleteSession,
-  handleUndoLatestRun,
+  handleUndoComplete,
   onAttachExcel,
-  onSheetChanged,
-  onWorkbookStructureChanged,
+  onWorkspaceRefresh,
   referenceCacheRevision,
   currentUser,
   onLogout,
@@ -102,10 +94,6 @@ export function SessionShell({
       <SessionHeader
         sessionName={currentSession?.name ?? t("ai_chat", "AI 对话")}
         currentSessionId={currentSessionId}
-        undoState={undoState}
-        undoError={undoError}
-        isStreaming={isStreaming}
-        onUndoLatestRun={handleUndoLatestRun}
         onToggleHistory={() => setHistoryOpen(!historyOpen)}
         onNewSession={() => void handleNewSession()}
         currentUser={currentUser}
@@ -134,11 +122,11 @@ export function SessionShell({
           draftPendingText={draftPendingText}
           onDraftSent={clearDraftPendingText}
           onRunComplete={handleRunComplete}
-          onSheetChanged={onSheetChanged}
-          onWorkbookStructureChanged={onWorkbookStructureChanged}
+          onWorkspaceRefresh={onWorkspaceRefresh}
           onStreamingChange={setIsStreaming}
           onAttachExcel={onAttachExcel}
           referenceCacheRevision={referenceCacheRevision}
+          onUndoComplete={handleUndoComplete}
         />
       ) : (
         <div className={styles.emptyState}>{t("loading", "加载中...")}</div>

@@ -4,6 +4,8 @@
   padding: 20px 16px;
   scrollbar-width: none;
   -ms-overflow-style: none;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .messageList::-webkit-scrollbar {

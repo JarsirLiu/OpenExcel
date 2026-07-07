@@ -52,7 +52,7 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
   }), [routeData]);
 
   const workbook = useWorkspaceView(activeWorkspaceId, domainInitial.workbook);
-  const session = useSessionWorkspace(activeWorkspaceId, workbook.handleWorkbookRefresh, domainInitial.session);
+  const session = useSessionWorkspace(activeWorkspaceId, workbook.handleWorkspaceRefresh, domainInitial.session);
 
   useUrlSync(activeWorkspacePublicId);
 
@@ -180,8 +180,7 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
       </div>
       <ChatSidebar
         workspaceId={activeWorkspaceId}
-        onSheetChanged={workbook.handleSheetChanged}
-        onWorkbookStructureChanged={workbook.handleWorkbookStructureChanged}
+        onWorkspaceRefresh={workbook.handleWorkspaceRefresh}
         onAttachExcel={workbook.handleNewWorkbookFileChange}
         referenceCacheRevision={workbook.referenceCacheRevision}
         currentUser={currentUser}

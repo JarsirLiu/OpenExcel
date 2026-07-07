@@ -20,6 +20,7 @@ export function useChatComposer({
   const [editorText, setEditorText] = useState("");
   const [isMentionOpen, setIsMentionOpen] = useState(false);
   const isMentionOpenRef = useRef(false);
+  const pendingTextRef = useRef<string | null>(null);
   const cachedSheetsRef = useRef<WorkbookSource[] | null>(null);
   const inflightSheetsRef = useRef<Promise<WorkbookSource[]> | null>(null);
   const cacheRevisionRef = useRef(referenceCacheRevision);
@@ -109,10 +110,35 @@ export function useChatComposer({
     isMentionOpenRef.current = isMentionOpen;
   }, [isMentionOpen]);
 
+  const setText = useCallback((text: string) => {
+    const editor = editorRef.current;
+    if (!editor) {
+      pendingTextRef.current = text;
+      return;
+    }
+    editor.commands.clearContent();
+    if (text.length > 0) {
+      editor.commands.insertContent(text);
+    }
+    editor.commands.focus();
+  }, []);
+
+  // 当编辑器就绪或收到显式恢复指令时，填入输入框
+  useEffect(() => {
+    if (!editor || pendingTextRef.current == null) {
+      return;
+    }
+
+    const nextText = pendingTextRef.current;
+    pendingTextRef.current = null;
+    setText(nextText);
+  }, [editor, setText]);
+
   return {
     editor,
     editorText,
     handleSend,
+    setText,
     isMentionOpen,
   };
 }

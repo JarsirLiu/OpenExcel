@@ -6,7 +6,7 @@ import {
   generateSessionTitle,
   type Session,
 } from "@/api/sessions";
-import { fetchMessages as fetchChatMessages, undoLatestRun as undoLatestChatRun } from "@/api/chat";
+import { fetchMessages as fetchChatMessages } from "@/api/chat";
 import { getFirstUserText } from "./utils";
 
 const PAGE_SIZE = 40;
@@ -38,7 +38,7 @@ type UndoState = "idle" | "loading" | "success" | "error";
 
 export function useSessionWorkspace(
   workspaceId: number | null,
-  onUndoComplete?: () => void,
+  onUndoComplete?: () => Promise<void> | void,
   initial?: { sessions: Session[]; messages?: unknown[]; messageTotal?: number },
 ) {
   const [sessions, setSessions] = useState<Session[]>(initial?.sessions ?? []);
@@ -55,8 +55,6 @@ export function useSessionWorkspace(
   const [initialLoaded, setInitialLoaded] = useState(!!initial);
   const [loadingMore, setLoadingMore] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [undoState, setUndoState] = useState<UndoState>("idle");
-  const [undoError, setUndoError] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [draftPendingText, setDraftPendingText] = useState<string | null>(null);
   const loadedOffsetRef = useRef(initial?.messages?.length ?? 0);
@@ -187,17 +185,6 @@ export function useSessionWorkspace(
     setDraftPendingText(null);
   }, []);
 
-  useEffect(() => {
-    setUndoState("idle");
-    setUndoError("");
-  }, [currentSessionId]);
-
-  useEffect(() => {
-    if (undoState !== "success") return;
-    const timer = window.setTimeout(() => setUndoState("idle"), 2500);
-    return () => window.clearTimeout(timer);
-  }, [undoState]);
-
   const handleNewSession = useCallback(() => {
     setCurrentSessionId(null);
     setMessages([]);
@@ -242,20 +229,9 @@ export function useSessionWorkspace(
     loadedOffsetRef.current = finishedMessages.length;
   }, [refreshSessions, workspaceId]);
 
-  const handleUndoLatestRun = useCallback(async () => {
-    if (!currentSessionId || undoState === "loading" || isStreaming) return;
-    if (workspaceId == null) return;
-    setUndoState("loading");
-    setUndoError("");
-    try {
-      await undoLatestChatRun(workspaceId, currentSessionId);
-      setUndoState("success");
-      onUndoComplete?.();
-    } catch (error) {
-      setUndoState("error");
-      setUndoError(error instanceof Error ? error.message : "撤销本轮修改失败");
-    }
-  }, [currentSessionId, isStreaming, onUndoComplete, undoState, workspaceId]);
+  const handleUndoComplete = useCallback(async () => {
+    await onUndoComplete?.();
+  }, [onUndoComplete]);
 
   return {
     sessions,
@@ -266,8 +242,6 @@ export function useSessionWorkspace(
     loadingMore,
     historyOpen,
     setHistoryOpen,
-    undoState,
-    undoError,
     isStreaming,
     setIsStreaming,
     refreshSessions,
@@ -280,6 +254,6 @@ export function useSessionWorkspace(
     handleNewSession,
     handleSelectSession,
     handleDeleteSession,
-    handleUndoLatestRun,
+    handleUndoComplete,
   };
 }

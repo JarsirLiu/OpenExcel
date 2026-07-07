@@ -10,10 +10,6 @@ type CurrentUser = {
 type Props = {
   sessionName: string;
   currentSessionId: number | null;
-  undoState: "idle" | "loading" | "success" | "error";
-  undoError: string;
-  isStreaming: boolean;
-  onUndoLatestRun: () => void;
   onToggleHistory: () => void;
   onNewSession: () => void;
   currentUser: CurrentUser;
@@ -91,16 +87,11 @@ const UserMenu = ({ currentUser, onLogout }: { currentUser: CurrentUser; onLogou
 export function SessionHeader({
   sessionName,
   currentSessionId,
-  undoState,
-  undoError,
-  isStreaming,
-  onUndoLatestRun,
   onToggleHistory,
   onNewSession,
   currentUser,
   onLogout,
 }: Props) {
-  const undoDisabled = !currentSessionId || undoState === "loading" || isStreaming;
 
   return (
     <>
@@ -109,13 +100,6 @@ export function SessionHeader({
           {sessionName}
         </span>
         <div className={styles.actions}>
-          <div
-            onClick={undoDisabled ? undefined : onUndoLatestRun}
-            className={`${styles.pillBtn} ${undoDisabled ? styles.pillBtnDisabled : styles.pillBtnEnabled}`}
-            title={isStreaming ? t("undo_streaming_hint", "对话进行中，无法撤销") : t("undo", "撤销本轮修改")}
-          >
-            {isStreaming ? t("undo", "撤销") : (undoState === "loading" ? t("undoing", "撤销中...") : t("undo", "撤销"))}
-          </div>
           <div
             onClick={onToggleHistory}
             className={styles.pillBtn}
@@ -138,20 +122,6 @@ export function SessionHeader({
           <UserMenu currentUser={currentUser} onLogout={onLogout} />
         </div>
       </div>
-      {undoError && (
-        <div className={styles.bannerWrap}>
-          <div className={styles.banner}>
-            {t("undo_failed", "撤销失败")}: {undoError}
-          </div>
-        </div>
-      )}
-      {undoState === "success" && (
-        <div className={styles.bannerWrap}>
-          <div className={styles.banner}>
-            {t("undo_success", "已撤销本轮修改")}
-          </div>
-        </div>
-      )}
     </>
   );
 }

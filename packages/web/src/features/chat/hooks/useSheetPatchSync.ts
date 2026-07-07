@@ -198,6 +198,29 @@ export function collectWorkbookStructureUpdates(
   return updates;
 }
 
+export function collectWorkbookMutationToolCallIds(
+  messages: ReadonlyArray<SheetPatchMessageLike>,
+  seenToolCallIds: ReadonlySet<string>,
+): string[] {
+  const toolCallIds = new Set<string>();
+  const patchUpdates = collectSheetPatchUpdates(messages, seenToolCallIds);
+  for (const update of patchUpdates) {
+    toolCallIds.add(update.toolCallId);
+  }
+
+  const seenAfterPatchUpdates = new Set(seenToolCallIds);
+  for (const toolCallId of toolCallIds) {
+    seenAfterPatchUpdates.add(toolCallId);
+  }
+
+  const structureUpdates = collectWorkbookStructureUpdates(messages, seenAfterPatchUpdates);
+  for (const update of structureUpdates) {
+    toolCallIds.add(update.toolCallId);
+  }
+
+  return Array.from(toolCallIds);
+}
+
 export function useSheetPatchSync(
   messages: ReadonlyArray<SheetPatchMessageLike>,
   onSheetChanged?: (sheetId: number, delta: SheetChangeDelta | null) => void,

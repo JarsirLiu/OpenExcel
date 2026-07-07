@@ -14,7 +14,7 @@ export async function fetchRuns(workspaceId: number, sessionId: number): Promise
   return res.json();
 }
 
-export async function undoLatestRun(workspaceId: number, sessionId: number): Promise<{ runId: number; restoredSheetIds: number[] }> {
+export async function undoLatestRun(workspaceId: number, sessionId: number): Promise<{ runId: number; restoredSheetIds: number[]; undoneUserText: string }> {
   const res = await apiFetch(`/workspaces/${workspaceId}/sessions/${sessionId}/runs/undo-latest`, {
     method: "POST",
   });

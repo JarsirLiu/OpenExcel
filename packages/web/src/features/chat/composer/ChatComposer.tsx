@@ -1,8 +1,29 @@
-import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+  type ChangeEvent,
+} from "react";
 import { EditorContent } from "@tiptap/react";
 import { useChatComposer } from "./useChatComposer";
 import { t } from "@/lib/i18n";
 import styles from "./ChatComposer.module.css";
+
+export type ChatComposerHandle = {
+  restoreDraft: (text: string) => void;
+};
+
+type ChatComposerProps = {
+  isStreaming: boolean;
+  onSend: (text: string) => void;
+  onStop: () => void;
+  onAttachExcel: (file: File) => Promise<void> | void;
+  referenceCacheRevision: number;
+  workspaceId: number;
+};
 
 const SendIcon = () => (
   <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -28,27 +49,24 @@ const PLACEHOLDERS = [
   "让 AI 来帮你修改表格",
 ];
 
-export function ChatComposer({
+export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(function ChatComposer({
   isStreaming,
   onSend,
   onStop,
   onAttachExcel,
   referenceCacheRevision,
   workspaceId,
-}: {
-  isStreaming: boolean;
-  onSend: (text: string) => void;
-  onStop: () => void;
-  onAttachExcel: (file: File) => Promise<void> | void;
-  referenceCacheRevision: number;
-  workspaceId: number;
-}) {
-  const { editor, editorText, handleSend } = useChatComposer({
+}, ref) {
+  const { editor, editorText, handleSend, setText } = useChatComposer({
     isStreaming,
     onSend,
     referenceCacheRevision,
     workspaceId,
   });
+
+  useImperativeHandle(ref, () => ({
+    restoreDraft: setText,
+  }), [setText]);
 
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const [editorEmpty, setEditorEmpty] = useState(true);
@@ -119,4 +137,4 @@ export function ChatComposer({
       </div>
     </div>
   );
-}
+});

@@ -1,12 +1,43 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import type { SheetChangeDelta } from "@openexcel/core";
-import { fetchMessages as fetchChatMessages } from "@/api/chat";
-import { useSheetPatchSync } from "./useSheetPatchSync";
-import type { WorkbookStructureUpdate } from "./useSheetPatchSync";
+import { fetchMessages as fetchChatMessages, undoLatestRun } from "@/api/chat";
+import { collectWorkbookMutationToolCallIds } from "./useSheetPatchSync";
 
 const PAGE_SIZE = 40;
+
+type ChatMessageLike = {
+  role?: unknown;
+  content?: unknown;
+  parts?: ReadonlyArray<unknown> | null;
+};
+
+function extractMessageText(message: ChatMessageLike): string {
+  if (typeof message.content === "string") {
+    return message.content;
+  }
+
+  if (!Array.isArray(message.parts)) {
+    return "";
+  }
+
+  return message.parts
+    .filter((part: any) => part?.type === "text" && typeof part.text === "string")
+    .map((part: any) => part.text)
+    .join("");
+}
+
+function trimMessagesAfterUserTurn(messages: any[], userText: string): any[] {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index] as ChatMessageLike;
+    if (message?.role !== "user") continue;
+    if (extractMessageText(message).trim() === userText.trim()) {
+      return messages.slice(0, index);
+    }
+  }
+
+  throw new Error("会话消息与撤销结果不一致，无法更新本地状态");
+}
 
 export function useChatConversation({
   sessionId,
@@ -14,22 +45,24 @@ export function useChatConversation({
   initialMessages,
   messageTotal,
   onRunComplete,
-  onSheetChanged,
-  onWorkbookStructureChanged,
+  onWorkspaceRefresh,
   onStreamingChange,
 }: {
   sessionId: number;
   workspaceId: number;
   initialMessages: any[];
   messageTotal: number;
-  onRunComplete?: (messages: any[]) => void;
-  onSheetChanged?: (sheetId: number, delta: SheetChangeDelta | null) => void;
-  onWorkbookStructureChanged?: (update: WorkbookStructureUpdate) => void;
+  onRunComplete?: (messages: any[]) => Promise<void> | void;
+  onWorkspaceRefresh?: () => Promise<void> | void;
   onStreamingChange?: (isStreaming: boolean) => void;
 }) {
   const messagesRef = useRef<any[]>(initialMessages);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [hasOlder, setHasOlder] = useState(true);
+  const seenWorkbookMutationToolCallIdsRef = useRef<Set<string>>(new Set());
+  const hasPrimedWorkbookMutationHistoryRef = useRef(false);
+  const pendingWorkspaceRefreshRef = useRef(false);
+  const wasStreamingRef = useRef(false);
 
   const transport = useMemo(() => new DefaultChatTransport({
     api: `/api/workspaces/${workspaceId}/sessions/${sessionId}/chat`,
@@ -57,7 +90,48 @@ export function useChatConversation({
     onStreamingChange?.(isStreaming);
   }, [isStreaming, onStreamingChange]);
 
-  useSheetPatchSync(messages, onSheetChanged, onWorkbookStructureChanged);
+  useEffect(() => {
+    const toolCallIds = collectWorkbookMutationToolCallIds(messages, seenWorkbookMutationToolCallIdsRef.current);
+    if (toolCallIds.length === 0) {
+      hasPrimedWorkbookMutationHistoryRef.current = true;
+      return;
+    }
+
+    for (const toolCallId of toolCallIds) {
+      seenWorkbookMutationToolCallIdsRef.current.add(toolCallId);
+    }
+
+    if (!hasPrimedWorkbookMutationHistoryRef.current) {
+      hasPrimedWorkbookMutationHistoryRef.current = true;
+      return;
+    }
+
+    if (!isStreaming && !wasStreamingRef.current) {
+      return;
+    }
+
+    pendingWorkspaceRefreshRef.current = true;
+  }, [isStreaming, messages]);
+
+  const flushPendingWorkspaceRefresh = useCallback(async () => {
+    if (!pendingWorkspaceRefreshRef.current) return;
+    pendingWorkspaceRefreshRef.current = false;
+    await onWorkspaceRefresh?.();
+  }, [onWorkspaceRefresh]);
+
+  useEffect(() => {
+    if (isStreaming) {
+      wasStreamingRef.current = true;
+      return;
+    }
+
+    if (!wasStreamingRef.current) {
+      return;
+    }
+
+    wasStreamingRef.current = false;
+    void flushPendingWorkspaceRefresh();
+  }, [flushPendingWorkspaceRefresh, isStreaming]);
 
   const handleSend = useCallback((text: string) => {
     if (!text || isStreaming) return;
@@ -81,6 +155,18 @@ export function useChatConversation({
     }
   }, [loadingOlder, hasOlder, workspaceId, sessionId, setMessages]);
 
+  const handleUndo = useCallback(async (): Promise<{ undoneUserText: string }> => {
+    if (isStreaming) {
+      throw new Error("对话进行中，无法撤销");
+    }
+
+    const result = await undoLatestRun(workspaceId, sessionId);
+    const nextMessages = trimMessagesAfterUserTurn(messagesRef.current, result.undoneUserText);
+    setMessages(nextMessages);
+
+    return { undoneUserText: result.undoneUserText };
+  }, [workspaceId, sessionId, isStreaming, setMessages]);
+
   return {
     messages,
     error,
@@ -90,5 +176,6 @@ export function useChatConversation({
     sendMessage: handleSend,
     stop,
     loadOlderMessages,
+    onUndo: handleUndo,
   };
 }

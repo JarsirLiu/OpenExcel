@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { collectSheetPatchUpdates, collectWorkbookStructureUpdates } from "../features/chat/hooks/useSheetPatchSync";
+import {
+  collectSheetPatchUpdates,
+  collectWorkbookMutationToolCallIds,
+  collectWorkbookStructureUpdates,
+} from "../features/chat/hooks/useSheetPatchSync";
 
 describe("collectSheetPatchUpdates", () => {
   it("collects valid completed patch outputs once", () => {
@@ -233,5 +237,67 @@ describe("collectWorkbookStructureUpdates", () => {
     const updates = collectWorkbookStructureUpdates(messages, new Set());
 
     expect(updates).toEqual([]);
+  });
+});
+
+describe("collectWorkbookMutationToolCallIds", () => {
+  it("collects new sheet and structure tool calls without duplicating seen ids", () => {
+    const messages = [
+      {
+        role: "assistant",
+        parts: [
+          {
+            toolCallId: "tool-10",
+            state: "output-available",
+            output: {
+              sheetInfo: { sheetId: 31, sheetNo: 1, sheetName: "Sheet1" },
+              delta: {
+                type: "clear",
+                operations: [{ type: "cell", row: 1, col: 1 }],
+              },
+            },
+          },
+          {
+            toolCallId: "tool-11",
+            toolName: "createSheet",
+            state: "output-available",
+            output: {
+              workbookId: 7,
+              id: 32,
+              sheetNo: 2,
+              name: "Sheet2",
+              order: 1,
+            },
+          },
+        ],
+      },
+    ];
+
+    expect(collectWorkbookMutationToolCallIds(messages, new Set(["tool-10"]))).toEqual(["tool-11"]);
+    expect(new Set(collectWorkbookMutationToolCallIds(messages, new Set()))).toEqual(new Set(["tool-10", "tool-11"]));
+  });
+
+  it("returns an empty list when only historical tool calls are present", () => {
+    const messages = [
+      {
+        role: "assistant",
+        parts: [
+          {
+            toolCallId: "tool-12",
+            toolName: "createWorkbook",
+            state: "output-available",
+            output: {
+              id: 41,
+              name: "Budget",
+              order: 0,
+              sheets: 1,
+              initialSheet: { id: 51, sheetNo: 1, name: "Sheet 1", order: 0 },
+            },
+          },
+        ],
+      },
+    ];
+
+    expect(collectWorkbookMutationToolCallIds(messages, new Set(["tool-12"]))).toEqual([]);
   });
 });

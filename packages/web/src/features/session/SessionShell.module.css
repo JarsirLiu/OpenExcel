@@ -6,6 +6,7 @@
   border-left: 1px solid var(--border-default);
   overflow: hidden;
   position: relative;
+  box-sizing: border-box;
 }
 
 .emptyState {

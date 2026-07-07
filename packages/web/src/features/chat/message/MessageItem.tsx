@@ -50,6 +50,13 @@ const DownloadIcon = ({ size = 14 }: { size?: number }) => (
   </svg>
 );
 
+const UndoIcon = ({ size = 14 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9 7 4 12l5 5" />
+    <path d="M20 19a8 8 0 0 0-8-8H4" />
+  </svg>
+);
+
 function renderAssistantParts(
   msg: any,
   isStreaming: boolean,
@@ -114,12 +121,18 @@ export function MessageItem({
   msg,
   isStreaming,
   isLastAssistantMessage,
+  isLastUserMessage,
   onRegenerate,
+  onUndo,
+  isUndoing,
 }: {
   msg: any;
   isStreaming: boolean;
   isLastAssistantMessage: boolean;
+  isLastUserMessage: boolean;
   onRegenerate?: () => void;
+  onUndo?: () => void;
+  isUndoing?: boolean;
 }) {
   const [thinkingOpen, setThinkingOpen] = useState<Record<string, boolean>>({});
 
@@ -134,6 +147,19 @@ export function MessageItem({
           <div className={styles.userText}>
             {getMessageText(msg)}
           </div>
+          {!isStreaming && isLastUserMessage && onUndo && (
+            <div className={styles.actions}>
+              <button
+                type="button"
+                onClick={isUndoing ? undefined : onUndo}
+                className={`${styles.actionBtn} ${isUndoing ? styles.actionBtnDisabled : ""}`}
+                disabled={isUndoing}
+              >
+                <UndoIcon size={14} />
+                {isUndoing ? "撤销中..." : "撤销"}
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -169,11 +195,12 @@ export function MessageItem({
               <DownloadIcon size={14} />
             </button>
             <button
+              type="button"
               className={styles.actionBtn}
               onClick={() => navigator.clipboard.writeText(getMessageText(msg) || "")}
               title="复制"
             >
-              <CopyIcon size={14} />
+              <CopyIcon size={12} />
               复制
             </button>
           </div>

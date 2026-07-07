@@ -1,7 +1,5 @@
-import type { SheetChangeDelta } from "@openexcel/core";
 import type { useSessionWorkspace } from "@/features/session/useSessionWorkspace";
 import { ChatInterface } from "./ChatInterface";
-import type { WorkbookStructureUpdate } from "./hooks/useSheetPatchSync";
 import styles from "./ChatSidebar.module.css";
 
 type CurrentUser = {
@@ -12,8 +10,7 @@ type CurrentUser = {
 type SessionWorkspaceState = ReturnType<typeof useSessionWorkspace>;
 
 export function ChatSidebar({
-  onSheetChanged,
-  onWorkbookStructureChanged,
+  onWorkspaceRefresh,
   onAttachExcel,
   referenceCacheRevision,
   workspaceId,
@@ -22,8 +19,7 @@ export function ChatSidebar({
   style,
   sessionWorkspace,
 }: {
-  onSheetChanged?: (sheetId: number, delta: SheetChangeDelta | null) => void;
-  onWorkbookStructureChanged?: (update: WorkbookStructureUpdate) => void;
+  onWorkspaceRefresh?: () => Promise<void> | void;
   onAttachExcel: (file: File) => Promise<void> | void;
   referenceCacheRevision: number;
   workspaceId: number | null;
@@ -35,8 +31,7 @@ export function ChatSidebar({
   return (
     <div className={styles.sidebar} style={style}>
       <ChatInterface
-        onSheetChanged={onSheetChanged}
-        onWorkbookStructureChanged={onWorkbookStructureChanged}
+        onWorkspaceRefresh={onWorkspaceRefresh}
         onAttachExcel={onAttachExcel}
         referenceCacheRevision={referenceCacheRevision}
         workspaceId={workspaceId}
