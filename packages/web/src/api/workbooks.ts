@@ -173,3 +173,12 @@ export async function deleteSheet(workspaceId: number, workbookId: number, sheet
   });
   if (!res.ok) throw new Error(await readErrorMessage(res, "删除 Sheet 失败"));
 }
+
+export async function updateWorkbookName(workspaceId: number, workbookId: number, name: string): Promise<void> {
+  const res = await apiFetch(`/workspaces/${workspaceId}/workbooks/${workbookId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok) throw new Error(await readErrorMessage(res, "重命名失败"));
+}

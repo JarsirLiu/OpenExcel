@@ -10,6 +10,7 @@ import styles from "./WorkspaceView.module.css";
 
 type WorkbookMeta = {
   id: number;
+  publicId: string;
   name: string;
 };
 
@@ -33,6 +34,7 @@ type Props = {
   handleImportCancel: () => void;
   handleNewWorkbookFileChange: (file: File) => void;
   handleWorkbookDelete: (workbookId: number) => void;
+  handleWorkbookRename: (workbookId: number, newName: string) => Promise<void>;
   handleWorkbookStructureChanged: (update: WorkbookStructureUpdate) => void;
   handleWorkbookRefresh: () => Promise<void>;
 };
@@ -57,6 +59,7 @@ export function WorkspaceView({
   handleImportCancel,
   handleNewWorkbookFileChange,
   handleWorkbookDelete,
+  handleWorkbookRename,
   handleWorkbookStructureChanged,
   handleWorkbookRefresh,
 }: Props) {
@@ -69,13 +72,14 @@ export function WorkspaceView({
 
   return (
     <div className={styles.container}>
-      <WorkbookHeader
+<WorkbookHeader
         workbooks={workbooks}
         activeWorkbookIdx={workbookIdx}
         status={status}
         onSwitchWorkbook={handleSwitchWorkbook}
         onUploadClick={() => uploadInputRef.current?.click()}
         onUploadNewWorkbookClick={() => newWbInputRef.current?.click()}
+        onWorkbookRename={handleWorkbookRename}
       />
 
       <input

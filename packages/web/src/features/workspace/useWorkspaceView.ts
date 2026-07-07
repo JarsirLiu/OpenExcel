@@ -6,6 +6,7 @@ import {
   fetchWorkbook,
   fetchWorkbooks,
   uploadNewWorkbook,
+  updateWorkbookName,
 } from "@/api/workbooks";
 import type { WorkbookFull, WorkbookMeta } from "@/api/workbooks";
 import { patchWorkbookWithDelta } from "../workbook/utils/patchWorkbook";
@@ -211,6 +212,25 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
     }
   }, [invalidateReferenceCache, setStatus, setWorkbookIdx, setWorkbooks, workspaceId]);
 
+  const handleWorkbookRename = useCallback(async (workbookId: number, newName: string) => {
+    if (workspaceId == null) return;
+    setStatus("重命名中...");
+    try {
+      await updateWorkbookName(workspaceId, workbookId, newName);
+      const list = await fetchWorkbooks(workspaceId);
+      const safeList = Array.isArray(list) ? sortWorkbooks(list) : [];
+      setWorkbooks(safeList);
+      if (currentWorkbook?.id === workbookId) {
+        replaceCurrentWorkbook({ ...currentWorkbook, name: newName });
+      }
+      invalidateReferenceCache();
+      setStatus("已重命名");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "重命名失败";
+      setStatus(`重命名失败：${message}`);
+    }
+  }, [currentWorkbook, invalidateReferenceCache, replaceCurrentWorkbook, setStatus, setWorkbooks, workspaceId]);
+
   return {
     workbooks,
     workbookIdx,
@@ -233,6 +253,7 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
     handleImportCancel,
     handleNewWorkbookFileChange,
     handleWorkbookDelete,
+    handleWorkbookRename,
     handleCreateWorkbook,
     referenceCacheRevision,
   };

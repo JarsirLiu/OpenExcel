@@ -169,6 +169,7 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
           handleImportCancel={workbook.handleImportCancel}
           handleNewWorkbookFileChange={workbook.handleNewWorkbookFileChange}
           handleWorkbookDelete={workbook.handleWorkbookDelete}
+          handleWorkbookRename={workbook.handleWorkbookRename}
           handleWorkbookStructureChanged={workbook.handleWorkbookStructureChanged}
           handleWorkbookRefresh={workbook.handleWorkbookRefresh}
         />

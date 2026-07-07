@@ -112,3 +112,16 @@
 .statusOk {
   color: #22c55e;
 }
+
+.renameInput {
+  width: 100%;
+  min-width: 60px;
+  padding: 2px 4px;
+  font-size: 12px;
+  font-family: Georgia, "Times New Roman", serif;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-focus);
+  border-radius: 4px;
+  outline: none;
+  color: var(--text-primary);
+}
