@@ -38,14 +38,8 @@ export function WorkspaceSidebar({
   const rafRef = useRef<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Auto-expand the active workspace
-  const expandedSet = useMemo(() => {
-    const next = new Set(expandedWorkspaces);
-    if (activeWorkspaceId != null && workbooksMap.has(activeWorkspaceId)) {
-      next.add(activeWorkspaceId);
-    }
-    return next;
-  }, [expandedWorkspaces, activeWorkspaceId, workbooksMap]);
+  // No auto-expand — user controls expand/collapse manually.
+  const expandedSet = expandedWorkspaces;
 
   const toggleExpand = useCallback((id: number) => {
     const next = new Set(expandedWorkspaces);
