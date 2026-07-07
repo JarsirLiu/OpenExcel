@@ -61,6 +61,7 @@ type CompletedToolPart = {
   input?: unknown;
   args?: unknown;
   toolName?: unknown;
+  type?: unknown;
 };
 
 function isCompletedToolPart(part: unknown): part is CompletedToolPart {
@@ -68,6 +69,18 @@ function isCompletedToolPart(part: unknown): part is CompletedToolPart {
   return typeof part.toolCallId === "string"
     && part.state === "output-available"
     && "output" in part;
+}
+
+function getToolName(part: CompletedToolPart): string {
+  // ai-sdk v7 static tool: type is "tool-${name}" (e.g. "tool-createSheet")
+  if (typeof part.type === "string" && part.type.startsWith("tool-")) {
+    return part.type.slice("tool-".length);
+  }
+  // ai-sdk v7 dynamic tool or legacy v4 format
+  if (typeof part.toolName === "string") {
+    return part.toolName;
+  }
+  return "";
 }
 
 export function collectSheetPatchUpdates(
@@ -151,7 +164,7 @@ export function collectWorkbookStructureUpdates(
       if (!isCompletedToolPart(part)) continue;
       if (seenToolCallIds.has(part.toolCallId)) continue;
 
-      const toolName = typeof part.toolName === "string" ? part.toolName : "";
+      const toolName = getToolName(part);
       const input = getToolInput(part);
 
       if (toolName === "createWorkbook" && isWorkbookCreatedOutput(part.output)) {

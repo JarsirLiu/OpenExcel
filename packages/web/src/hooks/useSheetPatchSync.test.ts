@@ -171,6 +171,44 @@ describe("collectWorkbookStructureUpdates", () => {
     ]);
   });
 
+  it("detects createSheet with ai-sdk v7 static tool format (type: tool-{name})", () => {
+    const messages = [
+      {
+        role: "assistant",
+        parts: [
+          {
+            toolCallId: "tool-8",
+            type: "tool-createSheet",
+            state: "output-available",
+            input: { workbookId: 21 },
+            output: {
+              workbookId: 21,
+              id: 91,
+              sheetNo: 3,
+              name: "NewSheet",
+              order: 2,
+            },
+          },
+        ],
+      },
+    ];
+
+    const updates = collectWorkbookStructureUpdates(messages, new Set());
+
+    expect(updates).toEqual([
+      {
+        toolCallId: "tool-8",
+        kind: "sheet-created",
+        workbookId: 21,
+        sheetId: 91,
+        sheetNo: 3,
+        sheetName: "NewSheet",
+        order: 2,
+        sourceSheetId: null,
+      },
+    ]);
+  });
+
   it("skips malformed structure outputs", () => {
     const messages = [
       {
