@@ -60,12 +60,14 @@ const router = createHashRouter([
     element: <Outlet />,
     errorElement: <RouteErrorBoundary />,
     loader: protectedLoader,
+    hydrateFallbackElement: null,
     children: [
       {
         id: "workspace-route",
         path: "workspaces/:workspacePublicId",
         element: <App />,
         loader: workspaceLoader,
+        hydrateFallbackElement: null,
       },
       {
         path: "*",

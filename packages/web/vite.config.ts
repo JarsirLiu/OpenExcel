@@ -3,7 +3,18 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    {
+      name: "mock-stream",
+      resolveId(id) {
+        if (id === "stream") return "\0stream";
+      },
+      load(id) {
+        if (id === "\0stream") return "export default {};";
+      },
+    },
+  ],
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
