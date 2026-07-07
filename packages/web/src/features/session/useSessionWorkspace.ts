@@ -56,9 +56,10 @@ export function useSessionWorkspace(
   const [loadingMore, setLoadingMore] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
-  const [draftPendingText, setDraftPendingText] = useState<string | null>(null);
   const loadedOffsetRef = useRef(initial?.messages?.length ?? 0);
   const messagesSeededRef = useRef(!!initial?.messages);
+  const pendingDraftSessionIdRef = useRef<number | null>(null);
+  const pendingDraftRef = useRef<{ sessionId: number; text: string } | null>(null);
 
   useEffect(() => {
     if (!initial) return;
@@ -81,6 +82,8 @@ export function useSessionWorkspace(
 
   useEffect(() => {
     if (workspaceId == null) {
+      pendingDraftSessionIdRef.current = null;
+      pendingDraftRef.current = null;
       setSessions([]);
       setCurrentSessionId(null);
       setMessages([]);
@@ -88,6 +91,8 @@ export function useSessionWorkspace(
       loadedOffsetRef.current = 0;
       setInitialLoaded(true);
     } else if (prevWorkspaceIdRef.current != null && prevWorkspaceIdRef.current !== workspaceId) {
+      pendingDraftSessionIdRef.current = null;
+      pendingDraftRef.current = null;
       setCurrentSessionId(null);
       setMessages([]);
       setMessageTotal(0);
@@ -120,6 +125,14 @@ export function useSessionWorkspace(
   useEffect(() => {
     if (messagesSeededRef.current) {
       messagesSeededRef.current = false;
+      return;
+    }
+
+    if (currentSessionId != null && pendingDraftSessionIdRef.current === currentSessionId) {
+      setMessages([]);
+      setMessageTotal(0);
+      loadedOffsetRef.current = 0;
+      setInitialLoaded(true);
       return;
     }
 
@@ -184,31 +197,44 @@ export function useSessionWorkspace(
   }, [currentSessionId, workspaceId]);
 
   const handleSendInDraft = useCallback(async (text: string) => {
-    setDraftPendingText(text);
     if (workspaceId == null) throw new Error("No workspace");
     const session = await createSession(workspaceId);
+    pendingDraftRef.current = { sessionId: session.id, text };
+    pendingDraftSessionIdRef.current = session.id;
     setCurrentSessionId(session.id);
     setSessions((prev) => [session, ...prev]);
     return session.id;
   }, [workspaceId]);
 
-  const clearDraftPendingText = useCallback(() => {
-    setDraftPendingText(null);
+  const claimPendingDraftText = useCallback((sessionId: number) => {
+    const pendingDraft = pendingDraftRef.current;
+    if (!pendingDraft || pendingDraft.sessionId !== sessionId) {
+      return null;
+    }
+
+    pendingDraftRef.current = null;
+    return pendingDraft.text;
   }, []);
 
   const handleNewSession = useCallback(() => {
+    pendingDraftSessionIdRef.current = null;
+    pendingDraftRef.current = null;
     setCurrentSessionId(null);
     setMessages([]);
     setMessageTotal(0);
     setInitialLoaded(true);
     setHistoryOpen(false);
-    setDraftPendingText(null);
   }, []);
 
   const handleSelectSession = useCallback((id: number) => {
+    if (pendingDraftSessionIdRef.current !== id) {
+      pendingDraftSessionIdRef.current = null;
+    }
+    if (pendingDraftRef.current?.sessionId !== id) {
+      pendingDraftRef.current = null;
+    }
     setCurrentSessionId(id);
     setHistoryOpen(false);
-    setDraftPendingText(null);
   }, []);
 
   const handleDeleteSession = useCallback(async (id: number) => {
@@ -218,6 +244,10 @@ export function useSessionWorkspace(
   }, [refreshSessions, workspaceId]);
 
   const handleRunComplete = useCallback(async (sessionId: number, finishedMessages: any[]) => {
+    if (pendingDraftSessionIdRef.current === sessionId) {
+      pendingDraftSessionIdRef.current = null;
+    }
+
     const firstUserText = getFirstUserText(finishedMessages).trim();
     try {
       if (firstUserText) {
@@ -259,8 +289,7 @@ export function useSessionWorkspace(
     ensureSession,
     loadMoreMessages,
     handleSendInDraft,
-    draftPendingText,
-    clearDraftPendingText,
+    claimPendingDraftText,
     handleRunComplete,
     handleNewSession,
     handleSelectSession,

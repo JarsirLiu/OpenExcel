@@ -24,8 +24,7 @@ type Props = {
   isStreaming: boolean;
   setIsStreaming: (next: boolean) => void;
   handleSendInDraft: (text: string) => Promise<number>;
-  draftPendingText: string | null;
-  clearDraftPendingText: () => void;
+  claimPendingDraftText: (sessionId: number) => string | null;
   handleRunComplete: (sessionId: number, messages: any[]) => Promise<void>;
   handleNewSession: () => void;
   handleSelectSession: (id: number) => void;
@@ -52,8 +51,7 @@ export function SessionShell({
   isStreaming,
   setIsStreaming,
   handleSendInDraft,
-  draftPendingText,
-  clearDraftPendingText,
+  claimPendingDraftText,
   handleRunComplete,
   handleNewSession,
   handleSelectSession,
@@ -121,8 +119,7 @@ export function SessionShell({
           messages={messages}
           messageTotal={messageTotal}
           onSendInDraft={handleSendInDraft}
-          draftPendingText={draftPendingText}
-          onDraftSent={clearDraftPendingText}
+          claimPendingDraftText={claimPendingDraftText}
           onRunComplete={handleRunComplete}
           onWorkspaceRefresh={onWorkspaceRefresh}
           onStreamingChange={setIsStreaming}

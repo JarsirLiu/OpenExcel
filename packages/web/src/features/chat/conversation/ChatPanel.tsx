@@ -12,8 +12,7 @@ export function ChatPanel({
   messages: parentMessages,
   messageTotal,
   onSendInDraft,
-  draftPendingText,
-  onDraftSent,
+  claimPendingDraftText,
   onRunComplete,
   onWorkspaceRefresh,
   onStreamingChange,
@@ -28,8 +27,7 @@ export function ChatPanel({
   messages: any[];
   messageTotal: number;
   onSendInDraft: (text: string) => Promise<number>;
-  draftPendingText: string | null;
-  onDraftSent: () => void;
+  claimPendingDraftText: (sessionId: number) => string | null;
   onRunComplete?: (sessionId: number, messages: any[]) => Promise<void> | void;
   onWorkspaceRefresh?: () => Promise<void> | void;
   onStreamingChange?: (isStreaming: boolean) => void;
@@ -60,8 +58,7 @@ export function ChatPanel({
     workspaceId={workspaceId}
     parentMessages={parentMessages}
     messageTotal={messageTotal}
-    draftPendingText={draftPendingText}
-    onDraftSent={onDraftSent}
+    claimPendingDraftText={claimPendingDraftText}
     onRunComplete={onRunComplete}
     onWorkspaceRefresh={onWorkspaceRefresh}
     onStreamingChange={onStreamingChange}
@@ -78,8 +75,7 @@ function RealChat({
   workspaceId,
   parentMessages,
   messageTotal,
-  draftPendingText,
-  onDraftSent,
+  claimPendingDraftText,
   onRunComplete,
   onWorkspaceRefresh,
   onStreamingChange,
@@ -93,8 +89,7 @@ function RealChat({
   workspaceId: number;
   parentMessages: any[];
   messageTotal: number;
-  draftPendingText: string | null;
-  onDraftSent: () => void;
+  claimPendingDraftText: (sessionId: number) => string | null;
   onRunComplete?: (sessionId: number, messages: any[]) => Promise<void> | void;
   onWorkspaceRefresh?: () => Promise<void> | void;
   onStreamingChange?: (isStreaming: boolean) => void;
@@ -151,11 +146,11 @@ function RealChat({
   }, [onUndo, isUndoing, onUndoComplete]);
 
   useEffect(() => {
-    if (draftPendingText) {
-      sendMessage(draftPendingText);
-      onDraftSent();
+    const pendingDraftText = claimPendingDraftText(sessionId);
+    if (pendingDraftText) {
+      sendMessage(pendingDraftText);
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [claimPendingDraftText, sendMessage, sessionId]);
 
   const handleScroll = useCallback(() => {
     const el = document.querySelector(`.${msgStyles.messageList}`) as HTMLElement | null;
