@@ -35,7 +35,7 @@ export function SheetPreview({ preview, changedCells }: { preview: PreviewData; 
       <div style={{ fontSize: 12, fontWeight: 600, color: "var(--muted-foreground)", marginBottom: 4 }}>
         {preview.sheetName} — 变更区域
       </div>
-      <div style={{ overflowX: "auto" }}>
+      <div style={{ overflowX: "auto", maxHeight: 300, overflowY: "auto" }}>
         <table
           style={{
             borderCollapse: "collapse",

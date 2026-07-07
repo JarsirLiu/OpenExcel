@@ -6,10 +6,10 @@ import { useSessionWorkspace } from "@/features/session/useSessionWorkspace";
 import { useWorkspaceState } from "@/features/workspace/useWorkspaceState";
 import { WorkspaceSidebar } from "@/features/workspace/WorkspaceSidebar";
 import { useUrlSync } from "./useUrlSync";
+import { useSheetActivation } from "@/features/workbook/editor/SheetActivationContext";
 import type { Workspace } from "@/api/workspaces";
 import type { WorkbookMeta, WorkbookFull } from "@/api/workbooks";
 import type { Session } from "@/api/sessions";
-import type { WorkbookMeta as WorkbookMetaType } from "@/api/workbooks";
 import styles from "./Workbench.module.css";
 
 type CurrentUser = { email: string; displayName: string };
@@ -73,6 +73,7 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
   }, [workbook.handleWorkbookDelete, refreshWorkbooks, workspaces]);
 
   const pendingWorkbookSwitch = useRef<number | null>(null);
+  const { activateSheetByIndex } = useSheetActivation();
 
   const handleWorkbookSelect = useCallback((workspaceId: number, workbookId: number) => {
     if (workspaceId !== activeWorkspaceId) {
@@ -95,6 +96,15 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
       void workbook.handleSwitchWorkbook(idx);
     }
   }, [activeWorkspaceId, workbook.workbooks, workbook]);
+
+  const handleNavigateSheet = useCallback((sheetId: number) => {
+    if (!workbook.currentWorkbook) return;
+    const idx = workbook.currentWorkbook.sheets.findIndex((s: any) => s.id === sheetId);
+    if (idx >= 0) {
+      workbook.setCurrentSheetIndex(idx);
+      activateSheetByIndex(idx);
+    }
+  }, [workbook.currentWorkbook, workbook.setCurrentSheetIndex, activateSheetByIndex]);
 
   const handleResizeMouseDown = useCallback(
     (e: React.MouseEvent) => {
@@ -187,6 +197,7 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
         onLogout={onLogout}
         style={{ width: sidebarWidth }}
         sessionWorkspace={session}
+        onNavigateSheet={handleNavigateSheet}
       />
     </div>
   );

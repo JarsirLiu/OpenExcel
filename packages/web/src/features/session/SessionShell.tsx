@@ -36,6 +36,7 @@ type Props = {
   referenceCacheRevision: number;
   currentUser: CurrentUser;
   onLogout: () => void;
+  onNavigateSheet?: (sheetId: number) => void;
 };
 
 export function SessionShell({
@@ -63,6 +64,7 @@ export function SessionShell({
   referenceCacheRevision,
   currentUser,
   onLogout,
+  onNavigateSheet,
 }: Props) {
   const historyRef = useRef<HTMLDivElement>(null);
 
@@ -127,6 +129,7 @@ export function SessionShell({
           onAttachExcel={onAttachExcel}
           referenceCacheRevision={referenceCacheRevision}
           onUndoComplete={handleUndoComplete}
+          onNavigateSheet={onNavigateSheet}
         />
       ) : (
         <div className={styles.emptyState}>{t("loading", "加载中...")}</div>

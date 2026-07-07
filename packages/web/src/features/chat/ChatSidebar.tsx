@@ -18,6 +18,7 @@ export function ChatSidebar({
   onLogout,
   style,
   sessionWorkspace,
+  onNavigateSheet,
 }: {
   onWorkspaceRefresh?: () => Promise<void> | void;
   onAttachExcel: (file: File) => Promise<void> | void;
@@ -27,6 +28,7 @@ export function ChatSidebar({
   onLogout: () => void;
   style?: React.CSSProperties;
   sessionWorkspace: SessionWorkspaceState;
+  onNavigateSheet?: (sheetId: number) => void;
 }) {
   return (
     <div className={styles.sidebar} style={style}>
@@ -38,6 +40,7 @@ export function ChatSidebar({
         currentUser={currentUser}
         onLogout={onLogout}
         sessionWorkspace={sessionWorkspace}
+        onNavigateSheet={onNavigateSheet}
       />
     </div>
   );

@@ -16,6 +16,7 @@ export function ChatInterface({
   currentUser,
   onLogout,
   sessionWorkspace,
+  onNavigateSheet,
 }: {
   onWorkspaceRefresh?: () => Promise<void> | void;
   onAttachExcel: (file: File) => Promise<void> | void;
@@ -24,6 +25,7 @@ export function ChatInterface({
   currentUser: CurrentUser;
   onLogout: () => void;
   sessionWorkspace: SessionWorkspaceState;
+  onNavigateSheet?: (sheetId: number) => void;
 }) {
   return (
     <SessionShell
@@ -34,6 +36,7 @@ export function ChatInterface({
       onAttachExcel={onAttachExcel}
       currentUser={currentUser}
       onLogout={onLogout}
+      onNavigateSheet={onNavigateSheet}
     />
   );
 }

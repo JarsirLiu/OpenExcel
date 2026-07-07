@@ -7,6 +7,7 @@ import { confirm } from "@/shared/lib";
 import { useWorkbookEditorSession } from "./useWorkbookEditorSession";
 import { toFortuneSheetData } from "./fortuneSheet";
 import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatchSync";
+import { useSheetActivation } from "./SheetActivationContext";
 
 type UseExcelGridWorkspaceProps = {
   workspaceId: number | null;
@@ -35,6 +36,7 @@ export function useExcelGridWorkspace({
   const lastSavedSnapshotRef = useRef<Record<number, string>>({});
   const workbookRef = useRef<WorkbookInstance>(null);
   const { sheetData, sessionKey } = useWorkbookEditorSession(workbook, workbookRevision);
+  const { registerActivateSheet } = useSheetActivation();
 
   const getSnapshot = useCallback((celldata: any[], config: any) => {
     return JSON.stringify({ celldata, config });
@@ -51,6 +53,14 @@ export function useExcelGridWorkspace({
 
     lastSavedSnapshotRef.current = nextSnapshots;
   }, [workbook, getSnapshot]);
+
+  useEffect(() => {
+    if (!workbookRef.current) return;
+    registerActivateSheet((index: number) => {
+      workbookRef.current?.activateSheet({ index });
+    });
+    return () => registerActivateSheet(null);
+  }, [registerActivateSheet]);
 
   useEffect(() => {
     return () => {

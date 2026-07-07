@@ -21,6 +21,7 @@ export function ChatPanel({
   referenceCacheRevision,
   onRegenerate,
   onUndoComplete,
+  onNavigateSheet,
 }: {
   sessionId: number | null;
   workspaceId: number;
@@ -36,6 +37,7 @@ export function ChatPanel({
   referenceCacheRevision: number;
   onRegenerate?: () => void;
   onUndoComplete?: () => Promise<void> | void;
+  onNavigateSheet?: (sheetId: number) => void;
 }) {
   if (sessionId == null) {
     return (
@@ -67,6 +69,7 @@ export function ChatPanel({
     referenceCacheRevision={referenceCacheRevision}
     onRegenerate={onRegenerate}
     onUndoComplete={onUndoComplete}
+    onNavigateSheet={onNavigateSheet}
   />;
 }
 
@@ -84,6 +87,7 @@ function RealChat({
   referenceCacheRevision,
   onRegenerate,
   onUndoComplete,
+  onNavigateSheet,
 }: {
   sessionId: number;
   workspaceId: number;
@@ -98,6 +102,7 @@ function RealChat({
   referenceCacheRevision: number;
   onRegenerate?: () => void;
   onUndoComplete?: () => Promise<void> | void;
+  onNavigateSheet?: (sheetId: number) => void;
 }) {
   const { messages, error, isStreaming, loadingOlder, hasOlder, sendMessage, stop, loadOlderMessages, onUndo } = useChatConversation({
     sessionId,
@@ -185,6 +190,7 @@ function RealChat({
         hasOlder={hasOlder}
         onLoadOlder={loadOlderMessages}
         onScroll={handleScroll}
+        onNavigateSheet={onNavigateSheet}
       />
 
       {error && (
