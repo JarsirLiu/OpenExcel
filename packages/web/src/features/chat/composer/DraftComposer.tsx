@@ -1,15 +1,15 @@
 import { ChatComposer } from "@/features/chat/composer/ChatComposer";
 import { MessageList } from "@/features/chat/message/MessageList";
+import { useSessionInfra } from "@/features/session/SessionShellContext";
 import styles from "./DraftComposer.module.css";
 
 type Props = {
-  workspaceId: number;
   onSend: (text: string) => Promise<number>;
-  onAttachExcel: (file: File) => Promise<void> | void;
-  referenceCacheRevision: number;
 };
 
-export function DraftComposer({ workspaceId, onSend, onAttachExcel, referenceCacheRevision }: Props) {
+export function DraftComposer({ onSend }: Props) {
+  const { workspaceId, onAttachExcel, referenceCacheRevision } = useSessionInfra();
+
   return (
     <div className={styles.container}>
       <MessageList messages={[]} isStreaming={false} />

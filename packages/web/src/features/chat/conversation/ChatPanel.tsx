@@ -2,35 +2,24 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ChatComposer, type ChatComposerHandle } from "@/features/chat/composer/ChatComposer";
 import { MessageList } from "@/features/chat/message/MessageList";
 import { useChatConversation } from "@/features/chat/hooks/useChatConversation";
+import { useSessionInfra } from "@/features/session/SessionShellContext";
 import { t } from "@/lib/i18n";
 import styles from "./ChatPanel.module.css";
 import msgStyles from "@/features/chat/message/MessageList.module.css";
 
 export function ChatPanel({
   sessionId,
-  workspaceId,
   pendingDraftTextRef,
   onRunComplete,
-  onWorkspaceRefresh,
-  onAttachExcel,
-  referenceCacheRevision,
   onRegenerate,
-  onUndoComplete,
-  onNavigateSheet,
-  initialMessages,
 }: {
   sessionId: number;
-  workspaceId: number;
   pendingDraftTextRef: React.MutableRefObject<{ [sessionId: number]: string }>;
   onRunComplete?: (sessionId: number, messages: any[]) => Promise<void> | void;
-  onWorkspaceRefresh?: () => Promise<void> | void;
-  onAttachExcel: (file: File) => Promise<void> | void;
-  referenceCacheRevision: number;
   onRegenerate?: () => void;
-  onUndoComplete?: () => Promise<void> | void;
-  onNavigateSheet?: (sheetId: number) => void;
-  initialMessages?: unknown[];
 }) {
+  const { workspaceId, initialMessages, onWorkspaceRefresh, onUndoComplete, onAttachExcel, referenceCacheRevision, onNavigateSheet } = useSessionInfra();
+
   const { messages, error, isStreaming, loadingOlder, hasOlder, sendMessage, stop, loadOlderMessages, onUndo } = useChatConversation({
     sessionId,
     workspaceId,

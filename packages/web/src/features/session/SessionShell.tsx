@@ -3,6 +3,7 @@ import { ChatPanel } from "@/features/chat/conversation/ChatPanel";
 import { DraftComposer } from "@/features/chat/composer/DraftComposer";
 import { SessionHeader } from "./components/SessionHeader";
 import { SessionHistoryPopover } from "./components/SessionHistoryPopover";
+import { SessionShellProvider } from "./SessionShellContext";
 import type { Session } from "@/api/sessions";
 import { t } from "@/lib/i18n";
 import styles from "./SessionShell.module.css";
@@ -86,49 +87,39 @@ export function SessionShell({
   }
 
   return (
-    <div className={styles.container}>
-      <SessionHeader
-        sessionName={currentSession?.name ?? t("ai_chat", "AI 对话")}
-        currentSessionId={currentSessionId}
-        onToggleHistory={() => setHistoryOpen(!historyOpen)}
-        onNewSession={() => void handleNewSession()}
-        currentUser={currentUser}
-        onLogout={onLogout}
-      />
+    <SessionShellProvider value={{ workspaceId, onAttachExcel, referenceCacheRevision, onWorkspaceRefresh, onUndoComplete: handleUndoComplete, onNavigateSheet, initialMessages }}>
+      <div className={styles.container}>
+        <SessionHeader
+          sessionName={currentSession?.name ?? t("ai_chat", "AI 对话")}
+          currentSessionId={currentSessionId}
+          onToggleHistory={() => setHistoryOpen(!historyOpen)}
+          onNewSession={() => void handleNewSession()}
+          currentUser={currentUser}
+          onLogout={onLogout}
+        />
 
-      {historyOpen && (
-        <div ref={historyRef} className={styles.historyPanel}>
-          <SessionHistoryPopover
-            sessions={sessions}
-            currentSessionId={currentSessionId}
-            onSelectSession={handleSelectSession}
-            onDeleteSession={(id) => void handleDeleteSession(id)}
+        {historyOpen && (
+          <div ref={historyRef} className={styles.historyPanel}>
+            <SessionHistoryPopover
+              sessions={sessions}
+              currentSessionId={currentSessionId}
+              onSelectSession={handleSelectSession}
+              onDeleteSession={(id) => void handleDeleteSession(id)}
+            />
+          </div>
+        )}
+
+        {currentSessionId != null ? (
+          <ChatPanel
+            key={currentSessionId}
+            sessionId={currentSessionId}
+            pendingDraftTextRef={pendingDraftTextRef}
+            onRunComplete={handleRunComplete}
           />
-        </div>
-      )}
-
-      {currentSessionId != null ? (
-        <ChatPanel
-          key={currentSessionId}
-          workspaceId={workspaceId}
-          sessionId={currentSessionId}
-          pendingDraftTextRef={pendingDraftTextRef}
-          onRunComplete={handleRunComplete}
-          onWorkspaceRefresh={onWorkspaceRefresh}
-          onAttachExcel={onAttachExcel}
-          referenceCacheRevision={referenceCacheRevision}
-          onUndoComplete={handleUndoComplete}
-          onNavigateSheet={onNavigateSheet}
-          initialMessages={initialMessages}
-        />
-      ) : (
-        <DraftComposer
-          workspaceId={workspaceId}
-          onSend={handleDraftSend}
-          onAttachExcel={onAttachExcel}
-          referenceCacheRevision={referenceCacheRevision}
-        />
-      )}
-    </div>
+        ) : (
+          <DraftComposer onSend={handleDraftSend} />
+        )}
+      </div>
+    </SessionShellProvider>
   );
 }
