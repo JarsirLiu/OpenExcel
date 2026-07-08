@@ -1,7 +1,9 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { ChatPanel } from "@/features/chat/conversation/ChatPanel";
+import { DraftComposer } from "@/features/chat/composer/DraftComposer";
 import { SessionHeader } from "./components/SessionHeader";
 import { SessionHistoryPopover } from "./components/SessionHistoryPopover";
+import { SessionShellProvider } from "./SessionShellContext";
 import type { Session } from "@/api/sessions";
 import { t } from "@/lib/i18n";
 import styles from "./SessionShell.module.css";
@@ -15,17 +17,9 @@ type Props = {
   workspaceId: number | null;
   sessions: Session[];
   currentSessionId: number | null;
-  messages: any[];
-  messageTotal: number;
-  initialLoaded: boolean;
-  loadingMore: boolean;
   historyOpen: boolean;
   setHistoryOpen: (next: boolean) => void;
-  isStreaming: boolean;
-  setIsStreaming: (next: boolean) => void;
   handleSendInDraft: (text: string) => Promise<number>;
-  draftPendingText: string | null;
-  clearDraftPendingText: () => void;
   handleRunComplete: (sessionId: number, messages: any[]) => Promise<void>;
   handleNewSession: () => void;
   handleSelectSession: (id: number) => void;
@@ -36,23 +30,17 @@ type Props = {
   referenceCacheRevision: number;
   currentUser: CurrentUser;
   onLogout: () => void;
+  onNavigateSheet?: (sheetId: number) => void;
+  initialMessages?: unknown[];
 };
 
 export function SessionShell({
   workspaceId,
   sessions,
   currentSessionId,
-  messages,
-  messageTotal,
-  initialLoaded,
-  loadingMore,
   historyOpen,
   setHistoryOpen,
-  isStreaming,
-  setIsStreaming,
   handleSendInDraft,
-  draftPendingText,
-  clearDraftPendingText,
   handleRunComplete,
   handleNewSession,
   handleSelectSession,
@@ -63,8 +51,11 @@ export function SessionShell({
   referenceCacheRevision,
   currentUser,
   onLogout,
+  onNavigateSheet,
+  initialMessages,
 }: Props) {
   const historyRef = useRef<HTMLDivElement>(null);
+  const pendingDraftTextRef = useRef<{ [sessionId: number]: string }>({});
 
   useEffect(() => {
     if (!historyOpen) return;
@@ -76,6 +67,12 @@ export function SessionShell({
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [historyOpen, setHistoryOpen]);
+
+  const handleDraftSend = useCallback(async (text: string) => {
+    const newId = await handleSendInDraft(text);
+    pendingDraftTextRef.current[newId] = text;
+    return newId;
+  }, [handleSendInDraft]);
 
   const currentSession = currentSessionId != null
     ? sessions.find((session) => session.id === currentSessionId)
@@ -90,47 +87,39 @@ export function SessionShell({
   }
 
   return (
-    <div className={styles.container}>
-      <SessionHeader
-        sessionName={currentSession?.name ?? t("ai_chat", "AI 对话")}
-        currentSessionId={currentSessionId}
-        onToggleHistory={() => setHistoryOpen(!historyOpen)}
-        onNewSession={() => void handleNewSession()}
-        currentUser={currentUser}
-        onLogout={onLogout}
-      />
-
-      {historyOpen && (
-        <div ref={historyRef} className={styles.historyPanel}>
-          <SessionHistoryPopover
-            sessions={sessions}
-            currentSessionId={currentSessionId}
-            onSelectSession={handleSelectSession}
-            onDeleteSession={(id) => void handleDeleteSession(id)}
-          />
-        </div>
-      )}
-
-      {initialLoaded ? (
-        <ChatPanel
-          key={currentSessionId ?? "draft"}
-          workspaceId={workspaceId}
-          sessionId={currentSessionId}
-          messages={messages}
-          messageTotal={messageTotal}
-          onSendInDraft={handleSendInDraft}
-          draftPendingText={draftPendingText}
-          onDraftSent={clearDraftPendingText}
-          onRunComplete={handleRunComplete}
-          onWorkspaceRefresh={onWorkspaceRefresh}
-          onStreamingChange={setIsStreaming}
-          onAttachExcel={onAttachExcel}
-          referenceCacheRevision={referenceCacheRevision}
-          onUndoComplete={handleUndoComplete}
+    <SessionShellProvider value={{ workspaceId, onAttachExcel, referenceCacheRevision, onWorkspaceRefresh, onUndoComplete: handleUndoComplete, onNavigateSheet, initialMessages }}>
+      <div className={styles.container}>
+        <SessionHeader
+          sessionName={currentSession?.name ?? t("ai_chat", "AI 对话")}
+          currentSessionId={currentSessionId}
+          onToggleHistory={() => setHistoryOpen(!historyOpen)}
+          onNewSession={() => void handleNewSession()}
+          currentUser={currentUser}
+          onLogout={onLogout}
         />
-      ) : (
-        <div className={styles.emptyState}>{t("loading", "加载中...")}</div>
-      )}
-    </div>
+
+        {historyOpen && (
+          <div ref={historyRef} className={styles.historyPanel}>
+            <SessionHistoryPopover
+              sessions={sessions}
+              currentSessionId={currentSessionId}
+              onSelectSession={handleSelectSession}
+              onDeleteSession={(id) => void handleDeleteSession(id)}
+            />
+          </div>
+        )}
+
+        {currentSessionId != null ? (
+          <ChatPanel
+            key={currentSessionId}
+            sessionId={currentSessionId}
+            pendingDraftTextRef={pendingDraftTextRef}
+            onRunComplete={handleRunComplete}
+          />
+        ) : (
+          <DraftComposer onSend={handleDraftSend} />
+        )}
+      </div>
+    </SessionShellProvider>
   );
 }

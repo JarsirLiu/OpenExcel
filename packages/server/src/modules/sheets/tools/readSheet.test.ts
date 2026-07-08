@@ -136,8 +136,8 @@ describe("readSheet", () => {
       expect(result.startCol).toBe(2);
       expect(result.endCol).toBe(3);
       expect(result.data.length).toBe(2);
-      expect(result.data[0]).toEqual({ row: 1, col: 1, value: "y" });
-      expect(result.data[1]).toEqual({ row: 1, col: 2, value: "z" });
+      expect(result.data[0]).toEqual({ row: 1, col: 2, value: "y" });
+      expect(result.data[1]).toEqual({ row: 1, col: 3, value: "z" });
       expect(result.hasMoreCols).toBe(false);
     });
   });
@@ -167,8 +167,8 @@ describe("readSheet", () => {
       expect(result.hasFirstRowAsHeader).toBe(true);
       expect(result.headers).toEqual(["Name", "Score"]);
       expect(result.columnTypes).toEqual(["string", "number"]);
-      expect(result.columnStats).toHaveProperty("1");
-      expect(result.columnStats["1"]).toEqual({
+      expect(result.columnStats).toHaveProperty("2");
+      expect(result.columnStats["2"]).toEqual({
         min: 87,
         max: 95,
         avg: 91,

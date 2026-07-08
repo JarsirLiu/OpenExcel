@@ -7,6 +7,7 @@ import { clearSessionStorage } from "@/shared/utils/storage";
 import { ConfirmDialog } from "@/shared/ui";
 import { t } from "@/lib/i18n";
 import type { RouteData } from "@/app/Workbench";
+import { SheetActivationProvider } from "@/features/workbook/editor/SheetActivationContext";
 
 const Workbench = lazy(() =>
   import("@/app/Workbench").then((module) => ({ default: module.Workbench }))
@@ -76,7 +77,9 @@ function WorkbenchPage() {
   return (
     <>
       <Suspense fallback={<LoadingScreen />}>
-        <Workbench currentUser={user} onLogout={() => void handleLogout()} routeData={routeData} />
+        <SheetActivationProvider>
+          <Workbench currentUser={user} onLogout={() => void handleLogout()} routeData={routeData} />
+        </SheetActivationProvider>
       </Suspense>
       <ConfirmDialog />
     </>

@@ -12,6 +12,7 @@ export function MessageList({
   hasOlder,
   onLoadOlder,
   onScroll,
+  onNavigateSheet,
 }: {
   messages: any[];
   isStreaming: boolean;
@@ -22,6 +23,7 @@ export function MessageList({
   hasOlder?: boolean;
   onLoadOlder?: () => void;
   onScroll?: () => void;
+  onNavigateSheet?: (sheetId: number) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -79,7 +81,7 @@ export function MessageList({
       )}
       {messages.map((msg: any, idx: number) => (
         <MessageItem
-          key={msg.id ?? idx}
+          key={msg.id || idx}
           msg={msg}
           isStreaming={isStreaming}
           isLastAssistantMessage={!isStreaming && msg.role === "assistant" && msg.id === lastAssistantMsg?.id}
@@ -87,6 +89,7 @@ export function MessageList({
           onRegenerate={onRegenerate}
           onUndo={onUndo}
           isUndoing={isUndoing}
+          onNavigateSheet={onNavigateSheet}
         />
       ))}
       <div ref={messagesEndRef} />

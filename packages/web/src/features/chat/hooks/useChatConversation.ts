@@ -43,26 +43,26 @@ export function useChatConversation({
   sessionId,
   workspaceId,
   initialMessages,
-  messageTotal,
   onRunComplete,
   onWorkspaceRefresh,
   onStreamingChange,
 }: {
   sessionId: number;
   workspaceId: number;
-  initialMessages: any[];
-  messageTotal: number;
+  initialMessages?: any[];
   onRunComplete?: (messages: any[]) => Promise<void> | void;
   onWorkspaceRefresh?: () => Promise<void> | void;
   onStreamingChange?: (isStreaming: boolean) => void;
 }) {
-  const messagesRef = useRef<any[]>(initialMessages);
+  const messagesRef = useRef<any[]>(initialMessages ?? []);
   const [loadingOlder, setLoadingOlder] = useState(false);
-  const [hasOlder, setHasOlder] = useState(true);
+  const [hasOlder, setHasOlder] = useState(false);
+  const [initialLoaded, setInitialLoaded] = useState(!!initialMessages);
   const seenWorkbookMutationToolCallIdsRef = useRef<Set<string>>(new Set());
   const hasPrimedWorkbookMutationHistoryRef = useRef(false);
   const pendingWorkspaceRefreshRef = useRef(false);
   const wasStreamingRef = useRef(false);
+  const loadedOffsetRef = useRef(initialMessages?.length ?? 0);
 
   const transport = useMemo(() => new DefaultChatTransport({
     api: `/api/workspaces/${workspaceId}/sessions/${sessionId}/chat`,
@@ -70,7 +70,7 @@ export function useChatConversation({
 
   const { messages, setMessages, sendMessage, status, stop, error } = useChat({
     id: String(sessionId),
-    messages: initialMessages,
+    messages: initialMessages ?? [],
     transport,
     onFinish: ({ isAbort, isError, messages: finishedMessages }) => {
       if (isAbort || isError) return;
@@ -80,9 +80,37 @@ export function useChatConversation({
 
   messagesRef.current = messages;
 
+  // Load initial messages when switching to a session (not from route loader)
   useEffect(() => {
-    setHasOlder(initialMessages.length < messageTotal);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    if (initialMessages != null) return;
+
+    let cancelled = false;
+    setInitialLoaded(false);
+    setHasOlder(false);
+    loadedOffsetRef.current = 0;
+
+    const loadInitialMessages = async () => {
+      try {
+        const { messages: msgs, total } = await fetchChatMessages(workspaceId, sessionId, PAGE_SIZE, 0);
+        if (!cancelled) {
+          setMessages(msgs);
+          loadedOffsetRef.current = msgs.length;
+          setHasOlder(msgs.length < total);
+          setInitialLoaded(true);
+        }
+      } catch {
+        // Expected: session invalidated by workspace switch
+        if (!cancelled) {
+          setInitialLoaded(true);
+        }
+      }
+    };
+
+    void loadInitialMessages();
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId, workspaceId, initialMessages, setMessages]);
 
   const isStreaming = status === "submitted" || status === "streaming";
 
@@ -142,14 +170,15 @@ export function useChatConversation({
     if (loadingOlder || !hasOlder) return;
     setLoadingOlder(true);
     try {
-      const offset = messagesRef.current.length;
+      const offset = loadedOffsetRef.current;
       const { messages: olderMsgs, total } = await fetchChatMessages(workspaceId, sessionId, PAGE_SIZE, offset);
       if (olderMsgs.length === 0) {
         setHasOlder(false);
         return;
       }
       setMessages([...olderMsgs, ...messagesRef.current]);
-      setHasOlder(messagesRef.current.length + olderMsgs.length < total);
+      loadedOffsetRef.current += olderMsgs.length;
+      setHasOlder(loadedOffsetRef.current < total);
     } finally {
       setLoadingOlder(false);
     }
@@ -171,6 +200,7 @@ export function useChatConversation({
     messages,
     error,
     isStreaming,
+    initialLoaded,
     loadingOlder,
     hasOlder,
     sendMessage: handleSend,

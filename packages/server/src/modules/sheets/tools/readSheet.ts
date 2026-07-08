@@ -73,7 +73,7 @@ function computeColumnStats(
     const cells = celldata.filter((c) => c.c === col && (!hasHeader || c.r > 0));
     const nums = cells.map((c) => Number(c.v?.v)).filter((n) => !isNaN(n));
     if (nums.length === 0) continue;
-    const key = String(col);
+    const key = String(col + 1);
     stats[key] = {
       min: Math.min(...nums),
       max: Math.max(...nums),
@@ -179,7 +179,7 @@ export const readSheet = {
 
     const data: SparseCell[] = filteredCelldata.map((c) => ({
       row: c.r + 1 - headerOffset,
-      col: c.c,
+      col: c.c + 1,
       value: String(c.v?.v ?? ""),
     }));
 

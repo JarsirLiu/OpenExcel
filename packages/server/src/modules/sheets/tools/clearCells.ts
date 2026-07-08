@@ -2,6 +2,8 @@ import { excelToolSpecs, runToolContextSchema } from "@openexcel/agent";
 import { prisma } from "../../../infra/database/db.js";
 import {
   sheetChangePatchOutputSchema,
+  sheetChangeRangeToZeroBased,
+  toZeroBasedIndex,
   type SheetChangeDelta,
   type SheetChangeClearOperation,
 } from "@openexcel/core";
@@ -41,7 +43,10 @@ export const clearCells = {
     const touchedCellKeys = new Set<string>();
     const touchedRowIndices = new Set<number>();
     for (const operation of operations) {
-      const touchedKeys = applyClearOperation(cellMap, operation);
+      const zeroBased = operation.type === "cell"
+        ? { type: "cell" as const, row: toZeroBasedIndex(operation.row), col: toZeroBasedIndex(operation.col) }
+        : sheetChangeRangeToZeroBased(operation);
+      const touchedKeys = applyClearOperation(cellMap, zeroBased);
       for (const key of touchedKeys) {
         touchedCellKeys.add(key);
         const [row] = key.split(",");

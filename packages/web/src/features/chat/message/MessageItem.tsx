@@ -1,9 +1,10 @@
 import { useState } from "react";
 import type { JSX } from "react";
-import { getMessageText } from "@/features/chat/utils";
+import { getMessageText } from "@/features/shared/messageUtils";
 import { MessageMarkdown } from "./MessageMarkdown";
 import { ReasoningCard } from "./ReasoningCard";
 import { ToolCallCard } from "./ToolCallCard";
+import { SheetChangeSummary } from "./SheetChangeSummary";
 import styles from "./MessageItem.module.css";
 
 const UserAvatar = () => (
@@ -125,6 +126,7 @@ export function MessageItem({
   onRegenerate,
   onUndo,
   isUndoing,
+  onNavigateSheet,
 }: {
   msg: any;
   isStreaming: boolean;
@@ -133,6 +135,7 @@ export function MessageItem({
   onRegenerate?: () => void;
   onUndo?: () => void;
   isUndoing?: boolean;
+  onNavigateSheet?: (sheetId: number) => void;
 }) {
   const [thinkingOpen, setThinkingOpen] = useState<Record<string, boolean>>({});
 
@@ -173,6 +176,9 @@ export function MessageItem({
         </div>
         <div className={styles.msgBody}>
         {renderAssistantParts(msg, isStreaming, thinkingOpen, setThinkingOpen)}
+        {!isStreaming && msg.role === "assistant" && msg.parts && (
+          <SheetChangeSummary parts={msg.parts} onNavigateSheet={onNavigateSheet} />
+        )}
         {!isStreaming && isLastAssistantMessage && (
           <div className={styles.actions}>
             {onRegenerate && (

@@ -2,113 +2,32 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ChatComposer, type ChatComposerHandle } from "@/features/chat/composer/ChatComposer";
 import { MessageList } from "@/features/chat/message/MessageList";
 import { useChatConversation } from "@/features/chat/hooks/useChatConversation";
+import { useSessionInfra } from "@/features/session/SessionShellContext";
 import { t } from "@/lib/i18n";
 import styles from "./ChatPanel.module.css";
 import msgStyles from "@/features/chat/message/MessageList.module.css";
 
 export function ChatPanel({
   sessionId,
-  workspaceId,
-  messages: parentMessages,
-  messageTotal,
-  onSendInDraft,
-  draftPendingText,
-  onDraftSent,
+  pendingDraftTextRef,
   onRunComplete,
-  onWorkspaceRefresh,
-  onStreamingChange,
-  onAttachExcel,
-  referenceCacheRevision,
   onRegenerate,
-  onUndoComplete,
-}: {
-  sessionId: number | null;
-  workspaceId: number;
-  messages: any[];
-  messageTotal: number;
-  onSendInDraft: (text: string) => Promise<number>;
-  draftPendingText: string | null;
-  onDraftSent: () => void;
-  onRunComplete?: (sessionId: number, messages: any[]) => Promise<void> | void;
-  onWorkspaceRefresh?: () => Promise<void> | void;
-  onStreamingChange?: (isStreaming: boolean) => void;
-  onAttachExcel: (file: File) => Promise<void> | void;
-  referenceCacheRevision: number;
-  onRegenerate?: () => void;
-  onUndoComplete?: () => Promise<void> | void;
-}) {
-  if (sessionId == null) {
-    return (
-      <div className={styles.container}>
-        <MessageList messages={[]} isStreaming={false} />
-        <ChatComposer
-          isStreaming={false}
-          onSend={(text) => { void onSendInDraft(text); }}
-          onStop={() => {}}
-          onAttachExcel={onAttachExcel}
-          referenceCacheRevision={referenceCacheRevision}
-          workspaceId={workspaceId}
-        />
-      </div>
-    );
-  }
-
-  return <RealChat
-    sessionId={sessionId}
-    workspaceId={workspaceId}
-    parentMessages={parentMessages}
-    messageTotal={messageTotal}
-    draftPendingText={draftPendingText}
-    onDraftSent={onDraftSent}
-    onRunComplete={onRunComplete}
-    onWorkspaceRefresh={onWorkspaceRefresh}
-    onStreamingChange={onStreamingChange}
-    onAttachExcel={onAttachExcel}
-    referenceCacheRevision={referenceCacheRevision}
-    onRegenerate={onRegenerate}
-    onUndoComplete={onUndoComplete}
-  />;
-}
-
-function RealChat({
-  sessionId,
-  workspaceId,
-  parentMessages,
-  messageTotal,
-  draftPendingText,
-  onDraftSent,
-  onRunComplete,
-  onWorkspaceRefresh,
-  onStreamingChange,
-  onAttachExcel,
-  referenceCacheRevision,
-  onRegenerate,
-  onUndoComplete,
 }: {
   sessionId: number;
-  workspaceId: number;
-  parentMessages: any[];
-  messageTotal: number;
-  draftPendingText: string | null;
-  onDraftSent: () => void;
+  pendingDraftTextRef: React.MutableRefObject<{ [sessionId: number]: string }>;
   onRunComplete?: (sessionId: number, messages: any[]) => Promise<void> | void;
-  onWorkspaceRefresh?: () => Promise<void> | void;
-  onStreamingChange?: (isStreaming: boolean) => void;
-  onAttachExcel: (file: File) => Promise<void> | void;
-  referenceCacheRevision: number;
   onRegenerate?: () => void;
-  onUndoComplete?: () => Promise<void> | void;
 }) {
+  const { workspaceId, initialMessages, onWorkspaceRefresh, onUndoComplete, onAttachExcel, referenceCacheRevision, onNavigateSheet } = useSessionInfra();
+
   const { messages, error, isStreaming, loadingOlder, hasOlder, sendMessage, stop, loadOlderMessages, onUndo } = useChatConversation({
     sessionId,
     workspaceId,
-    initialMessages: parentMessages,
-    messageTotal,
+    initialMessages,
     onRunComplete: (finishedMessages) => {
       return onRunComplete?.(sessionId, finishedMessages);
     },
     onWorkspaceRefresh,
-    onStreamingChange,
   });
 
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
@@ -117,7 +36,6 @@ function RealChat({
   const composerRef = useRef<ChatComposerHandle>(null);
   const prevStreaming = useRef(isStreaming);
 
-  // 新 AI 流完成后恢复撤销能力
   useEffect(() => {
     if (prevStreaming.current && !isStreaming) {
       setCanUndo(true);
@@ -125,7 +43,6 @@ function RealChat({
     prevStreaming.current = isStreaming;
   }, [isStreaming]);
 
-  // 切换会话后重置
   useEffect(() => {
     setCanUndo(true);
   }, [sessionId]);
@@ -146,11 +63,12 @@ function RealChat({
   }, [onUndo, isUndoing, onUndoComplete]);
 
   useEffect(() => {
-    if (draftPendingText) {
-      sendMessage(draftPendingText);
-      onDraftSent();
+    const text = pendingDraftTextRef.current[sessionId];
+    if (text) {
+      delete pendingDraftTextRef.current[sessionId];
+      sendMessage(text);
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pendingDraftTextRef, sendMessage, sessionId]);
 
   const handleScroll = useCallback(() => {
     const el = document.querySelector(`.${msgStyles.messageList}`) as HTMLElement | null;
@@ -159,14 +77,12 @@ function RealChat({
     setShowScrollToBottom(!nearBottom);
   }, []);
 
-  // Hide when new messages arrive (auto-scroll kicks in)
   useEffect(() => {
     setShowScrollToBottom(false);
   }, [messages, isStreaming]);
 
   const handleScrollToBottom = useCallback(() => {
     setShowScrollToBottom(false);
-    // Force scroll to bottom
     const el = document.querySelector(`.${msgStyles.messageList}`) as HTMLElement | null;
     if (el) {
       el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
@@ -185,6 +101,7 @@ function RealChat({
         hasOlder={hasOlder}
         onLoadOlder={loadOlderMessages}
         onScroll={handleScroll}
+        onNavigateSheet={onNavigateSheet}
       />
 
       {error && (
