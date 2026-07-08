@@ -4,6 +4,7 @@ import { createWorkspace, deleteWorkspace, renameWorkspace } from "@/api/workspa
 import type { Workspace } from "@/api/workspaces";
 import type { WorkbookMeta } from "@/api/workbooks";
 import { downloadWorkbook } from "@/api/workbooks";
+import { confirm } from "@/shared/lib";
 import styles from "./WorkspaceSidebar.module.css";
 
 const MIN_WIDTH = 210;
@@ -46,8 +47,6 @@ export function WorkspaceSidebar({
   const [isResizing, setIsResizing] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editValue, setEditValue] = useState("");
-  const [deletingId, setDeletingId] = useState<number | null>(null);
-  const [deletingWbId, setDeletingWbId] = useState<number | null>(null);
   const [expandedWorkspaces, setExpandedWorkspaces] = useState<Set<number>>(new Set());
   const rafRef = useRef<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -132,21 +131,20 @@ export function WorkspaceSidebar({
   );
 
   const handleDelete = useCallback(
-    async (e: React.MouseEvent, id: number) => {
+    async (e: React.MouseEvent, ws: Workspace) => {
       e.stopPropagation();
-      setDeletingId(id);
-    },
-    [],
-  );
-
-  const handleConfirmDelete = useCallback(
-    async (e: React.MouseEvent, id: number) => {
-      e.stopPropagation();
+      setEditingId(null);
+      const ok = await confirm({
+        title: "删除项目",
+        message: `确认删除「${ws.name}」？此操作不可恢复。`,
+        confirmText: "删除",
+        cancelText: "取消",
+      });
+      if (!ok) return;
       try {
-        await deleteWorkspace(id);
-        setDeletingId(null);
-        if (id === activeWorkspaceId) {
-          const remaining = workspaces.filter((ws) => ws.id !== id);
+        await deleteWorkspace(ws.id);
+        if (ws.id === activeWorkspaceId) {
+          const remaining = workspaces.filter((w) => w.id !== ws.id);
           if (remaining.length > 0) {
             onActiveWorkspaceChange(remaining[0].id);
           }
@@ -154,40 +152,29 @@ export function WorkspaceSidebar({
         void onRefresh();
       } catch (e) {
         console.error("删除项目失败:", e);
-        setDeletingId(null);
       }
     },
     [activeWorkspaceId, onActiveWorkspaceChange, onRefresh, workspaces],
   );
 
-  const handleCancelDelete = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    setDeletingId(null);
-  }, []);
-
-  const handleWorkbookDeleteClick = useCallback((e: React.MouseEvent, wbId: number) => {
-    e.stopPropagation();
-    setDeletingWbId(wbId);
-  }, []);
-
-  const handleConfirmWbDelete = useCallback(
-    async (e: React.MouseEvent, wbId: number) => {
+  const handleWorkbookDeleteClick = useCallback(
+    async (e: React.MouseEvent, wb: WorkbookMeta) => {
       e.stopPropagation();
+      const ok = await confirm({
+        title: "删除工作簿",
+        message: `确认删除「${wb.name}」？此操作不可恢复。`,
+        confirmText: "删除",
+        cancelText: "取消",
+      });
+      if (!ok) return;
       try {
-        await onWorkbookDelete(wbId);
-        setDeletingWbId(null);
+        await onWorkbookDelete(wb.id);
       } catch (e) {
         console.error("删除工作簿失败:", e);
-        setDeletingWbId(null);
       }
     },
     [onWorkbookDelete],
   );
-
-  const handleCancelWbDelete = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    setDeletingWbId(null);
-  }, []);
 
   const handleCreateWorkbook = useCallback(
     (e: React.MouseEvent, workspaceId: number) => {
@@ -280,21 +267,7 @@ export function WorkspaceSidebar({
                       <path d="M4 5h8M4 8h8M4 11h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                     </svg>
                   </span>
-                  {deletingId === ws.id ? (
-                    <span className={styles.deleteConfirm}>
-                      <span>确认删除?</span>
-                      <button onClick={(e) => void handleConfirmDelete(e, ws.id)}>
-                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                          <path d="M2.5 7.5l3 3 6-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      </button>
-                      <button onClick={handleCancelDelete}>
-                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                          <path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                        </svg>
-                      </button>
-                    </span>
-                  ) : editingId === ws.id ? (
+                  {editingId === ws.id ? (
                     <input
                       ref={inputRef}
                       className={styles.editInput}
@@ -326,7 +299,7 @@ export function WorkspaceSidebar({
                             <path d="M8.5 1.5l2 2L4 10H2V8l6.5-6.5z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
                           </svg>
                         </button>
-                        <button className={styles.deleteBtn} onClick={(e) => handleDelete(e, ws.id)} title="删除">
+                        <button className={styles.deleteBtn} onClick={(e) => void handleDelete(e, ws)} title="删除">
                           <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                             <path d="M2 3h8M4.5 3V2a1 1 0 011-1h1a1 1 0 011 1v1M9.5 3v7a1 1 0 01-1 1h-5a1 1 0 01-1-1V3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
                             <path d="M5 5.5v3M7 5.5v3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
@@ -355,23 +328,7 @@ export function WorkspaceSidebar({
                               <path d="M4 5h6M4 7h6M4 9h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
                             </svg>
                           </span>
-                          {deletingWbId === wb.id ? (
-                            <span className={styles.deleteConfirm}>
-                              <span>确认删除?</span>
-                              <button onClick={(e) => void handleConfirmWbDelete(e, wb.id)}>
-                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                                  <path d="M2.5 7.5l3 3 6-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                                </svg>
-                              </button>
-                              <button onClick={handleCancelWbDelete}>
-                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                                  <path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                                </svg>
-                              </button>
-                            </span>
-                          ) : (
-                            <>
-                              <span className={styles.workbookName}>{wb.name}</span>
+                          <span className={styles.workbookName}>{wb.name}</span>
                               <span className={styles.workbookActions}>
                                 <button
                                   className={styles.workbookDownloadBtn}
@@ -388,7 +345,7 @@ export function WorkspaceSidebar({
                                 </button>
                                 <button
                                   className={styles.workbookDeleteBtn}
-                                  onClick={(e) => handleWorkbookDeleteClick(e, wb.id)}
+                                  onClick={(e) => void handleWorkbookDeleteClick(e, wb)}
                                   title="删除"
                                 >
                                   <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
@@ -397,8 +354,6 @@ export function WorkspaceSidebar({
                                   </svg>
                                 </button>
                               </span>
-                            </>
-                          )}
                         </div>
                       );
                     })}
