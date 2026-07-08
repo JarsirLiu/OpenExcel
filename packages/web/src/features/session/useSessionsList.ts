@@ -83,9 +83,13 @@ export function useSessionsList(
 
   const handleDeleteSession = useCallback(async (id: number) => {
     if (workspaceId == null) return;
+    const wasCurrent = currentSessionId === id;
     await deleteSession(workspaceId, id);
     await refreshSessions();
-  }, [refreshSessions, workspaceId]);
+    if (wasCurrent) {
+      setCurrentSessionId(null);
+    }
+  }, [refreshSessions, workspaceId, currentSessionId]);
 
   return {
     sessions,
