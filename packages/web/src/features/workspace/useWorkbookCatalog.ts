@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { fetchWorkbook, uploadExcel, type WorkbookFull, type WorkbookMeta } from "@/api/workbooks";
+import { useCallback, useEffect, useState } from "react";
+import { fetchWorkbook, type WorkbookFull, type WorkbookMeta } from "@/api/workbooks";
 
 const STORAGE_KEY_IDX = "openexcel:workbookIdx";
 
@@ -74,20 +74,6 @@ export function useWorkbookCatalog(workspaceId: number | null, initial?: Workboo
     setWorkbookIdx(idx);
   }, []);
 
-  const handleUpload = useCallback(async (file: File) => {
-    if (!currentWorkbook || workspaceId == null) return;
-    setStatus("导入中...");
-    try {
-      await uploadExcel(workspaceId, currentWorkbook.id, file);
-      const refreshed = await fetchWorkbook(workspaceId, currentWorkbook.id);
-      replaceCurrentWorkbook(refreshed);
-      setStatus("");
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "导入失败";
-      setStatus(`导入失败：${message}`);
-    }
-  }, [currentWorkbook, replaceCurrentWorkbook, workspaceId]);
-
   return {
     workbooks,
     setWorkbooks,
@@ -100,6 +86,5 @@ export function useWorkbookCatalog(workspaceId: number | null, initial?: Workboo
     setStatus,
     loading,
     switchWorkbook,
-    uploadExcel: handleUpload,
   };
 }

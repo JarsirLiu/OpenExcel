@@ -64,31 +64,6 @@ export async function workbookRoutes(app: FastifyInstance) {
     return result;
   });
 
-  app.post<{ Params: { workspacePublicId: string; workbookPublicId: string } }>(
-    "/api/workspaces/:workspacePublicId/workbooks/:workbookPublicId/upload",
-    async (req, reply) => {
-      try {
-        const ids = await resolveWorkbookIdForRequest(req, req.params.workspacePublicId, req.params.workbookPublicId, reply);
-        if (ids == null) return;
-        const data = await req.file();
-        if (!data) return reply.status(400).send({ error: "No file uploaded" });
-
-        const buf = await data.toBuffer();
-        const result = await service.uploadExcel(ids.workspaceId, ids.workbookId, buf);
-        return { success: true, ...result };
-      } catch (error) {
-        if (error instanceof service.WorkbookUploadError) {
-          return reply.status(error.statusCode).send({
-            error: error.message,
-            code: error.code,
-            details: error.details,
-          });
-        }
-        throw error;
-      }
-    },
-  );
-
   app.post<{ Params: { workspacePublicId: string } }>(
     "/api/workspaces/:workspacePublicId/workbooks/upload",
     async (req, reply) => {

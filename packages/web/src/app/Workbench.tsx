@@ -168,15 +168,8 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
           status={workbook.status}
           loading={loading}
           currentSheetIndex={workbook.currentSheetIndex}
-          importPreview={workbook.importPreview}
-          importSheetIndex={workbook.importSheetIndex}
-          importing={workbook.importing}
           setCurrentSheetIndex={workbook.setCurrentSheetIndex}
-          setImportSheetIndex={workbook.setImportSheetIndex}
           handleSwitchWorkbook={workbook.handleSwitchWorkbook}
-          handleUploadFileChange={workbook.handleUploadFileChange}
-          handleImportConfirm={workbook.handleImportConfirm}
-          handleImportCancel={workbook.handleImportCancel}
           handleNewWorkbookFileChange={workbook.handleNewWorkbookFileChange}
           handleWorkbookDelete={workbook.handleWorkbookDelete}
           handleWorkbookRename={workbook.handleWorkbookRename}

@@ -1,6 +1,5 @@
 import * as XLSX from "xlsx";
 import { prisma } from "../../../infra/database/db.js";
-import * as repo from "../repository.js";
 import { generateWorkbookPublicId } from "../../../shared/utils/publicId.js";
 
 function bufferToArrayBuffer(buffer: Buffer): ArrayBuffer | SharedArrayBuffer {
@@ -8,8 +7,7 @@ function bufferToArrayBuffer(buffer: Buffer): ArrayBuffer | SharedArrayBuffer {
 }
 
 export type WorkbookUploadErrorCode =
-  | "INVALID_EXCEL_FILE"
-  | "WORKBOOK_NOT_FOUND";
+  | "INVALID_EXCEL_FILE";
 
 export class WorkbookUploadError extends Error {
   statusCode: number;
@@ -41,93 +39,6 @@ function readWorkbookOrThrow(buffer: Buffer) {
       { cause: error instanceof Error ? error.message : String(error) },
     );
   }
-}
-
-function getCellBounds(celldata: { r: number; c: number }[]) {
-  let maxRow = -1;
-  let maxCol = -1;
-  for (const cell of celldata) {
-    if (cell.r > maxRow) maxRow = cell.r;
-    if (cell.c > maxCol) maxCol = cell.c;
-  }
-  return {
-    rows: maxRow + 1,
-    cols: maxCol + 1,
-  };
-}
-
-function emptySheetParseResult() {
-  return { celldata: [], merges: [], config: {} };
-}
-
-function buildUploadedSheetMap(
-  sheetNames: string[],
-  results: { celldata: any[]; merges: any[]; config: Record<string, any> }[],
-) {
-  const map = new Map<string, (typeof results)[number]>();
-  for (let i = 0; i < sheetNames.length; i++) {
-    if (!map.has(sheetNames[i])) {
-      map.set(sheetNames[i], results[i] ?? emptySheetParseResult());
-    }
-  }
-  return map;
-}
-
-export function resolveWorkbookImportTargets(currentSheetNames: string[], uploadedSheetNames: string[]) {
-  const currentSet = new Set(currentSheetNames);
-  const uploadedSet = new Set(uploadedSheetNames);
-  return {
-    matchedSheetNames: currentSheetNames.filter((name) => uploadedSet.has(name)),
-    skippedCurrentSheetNames: currentSheetNames.filter((name) => !uploadedSet.has(name)),
-    ignoredUploadedSheetNames: uploadedSheetNames.filter((name) => !currentSet.has(name)),
-  };
-}
-
-export async function uploadExcel(workspaceId: number, workbookId: number, buffer: Buffer) {
-  const workbook = await repo.findWorkbookWithSheets(workbookId, workspaceId);
-  if (!workbook) {
-    throw new WorkbookUploadError("当前工作簿不存在", "WORKBOOK_NOT_FOUND", 404);
-  }
-
-  const sheets = workbook.sheets;
-  const uploadedWorkbook = readWorkbookOrThrow(buffer);
-  const uploadedSheetNames = uploadedWorkbook.SheetNames;
-
-  const { excelToGrid } = await import("@openexcel/core");
-  const results = excelToGrid(bufferToArrayBuffer(buffer), uploadedSheetNames);
-  const resultBySheetName = buildUploadedSheetMap(uploadedSheetNames, results);
-  const importTargets = resolveWorkbookImportTargets(
-    sheets.map((sheet) => sheet.name),
-    uploadedSheetNames,
-  );
-  const updatedSheets: { id: number; name: string; rows: number; cols: number }[] = [];
-
-  await prisma.$transaction(async (tx) => {
-    for (const sheet of sheets) {
-      const parsed = resultBySheetName.get(sheet.name);
-      if (!parsed) {
-        continue;
-      }
-      const bounds = getCellBounds(parsed.celldata);
-      await tx.sheet.update({
-        where: { id: sheet.id },
-        data: {
-          uploadedData: JSON.stringify(parsed.celldata),
-          merges: JSON.stringify(parsed.merges),
-          config: JSON.stringify(parsed.config ?? {}),
-        },
-      });
-      updatedSheets.push({ id: sheet.id, name: sheet.name, rows: bounds.rows, cols: bounds.cols });
-    }
-  });
-
-  return {
-    workbookId,
-    workbookName: workbook.name,
-    updatedSheets,
-    skippedCurrentSheets: importTargets.skippedCurrentSheetNames,
-    ignoredUploadedSheets: importTargets.ignoredUploadedSheetNames,
-  };
 }
 
 export async function uploadAsNewWorkbook(workspaceId: number, buffer: Buffer, fileName: string) {

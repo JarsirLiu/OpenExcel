@@ -10,7 +10,6 @@ import {
 } from "@/api/workbooks";
 import type { WorkbookFull, WorkbookMeta } from "@/api/workbooks";
 import { patchWorkbookWithDelta } from "../workbook/utils/patchWorkbook";
-import { useWorkbookImportFlow } from "../workbook/import/useWorkbookImportFlow";
 import { useWorkbookCatalog } from "./useWorkbookCatalog";
 import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatchSync";
 
@@ -46,7 +45,6 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
     replaceCurrentWorkbook,
     setWorkbookIdx,
     setStatus,
-    uploadExcel,
     workbookRevision,
   } = useWorkbookCatalog(workspaceId, initial);
 
@@ -190,20 +188,6 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
     setCurrentSheetIndex(0);
   }, [switchWorkbook]);
 
-  const {
-    importPreview,
-    importSheetIndex,
-    importing,
-    setImportSheetIndex,
-    handleUploadFileChange,
-    handleImportConfirm,
-    handleImportCancel,
-  } = useWorkbookImportFlow({
-    currentWorkbook,
-    setStatus,
-    uploadExcel,
-  });
-
   const handleNewWorkbookFileChange = useCallback(async (file: File) => {
     if (workspaceId == null) return;
     setStatus("上传中...");
@@ -291,19 +275,12 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
     status,
     loading,
     currentSheetIndex,
-    importPreview,
-    importSheetIndex,
-    importing,
     setCurrentSheetIndex,
-    setImportSheetIndex,
     handleSheetChanged,
     handleWorkbookStructureChanged,
     handleWorkbookRefresh: refreshCurrentWorkbook,
     handleWorkspaceRefresh: refreshWorkspace,
     handleSwitchWorkbook,
-    handleUploadFileChange,
-    handleImportConfirm,
-    handleImportCancel,
     handleNewWorkbookFileChange,
     handleWorkbookDelete,
     handleWorkbookRename,
