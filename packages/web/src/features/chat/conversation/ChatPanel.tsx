@@ -9,42 +9,36 @@ import msgStyles from "@/features/chat/message/MessageList.module.css";
 export function ChatPanel({
   sessionId,
   workspaceId,
-  messages: parentMessages,
-  messageTotal,
   pendingDraftTextRef,
   onRunComplete,
   onWorkspaceRefresh,
-  onStreamingChange,
   onAttachExcel,
   referenceCacheRevision,
   onRegenerate,
   onUndoComplete,
   onNavigateSheet,
+  initialMessages,
 }: {
   sessionId: number;
   workspaceId: number;
-  messages: any[];
-  messageTotal: number;
   pendingDraftTextRef: React.MutableRefObject<{ [sessionId: number]: string }>;
   onRunComplete?: (sessionId: number, messages: any[]) => Promise<void> | void;
   onWorkspaceRefresh?: () => Promise<void> | void;
-  onStreamingChange?: (isStreaming: boolean) => void;
   onAttachExcel: (file: File) => Promise<void> | void;
   referenceCacheRevision: number;
   onRegenerate?: () => void;
   onUndoComplete?: () => Promise<void> | void;
   onNavigateSheet?: (sheetId: number) => void;
+  initialMessages?: unknown[];
 }) {
   const { messages, error, isStreaming, loadingOlder, hasOlder, sendMessage, stop, loadOlderMessages, onUndo } = useChatConversation({
     sessionId,
     workspaceId,
-    initialMessages: parentMessages,
-    messageTotal,
+    initialMessages,
     onRunComplete: (finishedMessages) => {
       return onRunComplete?.(sessionId, finishedMessages);
     },
     onWorkspaceRefresh,
-    onStreamingChange,
   });
 
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);

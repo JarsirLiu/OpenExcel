@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { JSX } from "react";
-import { getMessageText } from "@/features/chat/utils";
+import { getMessageText } from "@/features/shared/messageUtils";
 import { MessageMarkdown } from "./MessageMarkdown";
 import { ReasoningCard } from "./ReasoningCard";
 import { ToolCallCard } from "./ToolCallCard";

@@ -5,7 +5,6 @@ import { useSessionWorkspace } from "./useSessionWorkspace";
 const mocks = vi.hoisted(() => ({
   createSession: vi.fn(),
   deleteSession: vi.fn(),
-  fetchMessages: vi.fn(),
   fetchSessions: vi.fn(),
   generateSessionTitle: vi.fn(),
 }));
@@ -17,21 +16,16 @@ vi.mock("@/api/sessions", () => ({
   generateSessionTitle: mocks.generateSessionTitle,
 }));
 
-vi.mock("@/api/chat", () => ({
-  fetchMessages: mocks.fetchMessages,
-}));
-
 describe("useSessionWorkspace", () => {
   beforeEach(() => {
     sessionStorage.clear();
     mocks.createSession.mockReset();
     mocks.deleteSession.mockReset();
-    mocks.fetchMessages.mockReset();
     mocks.fetchSessions.mockReset();
     mocks.generateSessionTitle.mockReset();
   });
 
-  it("creates a session for draft and skips fetchMessages", async () => {
+  it("creates a session for draft", async () => {
     mocks.createSession.mockResolvedValue({
       id: 5,
       publicId: "session-5",
@@ -39,7 +33,6 @@ describe("useSessionWorkspace", () => {
       name: "新对话",
       createdAt: "2026-07-07T00:00:00.000Z",
     });
-    mocks.fetchMessages.mockResolvedValue({ messages: [], total: 0 });
 
     const { result } = renderHook(() => useSessionWorkspace(1, undefined, {
       sessions: [],
@@ -55,51 +48,6 @@ describe("useSessionWorkspace", () => {
       expect(result.current.currentSessionId).toBe(5);
     });
 
-    expect(result.current.initialLoaded).toBe(true);
     expect(result.current.sessions.map((session) => session.id)).toEqual([5]);
-    expect(mocks.fetchMessages).not.toHaveBeenCalled();
-  });
-
-  it("loads message history when switching to an existing session", async () => {
-    mocks.fetchMessages.mockResolvedValue({
-      messages: [{ id: "message-1", role: "user", parts: [{ type: "text", text: "你好" }] }],
-      total: 1,
-    });
-
-    const { result } = renderHook(() => useSessionWorkspace(1, undefined, {
-      sessions: [
-        {
-          id: 1,
-          publicId: "session-1",
-          sheetId: null,
-          name: "会话 1",
-          createdAt: "2026-07-07T00:00:00.000Z",
-        },
-        {
-          id: 2,
-          publicId: "session-2",
-          sheetId: null,
-          name: "会话 2",
-          createdAt: "2026-07-07T00:00:00.000Z",
-        },
-      ],
-      messages: [],
-      messageTotal: 0,
-    }));
-
-    act(() => {
-      result.current.handleSelectSession(2);
-    });
-
-    await waitFor(() => {
-      expect(mocks.fetchMessages).toHaveBeenCalledWith(1, 2, 40, 0);
-    });
-
-    await waitFor(() => {
-      expect(result.current.messages).toEqual([
-        { id: "message-1", role: "user", parts: [{ type: "text", text: "你好" }] },
-      ]);
-      expect(result.current.messageTotal).toBe(1);
-    });
   });
 });

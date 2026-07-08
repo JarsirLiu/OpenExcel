@@ -16,14 +16,8 @@ type Props = {
   workspaceId: number | null;
   sessions: Session[];
   currentSessionId: number | null;
-  messages: any[];
-  messageTotal: number;
-  initialLoaded: boolean;
-  loadingMore: boolean;
   historyOpen: boolean;
   setHistoryOpen: (next: boolean) => void;
-  isStreaming: boolean;
-  setIsStreaming: (next: boolean) => void;
   handleSendInDraft: (text: string) => Promise<number>;
   handleRunComplete: (sessionId: number, messages: any[]) => Promise<void>;
   handleNewSession: () => void;
@@ -36,20 +30,15 @@ type Props = {
   currentUser: CurrentUser;
   onLogout: () => void;
   onNavigateSheet?: (sheetId: number) => void;
+  initialMessages?: unknown[];
 };
 
 export function SessionShell({
   workspaceId,
   sessions,
   currentSessionId,
-  messages,
-  messageTotal,
-  initialLoaded,
-  loadingMore,
   historyOpen,
   setHistoryOpen,
-  isStreaming,
-  setIsStreaming,
   handleSendInDraft,
   handleRunComplete,
   handleNewSession,
@@ -62,6 +51,7 @@ export function SessionShell({
   currentUser,
   onLogout,
   onNavigateSheet,
+  initialMessages,
 }: Props) {
   const historyRef = useRef<HTMLDivElement>(null);
   const pendingDraftTextRef = useRef<{ [sessionId: number]: string }>({});
@@ -117,33 +107,27 @@ export function SessionShell({
         </div>
       )}
 
-      {initialLoaded ? (
-        currentSessionId != null ? (
-          <ChatPanel
-            key={currentSessionId}
-            workspaceId={workspaceId}
-            sessionId={currentSessionId}
-            messages={messages}
-            messageTotal={messageTotal}
-            pendingDraftTextRef={pendingDraftTextRef}
-            onRunComplete={handleRunComplete}
-            onWorkspaceRefresh={onWorkspaceRefresh}
-            onStreamingChange={setIsStreaming}
-            onAttachExcel={onAttachExcel}
-            referenceCacheRevision={referenceCacheRevision}
-            onUndoComplete={handleUndoComplete}
-            onNavigateSheet={onNavigateSheet}
-          />
-        ) : (
-          <DraftComposer
-            workspaceId={workspaceId}
-            onSend={handleDraftSend}
-            onAttachExcel={onAttachExcel}
-            referenceCacheRevision={referenceCacheRevision}
-          />
-        )
+      {currentSessionId != null ? (
+        <ChatPanel
+          key={currentSessionId}
+          workspaceId={workspaceId}
+          sessionId={currentSessionId}
+          pendingDraftTextRef={pendingDraftTextRef}
+          onRunComplete={handleRunComplete}
+          onWorkspaceRefresh={onWorkspaceRefresh}
+          onAttachExcel={onAttachExcel}
+          referenceCacheRevision={referenceCacheRevision}
+          onUndoComplete={handleUndoComplete}
+          onNavigateSheet={onNavigateSheet}
+          initialMessages={initialMessages}
+        />
       ) : (
-        <div className={styles.emptyState}>{t("loading", "加载中...")}</div>
+        <DraftComposer
+          workspaceId={workspaceId}
+          onSend={handleDraftSend}
+          onAttachExcel={onAttachExcel}
+          referenceCacheRevision={referenceCacheRevision}
+        />
       )}
     </div>
   );

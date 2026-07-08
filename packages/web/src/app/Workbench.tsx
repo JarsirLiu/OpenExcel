@@ -198,6 +198,7 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
         style={{ width: sidebarWidth }}
         sessionWorkspace={session}
         onNavigateSheet={handleNavigateSheet}
+        initialMessages={domainInitial.session?.messages}
       />
     </div>
   );

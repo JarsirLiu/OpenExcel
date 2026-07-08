@@ -1,6 +1,6 @@
 import { ChatComposer } from "@/features/chat/composer/ChatComposer";
 import { MessageList } from "@/features/chat/message/MessageList";
-import styles from "@/features/chat/conversation/ChatPanel.module.css";
+import styles from "./DraftComposer.module.css";
 
 type Props = {
   workspaceId: number;

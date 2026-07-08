@@ -1,5 +1,5 @@
 import type { useSessionWorkspace } from "@/features/session/useSessionWorkspace";
-import { ChatInterface } from "./ChatInterface";
+import { SessionShell } from "@/features/session/SessionShell";
 import styles from "./ChatSidebar.module.css";
 
 type CurrentUser = {
@@ -19,6 +19,7 @@ export function ChatSidebar({
   style,
   sessionWorkspace,
   onNavigateSheet,
+  initialMessages,
 }: {
   onWorkspaceRefresh?: () => Promise<void> | void;
   onAttachExcel: (file: File) => Promise<void> | void;
@@ -29,18 +30,20 @@ export function ChatSidebar({
   style?: React.CSSProperties;
   sessionWorkspace: SessionWorkspaceState;
   onNavigateSheet?: (sheetId: number) => void;
+  initialMessages?: unknown[];
 }) {
   return (
     <div className={styles.sidebar} style={style}>
-      <ChatInterface
-        onWorkspaceRefresh={onWorkspaceRefresh}
-        onAttachExcel={onAttachExcel}
-        referenceCacheRevision={referenceCacheRevision}
+      <SessionShell
+        {...sessionWorkspace}
         workspaceId={workspaceId}
+        onWorkspaceRefresh={onWorkspaceRefresh}
+        referenceCacheRevision={referenceCacheRevision}
+        onAttachExcel={onAttachExcel}
         currentUser={currentUser}
         onLogout={onLogout}
-        sessionWorkspace={sessionWorkspace}
         onNavigateSheet={onNavigateSheet}
+        initialMessages={initialMessages}
       />
     </div>
   );
