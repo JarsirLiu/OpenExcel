@@ -3,6 +3,7 @@ import { t } from "@/lib/i18n";
 import { createWorkspace, deleteWorkspace, renameWorkspace } from "@/api/workspaces";
 import type { Workspace } from "@/api/workspaces";
 import type { WorkbookMeta } from "@/api/workbooks";
+import { downloadWorkbook } from "@/api/workbooks";
 import styles from "./WorkspaceSidebar.module.css";
 
 const MIN_WIDTH = 210;
@@ -372,6 +373,19 @@ export function WorkspaceSidebar({
                             <>
                               <span className={styles.workbookName}>{wb.name}</span>
                               <span className={styles.workbookActions}>
+                                <button
+                                  className={styles.workbookDownloadBtn}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    void downloadWorkbook(ws.id, wb.id, wb.name);
+                                  }}
+                                  title="下载"
+                                >
+                                  <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                                    <path d="M5.5 1v6M3 4.5l2.5 2.5L8 4.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                                    <path d="M1.5 8v1a1 1 0 001 1h6a1 1 0 001-1V8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                                  </svg>
+                                </button>
                                 <button
                                   className={styles.workbookDeleteBtn}
                                   onClick={(e) => handleWorkbookDeleteClick(e, wb.id)}

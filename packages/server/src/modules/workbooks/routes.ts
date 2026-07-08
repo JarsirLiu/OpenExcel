@@ -144,12 +144,13 @@ export async function workbookRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const ids = await resolveWorkbookIdForRequest(req, req.params.workspacePublicId, req.params.workbookPublicId, reply);
       if (ids == null) return;
-      const buf = await service.exportTemplate(ids.workspaceId, ids.workbookId);
-      if (!buf) return reply.status(404).send({ error: "Not found" });
+      const result = await service.exportTemplate(ids.workspaceId, ids.workbookId);
+      if (!result) return reply.status(404).send({ error: "Not found" });
 
+      const { buffer, name } = result;
       reply.header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-      reply.header("Content-Disposition", `attachment; filename="template.xlsx"`);
-      return reply.send(buf);
+      reply.header("Content-Disposition", `attachment; filename="${encodeURIComponent(name)}.xlsx"`);
+      return reply.send(buffer);
     },
   );
 }

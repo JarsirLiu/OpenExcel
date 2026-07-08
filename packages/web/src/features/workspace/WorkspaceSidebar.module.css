@@ -402,6 +402,25 @@
   color: #dc2626;
 }
 
+.workbookDownloadBtn {
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+  border-radius: 4px;
+  padding: 0;
+}
+
+.workbookDownloadBtn:hover {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+}
+
 .workbookCreateBtn {
   display: flex;
   align-items: center;

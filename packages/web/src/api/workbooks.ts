@@ -108,6 +108,20 @@ export function downloadTemplateUrl(workspaceId: number, workbookId: number): st
   return `${API_BASE}/workspaces/${workspaceId}/workbooks/${workbookId}/template`;
 }
 
+export async function downloadWorkbook(workspaceId: number, workbookId: number, fileName: string): Promise<void> {
+  const res = await apiFetch(`/workspaces/${workspaceId}/workbooks/${workbookId}/template`);
+  if (!res.ok) throw new Error(await readErrorMessage(res, "下载工作簿失败"));
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${fileName}.xlsx`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 export async function updateSheetData(workspaceId: number, sheetId: number, celldata: any[], config?: any): Promise<void> {
   const body: any = { celldata };
   if (config !== undefined) body.config = config;

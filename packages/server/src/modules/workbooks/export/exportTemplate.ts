@@ -28,5 +28,5 @@ export async function exportTemplate(workspaceId: number, id: number) {
   });
 
   const ab = celldataToExcel(sheets);
-  return Buffer.from(ab);
+  return { buffer: Buffer.from(ab), name: wb.name };
 }
