@@ -45,6 +45,21 @@ export function toFortuneSheetData(
         col: [m.col[0], m.col[1]],
       }));
     }
+    if (sheet.columns.length > 0 && celldata.length > 0) {
+      const headerCells = sheet.columns.map((col, ci) => ({
+        r: 0,
+        c: ci,
+        v: { v: col.label, m: col.label },
+      }));
+      celldata = [
+        ...headerCells,
+        ...celldata.map((c) => ({ ...c, r: c.r + 1 })),
+      ];
+      merges = merges.map((m) => ({
+        row: [m.row[0] + 1, m.row[1] + 1],
+        col: [m.col[0], m.col[1]],
+      }));
+    }
   } else {
     celldata = [];
     merges = (sheet.merges || []).map((m) => ({

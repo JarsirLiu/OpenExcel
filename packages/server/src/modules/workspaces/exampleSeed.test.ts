@@ -90,7 +90,7 @@ describe("seedExampleWorkspaceForUser", () => {
     expect(mocks.workspaceCreate).toHaveBeenCalledWith({
       data: {
         ownerUserId: 8,
-        name: "示例工作区",
+        name: "示例项目",
         order: 0,
         publicId: expect.stringMatching(/^ws_[0-9a-f]{12}$/),
       },

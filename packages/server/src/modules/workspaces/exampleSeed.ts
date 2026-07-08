@@ -60,7 +60,7 @@ export async function seedExampleWorkspaceForUser(ownerUserId: number, template 
     const workspace = await tx.workspace.create({
       data: {
         ownerUserId,
-        name: "示例工作区",
+        name: "示例项目",
         order: nextOrder,
         publicId: generateWorkspacePublicId(),
       },
