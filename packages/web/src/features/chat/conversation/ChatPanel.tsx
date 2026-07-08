@@ -11,71 +11,7 @@ export function ChatPanel({
   workspaceId,
   messages: parentMessages,
   messageTotal,
-  onSendInDraft,
-  claimPendingDraftText,
-  onRunComplete,
-  onWorkspaceRefresh,
-  onStreamingChange,
-  onAttachExcel,
-  referenceCacheRevision,
-  onRegenerate,
-  onUndoComplete,
-  onNavigateSheet,
-}: {
-  sessionId: number | null;
-  workspaceId: number;
-  messages: any[];
-  messageTotal: number;
-  onSendInDraft: (text: string) => Promise<number>;
-  claimPendingDraftText: (sessionId: number) => string | null;
-  onRunComplete?: (sessionId: number, messages: any[]) => Promise<void> | void;
-  onWorkspaceRefresh?: () => Promise<void> | void;
-  onStreamingChange?: (isStreaming: boolean) => void;
-  onAttachExcel: (file: File) => Promise<void> | void;
-  referenceCacheRevision: number;
-  onRegenerate?: () => void;
-  onUndoComplete?: () => Promise<void> | void;
-  onNavigateSheet?: (sheetId: number) => void;
-}) {
-  if (sessionId == null) {
-    return (
-      <div className={styles.container}>
-        <MessageList messages={[]} isStreaming={false} />
-        <ChatComposer
-          isStreaming={false}
-          onSend={(text) => { void onSendInDraft(text); }}
-          onStop={() => {}}
-          onAttachExcel={onAttachExcel}
-          referenceCacheRevision={referenceCacheRevision}
-          workspaceId={workspaceId}
-        />
-      </div>
-    );
-  }
-
-  return <RealChat
-    sessionId={sessionId}
-    workspaceId={workspaceId}
-    parentMessages={parentMessages}
-    messageTotal={messageTotal}
-    claimPendingDraftText={claimPendingDraftText}
-    onRunComplete={onRunComplete}
-    onWorkspaceRefresh={onWorkspaceRefresh}
-    onStreamingChange={onStreamingChange}
-    onAttachExcel={onAttachExcel}
-    referenceCacheRevision={referenceCacheRevision}
-    onRegenerate={onRegenerate}
-    onUndoComplete={onUndoComplete}
-    onNavigateSheet={onNavigateSheet}
-  />;
-}
-
-function RealChat({
-  sessionId,
-  workspaceId,
-  parentMessages,
-  messageTotal,
-  claimPendingDraftText,
+  pendingDraftTextRef,
   onRunComplete,
   onWorkspaceRefresh,
   onStreamingChange,
@@ -87,9 +23,9 @@ function RealChat({
 }: {
   sessionId: number;
   workspaceId: number;
-  parentMessages: any[];
+  messages: any[];
   messageTotal: number;
-  claimPendingDraftText: (sessionId: number) => string | null;
+  pendingDraftTextRef: React.MutableRefObject<{ [sessionId: number]: string }>;
   onRunComplete?: (sessionId: number, messages: any[]) => Promise<void> | void;
   onWorkspaceRefresh?: () => Promise<void> | void;
   onStreamingChange?: (isStreaming: boolean) => void;
@@ -117,7 +53,6 @@ function RealChat({
   const composerRef = useRef<ChatComposerHandle>(null);
   const prevStreaming = useRef(isStreaming);
 
-  // 新 AI 流完成后恢复撤销能力
   useEffect(() => {
     if (prevStreaming.current && !isStreaming) {
       setCanUndo(true);
@@ -125,7 +60,6 @@ function RealChat({
     prevStreaming.current = isStreaming;
   }, [isStreaming]);
 
-  // 切换会话后重置
   useEffect(() => {
     setCanUndo(true);
   }, [sessionId]);
@@ -146,11 +80,12 @@ function RealChat({
   }, [onUndo, isUndoing, onUndoComplete]);
 
   useEffect(() => {
-    const pendingDraftText = claimPendingDraftText(sessionId);
-    if (pendingDraftText) {
-      sendMessage(pendingDraftText);
+    const text = pendingDraftTextRef.current[sessionId];
+    if (text) {
+      delete pendingDraftTextRef.current[sessionId];
+      sendMessage(text);
     }
-  }, [claimPendingDraftText, sendMessage, sessionId]);
+  }, [pendingDraftTextRef, sendMessage, sessionId]);
 
   const handleScroll = useCallback(() => {
     const el = document.querySelector(`.${msgStyles.messageList}`) as HTMLElement | null;
@@ -159,14 +94,12 @@ function RealChat({
     setShowScrollToBottom(!nearBottom);
   }, []);
 
-  // Hide when new messages arrive (auto-scroll kicks in)
   useEffect(() => {
     setShowScrollToBottom(false);
   }, [messages, isStreaming]);
 
   const handleScrollToBottom = useCallback(() => {
     setShowScrollToBottom(false);
-    // Force scroll to bottom
     const el = document.querySelector(`.${msgStyles.messageList}`) as HTMLElement | null;
     if (el) {
       el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });

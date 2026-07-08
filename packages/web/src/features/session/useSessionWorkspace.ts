@@ -1,99 +1,66 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   createSession,
-  deleteSession,
-  fetchSessions,
   generateSessionTitle,
   type Session,
 } from "@/api/sessions";
 import { fetchMessages as fetchChatMessages } from "@/api/chat";
 import { getFirstUserText } from "./utils";
+import { useSessionsList } from "./useSessionsList";
 
 const PAGE_SIZE = 40;
-
-const SESSION_STORAGE_KEY = "openexcel:sessionId";
-
-function loadStoredSessionId(): number | null {
-  try {
-    const stored = sessionStorage.getItem(SESSION_STORAGE_KEY);
-    return stored !== null ? Number(stored) : null;
-  } catch {
-    return null;
-  }
-}
-
-function saveSessionId(id: number | null) {
-  try {
-    if (id != null) {
-      sessionStorage.setItem(SESSION_STORAGE_KEY, String(id));
-    } else {
-      sessionStorage.removeItem(SESSION_STORAGE_KEY);
-    }
-  } catch {
-    // ignore
-  }
-}
-
-type UndoState = "idle" | "loading" | "success" | "error";
 
 export function useSessionWorkspace(
   workspaceId: number | null,
   onUndoComplete?: () => Promise<void> | void,
   initial?: { sessions: Session[]; messages?: unknown[]; messageTotal?: number },
 ) {
-  const [sessions, setSessions] = useState<Session[]>(initial?.sessions ?? []);
-  const [currentSessionId, setCurrentSessionId] = useState<number | null>(() => {
-    const stored = loadStoredSessionId();
-    if (initial && stored !== null && initial.sessions.some((s) => s.id === stored)) {
-      return stored;
-    }
-    if (initial && initial.sessions.length > 0) return initial.sessions[0].id;
-    return stored;
-  });
+  const {
+    sessions,
+    setSessions,
+    currentSessionId,
+    setCurrentSessionId,
+    historyOpen,
+    setHistoryOpen,
+    refreshSessions,
+    ensureSession,
+    handleNewSession: listNewSession,
+    handleSelectSession: listSelectSession,
+    handleDeleteSession: listDeleteSession,
+  } = useSessionsList(workspaceId, initial?.sessions);
+
   const [messages, setMessages] = useState<any[]>(initial?.messages ?? []);
   const [messageTotal, setMessageTotal] = useState(initial?.messageTotal ?? 0);
   const [initialLoaded, setInitialLoaded] = useState(!!initial);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const loadedOffsetRef = useRef(initial?.messages?.length ?? 0);
   const messagesSeededRef = useRef(!!initial?.messages);
-  const pendingDraftSessionIdRef = useRef<number | null>(null);
-  const pendingDraftRef = useRef<{ sessionId: number; text: string } | null>(null);
+  const draftSessionIdsRef = useRef<Set<number>>(new Set());
 
+  // Seed initial data from route loader
   useEffect(() => {
     if (!initial) return;
     messagesSeededRef.current = !!initial.messages;
     setSessions(initial.sessions);
-    const stored = loadStoredSessionId();
-    const targetId = stored !== null && initial.sessions.some((s) => s.id === stored)
-      ? stored
-      : initial.sessions[0]?.id ?? null;
-    setCurrentSessionId(targetId);
     if (initial.messages) {
       setMessages(initial.messages);
       setMessageTotal(initial.messageTotal ?? initial.messages.length);
       loadedOffsetRef.current = initial.messages.length;
     }
     setInitialLoaded(true);
-  }, [initial]);
+  }, [initial]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Reset on workspace switch
   const prevWorkspaceIdRef = useRef(workspaceId);
 
   useEffect(() => {
     if (workspaceId == null) {
-      pendingDraftSessionIdRef.current = null;
-      pendingDraftRef.current = null;
-      setSessions([]);
-      setCurrentSessionId(null);
       setMessages([]);
       setMessageTotal(0);
       loadedOffsetRef.current = 0;
       setInitialLoaded(true);
     } else if (prevWorkspaceIdRef.current != null && prevWorkspaceIdRef.current !== workspaceId) {
-      pendingDraftSessionIdRef.current = null;
-      pendingDraftRef.current = null;
-      setCurrentSessionId(null);
       setMessages([]);
       setMessageTotal(0);
       loadedOffsetRef.current = 0;
@@ -101,34 +68,17 @@ export function useSessionWorkspace(
       refreshSessions();
     }
     prevWorkspaceIdRef.current = workspaceId;
-  }, [workspaceId]);
+  }, [workspaceId, refreshSessions]);
 
-  const refreshSessions = useCallback(async () => {
-    if (workspaceId == null) {
-      setSessions([]);
-      setCurrentSessionId(null);
-      return [];
-    }
-
-    const list = await fetchSessions(workspaceId);
-
-    setSessions(list);
-    setCurrentSessionId((prev) => {
-      if (prev !== null && list.some((session) => session.id === prev)) {
-        return prev;
-      }
-      return list[0]?.id ?? null;
-    });
-    return list;
-  }, [workspaceId]);
-
+  // Load messages when switching to an existing session
   useEffect(() => {
     if (messagesSeededRef.current) {
       messagesSeededRef.current = false;
       return;
     }
 
-    if (currentSessionId != null && pendingDraftSessionIdRef.current === currentSessionId) {
+    if (currentSessionId != null && draftSessionIdsRef.current.has(currentSessionId)) {
+      draftSessionIdsRef.current.delete(currentSessionId);
       setMessages([]);
       setMessageTotal(0);
       loadedOffsetRef.current = 0;
@@ -167,10 +117,6 @@ export function useSessionWorkspace(
     };
   }, [currentSessionId, workspaceId]);
 
-  useEffect(() => {
-    saveSessionId(currentSessionId);
-  }, [currentSessionId]);
-
   const loadMoreMessages = useCallback(async () => {
     if (!currentSessionId || workspaceId == null || loadingMore) return;
     if (loadedOffsetRef.current >= messageTotal) return;
@@ -187,67 +133,32 @@ export function useSessionWorkspace(
     }
   }, [currentSessionId, loadingMore, messageTotal, workspaceId]);
 
-  const ensureSession = useCallback(async () => {
-    if (currentSessionId != null) return currentSessionId;
-    if (workspaceId == null) throw new Error("No workspace");
-    const session = await createSession(workspaceId);
-    setCurrentSessionId(session.id);
-    setSessions((prev) => [session, ...prev]);
-    return session.id;
-  }, [currentSessionId, workspaceId]);
-
   const handleSendInDraft = useCallback(async (text: string) => {
     if (workspaceId == null) throw new Error("No workspace");
     const session = await createSession(workspaceId);
-    pendingDraftRef.current = { sessionId: session.id, text };
-    pendingDraftSessionIdRef.current = session.id;
+    draftSessionIdsRef.current.add(session.id);
     setCurrentSessionId(session.id);
     setSessions((prev) => [session, ...prev]);
     return session.id;
-  }, [workspaceId]);
-
-  const claimPendingDraftText = useCallback((sessionId: number) => {
-    const pendingDraft = pendingDraftRef.current;
-    if (!pendingDraft || pendingDraft.sessionId !== sessionId) {
-      return null;
-    }
-
-    pendingDraftRef.current = null;
-    return pendingDraft.text;
-  }, []);
+  }, [workspaceId, setCurrentSessionId, setSessions]);
 
   const handleNewSession = useCallback(() => {
-    pendingDraftSessionIdRef.current = null;
-    pendingDraftRef.current = null;
-    setCurrentSessionId(null);
     setMessages([]);
     setMessageTotal(0);
+    loadedOffsetRef.current = 0;
     setInitialLoaded(true);
-    setHistoryOpen(false);
-  }, []);
+    listNewSession();
+  }, [listNewSession]);
 
   const handleSelectSession = useCallback((id: number) => {
-    if (pendingDraftSessionIdRef.current !== id) {
-      pendingDraftSessionIdRef.current = null;
-    }
-    if (pendingDraftRef.current?.sessionId !== id) {
-      pendingDraftRef.current = null;
-    }
-    setCurrentSessionId(id);
-    setHistoryOpen(false);
-  }, []);
+    listSelectSession(id);
+  }, [listSelectSession]);
 
   const handleDeleteSession = useCallback(async (id: number) => {
-    if (workspaceId == null) return;
-    await deleteSession(workspaceId, id);
-    await refreshSessions();
-  }, [refreshSessions, workspaceId]);
+    await listDeleteSession(id);
+  }, [listDeleteSession]);
 
   const handleRunComplete = useCallback(async (sessionId: number, finishedMessages: any[]) => {
-    if (pendingDraftSessionIdRef.current === sessionId) {
-      pendingDraftSessionIdRef.current = null;
-    }
-
     const firstUserText = getFirstUserText(finishedMessages).trim();
     try {
       if (firstUserText) {
@@ -289,7 +200,6 @@ export function useSessionWorkspace(
     ensureSession,
     loadMoreMessages,
     handleSendInDraft,
-    claimPendingDraftText,
     handleRunComplete,
     handleNewSession,
     handleSelectSession,

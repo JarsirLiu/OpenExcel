@@ -31,7 +31,7 @@ describe("useSessionWorkspace", () => {
     mocks.generateSessionTitle.mockReset();
   });
 
-  it("keeps the draft session mounted while the first message is being sent", async () => {
+  it("creates a session for draft and skips fetchMessages", async () => {
     mocks.createSession.mockResolvedValue({
       id: 5,
       publicId: "session-5",
@@ -55,14 +55,8 @@ describe("useSessionWorkspace", () => {
       expect(result.current.currentSessionId).toBe(5);
     });
 
-    await act(async () => {
-      await Promise.resolve();
-    });
-
     expect(result.current.initialLoaded).toBe(true);
     expect(result.current.sessions.map((session) => session.id)).toEqual([5]);
-    expect(result.current.claimPendingDraftText(5)).toBe("帮我汇总这份表格");
-    expect(result.current.claimPendingDraftText(5)).toBeNull();
     expect(mocks.fetchMessages).not.toHaveBeenCalled();
   });
 

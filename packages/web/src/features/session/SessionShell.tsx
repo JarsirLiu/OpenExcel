@@ -1,5 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { ChatPanel } from "@/features/chat/conversation/ChatPanel";
+import { DraftComposer } from "@/features/chat/composer/DraftComposer";
 import { SessionHeader } from "./components/SessionHeader";
 import { SessionHistoryPopover } from "./components/SessionHistoryPopover";
 import type { Session } from "@/api/sessions";
@@ -24,7 +25,6 @@ type Props = {
   isStreaming: boolean;
   setIsStreaming: (next: boolean) => void;
   handleSendInDraft: (text: string) => Promise<number>;
-  claimPendingDraftText: (sessionId: number) => string | null;
   handleRunComplete: (sessionId: number, messages: any[]) => Promise<void>;
   handleNewSession: () => void;
   handleSelectSession: (id: number) => void;
@@ -51,7 +51,6 @@ export function SessionShell({
   isStreaming,
   setIsStreaming,
   handleSendInDraft,
-  claimPendingDraftText,
   handleRunComplete,
   handleNewSession,
   handleSelectSession,
@@ -65,6 +64,7 @@ export function SessionShell({
   onNavigateSheet,
 }: Props) {
   const historyRef = useRef<HTMLDivElement>(null);
+  const pendingDraftTextRef = useRef<{ [sessionId: number]: string }>({});
 
   useEffect(() => {
     if (!historyOpen) return;
@@ -76,6 +76,12 @@ export function SessionShell({
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [historyOpen, setHistoryOpen]);
+
+  const handleDraftSend = useCallback(async (text: string) => {
+    const newId = await handleSendInDraft(text);
+    pendingDraftTextRef.current[newId] = text;
+    return newId;
+  }, [handleSendInDraft]);
 
   const currentSession = currentSessionId != null
     ? sessions.find((session) => session.id === currentSessionId)
@@ -112,22 +118,30 @@ export function SessionShell({
       )}
 
       {initialLoaded ? (
-        <ChatPanel
-          key={currentSessionId ?? "draft"}
-          workspaceId={workspaceId}
-          sessionId={currentSessionId}
-          messages={messages}
-          messageTotal={messageTotal}
-          onSendInDraft={handleSendInDraft}
-          claimPendingDraftText={claimPendingDraftText}
-          onRunComplete={handleRunComplete}
-          onWorkspaceRefresh={onWorkspaceRefresh}
-          onStreamingChange={setIsStreaming}
-          onAttachExcel={onAttachExcel}
-          referenceCacheRevision={referenceCacheRevision}
-          onUndoComplete={handleUndoComplete}
-          onNavigateSheet={onNavigateSheet}
-        />
+        currentSessionId != null ? (
+          <ChatPanel
+            key={currentSessionId}
+            workspaceId={workspaceId}
+            sessionId={currentSessionId}
+            messages={messages}
+            messageTotal={messageTotal}
+            pendingDraftTextRef={pendingDraftTextRef}
+            onRunComplete={handleRunComplete}
+            onWorkspaceRefresh={onWorkspaceRefresh}
+            onStreamingChange={setIsStreaming}
+            onAttachExcel={onAttachExcel}
+            referenceCacheRevision={referenceCacheRevision}
+            onUndoComplete={handleUndoComplete}
+            onNavigateSheet={onNavigateSheet}
+          />
+        ) : (
+          <DraftComposer
+            workspaceId={workspaceId}
+            onSend={handleDraftSend}
+            onAttachExcel={onAttachExcel}
+            referenceCacheRevision={referenceCacheRevision}
+          />
+        )
       ) : (
         <div className={styles.emptyState}>{t("loading", "加载中...")}</div>
       )}
