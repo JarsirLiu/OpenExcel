@@ -1,0 +1,20 @@
+name: openexcel
+
+services:
+  server:
+    build: .
+    container_name: openexcel-server
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      - PORT=4000
+      - NODE_ENV=production
+      - DATABASE_PROVIDER=sqlite
+      - DATABASE_URL=file:../../.data/prod.db
+    volumes:
+      - openexcel-data:/app/.data
+      - ./config/config.toml:/app/config/config.toml:ro
+
+volumes:
+  openexcel-data:

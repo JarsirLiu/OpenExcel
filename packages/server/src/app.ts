@@ -1,6 +1,9 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
+import fastifyStatic from "@fastify/static";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { authRoutes } from "./modules/auth/routes.js";
 import { workspaceRoutes } from "./modules/workspaces/routes.js";
 import { workbookRoutes } from "./modules/workbooks/routes.js";
@@ -9,6 +12,8 @@ import { sessionRoutes } from "./modules/sessions/routes.js";
 import { pinoStream } from "./infra/observability/logger.js";
 import { resolveUserHook } from "./middleware/resolveUser.js";
 import { startTimerHook, responseLoggerHook } from "./middleware/requestLogger.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export async function createApp() {
   const app = Fastify({ logger: { stream: pinoStream, level: "info" } });
@@ -25,6 +30,18 @@ export async function createApp() {
   await app.register(workbookRoutes);
   await app.register(sheetRoutes);
   await app.register(sessionRoutes);
+
+  // 生产环境：server 自 serve 前端静态文件
+  const webDist = resolve(__dirname, "../../web/dist");
+  await app.register(fastifyStatic, {
+    root: webDist,
+    prefix: "/",
+    wildcard: false,
+  });
+
+  app.setNotFoundHandler((_req, reply) => {
+    reply.sendFile("index.html");
+  });
 
   return app;
 }
