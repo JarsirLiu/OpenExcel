@@ -35,15 +35,14 @@ export const sheetChangeClearRangeSchema = sheetChangeRangePayloadSchema.refine(
   },
 );
 
-export const sheetChangeRangeOperationSchema = z.object({
-  type: z.literal("range"),
-  ...sheetChangeRangePayloadSchema.shape,
-}).refine(
-  (range) => range.endRow >= range.startRow && range.endCol >= range.startCol,
-  {
+export const sheetChangeRangeOperationSchema = z
+  .object({
+    type: z.literal("range"),
+    ...sheetChangeRangePayloadSchema.shape,
+  })
+  .refine((range) => range.endRow >= range.startRow && range.endCol >= range.startCol, {
     message: "Invalid sheet range",
-  },
-);
+  });
 
 const sheetChangeClearCellOperationSchema = z.object({
   type: z.literal("cell"),
@@ -75,14 +74,16 @@ export const sheetChangeDeltaSchema = z.discriminatedUnion("type", [
   }),
 ]);
 
-export const sheetChangePatchOutputSchema = z.object({
-  sheetInfo: z.object({
-    sheetId: z.number().int(),
-    sheetNo: z.number().int().optional(),
-    sheetName: z.string().min(1),
-  }),
-  delta: sheetChangeDeltaSchema.nullish(),
-}).passthrough();
+export const sheetChangePatchOutputSchema = z
+  .object({
+    sheetInfo: z.object({
+      sheetId: z.number().int(),
+      sheetNo: z.number().int().optional(),
+      sheetName: z.string().min(1),
+    }),
+    delta: sheetChangeDeltaSchema.nullish(),
+  })
+  .passthrough();
 
 export type SheetChangeCell = z.infer<typeof sheetChangeCellSchema>;
 export type SheetChangeClearCell = z.infer<typeof sheetChangeClearCellSchema>;

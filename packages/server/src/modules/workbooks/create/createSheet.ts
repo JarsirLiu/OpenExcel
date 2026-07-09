@@ -1,13 +1,22 @@
-import { buildBlankSheetInitialization, buildSourceSheetInitialization, normalizeSheetName, WorkbookCreationError } from "./creation.js";
 import * as repo from "../repository.js";
+import {
+  buildBlankSheetInitialization,
+  buildSourceSheetInitialization,
+  normalizeSheetName,
+  WorkbookCreationError,
+} from "./creation.js";
 
-export async function createSheet(workspaceId: number, workbookId: number, name?: string, sourceSheetId?: number) {
+export async function createSheet(
+  workspaceId: number,
+  workbookId: number,
+  name?: string,
+  sourceSheetId?: number,
+) {
   const workbook = await repo.findWorkbookWithSheets(workbookId, workspaceId);
   if (!workbook) return null;
 
-  const sourceSheet = sourceSheetId != null
-    ? workbook.sheets.find((sheet) => sheet.id === sourceSheetId)
-    : null;
+  const sourceSheet =
+    sourceSheetId != null ? workbook.sheets.find((sheet) => sheet.id === sourceSheetId) : null;
 
   if (sourceSheetId != null && !sourceSheet) {
     throw new WorkbookCreationError("源 Sheet 不存在", "SOURCE_SHEET_NOT_FOUND", 404);

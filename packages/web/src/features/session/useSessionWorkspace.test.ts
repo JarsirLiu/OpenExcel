@@ -34,11 +34,13 @@ describe("useSessionWorkspace", () => {
       createdAt: "2026-07-07T00:00:00.000Z",
     });
 
-    const { result } = renderHook(() => useSessionWorkspace(1, undefined, {
-      sessions: [],
-      messages: [],
-      messageTotal: 0,
-    }));
+    const { result } = renderHook(() =>
+      useSessionWorkspace(1, undefined, {
+        sessions: [],
+        messages: [],
+        messageTotal: 0,
+      }),
+    );
 
     await act(async () => {
       await result.current.handleSendInDraft("帮我汇总这份表格");

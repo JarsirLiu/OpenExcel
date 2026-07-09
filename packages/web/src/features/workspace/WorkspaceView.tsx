@@ -1,9 +1,9 @@
 import { useRef } from "react";
 import type { WorkbookFull } from "@/api/workbooks";
-import { WorkbookHeader } from "../workbook/ui/WorkbookHeader";
-import { ExcelWorkspace } from "../workbook/ui/ExcelWorkspace";
 import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatchSync";
 import { t } from "@/lib/i18n";
+import { ExcelWorkspace } from "../workbook/ui/ExcelWorkspace";
+import { WorkbookHeader } from "../workbook/ui/WorkbookHeader";
 import styles from "./WorkspaceView.module.css";
 
 type WorkbookMeta = {
@@ -55,7 +55,7 @@ export function WorkspaceView({
 
   return (
     <div className={styles.container}>
-<WorkbookHeader
+      <WorkbookHeader
         workbooks={workbooks}
         activeWorkbookIdx={workbookIdx}
         status={status}
@@ -77,11 +77,11 @@ export function WorkspaceView({
       />
 
       <div className={styles.excelArea}>
-      <ExcelWorkspace
-        workspaceId={workspaceId}
-        workbook={currentWorkbook}
-        workbookRevision={workbookRevision}
-        currentSheetIndex={currentSheetIndex}
+        <ExcelWorkspace
+          workspaceId={workspaceId}
+          workbook={currentWorkbook}
+          workbookRevision={workbookRevision}
+          currentSheetIndex={currentSheetIndex}
           onSheetIndexChange={setCurrentSheetIndex}
           onWorkbookDelete={handleWorkbookDelete}
           onWorkbookStructureChanged={handleWorkbookStructureChanged}

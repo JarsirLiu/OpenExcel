@@ -1,13 +1,19 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { createHashRouter, Outlet, RouterProvider, type LoaderFunctionArgs, redirect } from "react-router-dom";
-import { RouteErrorBoundary } from "./app/RouteErrorBoundary";
+import {
+  createHashRouter,
+  type LoaderFunctionArgs,
+  Outlet,
+  RouterProvider,
+  redirect,
+} from "react-router-dom";
 import { fetchCurrentUser } from "./api/auth";
 import { getCachedUser } from "./api/authCache";
-import { fetchWorkspaces } from "./api/workspaces";
-import { fetchWorkbooks } from "./api/workbooks";
 import { fetchSessions } from "./api/sessions";
+import { fetchWorkbooks } from "./api/workbooks";
 import type { Workspace } from "./api/workspaces";
+import { fetchWorkspaces } from "./api/workspaces";
+import { RouteErrorBoundary } from "./app/RouteErrorBoundary";
 import "./styles/tokens.css";
 import "./styles/theme.css";
 import "./index.css";
@@ -80,5 +86,5 @@ const router = createHashRouter([
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <RouterProvider router={router} />
-  </React.StrictMode>
+  </React.StrictMode>,
 );

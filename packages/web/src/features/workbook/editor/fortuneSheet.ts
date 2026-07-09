@@ -1,12 +1,14 @@
+import type { FortuneCell, FortuneSheetData, SheetConfig } from "@openexcel/core";
 import { isCelldata, restoreSheetConfig } from "@openexcel/core";
-import type { FortuneCell, SheetConfig, FortuneSheetData } from "@openexcel/core";
 
-export type { FortuneCell, SheetConfig, FortuneSheetData };
+export type { FortuneCell, FortuneSheetData, SheetConfig };
 
 /**
  * 从 celldata 的 mc 属性提取合并范围。
  */
-function extractMergesFromCelldata(celldata: FortuneCell[]): { row: [number, number]; col: [number, number] }[] {
+function extractMergesFromCelldata(
+  celldata: FortuneCell[],
+): { row: [number, number]; col: [number, number] }[] {
   const seen = new Set<string>();
   const merges: { row: [number, number]; col: [number, number] }[] = [];
   for (const cell of celldata) {
@@ -23,16 +25,14 @@ function extractMergesFromCelldata(celldata: FortuneCell[]): { row: [number, num
   return merges;
 }
 
-export function toFortuneSheetData(
-  sheet: {
-    id: number;
-    name: string;
-    columns: { label: string; width?: number }[];
-    merges: { row: [number, number]; col: [number, number] }[];
-    uploadedData: any[] | null;
-    config: any | null;
-  },
-): FortuneSheetData {
+export function toFortuneSheetData(sheet: {
+  id: number;
+  name: string;
+  columns: { label: string; width?: number }[];
+  merges: { row: [number, number]; col: [number, number] }[];
+  uploadedData: any[] | null;
+  config: any | null;
+}): FortuneSheetData {
   let celldata: FortuneCell[];
   let merges: { row: [number, number]; col: [number, number] }[];
 
@@ -51,10 +51,7 @@ export function toFortuneSheetData(
         c: ci,
         v: { v: col.label, m: col.label },
       }));
-      celldata = [
-        ...headerCells,
-        ...celldata.map((c) => ({ ...c, r: c.r + 1 })),
-      ];
+      celldata = [...headerCells, ...celldata.map((c) => ({ ...c, r: c.r + 1 }))];
       merges = merges.map((m) => ({
         row: [m.row[0] + 1, m.row[1] + 1],
         col: [m.col[0], m.col[1]],

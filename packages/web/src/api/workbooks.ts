@@ -61,7 +61,10 @@ export async function fetchWorkbookReferenceCandidates(
   workspaceId: number,
   options?: { signal?: AbortSignal },
 ): Promise<WorkbookReferenceCandidate[]> {
-  const res = await apiFetch(`/workspaces/${workspaceId}/workbooks/reference-candidates`, options?.signal ? { signal: options.signal } : {});
+  const res = await apiFetch(
+    `/workspaces/${workspaceId}/workbooks/reference-candidates`,
+    options?.signal ? { signal: options.signal } : {},
+  );
   if (!res.ok) throw new Error("加载引用候选失败");
   return res.json();
 }
@@ -72,7 +75,10 @@ export async function fetchWorkbook(workspaceId: number, id: number): Promise<Wo
   return res.json();
 }
 
-export async function uploadNewWorkbook(workspaceId: number, file: File): Promise<{ id: number; publicId: string; name: string; sheets: number }> {
+export async function uploadNewWorkbook(
+  workspaceId: number,
+  file: File,
+): Promise<{ id: number; publicId: string; name: string; sheets: number }> {
   const form = new FormData();
   form.append("file", file);
   const res = await apiFetch(`/workspaces/${workspaceId}/workbooks/upload`, {
@@ -86,9 +92,9 @@ export async function uploadNewWorkbook(workspaceId: number, file: File): Promis
 export async function createWorkbook(
   workspaceId: number,
   input?: {
-  name?: string;
-  sheetName?: string;
-  sourceSheetId?: number;
+    name?: string;
+    sheetName?: string;
+    sourceSheetId?: number;
   },
 ): Promise<WorkbookCreateResult> {
   const res = await apiFetch(`/workspaces/${workspaceId}/workbooks`, {
@@ -108,7 +114,11 @@ export function downloadTemplateUrl(workspaceId: number, workbookId: number): st
   return `${API_BASE}/workspaces/${workspaceId}/workbooks/${workbookId}/template`;
 }
 
-export async function downloadWorkbook(workspaceId: number, workbookId: number, fileName: string): Promise<void> {
+export async function downloadWorkbook(
+  workspaceId: number,
+  workbookId: number,
+  fileName: string,
+): Promise<void> {
   const res = await apiFetch(`/workspaces/${workspaceId}/workbooks/${workbookId}/template`);
   if (!res.ok) throw new Error(await readErrorMessage(res, "下载工作簿失败"));
   const blob = await res.blob();
@@ -122,7 +132,12 @@ export async function downloadWorkbook(workspaceId: number, workbookId: number, 
   URL.revokeObjectURL(url);
 }
 
-export async function updateSheetData(workspaceId: number, sheetId: number, celldata: any[], config?: any): Promise<void> {
+export async function updateSheetData(
+  workspaceId: number,
+  sheetId: number,
+  celldata: any[],
+  config?: any,
+): Promise<void> {
   const body: any = { celldata };
   if (config !== undefined) body.config = config;
   const res = await apiFetch(`/workspaces/${workspaceId}/sheets/${sheetId}`, {
@@ -133,7 +148,11 @@ export async function updateSheetData(workspaceId: number, sheetId: number, cell
   if (!res.ok) throw new Error("保存失败");
 }
 
-export async function updateSheetName(workspaceId: number, sheetId: number, name: string): Promise<void> {
+export async function updateSheetName(
+  workspaceId: number,
+  sheetId: number,
+  name: string,
+): Promise<void> {
   const res = await apiFetch(`/workspaces/${workspaceId}/sheets/${sheetId}/name`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
@@ -161,14 +180,25 @@ export async function deleteWorkbook(workspaceId: number, id: number): Promise<v
   if (!res.ok) throw new Error(await readErrorMessage(res, "删除工作簿失败"));
 }
 
-export async function deleteSheet(workspaceId: number, workbookId: number, sheetId: number): Promise<void> {
-  const res = await apiFetch(`/workspaces/${workspaceId}/workbooks/${workbookId}/sheets/${sheetId}`, {
-    method: "DELETE",
-  });
+export async function deleteSheet(
+  workspaceId: number,
+  workbookId: number,
+  sheetId: number,
+): Promise<void> {
+  const res = await apiFetch(
+    `/workspaces/${workspaceId}/workbooks/${workbookId}/sheets/${sheetId}`,
+    {
+      method: "DELETE",
+    },
+  );
   if (!res.ok) throw new Error(await readErrorMessage(res, "删除 Sheet 失败"));
 }
 
-export async function updateWorkbookName(workspaceId: number, workbookId: number, name: string): Promise<void> {
+export async function updateWorkbookName(
+  workspaceId: number,
+  workbookId: number,
+  name: string,
+): Promise<void> {
   const res = await apiFetch(`/workspaces/${workspaceId}/workbooks/${workbookId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },

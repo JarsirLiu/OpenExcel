@@ -15,7 +15,9 @@ export function DraftComposer({ onSend }: Props) {
       <MessageList messages={[]} isStreaming={false} />
       <ChatComposer
         isStreaming={false}
-        onSend={(text) => { void onSend(text); }}
+        onSend={(text) => {
+          void onSend(text);
+        }}
         onStop={() => {}}
         onAttachExcel={onAttachExcel}
         referenceCacheRevision={referenceCacheRevision}

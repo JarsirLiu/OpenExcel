@@ -1,17 +1,17 @@
-import Fastify from "fastify";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
 import fastifyStatic from "@fastify/static";
-import { resolve, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
-import { authRoutes } from "./modules/auth/routes.js";
-import { workspaceRoutes } from "./modules/workspaces/routes.js";
-import { workbookRoutes } from "./modules/workbooks/routes.js";
-import { sheetRoutes } from "./modules/sheets/routes.js";
-import { sessionRoutes } from "./modules/sessions/routes.js";
+import Fastify from "fastify";
 import { pinoStream } from "./infra/observability/logger.js";
+import { responseLoggerHook, startTimerHook } from "./middleware/requestLogger.js";
 import { resolveUserHook } from "./middleware/resolveUser.js";
-import { startTimerHook, responseLoggerHook } from "./middleware/requestLogger.js";
+import { authRoutes } from "./modules/auth/routes.js";
+import { sessionRoutes } from "./modules/sessions/routes.js";
+import { sheetRoutes } from "./modules/sheets/routes.js";
+import { workbookRoutes } from "./modules/workbooks/routes.js";
+import { workspaceRoutes } from "./modules/workspaces/routes.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 

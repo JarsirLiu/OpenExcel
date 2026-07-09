@@ -46,9 +46,9 @@ vi.mock("./session.js", () => ({
 }));
 
 import {
+  loginWithPassword,
   logoutAllSessionsForUser,
   logoutCurrentSession,
-  loginWithPassword,
   registerWithPassword,
   resolveCurrentUser,
 } from "./service.js";
@@ -78,7 +78,9 @@ describe("auth service", () => {
       user: { id: 7, email: "alice@example.com", displayName: "Alice" },
     });
 
-    const currentUser = await resolveCurrentUser({ headers: { cookie: "openexcel_session=session-token" } } as any);
+    const currentUser = await resolveCurrentUser({
+      headers: { cookie: "openexcel_session=session-token" },
+    } as any);
 
     expect(currentUser).toEqual({ id: 7, email: "alice@example.com", displayName: "Alice" });
   });
@@ -86,7 +88,11 @@ describe("auth service", () => {
   it("registers a user, provisions a workspace, and sets a cookie", async () => {
     mocks.findUserByEmail.mockResolvedValue(null);
     mocks.hashPassword.mockResolvedValue("hashed-password");
-    mocks.createUser.mockResolvedValue({ id: 12, email: "new@example.com", displayName: "New User" });
+    mocks.createUser.mockResolvedValue({
+      id: 12,
+      email: "new@example.com",
+      displayName: "New User",
+    });
     mocks.seedExampleWorkspaceForUser.mockResolvedValue({ seeded: true, workspaceId: 99 });
     mocks.createSessionToken.mockReturnValue("session-token");
     mocks.hashSessionToken.mockReturnValue("session-hash");
@@ -169,7 +175,10 @@ describe("auth service", () => {
     mocks.buildClearedSessionCookie.mockReturnValue("cleared-cookie");
 
     const reply = { header: vi.fn() };
-    await logoutCurrentSession({ headers: { cookie: "openexcel_session=session-token" } } as any, reply as any);
+    await logoutCurrentSession(
+      { headers: { cookie: "openexcel_session=session-token" } } as any,
+      reply as any,
+    );
 
     expect(mocks.revokeSessionByTokenHash).toHaveBeenCalledWith("session-hash");
     expect(reply.header).toHaveBeenCalledWith("Set-Cookie", "cleared-cookie");

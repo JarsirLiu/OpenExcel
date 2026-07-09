@@ -53,9 +53,7 @@ describe("sheetChangePatchOutputSchema", () => {
       success: true,
       delta: {
         type: "merge",
-        operations: [
-          { type: "range", startRow: 2, startCol: 2, endRow: 1, endCol: 3 },
-        ],
+        operations: [{ type: "range", startRow: 2, startCol: 2, endRow: 1, endCol: 3 }],
       },
       sheetInfo: { sheetId: 1, sheetName: "Sheet1" },
     });

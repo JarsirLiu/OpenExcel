@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, writeFileSync, readFileSync, rmSync } from "node:fs";
-import { join } from "node:path";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 import toml from "@iarna/toml";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 describe("config parsing", () => {
   let tmpDir: string;
@@ -17,14 +17,20 @@ describe("config parsing", () => {
 
   it("parses a valid config.toml", () => {
     const configPath = join(tmpDir, "config.toml");
-    writeFileSync(configPath, `[model]
+    writeFileSync(
+      configPath,
+      `[model]
 baseUrl = "https://test.api.com/v1"
 apiKey = "sk-test123"
 modelName = "gpt-4o-mini"
-`, "utf-8");
+`,
+      "utf-8",
+    );
 
     const raw = readFileSync(configPath, "utf-8");
-    const parsed = toml.parse(raw) as unknown as { model: { baseUrl: string; apiKey: string; modelName: string } };
+    const parsed = toml.parse(raw) as unknown as {
+      model: { baseUrl: string; apiKey: string; modelName: string };
+    };
 
     expect(parsed.model.baseUrl).toBe("https://test.api.com/v1");
     expect(parsed.model.apiKey).toBe("sk-test123");

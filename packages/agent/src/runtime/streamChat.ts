@@ -4,9 +4,9 @@ import {
   convertToModelMessages,
   isLoopFinished,
   streamText,
+  type ToolSet,
   toUIMessageStream,
   validateUIMessages,
-  type ToolSet,
 } from "ai";
 import { createChatModel, type ModelConfig } from "../model.js";
 
@@ -24,7 +24,9 @@ export interface StreamChatInput {
   onEnd?: ({ messages }: { messages: any[] }) => void | Promise<void>;
 }
 
-export async function streamChat(input: StreamChatInput): Promise<ReturnType<typeof toUIMessageStream>> {
+export async function streamChat(
+  input: StreamChatInput,
+): Promise<ReturnType<typeof toUIMessageStream>> {
   const validatedMessages = await validateUIMessages({
     messages: input.messages,
     tools: input.tools as any,

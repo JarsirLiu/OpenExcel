@@ -25,7 +25,11 @@ export async function deleteSession(workspaceId: number, id: number): Promise<vo
   if (!res.ok) throw new Error("删除会话失败");
 }
 
-export async function renameSession(workspaceId: number, id: number, name: string): Promise<Session> {
+export async function renameSession(
+  workspaceId: number,
+  id: number,
+  name: string,
+): Promise<Session> {
   const res = await apiFetch(`/workspaces/${workspaceId}/sessions/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
@@ -35,7 +39,11 @@ export async function renameSession(workspaceId: number, id: number, name: strin
   return res.json();
 }
 
-export async function generateSessionTitle(workspaceId: number, sessionId: number, firstUserText: string): Promise<{ title: string }> {
+export async function generateSessionTitle(
+  workspaceId: number,
+  sessionId: number,
+  firstUserText: string,
+): Promise<{ title: string }> {
   const res = await apiFetch(`/workspaces/${workspaceId}/sessions/${sessionId}/title`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

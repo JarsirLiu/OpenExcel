@@ -1,19 +1,14 @@
 import { excelToolSpecs, runToolContextSchema } from "@openexcel/agent";
-import { prisma } from "../../../infra/database/db.js";
 import {
-  sheetChangePatchOutputSchema,
-  sheetChangeRangeToZeroBased,
   type SheetChangeDelta,
   type SheetChangeRangeOperation,
+  sheetChangePatchOutputSchema,
+  sheetChangeRangeToZeroBased,
 } from "@openexcel/core";
-import {
-  applyMergeOperation,
-  buildSheetChangePreview,
-  toA1CellRef,
-  toA1Range,
-} from "../domain.js";
-import * as repo from "../../sessions/runs/repository.js";
+import { prisma } from "../../../infra/database/db.js";
 import { sheetRecordToCelldata } from "../../../shared/utils/sheetData.js";
+import * as repo from "../../sessions/runs/repository.js";
+import { applyMergeOperation, buildSheetChangePreview, toA1CellRef, toA1Range } from "../domain.js";
 
 export const mergeCells = {
   ...excelToolSpecs.mergeCells,
@@ -27,7 +22,8 @@ export const mergeCells = {
       include: { workbook: true },
     });
     if (!sheet) throw new Error(`Sheet ${sheetId} 不存在`);
-    if (sheet.workbook.workspaceId !== context.workspaceId) throw new Error(`Sheet ${sheetId} 不存在`);
+    if (sheet.workbook.workspaceId !== context.workspaceId)
+      throw new Error(`Sheet ${sheetId} 不存在`);
 
     await repo.upsertRunSheetSnapshot({
       runId: context.runId,
@@ -51,7 +47,9 @@ export const mergeCells = {
     for (const operation of operations) {
       const storageRange = sheetChangeRangeToZeroBased(operation);
       applyMergeOperation(cellMap, storageRange);
-      mergedRanges.push(toA1Range(operation.startRow, operation.startCol, operation.endRow, operation.endCol));
+      mergedRanges.push(
+        toA1Range(operation.startRow, operation.startCol, operation.endRow, operation.endCol),
+      );
       minRow = Math.min(minRow, storageRange.startRow);
       maxRow = Math.max(maxRow, storageRange.endRow);
     }

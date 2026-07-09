@@ -36,7 +36,9 @@
   border-radius: var(--radius-pill);
   background: var(--bg-surface);
   cursor: pointer;
-  transition: background 0.15s, opacity 0.15s;
+  transition:
+    background 0.15s,
+    opacity 0.15s;
   user-select: none;
 }
 
@@ -65,7 +67,9 @@
   background: var(--text-primary);
   color: var(--bg-surface);
   font-weight: 600;
-  transition: opacity 0.2s, transform 0.15s;
+  transition:
+    opacity 0.2s,
+    transform 0.15s;
 }
 
 .plusBtnSolid:hover {
@@ -127,7 +131,9 @@
   background: var(--bg-surface);
   border: 1px solid var(--border-default);
   border-radius: var(--radius);
-  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.12), 0 1px 3px rgba(15, 23, 42, 0.08);
+  box-shadow:
+    0 4px 16px rgba(15, 23, 42, 0.12),
+    0 1px 3px rgba(15, 23, 42, 0.08);
   padding: 6px;
   z-index: 200;
 }

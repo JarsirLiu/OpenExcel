@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchMessages as fetchChatMessages, undoLatestRun } from "@/api/chat";
 import { collectWorkbookMutationToolCallIds } from "./useSheetPatchSync";
 
@@ -64,9 +64,13 @@ export function useChatConversation({
   const wasStreamingRef = useRef(false);
   const loadedOffsetRef = useRef(initialMessages?.length ?? 0);
 
-  const transport = useMemo(() => new DefaultChatTransport({
-    api: `/api/workspaces/${workspaceId}/sessions/${sessionId}/chat`,
-  }), [sessionId, workspaceId]);
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        api: `/api/workspaces/${workspaceId}/sessions/${sessionId}/chat`,
+      }),
+    [sessionId, workspaceId],
+  );
 
   const { messages, setMessages, sendMessage, status, stop, error } = useChat({
     id: String(sessionId),
@@ -91,7 +95,12 @@ export function useChatConversation({
 
     const loadInitialMessages = async () => {
       try {
-        const { messages: msgs, total } = await fetchChatMessages(workspaceId, sessionId, PAGE_SIZE, 0);
+        const { messages: msgs, total } = await fetchChatMessages(
+          workspaceId,
+          sessionId,
+          PAGE_SIZE,
+          0,
+        );
         if (!cancelled) {
           setMessages(msgs);
           loadedOffsetRef.current = msgs.length;
@@ -119,7 +128,10 @@ export function useChatConversation({
   }, [isStreaming, onStreamingChange]);
 
   useEffect(() => {
-    const toolCallIds = collectWorkbookMutationToolCallIds(messages, seenWorkbookMutationToolCallIdsRef.current);
+    const toolCallIds = collectWorkbookMutationToolCallIds(
+      messages,
+      seenWorkbookMutationToolCallIdsRef.current,
+    );
     if (toolCallIds.length === 0) {
       hasPrimedWorkbookMutationHistoryRef.current = true;
       return;
@@ -161,17 +173,25 @@ export function useChatConversation({
     void flushPendingWorkspaceRefresh();
   }, [flushPendingWorkspaceRefresh, isStreaming]);
 
-  const handleSend = useCallback((text: string) => {
-    if (!text || isStreaming) return;
-    sendMessage({ text });
-  }, [isStreaming, sendMessage]);
+  const handleSend = useCallback(
+    (text: string) => {
+      if (!text || isStreaming) return;
+      sendMessage({ text });
+    },
+    [isStreaming, sendMessage],
+  );
 
   const loadOlderMessages = useCallback(async () => {
     if (loadingOlder || !hasOlder) return;
     setLoadingOlder(true);
     try {
       const offset = loadedOffsetRef.current;
-      const { messages: olderMsgs, total } = await fetchChatMessages(workspaceId, sessionId, PAGE_SIZE, offset);
+      const { messages: olderMsgs, total } = await fetchChatMessages(
+        workspaceId,
+        sessionId,
+        PAGE_SIZE,
+        offset,
+      );
       if (olderMsgs.length === 0) {
         setHasOlder(false);
         return;

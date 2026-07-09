@@ -1,6 +1,6 @@
-import { ExcelGrid } from "@/features/workbook/editor/ExcelGrid";
 import type { WorkbookFull } from "@/api/workbooks";
 import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatchSync";
+import { ExcelGrid } from "@/features/workbook/editor/ExcelGrid";
 import styles from "./ExcelWorkspace.module.css";
 
 interface Props {

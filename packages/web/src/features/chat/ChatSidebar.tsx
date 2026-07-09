@@ -1,5 +1,5 @@
-import type { useSessionWorkspace } from "@/features/session/useSessionWorkspace";
 import { SessionShell } from "@/features/session/SessionShell";
+import type { useSessionWorkspace } from "@/features/session/useSessionWorkspace";
 import styles from "./ChatSidebar.module.css";
 
 type CurrentUser = {

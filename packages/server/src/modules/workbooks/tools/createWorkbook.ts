@@ -8,6 +8,11 @@ export const createWorkbook = {
     input: { name?: string; sheetName?: string; sourceSheetId?: number },
     { context }: { context: { workspaceId: number } },
   ) => {
-    return service.createWorkbook(context.workspaceId, input.name, input.sheetName, input.sourceSheetId);
+    return service.createWorkbook(
+      context.workspaceId,
+      input.name,
+      input.sheetName,
+      input.sourceSheetId,
+    );
   },
 };

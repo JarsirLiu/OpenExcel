@@ -1,8 +1,15 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
-import * as authRepo from "./repository.js";
-import { AUTH_SESSION_MAX_AGE_SECONDS, buildClearedSessionCookie, buildSessionCookie, createSessionToken, extractSessionTokenFromCookie, hashSessionToken } from "./session.js";
-import { PASSWORD_MIN_LENGTH, hashPassword, verifyPassword } from "./password.js";
 import { seedExampleWorkspaceForUser } from "../workspaces/exampleSeed.js";
+import { hashPassword, PASSWORD_MIN_LENGTH, verifyPassword } from "./password.js";
+import * as authRepo from "./repository.js";
+import {
+  AUTH_SESSION_MAX_AGE_SECONDS,
+  buildClearedSessionCookie,
+  buildSessionCookie,
+  createSessionToken,
+  extractSessionTokenFromCookie,
+  hashSessionToken,
+} from "./session.js";
 
 export interface CurrentUserContext {
   id: number;
@@ -44,7 +51,11 @@ function normalizeDisplayName(displayName: string | undefined, email: string): s
   return "用户";
 }
 
-function toCurrentUser(user: { id: number; email: string; displayName: string }): CurrentUserContext {
+function toCurrentUser(user: {
+  id: number;
+  email: string;
+  displayName: string;
+}): CurrentUserContext {
   return {
     id: user.id,
     email: user.email,
@@ -53,7 +64,8 @@ function toCurrentUser(user: { id: number; email: string; displayName: string })
 }
 
 function getRequestMetadata(req: FastifyRequest) {
-  const userAgent = typeof req.headers["user-agent"] === "string" ? req.headers["user-agent"] : null;
+  const userAgent =
+    typeof req.headers["user-agent"] === "string" ? req.headers["user-agent"] : null;
   return {
     userAgent,
     ipAddress: typeof req.ip === "string" ? req.ip : null,
@@ -87,9 +99,11 @@ export async function resolveCurrentUser(req: FastifyRequest): Promise<CurrentUs
   return toCurrentUser(session.user);
 }
 
-async function validateCredentialsInput(input: AuthCredentialsInput): Promise<{ email: string; password: string; displayName: string }> {
+async function validateCredentialsInput(
+  input: AuthCredentialsInput,
+): Promise<{ email: string; password: string; displayName: string }> {
   const email = normalizeEmail(input.email);
-  if (!email || !email.includes("@")) {
+  if (!email?.includes("@")) {
     throw new AuthError("请输入有效邮箱", "INVALID_EMAIL");
   }
 
@@ -105,7 +119,11 @@ async function validateCredentialsInput(input: AuthCredentialsInput): Promise<{ 
   };
 }
 
-export async function registerWithPassword(input: AuthCredentialsInput, req: FastifyRequest, reply: FastifyReply) {
+export async function registerWithPassword(
+  input: AuthCredentialsInput,
+  req: FastifyRequest,
+  reply: FastifyReply,
+) {
   const validated = await validateCredentialsInput(input);
   const existingUser = await authRepo.findUserByEmail(validated.email);
   if (existingUser) {
@@ -124,7 +142,11 @@ export async function registerWithPassword(input: AuthCredentialsInput, req: Fas
   return toCurrentUser(user);
 }
 
-export async function loginWithPassword(input: AuthCredentialsInput, req: FastifyRequest, reply: FastifyReply) {
+export async function loginWithPassword(
+  input: AuthCredentialsInput,
+  req: FastifyRequest,
+  reply: FastifyReply,
+) {
   const validated = await validateCredentialsInput(input);
   const user = await authRepo.findUserByEmail(validated.email);
   if (!user) {

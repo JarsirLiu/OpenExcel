@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  applyClearOperation,
   applyCellWrite,
+  applyClearOperation,
   applyMergeOperation,
   buildSheetChangePreview,
   normalizeWriteOperations,
@@ -22,7 +22,15 @@ describe("sheet domain helpers", () => {
       sheetId: 3,
       operations: [
         { type: "cell", row: 1, col: 2, value: "x", formula: "A1+B1" },
-        { type: "range", startRow: 3, startCol: 4, endRow: 5, endCol: 6, value: "y", formula: "SUM(A1:A3)" },
+        {
+          type: "range",
+          startRow: 3,
+          startCol: 4,
+          endRow: 5,
+          endCol: 6,
+          value: "y",
+          formula: "SUM(A1:A3)",
+        },
       ],
     });
 
@@ -30,7 +38,15 @@ describe("sheet domain helpers", () => {
       sheetId: 3,
       operations: [
         { type: "cell", row: 1, col: 2, value: "x", formula: "A1+B1" },
-        { type: "range", startRow: 3, startCol: 4, endRow: 5, endCol: 6, value: "y", formula: "SUM(A1:A3)" },
+        {
+          type: "range",
+          startRow: 3,
+          startCol: 4,
+          endRow: 5,
+          endCol: 6,
+          value: "y",
+          formula: "SUM(A1:A3)",
+        },
       ],
     });
   });
@@ -41,9 +57,7 @@ describe("sheet domain helpers", () => {
       { r: 4, c: 2, v: {} },
     ]);
 
-    expect(merges).toEqual([
-      { startRow: 1, startCol: 1, endRow: 2, endCol: 3 },
-    ]);
+    expect(merges).toEqual([{ startRow: 1, startCol: 1, endRow: 2, endCol: 3 }]);
   });
 
   it("builds previews from a celldata slice", () => {
@@ -65,9 +79,7 @@ describe("sheet domain helpers", () => {
       ["A", "", ""],
       ["", "B", ""],
     ]);
-    expect(preview.merges).toEqual([
-      { startRow: 2, startCol: 2, endRow: 3, endCol: 3 },
-    ]);
+    expect(preview.merges).toEqual([{ startRow: 2, startCol: 2, endRow: 3, endCol: 3 }]);
   });
 
   it("applies merge and clear operations to a cell map", () => {
@@ -87,7 +99,10 @@ describe("sheet domain helpers", () => {
 
   it("writes formulas and clears old formulas when replacing values", () => {
     const cellMap = new Map<string, any>();
-    const touchedCells = new Map<string, { row: number; col: number; value: string | number | boolean; formula?: string }>();
+    const touchedCells = new Map<
+      string,
+      { row: number; col: number; value: string | number | boolean; formula?: string }
+    >();
 
     applyCellWrite(cellMap, touchedCells, 0, 0, 3, "A1+B1");
     expect(cellMap.get("0,0").v).toEqual({ v: 3, m: "3", f: "A1+B1" });

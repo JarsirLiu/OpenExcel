@@ -1,17 +1,17 @@
 import {
-  buildSystemPrompt,
   buildExcelToolCatalog,
   buildRunToolContext,
+  buildSystemPrompt,
   buildWorkspaceToolContext,
   streamChat as streamAgentChat,
 } from "@openexcel/agent";
+import { loadModelConfig } from "../../../config.js";
+import { excelTools } from "../../sheets/tools/index.js";
+import { workbookTools } from "../../workbooks/tools/index.js";
 import * as repo from "../repository.js";
 import * as runRepo from "../runs/repository.js";
-import { buildWorkspaceContext } from "./context.js";
 import { persistSessionMessages } from "../transcript.js";
-import { workbookTools } from "../../workbooks/tools/index.js";
-import { excelTools } from "../../sheets/tools/index.js";
-import { loadModelConfig } from "../../../config.js";
+import { buildWorkspaceContext } from "./context.js";
 
 function extractMessageText(message: any): string {
   if (typeof message?.content === "string") return message.content;
@@ -94,14 +94,18 @@ export async function streamChat(
       await runRepo.createStep({
         runId: run.id,
         type: String(step?.stepType ?? "step"),
-        status: Array.isArray(step?.toolResults) && step.toolResults.some((result: any) => result?.isError)
-          ? "error"
-          : String(step?.finishReason ?? "completed"),
+        status:
+          Array.isArray(step?.toolResults) &&
+          step.toolResults.some((result: any) => result?.isError)
+            ? "error"
+            : String(step?.finishReason ?? "completed"),
         content: typeof step?.text === "string" ? step.text : null,
         toolName: Array.isArray(step?.toolCalls)
           ? step.toolCalls
               .map((call: any) => call?.toolName)
-              .filter((name: unknown): name is string => typeof name === "string" && name.length > 0)
+              .filter(
+                (name: unknown): name is string => typeof name === "string" && name.length > 0,
+              )
               .join(",") || null
           : null,
         input: serializeJson(step?.toolCalls ?? []),
@@ -147,7 +151,10 @@ export async function streamChat(
         try {
           await runRepo.pruneUndoSnapshots(workspaceId, sessionId);
         } catch (error) {
-          console.error(`[session] Failed to prune undo snapshots for session ${sessionId}:`, error);
+          console.error(
+            `[session] Failed to prune undo snapshots for session ${sessionId}:`,
+            error,
+          );
         }
       },
     });

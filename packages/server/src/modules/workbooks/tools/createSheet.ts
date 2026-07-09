@@ -8,7 +8,12 @@ export const createSheet = {
     input: { workbookId: number; name?: string; sourceSheetId?: number },
     { context }: { context: { workspaceId: number } },
   ) => {
-    const result = await service.createSheet(context.workspaceId, input.workbookId, input.name, input.sourceSheetId);
+    const result = await service.createSheet(
+      context.workspaceId,
+      input.workbookId,
+      input.name,
+      input.sourceSheetId,
+    );
     if (!result) {
       throw new Error(`Workbook ${input.workbookId} 不存在`);
     }

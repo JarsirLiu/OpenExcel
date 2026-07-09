@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { fetchCurrentUser, login, logout, register, type CurrentUser } from "@/api/auth";
-import { setCachedUser, clearCachedUser } from "@/api/authCache";
+import { type CurrentUser, fetchCurrentUser, login, logout, register } from "@/api/auth";
+import { clearCachedUser, setCachedUser } from "@/api/authCache";
 import { clearSessionStorage } from "@/shared/utils/storage";
 
 export function useAuthState() {

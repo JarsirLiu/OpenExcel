@@ -274,7 +274,9 @@ describe("collectWorkbookMutationToolCallIds", () => {
     ];
 
     expect(collectWorkbookMutationToolCallIds(messages, new Set(["tool-10"]))).toEqual(["tool-11"]);
-    expect(new Set(collectWorkbookMutationToolCallIds(messages, new Set()))).toEqual(new Set(["tool-10", "tool-11"]));
+    expect(new Set(collectWorkbookMutationToolCallIds(messages, new Set()))).toEqual(
+      new Set(["tool-10", "tool-11"]),
+    );
   });
 
   it("returns an empty list when only historical tool calls are present", () => {

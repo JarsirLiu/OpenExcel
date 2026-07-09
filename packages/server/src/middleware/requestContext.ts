@@ -7,7 +7,10 @@ declare module "fastify" {
   }
 }
 
-export function requireCurrentUser(req: FastifyRequest, reply: FastifyReply): CurrentUserContext | null {
+export function requireCurrentUser(
+  req: FastifyRequest,
+  reply: FastifyReply,
+): CurrentUserContext | null {
   if (!req.currentUser) {
     reply.status(401).send({ error: "Unauthorized" });
     return null;

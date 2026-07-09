@@ -1,9 +1,13 @@
 import { spawnSync } from "node:child_process";
-import { createRequire } from "node:module";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { getDefaultDatabaseUrl, loadDatabaseConfig, type DatabaseProvider } from "./databaseConfig.js";
+import {
+  type DatabaseProvider,
+  getDefaultDatabaseUrl,
+  loadDatabaseConfig,
+} from "./databaseConfig.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const packageRoot = resolve(__dirname, "../../..");
@@ -47,7 +51,10 @@ function runPrisma(args: string[], databaseUrl: string): void {
 
 export function generateAllClients(): void {
   (Object.keys(schemaByProvider) as DatabaseProvider[]).forEach((provider) => {
-    runPrisma(["generate", "--schema", schemaByProvider[provider]], getDefaultDatabaseUrl(provider));
+    runPrisma(
+      ["generate", "--schema", schemaByProvider[provider]],
+      getDefaultDatabaseUrl(provider),
+    );
   });
 }
 

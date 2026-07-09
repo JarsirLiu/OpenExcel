@@ -125,7 +125,11 @@ export async function deleteRunSheetSnapshots(runId: number) {
   });
 }
 
-export async function pruneUndoSnapshots(workspaceId: number, sessionId: number, keepRuns = DEFAULT_UNDO_SNAPSHOT_RETENTION) {
+export async function pruneUndoSnapshots(
+  workspaceId: number,
+  sessionId: number,
+  keepRuns = DEFAULT_UNDO_SNAPSHOT_RETENTION,
+) {
   const session = await prisma.session.findFirst({
     where: { id: sessionId, workspaceId },
     select: { id: true },
@@ -141,7 +145,9 @@ export async function pruneUndoSnapshots(workspaceId: number, sessionId: number,
     select: { id: true },
   });
 
-  const staleRunIds = runsWithSnapshots.slice(keepRuns).map((run: (typeof runsWithSnapshots)[number]) => run.id);
+  const staleRunIds = runsWithSnapshots
+    .slice(keepRuns)
+    .map((run: (typeof runsWithSnapshots)[number]) => run.id);
   if (staleRunIds.length === 0) {
     return 0;
   }
@@ -169,7 +175,8 @@ export async function restoreRunSheetSnapshots(runId: number) {
           uploadedData: snapshot.uploadedData,
           config: snapshot.config,
         },
-      })),
+      }),
+    ),
     prisma.agentRun.update({
       where: { id: runId },
       data: {

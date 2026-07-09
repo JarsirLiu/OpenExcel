@@ -43,12 +43,14 @@ describe("generateTitle", () => {
 
     const title = await generateTitle("title-model" as any, "分析这些数据");
 
-    expect(mockGenerateText).toHaveBeenCalledWith(expect.objectContaining({
-      model: "title-model",
-      prompt: expect.stringContaining("分析这些数据"),
-      maxOutputTokens: 32,
-      temperature: 0,
-    }));
+    expect(mockGenerateText).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: "title-model",
+        prompt: expect.stringContaining("分析这些数据"),
+        maxOutputTokens: 32,
+        temperature: 0,
+      }),
+    );
     expect(title).toBe("数据分析报告生成");
   });
 

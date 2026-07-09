@@ -1,5 +1,5 @@
-import { deserializeSheet } from "../../shared/utils/sheetSerialization.js";
 import { prisma } from "../../infra/database/db.js";
+import { deserializeSheet } from "../../shared/utils/sheetSerialization.js";
 
 export async function findSheetWithWorkbook(id: number, workspaceId: number) {
   const sheet = await prisma.sheet.findFirst({
@@ -11,7 +11,11 @@ export async function findSheetWithWorkbook(id: number, workspaceId: number) {
   return sheet;
 }
 
-export async function updateSheetData(sheetId: number, data: { uploadedData: string; config?: string }, workspaceId: number) {
+export async function updateSheetData(
+  sheetId: number,
+  data: { uploadedData: string; config?: string },
+  workspaceId: number,
+) {
   const sheet = await prisma.sheet.findFirst({
     where: { id: sheetId },
     include: { workbook: true },
@@ -51,7 +55,11 @@ export async function deleteSheet(id: number, workspaceId: number) {
   return prisma.sheet.delete({ where: { id: sheet.id } });
 }
 
-export async function deleteSheetAndReindex(workbookId: number, sheetId: number, workspaceId: number) {
+export async function deleteSheetAndReindex(
+  workbookId: number,
+  sheetId: number,
+  workspaceId: number,
+) {
   await prisma.$transaction(async (tx) => {
     const sheet = await tx.sheet.findFirst({
       where: { id: sheetId },
@@ -79,7 +87,9 @@ export async function getSheet(sheetId: number, workspaceId: number) {
     where: { id: sheetId },
   });
   if (!sheet) return null;
-  const workbook = await prisma.workbook.findFirst({ where: { id: sheet.workbookId, workspaceId } });
+  const workbook = await prisma.workbook.findFirst({
+    where: { id: sheet.workbookId, workspaceId },
+  });
   if (!workbook) return null;
   return deserializeSheet(sheet);
 }

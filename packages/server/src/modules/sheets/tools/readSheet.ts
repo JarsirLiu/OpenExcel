@@ -53,7 +53,7 @@ function inferColumnTypes(
     for (const cell of cells) {
       const v = String(cell.v?.v ?? "");
       if (v === "") continue;
-      if (!isNaN(Number(v))) numeric++;
+      if (!Number.isNaN(Number(v))) numeric++;
       else str++;
     }
     if (numeric > str) types[col] = "number";
@@ -71,7 +71,7 @@ function computeColumnStats(
   for (let col = 0; col < columnCount; col++) {
     if (columnTypes[col] !== "number") continue;
     const cells = celldata.filter((c) => c.c === col && (!hasHeader || c.r > 0));
-    const nums = cells.map((c) => Number(c.v?.v)).filter((n) => !isNaN(n));
+    const nums = cells.map((c) => Number(c.v?.v)).filter((n) => !Number.isNaN(n));
     if (nums.length === 0) continue;
     const key = String(col + 1);
     stats[key] = {

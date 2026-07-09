@@ -2,8 +2,7 @@
   min-height: 100vh;
   background:
     radial-gradient(ellipse at top left, #fdf6f0 0%, transparent 50%),
-    radial-gradient(ellipse at bottom right, #f5f0ff 0%, transparent 55%),
-    #faf8f6;
+    radial-gradient(ellipse at bottom right, #f5f0ff 0%, transparent 55%), #faf8f6;
   color: var(--text-primary);
 }
 
@@ -110,7 +109,9 @@
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
-  transition: opacity 0.2s, transform 0.15s;
+  transition:
+    opacity 0.2s,
+    transform 0.15s;
   letter-spacing: 0.01em;
   align-self: flex-start;
 }
@@ -229,9 +230,15 @@
   background: var(--bg-surface);
 }
 
-.cellFilledA { background: #e8f4e8; }
-.cellFilledB { background: #e8edf8; }
-.cellFilledC { background: #faf0e8; }
+.cellFilledA {
+  background: #e8f4e8;
+}
+.cellFilledB {
+  background: #e8edf8;
+}
+.cellFilledC {
+  background: #faf0e8;
+}
 
 .visualSidebar {
   display: flex;
@@ -247,10 +254,18 @@
   background: var(--bg-muted);
 }
 
-.sidebarLine:nth-child(1) { width: 80%; }
-.sidebarLine:nth-child(2) { width: 60%; }
-.sidebarLine:nth-child(3) { width: 90%; }
-.sidebarLine:nth-child(4) { width: 45%; }
+.sidebarLine:nth-child(1) {
+  width: 80%;
+}
+.sidebarLine:nth-child(2) {
+  width: 60%;
+}
+.sidebarLine:nth-child(3) {
+  width: 90%;
+}
+.sidebarLine:nth-child(4) {
+  width: 45%;
+}
 
 @media (max-width: 900px) {
   .hero {

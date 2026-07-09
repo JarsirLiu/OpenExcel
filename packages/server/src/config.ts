@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { resolve, dirname } from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import toml from "@iarna/toml";
 
@@ -21,7 +21,9 @@ export function loadModelConfig(): ModelConfig {
     const raw = readFileSync(configPath, "utf-8");
     const parsed = toml.parse(raw) as unknown as { model: ModelConfig };
     cachedConfig = parsed.model;
-    console.log(`[config] Loaded model config: ${parsed.model.modelName} @ ${parsed.model.baseUrl}`);
+    console.log(
+      `[config] Loaded model config: ${parsed.model.modelName} @ ${parsed.model.baseUrl}`,
+    );
     return cachedConfig;
   } catch (err) {
     console.error(`[config] Failed to load config from ${configPath}:`, err);

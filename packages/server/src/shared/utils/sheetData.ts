@@ -12,7 +12,9 @@ function safeParse<T>(value: string | null | undefined, fallback: T): T {
   }
 }
 
-export function parseUploadedCelldata(uploadedData: string | null | undefined): FortuneCell[] | null {
+export function parseUploadedCelldata(
+  uploadedData: string | null | undefined,
+): FortuneCell[] | null {
   const parsed = safeParse<unknown>(uploadedData, null);
   if (!Array.isArray(parsed)) {
     return null;
@@ -20,9 +22,7 @@ export function parseUploadedCelldata(uploadedData: string | null | undefined): 
   return parsed as FortuneCell[];
 }
 
-export function sheetRecordToCelldata(
-  sheet: Pick<SheetRecord, "uploadedData">,
-): FortuneCell[] {
+export function sheetRecordToCelldata(sheet: Pick<SheetRecord, "uploadedData">): FortuneCell[] {
   const uploadedData = parseUploadedCelldata(sheet.uploadedData);
   if (uploadedData && uploadedData.length > 0) {
     return uploadedData;

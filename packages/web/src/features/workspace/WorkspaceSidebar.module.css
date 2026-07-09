@@ -136,7 +136,9 @@
   flex-shrink: 0;
   opacity: 0;
   visibility: hidden;
-  transition: opacity 0.15s ease, visibility 0.15s ease;
+  transition:
+    opacity 0.15s ease,
+    visibility 0.15s ease;
 }
 
 .item:hover .itemActions {
@@ -211,7 +213,9 @@
   align-items: center;
   justify-content: center;
   color: var(--text-tertiary);
-  transition: background 0.12s ease, color 0.12s ease;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
 }
 
 .deleteConfirm button:first-of-type:hover {
@@ -243,7 +247,9 @@
   cursor: pointer;
   font-size: 13px;
   color: var(--text-secondary);
-  transition: background 0.12s ease, color 0.12s ease;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -282,7 +288,9 @@
   color: var(--text-tertiary);
   border-radius: 4px;
   cursor: pointer;
-  transition: transform 0.15s ease, color 0.12s ease;
+  transition:
+    transform 0.15s ease,
+    color 0.12s ease;
 }
 
 .chevron:hover {
@@ -312,7 +320,9 @@
   cursor: pointer;
   font-size: 13px;
   color: var(--text-secondary);
-  transition: background 0.12s ease, color 0.12s ease;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
   border: none;
   background: transparent;
   width: 100%;
@@ -375,7 +385,9 @@
   flex-shrink: 0;
   opacity: 0;
   visibility: hidden;
-  transition: opacity 0.15s ease, visibility 0.15s ease;
+  transition:
+    opacity 0.15s ease,
+    visibility 0.15s ease;
 }
 
 .workbookItem:hover .workbookActions {
@@ -432,7 +444,10 @@
   cursor: pointer;
   font-size: 13px;
   color: var(--text-tertiary);
-  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease,
+    border-color 0.12s ease;
   width: 100%;
   margin: 4px 0 2px 0;
 }

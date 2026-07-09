@@ -1,7 +1,7 @@
-import { prisma } from "../../infra/database/db.js";
 import type { FastifyReply, FastifyRequest } from "fastify";
-import { WorkspaceNotFoundError, requireWorkspace } from "../../modules/workspaces/service.js";
+import { prisma } from "../../infra/database/db.js";
 import { requireCurrentUser } from "../../middleware/requestContext.js";
+import { requireWorkspace, WorkspaceNotFoundError } from "../../modules/workspaces/service.js";
 
 function isNumeric(value: string): boolean {
   return /^\d+$/.test(value);

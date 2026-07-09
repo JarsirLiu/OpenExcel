@@ -44,12 +44,14 @@ export const pinoStream = new Writable({
 /* ───── hooks 里调用的请求日志 ───── */
 export function logRequest(req: any, reply: any, startTime: number) {
   const dur = Date.now() - startTime;
-  console.log(JSON.stringify({
-    time: localTimeISO(),
-    level: "info",
-    method: req.method,
-    url: req.url,
-    status: reply.statusCode,
-    duration: dur,
-  }));
+  console.log(
+    JSON.stringify({
+      time: localTimeISO(),
+      level: "info",
+      method: req.method,
+      url: req.url,
+      status: reply.statusCode,
+      duration: dur,
+    }),
+  );
 }

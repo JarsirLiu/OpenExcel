@@ -32,20 +32,34 @@ type XlsxBorderStyle =
 
 function toXlsxBorderStyle(style?: number): XlsxBorderStyle | undefined {
   switch (style) {
-    case 1: return "thin";
-    case 2: return "medium";
-    case 3: return "thick";
-    case 4: return "double";
-    case 5: return "hair";
-    case 6: return "dashed";
-    case 7: return "dotted";
-    case 8: return "dashDot";
-    case 9: return "mediumDashed";
-    case 10: return "mediumDotted";
-    case 11: return "mediumDashDot";
-    case 12: return "dashDotDot";
-    case 13: return "slantDashDot";
-    default: return undefined;
+    case 1:
+      return "thin";
+    case 2:
+      return "medium";
+    case 3:
+      return "thick";
+    case 4:
+      return "double";
+    case 5:
+      return "hair";
+    case 6:
+      return "dashed";
+    case 7:
+      return "dotted";
+    case 8:
+      return "dashDot";
+    case 9:
+      return "mediumDashed";
+    case 10:
+      return "mediumDotted";
+    case 11:
+      return "mediumDashDot";
+    case 12:
+      return "dashDotDot";
+    case 13:
+      return "slantDashDot";
+    default:
+      return undefined;
   }
 }
 
@@ -147,7 +161,10 @@ function toXlsxStyle(value: FortuneCellValue): Record<string, any> | undefined {
   return Object.keys(style).length > 0 ? style : undefined;
 }
 
-function collectMergeRanges(celldata: FortuneCell[], config?: Record<string, any> | string | null): MergeRange[] {
+function collectMergeRanges(
+  celldata: FortuneCell[],
+  config?: Record<string, any> | string | null,
+): MergeRange[] {
   const ranges = new Map<string, MergeRange>();
 
   for (const cell of celldata) {
@@ -160,7 +177,9 @@ function collectMergeRanges(celldata: FortuneCell[], config?: Record<string, any
 
   const mergeConfig = parseConfig(config).merge;
   if (mergeConfig && typeof mergeConfig === "object") {
-    for (const value of Object.values(mergeConfig as Record<string, { r: number; c: number; rs: number; cs: number }>)) {
+    for (const value of Object.values(
+      mergeConfig as Record<string, { r: number; c: number; rs: number; cs: number }>,
+    )) {
       if (value == null) continue;
       const row: [number, number] = [value.r, value.r + (value.rs ?? 1) - 1];
       const col: [number, number] = [value.c, value.c + (value.cs ?? 1) - 1];
@@ -253,7 +272,9 @@ function buildWorksheetFromCelldata(
   if (columnlen && typeof columnlen === "object") {
     const maxColumnIndex = Math.max(
       maxCol,
-      ...Object.keys(columnlen).map((key) => Number(key)).filter((value) => Number.isFinite(value)),
+      ...Object.keys(columnlen)
+        .map((key) => Number(key))
+        .filter((value) => Number.isFinite(value)),
     );
     ws["!cols"] = Array.from({ length: maxColumnIndex + 1 }, (_, index) => {
       const width = (columnlen as Record<string, number>)[index];
@@ -266,7 +287,9 @@ function buildWorksheetFromCelldata(
   if (rowlen && typeof rowlen === "object") {
     const maxRowIndex = Math.max(
       maxRow,
-      ...Object.keys(rowlen).map((key) => Number(key)).filter((value) => Number.isFinite(value)),
+      ...Object.keys(rowlen)
+        .map((key) => Number(key))
+        .filter((value) => Number.isFinite(value)),
     );
     ws["!rows"] = Array.from({ length: maxRowIndex + 1 }, (_, index) => {
       const height = (rowlen as Record<string, number>)[index];

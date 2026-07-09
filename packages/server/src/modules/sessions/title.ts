@@ -1,7 +1,7 @@
-import { generateText, type LanguageModel } from "ai";
 import { createTitleModel, type ModelConfig } from "@openexcel/agent";
-import * as repo from "./repository.js";
+import { generateText, type LanguageModel } from "ai";
 import { loadModelConfig } from "../../config.js";
+import * as repo from "./repository.js";
 
 export async function generateTitle(model: LanguageModel, prompt: string): Promise<string> {
   try {
@@ -12,7 +12,9 @@ export async function generateTitle(model: LanguageModel, prompt: string): Promi
       temperature: 0,
     });
 
-    const cleaned = stripThinkingTags(text || "").replace(/\s+/g, " ").trim();
+    const cleaned = stripThinkingTags(text || "")
+      .replace(/\s+/g, " ")
+      .trim();
     if (cleaned) {
       return cleaned.slice(0, 10);
     }
@@ -23,7 +25,11 @@ export async function generateTitle(model: LanguageModel, prompt: string): Promi
   return fallbackTitleFromPrompt(prompt);
 }
 
-export async function generateSessionTitleForSession(workspaceId: number, sessionId: number, firstUserText: string) {
+export async function generateSessionTitleForSession(
+  workspaceId: number,
+  sessionId: number,
+  firstUserText: string,
+) {
   const session = await repo.findSession(sessionId, workspaceId);
   if (!session) throw new Error("会话不存在");
   if (session.name !== "新对话") {
@@ -37,9 +43,7 @@ export async function generateSessionTitleForSession(workspaceId: number, sessio
 }
 
 function stripThinkingTags(text: string): string {
-  return text
-    .replace(/<think>[\s\S]*?<\/think>/gi, "")
-    .replace(/<\/?think>/gi, "");
+  return text.replace(/<think>[\s\S]*?<\/think>/gi, "").replace(/<\/?think>/gi, "");
 }
 
 function fallbackTitleFromPrompt(prompt: string): string {

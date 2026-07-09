@@ -1,5 +1,5 @@
+import { type SheetChangeDelta, sheetChangePatchOutputSchema } from "@openexcel/core";
 import { useEffect, useRef } from "react";
-import { sheetChangePatchOutputSchema, type SheetChangeDelta } from "@openexcel/core";
 
 export type SheetPatchMessageLike = {
   role?: unknown;
@@ -48,7 +48,10 @@ export type SheetDeletedUpdate = {
   order: number;
 };
 
-export type WorkbookStructureUpdate = WorkbookCreatedUpdate | SheetCreatedUpdate | SheetDeletedUpdate;
+export type WorkbookStructureUpdate =
+  | WorkbookCreatedUpdate
+  | SheetCreatedUpdate
+  | SheetDeletedUpdate;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -66,9 +69,9 @@ type CompletedToolPart = {
 
 function isCompletedToolPart(part: unknown): part is CompletedToolPart {
   if (!isRecord(part)) return false;
-  return typeof part.toolCallId === "string"
-    && part.state === "output-available"
-    && "output" in part;
+  return (
+    typeof part.toolCallId === "string" && part.state === "output-available" && "output" in part
+  );
 }
 
 function getToolName(part: CompletedToolPart): string {
@@ -125,15 +128,17 @@ function isWorkbookCreatedOutput(output: unknown): output is {
   initialSheet: { id: number; sheetNo: number; name: string; order: number };
 } {
   if (!isRecord(output)) return false;
-  return typeof output.id === "number"
-    && typeof output.name === "string"
-    && typeof output.order === "number"
-    && typeof output.sheets === "number"
-    && isRecord(output.initialSheet)
-    && typeof output.initialSheet.id === "number"
-    && typeof output.initialSheet.sheetNo === "number"
-    && typeof output.initialSheet.name === "string"
-    && typeof output.initialSheet.order === "number";
+  return (
+    typeof output.id === "number" &&
+    typeof output.name === "string" &&
+    typeof output.order === "number" &&
+    typeof output.sheets === "number" &&
+    isRecord(output.initialSheet) &&
+    typeof output.initialSheet.id === "number" &&
+    typeof output.initialSheet.sheetNo === "number" &&
+    typeof output.initialSheet.name === "string" &&
+    typeof output.initialSheet.order === "number"
+  );
 }
 
 function isSheetCreatedOutput(output: unknown): output is {
@@ -144,11 +149,13 @@ function isSheetCreatedOutput(output: unknown): output is {
   order: number;
 } {
   if (!isRecord(output)) return false;
-  return typeof output.workbookId === "number"
-    && typeof output.id === "number"
-    && typeof output.sheetNo === "number"
-    && typeof output.name === "string"
-    && typeof output.order === "number";
+  return (
+    typeof output.workbookId === "number" &&
+    typeof output.id === "number" &&
+    typeof output.sheetNo === "number" &&
+    typeof output.name === "string" &&
+    typeof output.order === "number"
+  );
 }
 
 export function collectWorkbookStructureUpdates(
@@ -229,7 +236,9 @@ export function useSheetPatchSync(
   const appliedToolCallIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    const patchUpdates = onSheetChanged ? collectSheetPatchUpdates(messages, appliedToolCallIdsRef.current) : [];
+    const patchUpdates = onSheetChanged
+      ? collectSheetPatchUpdates(messages, appliedToolCallIdsRef.current)
+      : [];
     for (const update of patchUpdates) {
       appliedToolCallIdsRef.current.add(update.toolCallId);
       onSheetChanged?.(update.sheetId, update.delta);

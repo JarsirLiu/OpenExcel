@@ -24,15 +24,23 @@ function buildMergeMap(merges: PreviewMerge[]): Map<string, { rs: number; cs: nu
   return map;
 }
 
-export function SheetPreview({ preview, changedCells }: { preview: PreviewData; changedCells?: ReadonlySet<string> }) {
+export function SheetPreview({
+  preview,
+  changedCells,
+}: {
+  preview: PreviewData;
+  changedCells?: ReadonlySet<string>;
+}) {
   const mergeMap = buildMergeMap(preview.merges);
   const skipped = new Set<string>();
   const rowBase = preview.range.startRow;
   const colBase = preview.range.startCol;
 
   return (
-      <div style={{ marginTop: 8 }}>
-      <div style={{ fontSize: 12, fontWeight: 600, color: "var(--muted-foreground)", marginBottom: 4 }}>
+    <div style={{ marginTop: 8 }}>
+      <div
+        style={{ fontSize: 12, fontWeight: 600, color: "var(--muted-foreground)", marginBottom: 4 }}
+      >
         {preview.sheetName} — 变更区域
       </div>
       <div style={{ overflowX: "auto", maxHeight: 300, overflowY: "auto" }}>

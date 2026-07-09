@@ -14,7 +14,9 @@ export function historyFromRuns(runs: RunLike[]) {
   return trim(transcript);
 }
 
-function trim(messages: { role: string; content: string }[]): { role: "user" | "assistant"; content: string }[] {
+function trim(
+  messages: { role: string; content: string }[],
+): { role: "user" | "assistant"; content: string }[] {
   if (messages.length <= MAX_TURNS * 2) {
     return messages.slice() as any;
   }

@@ -1,6 +1,6 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
-import { WorkspaceNotFoundError, requireWorkspace } from "./service.js";
 import { requireCurrentUser } from "../../middleware/requestContext.js";
+import { requireWorkspace, WorkspaceNotFoundError } from "./service.js";
 
 export async function resolveWorkspaceIdForRequest(
   req: FastifyRequest,

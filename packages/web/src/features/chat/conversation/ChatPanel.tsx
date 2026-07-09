@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChatComposer, type ChatComposerHandle } from "@/features/chat/composer/ChatComposer";
-import { MessageList } from "@/features/chat/message/MessageList";
 import { useChatConversation } from "@/features/chat/hooks/useChatConversation";
+import { MessageList } from "@/features/chat/message/MessageList";
+import msgStyles from "@/features/chat/message/MessageList.module.css";
 import { useSessionInfra } from "@/features/session/SessionShellContext";
 import { t } from "@/lib/i18n";
 import styles from "./ChatPanel.module.css";
-import msgStyles from "@/features/chat/message/MessageList.module.css";
 
 export function ChatPanel({
   sessionId,
@@ -18,9 +18,27 @@ export function ChatPanel({
   onRunComplete?: (sessionId: number, messages: any[]) => Promise<void> | void;
   onRegenerate?: () => void;
 }) {
-  const { workspaceId, initialMessages, onWorkspaceRefresh, onUndoComplete, onAttachExcel, referenceCacheRevision, onNavigateSheet } = useSessionInfra();
+  const {
+    workspaceId,
+    initialMessages,
+    onWorkspaceRefresh,
+    onUndoComplete,
+    onAttachExcel,
+    referenceCacheRevision,
+    onNavigateSheet,
+  } = useSessionInfra();
 
-  const { messages, error, isStreaming, loadingOlder, hasOlder, sendMessage, stop, loadOlderMessages, onUndo } = useChatConversation({
+  const {
+    messages,
+    error,
+    isStreaming,
+    loadingOlder,
+    hasOlder,
+    sendMessage,
+    stop,
+    loadOlderMessages,
+    onUndo,
+  } = useChatConversation({
     sessionId,
     workspaceId,
     initialMessages,
@@ -116,7 +134,13 @@ export function ChatPanel({
         <div className={msgStyles.scrollToBottom}>
           <button className={msgStyles.scrollToBottomBtn} onClick={handleScrollToBottom}>
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path d="M6 2v8M2 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              <path
+                d="M6 2v8M2 6l4 4 4-4"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             </svg>
             {t("scroll_to_bottom", "回到底部")}
           </button>

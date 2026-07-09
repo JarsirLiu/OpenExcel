@@ -1,7 +1,7 @@
-import { useState, type FormEvent } from "react";
-import { t } from "@/lib/i18n";
+import { type FormEvent, useState } from "react";
 import { Button } from "@/components/ui/Button/Button";
 import { Input } from "@/components/ui/Input/Input";
+import { t } from "@/lib/i18n";
 import styles from "./AuthScreen.module.css";
 
 export type AuthMode = "login" | "register";
@@ -11,7 +11,11 @@ type Props = {
   submitting: boolean;
   error: string | null;
   onLogin: (input: { email: string; password: string }) => Promise<unknown>;
-  onRegister: (input: { email: string; password: string; displayName?: string }) => Promise<unknown>;
+  onRegister: (input: {
+    email: string;
+    password: string;
+    displayName?: string;
+  }) => Promise<unknown>;
   onSwitchMode: () => void;
 };
 
@@ -91,12 +95,7 @@ export function AuthScreen({ mode, submitting, error, onLogin, onRegister, onSwi
 
             {error && <div className={styles.error}>{error}</div>}
 
-            <Button
-              variant="primary"
-              type="submit"
-              disabled={submitting}
-              className={styles.submit}
-            >
+            <Button variant="primary" type="submit" disabled={submitting} className={styles.submit}>
               {submitting
                 ? t("processing", "处理中…")
                 : mode === "login"
@@ -106,14 +105,8 @@ export function AuthScreen({ mode, submitting, error, onLogin, onRegister, onSwi
           </form>
 
           <p className={styles.switch}>
-            {mode === "login"
-              ? t("no_account", "还没有账号？")
-              : t("has_account", "已有账号？")}
-            <button
-              type="button"
-              className={styles.switchLink}
-              onClick={onSwitchMode}
-            >
+            {mode === "login" ? t("no_account", "还没有账号？") : t("has_account", "已有账号？")}
+            <button type="button" className={styles.switchLink} onClick={onSwitchMode}>
               {mode === "login" ? t("sign_up", "注册") : t("sign_in", "登录")}
             </button>
           </p>
@@ -140,7 +133,9 @@ export function AuthScreen({ mode, submitting, error, onLogin, onRegister, onSwi
                 <div key={row} className={styles.gridRow}>
                   <div className={styles.rowNum}>{row + 1}</div>
                   <div className={`${styles.cell} ${row === 1 ? styles.cellFilledA : ""}`}></div>
-                  <div className={`${styles.cell} ${row === 0 ? styles.cellFilledB : row === 2 ? styles.cellFilledA : ""}`}></div>
+                  <div
+                    className={`${styles.cell} ${row === 0 ? styles.cellFilledB : row === 2 ? styles.cellFilledA : ""}`}
+                  ></div>
                   <div className={`${styles.cell} ${row === 3 ? styles.cellFilledC : ""}`}></div>
                   <div className={`${styles.cell} ${row === 4 ? styles.cellFilledB : ""}`}></div>
                 </div>

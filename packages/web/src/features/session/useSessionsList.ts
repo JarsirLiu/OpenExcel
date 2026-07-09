@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { createSession, deleteSession, fetchSessions, type Session } from "@/api/sessions";
 
 const SESSION_STORAGE_KEY = "openexcel:sessionId";
@@ -24,10 +24,7 @@ function saveSessionId(id: number | null) {
   }
 }
 
-export function useSessionsList(
-  workspaceId: number | null,
-  initialSessions?: Session[],
-) {
+export function useSessionsList(workspaceId: number | null, initialSessions?: Session[]) {
   const [sessions, setSessions] = useState<Session[]>(initialSessions ?? []);
   const [currentSessionId, setCurrentSessionId] = useState<number | null>(() => {
     const stored = loadStoredSessionId();
@@ -81,15 +78,18 @@ export function useSessionsList(
     setHistoryOpen(false);
   }, []);
 
-  const handleDeleteSession = useCallback(async (id: number) => {
-    if (workspaceId == null) return;
-    const wasCurrent = currentSessionId === id;
-    await deleteSession(workspaceId, id);
-    await refreshSessions();
-    if (wasCurrent) {
-      setCurrentSessionId(null);
-    }
-  }, [refreshSessions, workspaceId, currentSessionId]);
+  const handleDeleteSession = useCallback(
+    async (id: number) => {
+      if (workspaceId == null) return;
+      const wasCurrent = currentSessionId === id;
+      await deleteSession(workspaceId, id);
+      await refreshSessions();
+      if (wasCurrent) {
+        setCurrentSessionId(null);
+      }
+    },
+    [refreshSessions, workspaceId, currentSessionId],
+  );
 
   return {
     sessions,

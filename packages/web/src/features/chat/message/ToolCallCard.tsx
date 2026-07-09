@@ -18,23 +18,27 @@ function redactSheetIds(value: unknown): unknown {
   }
 
   const entries = Object.entries(value).filter(([key]) => key !== "sheetId");
-  return Object.fromEntries(entries.map(([key, nestedValue]) => [key, redactSheetIds(nestedValue)]));
+  return Object.fromEntries(
+    entries.map(([key, nestedValue]) => [key, redactSheetIds(nestedValue)]),
+  );
 }
 
 function getSheetLabel(output: unknown): string | null {
   if (!isRecord(output)) return null;
 
   const sheetInfo = isRecord(output.sheetInfo) ? output.sheetInfo : null;
-  const sheetName = typeof sheetInfo?.sheetName === "string"
-    ? sheetInfo.sheetName
-    : typeof output.sheetName === "string"
-      ? output.sheetName
-      : null;
-  const sheetNo = typeof sheetInfo?.sheetNo === "number"
-    ? sheetInfo.sheetNo
-    : typeof output.sheetNo === "number"
-      ? output.sheetNo
-      : null;
+  const sheetName =
+    typeof sheetInfo?.sheetName === "string"
+      ? sheetInfo.sheetName
+      : typeof output.sheetName === "string"
+        ? output.sheetName
+        : null;
+  const sheetNo =
+    typeof sheetInfo?.sheetNo === "number"
+      ? sheetInfo.sheetNo
+      : typeof output.sheetNo === "number"
+        ? output.sheetNo
+        : null;
 
   if (!sheetName && sheetNo == null) return null;
   if (!sheetName) return `Sheet #${sheetNo}`;
@@ -42,14 +46,23 @@ function getSheetLabel(output: unknown): string | null {
 }
 
 function getToolSummary(toolName: string, output: unknown, input: unknown): string {
-  const isSheetTool = ["readSheet", "writeCells", "clearCells", "mergeCells", "unmergeCells"].includes(toolName);
+  const isSheetTool = [
+    "readSheet",
+    "writeCells",
+    "clearCells",
+    "mergeCells",
+    "unmergeCells",
+  ].includes(toolName);
   const safeInput = redactSheetIds(input);
   if (!isSheetTool) {
     return typeof safeInput === "object" ? JSON.stringify(safeInput) : String(safeInput ?? "");
   }
 
-  const sheetLabel = getSheetLabel(output)
-    ?? (isRecord(safeInput) && typeof safeInput.sheetNo === "number" ? `Sheet #${safeInput.sheetNo}` : "Sheet");
+  const sheetLabel =
+    getSheetLabel(output) ??
+    (isRecord(safeInput) && typeof safeInput.sheetNo === "number"
+      ? `Sheet #${safeInput.sheetNo}`
+      : "Sheet");
 
   switch (toolName) {
     case "readSheet":
@@ -92,17 +105,30 @@ function computeChangedCells(delta: unknown): Set<string> | undefined {
 
   if (d.type === "write" && Array.isArray(d.cells)) {
     for (const c of d.cells) {
-      if (c && typeof c === "object" && typeof (c as any).row === "number" && typeof (c as any).col === "number") {
+      if (
+        c &&
+        typeof c === "object" &&
+        typeof (c as any).row === "number" &&
+        typeof (c as any).col === "number"
+      ) {
         cells.push(`${(c as any).row},${(c as any).col}`);
       }
     }
-  } else if ((d.type === "clear" || d.type === "merge" || d.type === "unmerge") && Array.isArray(d.operations)) {
+  } else if (
+    (d.type === "clear" || d.type === "merge" || d.type === "unmerge") &&
+    Array.isArray(d.operations)
+  ) {
     for (const op of d.operations) {
       if (!op || typeof op !== "object") continue;
       const o = op as Record<string, unknown>;
       if (o.type === "cell" && typeof o.row === "number" && typeof o.col === "number") {
         cells.push(`${o.row},${o.col}`);
-      } else if (typeof o.startRow === "number" && typeof o.startCol === "number" && typeof o.endRow === "number" && typeof o.endCol === "number") {
+      } else if (
+        typeof o.startRow === "number" &&
+        typeof o.startCol === "number" &&
+        typeof o.endRow === "number" &&
+        typeof o.endCol === "number"
+      ) {
         for (let r = o.startRow; r <= o.endRow; r++) {
           for (let c = o.startCol; c <= o.endCol; c++) {
             cells.push(`${r},${c}`);
@@ -129,11 +155,19 @@ export function ToolCallCard({ part }: { part: any }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-      <div style={{
-        display: "flex", alignItems: "center", gap: 8,
-        padding: "8px 12px", background: "var(--muted)", border: "1px solid var(--border)",
-        borderRadius: "var(--radius-sm)", fontSize: 13, color: "var(--muted-foreground)",
-      }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "8px 12px",
+          background: "var(--muted)",
+          border: "1px solid var(--border)",
+          borderRadius: "var(--radius-sm)",
+          fontSize: 13,
+          color: "var(--muted-foreground)",
+        }}
+      >
         {isComplete ? (
           isError ? (
             <span style={{ color: "#ef4444", fontSize: 14, flexShrink: 0 }}>✕</span>
@@ -141,13 +175,41 @@ export function ToolCallCard({ part }: { part: any }) {
             <span style={{ color: "#22c55e", fontSize: 14, flexShrink: 0 }}>✓</span>
           )
         ) : (
-          <span style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid var(--border)", borderTopColor: "#3b82f6", animation: "spin 0.6s linear infinite", display: "inline-block", flexShrink: 0 }} />
+          <span
+            style={{
+              width: 14,
+              height: 14,
+              borderRadius: "50%",
+              border: "2px solid var(--border)",
+              borderTopColor: "#3b82f6",
+              animation: "spin 0.6s linear infinite",
+              display: "inline-block",
+              flexShrink: 0,
+            }}
+          />
         )}
-        <span style={{ fontWeight: 500, color: "var(--foreground)", flexShrink: 0 }}>{toolName}</span>
-        <span style={{ color: "var(--hint-foreground)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>
+        <span style={{ fontWeight: 500, color: "var(--foreground)", flexShrink: 0 }}>
+          {toolName}
+        </span>
+        <span
+          style={{
+            color: "var(--hint-foreground)",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            flex: 1,
+            minWidth: 0,
+          }}
+        >
           {summary}
         </span>
-        <span style={{ fontSize: 12, color: isComplete ? (isError ? "#ef4444" : "#22c55e") : "#3b82f6", flexShrink: 0 }}>
+        <span
+          style={{
+            fontSize: 12,
+            color: isComplete ? (isError ? "#ef4444" : "#22c55e") : "#3b82f6",
+            flexShrink: 0,
+          }}
+        >
           {isComplete ? (isError ? "失败" : "已完成") : "运行中..."}
         </span>
       </div>
@@ -157,7 +219,9 @@ export function ToolCallCard({ part }: { part: any }) {
         </div>
       )}
       {isComplete && sheetInfo && (
-        <div style={{ paddingLeft: 22, marginTop: 2, fontSize: 12, color: "var(--hint-foreground)" }}>
+        <div
+          style={{ paddingLeft: 22, marginTop: 2, fontSize: 12, color: "var(--hint-foreground)" }}
+        >
           {getSheetActionLabel(toolName)}: {sheetInfo.sheetName}
           {sheetInfo.sheetNo != null ? ` (#${sheetInfo.sheetNo})` : ""}
         </div>

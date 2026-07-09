@@ -1,13 +1,19 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { celldataToExcel, extractSheetConfig, matrixToCelldata } from "@openexcel/core";
 import type { WorkbookInstance } from "@fortune-sheet/react";
+import { celldataToExcel, extractSheetConfig, matrixToCelldata } from "@openexcel/core";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { WorkbookFull } from "@/api/workbooks";
-import { createSheet, deleteSheet, deleteWorkbook, updateSheetData, updateSheetName } from "@/api/workbooks";
-import { confirm } from "@/shared/lib";
-import { useWorkbookEditorSession } from "./useWorkbookEditorSession";
-import { toFortuneSheetData } from "./fortuneSheet";
+import {
+  createSheet,
+  deleteSheet,
+  deleteWorkbook,
+  updateSheetData,
+  updateSheetName,
+} from "@/api/workbooks";
 import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatchSync";
+import { confirm } from "@/shared/lib";
+import { toFortuneSheetData } from "./fortuneSheet";
 import { useSheetActivation } from "./SheetActivationContext";
+import { useWorkbookEditorSession } from "./useWorkbookEditorSession";
 
 type UseExcelGridWorkspaceProps = {
   workspaceId: number | null;
@@ -73,121 +79,142 @@ export function useExcelGridWorkspace({
     };
   }, []);
 
-  const syncSheetToServer = useCallback(async (celldata: any[], config: any) => {
-    if (!workbook || !workbook.sheets[currentSheetIndex] || workspaceId == null) return;
+  const syncSheetToServer = useCallback(
+    async (celldata: any[], config: any) => {
+      if (!workbook?.sheets[currentSheetIndex] || workspaceId == null) return;
 
-    setSaveStatus("saving");
-    try {
+      setSaveStatus("saving");
+      try {
+        const sheet = workbook.sheets[currentSheetIndex];
+        await updateSheetData(workspaceId, sheet.id, celldata, config);
+        setSaveStatus("saved");
+        lastSavedSnapshotRef.current[sheet.id] = getSnapshot(celldata, config);
+        if (saveStatusResetRef.current) clearTimeout(saveStatusResetRef.current);
+        saveStatusResetRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
+      } catch (error) {
+        setSaveStatus("idle");
+        console.error("保存失败:", error);
+      }
+    },
+    [currentSheetIndex, getSnapshot, workbook, workspaceId],
+  );
+
+  const scheduleSave = useCallback(
+    (celldata: any[], config: any) => {
+      if (!workbook?.sheets[currentSheetIndex]) return;
       const sheet = workbook.sheets[currentSheetIndex];
-      await updateSheetData(workspaceId, sheet.id, celldata, config);
-      setSaveStatus("saved");
-      lastSavedSnapshotRef.current[sheet.id] = getSnapshot(celldata, config);
-      if (saveStatusResetRef.current) clearTimeout(saveStatusResetRef.current);
-      saveStatusResetRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
-    } catch (error) {
-      setSaveStatus("idle");
-      console.error("保存失败:", error);
-    }
-  }, [currentSheetIndex, getSnapshot, workbook, workspaceId]);
+      if (!Array.isArray(celldata)) return;
 
-  const scheduleSave = useCallback((celldata: any[], config: any) => {
-    if (!workbook || !workbook.sheets[currentSheetIndex]) return;
-    const sheet = workbook.sheets[currentSheetIndex];
-    if (!Array.isArray(celldata)) return;
+      const snapshot = getSnapshot(celldata, config);
+      if (lastSavedSnapshotRef.current[sheet.id] === snapshot) return;
 
-    const snapshot = getSnapshot(celldata, config);
-    if (lastSavedSnapshotRef.current[sheet.id] === snapshot) return;
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = setTimeout(() => {
+        void syncSheetToServer(celldata, config);
+      }, 500);
+    },
+    [currentSheetIndex, getSnapshot, syncSheetToServer, workbook],
+  );
 
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    saveTimeoutRef.current = setTimeout(() => {
-      void syncSheetToServer(celldata, config);
-    }, 500);
-  }, [currentSheetIndex, getSnapshot, syncSheetToServer, workbook]);
+  const handleChange = useCallback(
+    (data: any[]) => {
+      if (!workbook || !Array.isArray(data)) return;
+      const sheet = workbook.sheets[currentSheetIndex];
+      if (!sheet) return;
+      const fortuneSheet = data.find((s: any) => String(s.id) === String(sheet.id));
+      if (!fortuneSheet) return;
 
-  const handleChange = useCallback((data: any[]) => {
-    if (!workbook || !Array.isArray(data)) return;
-    const sheet = workbook.sheets[currentSheetIndex];
-    if (!sheet) return;
-    const fortuneSheet = data.find((s: any) => String(s.id) === String(sheet.id));
-    if (!fortuneSheet) return;
+      const cellMatrix = fortuneSheet.data;
+      if (!Array.isArray(cellMatrix)) return;
+      const celldata = matrixToCelldata(cellMatrix);
+      const config = extractSheetConfig(fortuneSheet);
+      scheduleSave(celldata, config);
+    },
+    [currentSheetIndex, scheduleSave, workbook],
+  );
 
-    const cellMatrix = fortuneSheet.data;
-    if (!Array.isArray(cellMatrix)) return;
-    const celldata = matrixToCelldata(cellMatrix);
-    const config = extractSheetConfig(fortuneSheet);
-    scheduleSave(celldata, config);
-  }, [currentSheetIndex, scheduleSave, workbook]);
-
-  const handleActivateSheet = useCallback((sheetId: string) => {
-    if (!workbook) return;
-    const nextIndex = workbook.sheets.findIndex((sheet) => String(sheet.id) === sheetId);
-    if (nextIndex >= 0) {
-      onSheetIndexChange?.(nextIndex);
-    }
-  }, [onSheetIndexChange, workbook]);
-
-  const handleBeforeAddSheet = useCallback((sheet: any) => {
-    if (!workbook) return false;
-    const name = typeof sheet?.name === "string" ? sheet.name : undefined;
-    void (async () => {
-      try {
-        if (workspaceId == null) return;
-        const result = await createSheet(workspaceId, workbook.id, { name });
-        await onWorkbookStructureChanged?.({
-          toolCallId: `ui-create-sheet:${workbook.id}:${result.id}`,
-          kind: "sheet-created",
-          workbookId: result.workbookId,
-          sheetId: result.id,
-          sheetNo: result.sheetNo,
-          sheetName: result.name,
-          order: result.order,
-          sourceSheetId: null,
-        });
-      } catch (error) {
-        console.error("创建 Sheet 失败:", error);
-        await onWorkbookRefresh?.();
+  const handleActivateSheet = useCallback(
+    (sheetId: string) => {
+      if (!workbook) return;
+      const nextIndex = workbook.sheets.findIndex((sheet) => String(sheet.id) === sheetId);
+      if (nextIndex >= 0) {
+        onSheetIndexChange?.(nextIndex);
       }
-    })();
-    return false;
-  }, [onWorkbookRefresh, onWorkbookStructureChanged, workbook, workspaceId]);
+    },
+    [onSheetIndexChange, workbook],
+  );
 
-  const handleBeforeDeleteSheet = useCallback((sheetId: string | number) => {
-    if (!workbook) return false;
-    const numericSheetId = Number(sheetId);
-    const deletedSheet = workbook.sheets.find((sheet) => sheet.id === numericSheetId);
-    if (!deletedSheet) return false;
+  const handleBeforeAddSheet = useCallback(
+    (sheet: any) => {
+      if (!workbook) return false;
+      const name = typeof sheet?.name === "string" ? sheet.name : undefined;
+      void (async () => {
+        try {
+          if (workspaceId == null) return;
+          const result = await createSheet(workspaceId, workbook.id, { name });
+          await onWorkbookStructureChanged?.({
+            toolCallId: `ui-create-sheet:${workbook.id}:${result.id}`,
+            kind: "sheet-created",
+            workbookId: result.workbookId,
+            sheetId: result.id,
+            sheetNo: result.sheetNo,
+            sheetName: result.name,
+            order: result.order,
+            sourceSheetId: null,
+          });
+        } catch (error) {
+          console.error("创建 Sheet 失败:", error);
+          await onWorkbookRefresh?.();
+        }
+      })();
+      return false;
+    },
+    [onWorkbookRefresh, onWorkbookStructureChanged, workbook, workspaceId],
+  );
 
-    void (async () => {
-      try {
-        if (workspaceId == null) return;
-        await deleteSheet(workspaceId, workbook.id, numericSheetId);
-        await onWorkbookStructureChanged?.({
-          toolCallId: `ui-delete-sheet:${workbook.id}:${numericSheetId}`,
-          kind: "sheet-deleted",
-          workbookId: workbook.id,
-          sheetId: numericSheetId,
-          sheetNo: deletedSheet.sheetNo,
-          order: deletedSheet.order,
-        });
-      } catch (error) {
-        console.error("删除 Sheet 失败:", error);
-        await onWorkbookRefresh?.();
-      }
-    })();
-    return false;
-  }, [onWorkbookRefresh, onWorkbookStructureChanged, workbook, workspaceId]);
+  const handleBeforeDeleteSheet = useCallback(
+    (sheetId: string | number) => {
+      if (!workbook) return false;
+      const numericSheetId = Number(sheetId);
+      const deletedSheet = workbook.sheets.find((sheet) => sheet.id === numericSheetId);
+      if (!deletedSheet) return false;
 
-  const handleBeforeUpdateSheetName = useCallback((sheetId: string, _oldName: string, newName: string) => {
-    void (async () => {
-      try {
-        if (workspaceId == null) return;
-        await updateSheetName(workspaceId, Number(sheetId), newName);
-      } catch (error) {
-        console.error("重命名 Sheet 失败:", error);
-      }
-    })();
-    return true;
-  }, [workspaceId]);
+      void (async () => {
+        try {
+          if (workspaceId == null) return;
+          await deleteSheet(workspaceId, workbook.id, numericSheetId);
+          await onWorkbookStructureChanged?.({
+            toolCallId: `ui-delete-sheet:${workbook.id}:${numericSheetId}`,
+            kind: "sheet-deleted",
+            workbookId: workbook.id,
+            sheetId: numericSheetId,
+            sheetNo: deletedSheet.sheetNo,
+            order: deletedSheet.order,
+          });
+        } catch (error) {
+          console.error("删除 Sheet 失败:", error);
+          await onWorkbookRefresh?.();
+        }
+      })();
+      return false;
+    },
+    [onWorkbookRefresh, onWorkbookStructureChanged, workbook, workspaceId],
+  );
+
+  const handleBeforeUpdateSheetName = useCallback(
+    (sheetId: string, _oldName: string, newName: string) => {
+      void (async () => {
+        try {
+          if (workspaceId == null) return;
+          await updateSheetName(workspaceId, Number(sheetId), newName);
+        } catch (error) {
+          console.error("重命名 Sheet 失败:", error);
+        }
+      })();
+      return true;
+    },
+    [workspaceId],
+  );
 
   const handleDownload = useCallback(() => {
     const inst = workbookRef.current;

@@ -22,7 +22,12 @@ vi.mock("../../infra/database/db.js", () => ({
   },
 }));
 
-import { ensureWorkspaceForUser, getWorkspaces, requireWorkspace, WorkspaceNotFoundError } from "./service.js";
+import {
+  ensureWorkspaceForUser,
+  getWorkspaces,
+  requireWorkspace,
+  WorkspaceNotFoundError,
+} from "./service.js";
 
 describe("workspace service scoping", () => {
   beforeEach(() => {
@@ -84,7 +89,12 @@ describe("workspace service scoping", () => {
     mocks.workspaceCreate.mockResolvedValueOnce({ id: 9, name: "新工作区", order: 9 });
     mocks.workbookCreate.mockResolvedValueOnce({ id: 10, name: "New Workbook", order: 9 });
     mocks.sheetCreate.mockResolvedValueOnce({ id: 11, sheetNo: 1, name: "Sheet1", order: 0 });
-    mocks.sessionCreate.mockResolvedValueOnce({ id: 12, workspaceId: 9, name: "新对话", sheetId: null });
+    mocks.sessionCreate.mockResolvedValueOnce({
+      id: 12,
+      workspaceId: 9,
+      name: "新对话",
+      sheetId: null,
+    });
 
     const created = (await ensureWorkspaceForUser(77)) as any;
 

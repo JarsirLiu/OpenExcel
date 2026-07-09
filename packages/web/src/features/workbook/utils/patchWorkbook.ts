@@ -1,5 +1,5 @@
-import { sheetChangeDeltaToZeroBased, type SheetChangeDelta } from "@openexcel/core";
-import type { WorkbookFull, SheetSchema } from "@/api/workbooks";
+import { type SheetChangeDelta, sheetChangeDeltaToZeroBased } from "@openexcel/core";
+import type { SheetSchema, WorkbookFull } from "@/api/workbooks";
 
 function toColRef(c: number): string {
   let ref = "";
@@ -42,7 +42,7 @@ export function patchWorkbookWithDelta(
   if (sheetIndex === -1) return null;
 
   const sheet = workbook.sheets[sheetIndex];
-  let celldata: any[] = sheet.uploadedData ? [...sheet.uploadedData] : [];
+  const celldata: any[] = sheet.uploadedData ? [...sheet.uploadedData] : [];
 
   const cellMap = new Map<string, any>();
   for (const cell of celldata) {
@@ -104,7 +104,7 @@ export function patchWorkbookWithDelta(
     }
 
     // Patch merges (if any write affected merge areas)
-    for (const m of (merges ?? [])) {
+    for (const m of merges ?? []) {
       const rs = m.endRow - m.startRow + 1;
       const cs = m.endCol - m.startCol + 1;
       for (let r = m.startRow; r <= m.endRow; r++) {
@@ -204,12 +204,7 @@ export function patchWorkbookWithDelta(
 
       // Clear mc from all cells in range
       for (const [key, cell] of cellMap) {
-        if (
-          cell.r >= startRow &&
-          cell.r <= endRow &&
-          cell.c >= startCol &&
-          cell.c <= endCol
-        ) {
+        if (cell.r >= startRow && cell.r <= endRow && cell.c >= startCol && cell.c <= endCol) {
           if (cell.v?.mc) {
             const { mc, ...rest } = cell.v;
             cell.v = rest;

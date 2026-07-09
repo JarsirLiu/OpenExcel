@@ -52,7 +52,9 @@
   white-space: nowrap;
   border: 1px solid transparent;
   border-bottom: none;
-  transition: background 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s;
 }
 
 .tabActive {

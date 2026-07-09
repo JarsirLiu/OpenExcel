@@ -1,14 +1,14 @@
 import { excelToolSpecs, runToolContextSchema } from "@openexcel/agent";
-import { prisma } from "../../../infra/database/db.js";
 import {
-  sheetChangePatchOutputSchema,
-  sheetChangeRangeToZeroBased,
   type SheetChangeDelta,
   type SheetChangeRangeOperation,
+  sheetChangePatchOutputSchema,
+  sheetChangeRangeToZeroBased,
 } from "@openexcel/core";
-import { buildSheetChangePreview, toA1Range } from "../domain.js";
-import * as repo from "../../sessions/runs/repository.js";
+import { prisma } from "../../../infra/database/db.js";
 import { sheetRecordToCelldata } from "../../../shared/utils/sheetData.js";
+import * as repo from "../../sessions/runs/repository.js";
+import { buildSheetChangePreview, toA1Range } from "../domain.js";
 
 export const unmergeCells = {
   ...excelToolSpecs.unmergeCells,
@@ -22,7 +22,8 @@ export const unmergeCells = {
       include: { workbook: true },
     });
     if (!sheet) throw new Error(`Sheet ${sheetId} 不存在`);
-    if (sheet.workbook.workspaceId !== context.workspaceId) throw new Error(`Sheet ${sheetId} 不存在`);
+    if (sheet.workbook.workspaceId !== context.workspaceId)
+      throw new Error(`Sheet ${sheetId} 不存在`);
 
     await repo.upsertRunSheetSnapshot({
       runId: context.runId,
@@ -38,7 +39,12 @@ export const unmergeCells = {
 
     for (const range of storageRanges) {
       for (const cell of celldata) {
-        if (cell.r >= range.startRow && cell.r <= range.endRow && cell.c >= range.startCol && cell.c <= range.endCol) {
+        if (
+          cell.r >= range.startRow &&
+          cell.r <= range.endRow &&
+          cell.c >= range.startCol &&
+          cell.c <= range.endCol
+        ) {
           if (cell.v?.mc) {
             const { mc, ...rest } = cell.v;
             cell.v = rest;
@@ -53,8 +59,10 @@ export const unmergeCells = {
         for (const key of Object.keys(config.merge)) {
           const m = config.merge[key];
           if (
-            m.r >= range.startRow && m.r <= range.endRow &&
-            m.c >= range.startCol && m.c <= range.endCol
+            m.r >= range.startRow &&
+            m.r <= range.endRow &&
+            m.c >= range.startCol &&
+            m.c <= range.endCol
           ) {
             delete config.merge[key];
           }
@@ -80,7 +88,9 @@ export const unmergeCells = {
 
     const output = {
       success: true,
-      unmergedRanges: operations.map((operation) => toA1Range(operation.startRow, operation.startCol, operation.endRow, operation.endCol)),
+      unmergedRanges: operations.map((operation) =>
+        toA1Range(operation.startRow, operation.startCol, operation.endRow, operation.endCol),
+      ),
       delta,
       preview: buildSheetChangePreview(celldata, sheet.name, sheetId, minRow, maxRow),
       sheetInfo: { sheetId: sheet.id, sheetNo: sheet.sheetNo, sheetName: sheet.name },

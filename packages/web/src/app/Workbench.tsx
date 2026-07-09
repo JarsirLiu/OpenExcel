@@ -1,15 +1,15 @@
-import { useCallback, useMemo, useRef, useState, useEffect } from "react";
-import { ChatSidebar } from "@/features/chat/ChatSidebar";
-import { WorkspaceView } from "@/features/workspace/WorkspaceView";
-import { useWorkspaceView } from "@/features/workspace/useWorkspaceView";
-import { useSessionWorkspace } from "@/features/session/useSessionWorkspace";
-import { useWorkspaceState } from "@/features/workspace/useWorkspaceState";
-import { WorkspaceSidebar } from "@/features/workspace/WorkspaceSidebar";
-import { useUrlSync } from "./useUrlSync";
-import { useSheetActivation } from "@/features/workbook/editor/SheetActivationContext";
-import type { Workspace } from "@/api/workspaces";
-import type { WorkbookMeta, WorkbookFull } from "@/api/workbooks";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Session } from "@/api/sessions";
+import type { WorkbookFull, WorkbookMeta } from "@/api/workbooks";
+import type { Workspace } from "@/api/workspaces";
+import { ChatSidebar } from "@/features/chat/ChatSidebar";
+import { useSessionWorkspace } from "@/features/session/useSessionWorkspace";
+import { useSheetActivation } from "@/features/workbook/editor/SheetActivationContext";
+import { useWorkspaceState } from "@/features/workspace/useWorkspaceState";
+import { useWorkspaceView } from "@/features/workspace/useWorkspaceView";
+import { WorkspaceSidebar } from "@/features/workspace/WorkspaceSidebar";
+import { WorkspaceView } from "@/features/workspace/WorkspaceView";
+import { useUrlSync } from "./useUrlSync";
 import styles from "./Workbench.module.css";
 
 type CurrentUser = { email: string; displayName: string };
@@ -33,7 +33,15 @@ type Props = {
 const MIN_SIDEBAR_WIDTH = 300;
 
 export function Workbench({ currentUser, onLogout, routeData }: Props) {
-  const { workspaces, activeWorkspaceId, setActiveWorkspaceId, loading: workspaceLoading, refresh: workspaceRefresh, workbooksMap, refreshWorkbooks } = useWorkspaceState(routeData?.workspaces);
+  const {
+    workspaces,
+    activeWorkspaceId,
+    setActiveWorkspaceId,
+    loading: workspaceLoading,
+    refresh: workspaceRefresh,
+    workbooksMap,
+    refreshWorkbooks,
+  } = useWorkspaceState(routeData?.workspaces);
   const [sidebarWidth, setSidebarWidth] = useState(MIN_SIDEBAR_WIDTH);
   const rafRef = useRef<number | null>(null);
 
@@ -42,17 +50,28 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
     [workspaces, activeWorkspaceId],
   );
 
-  const domainInitial = useMemo(() => ({
-    workbook: routeData?.workbooks
-      ? { workbooks: routeData.workbooks, currentWorkbook: routeData.currentWorkbook ?? null }
-      : undefined,
-    session: routeData?.sessions
-      ? { sessions: routeData.sessions, messages: routeData.messages, messageTotal: routeData.messageTotal }
-      : undefined,
-  }), [routeData]);
+  const domainInitial = useMemo(
+    () => ({
+      workbook: routeData?.workbooks
+        ? { workbooks: routeData.workbooks, currentWorkbook: routeData.currentWorkbook ?? null }
+        : undefined,
+      session: routeData?.sessions
+        ? {
+            sessions: routeData.sessions,
+            messages: routeData.messages,
+            messageTotal: routeData.messageTotal,
+          }
+        : undefined,
+    }),
+    [routeData],
+  );
 
   const workbook = useWorkspaceView(activeWorkspaceId, domainInitial.workbook);
-  const session = useSessionWorkspace(activeWorkspaceId, workbook.handleWorkspaceRefresh, domainInitial.session);
+  const session = useSessionWorkspace(
+    activeWorkspaceId,
+    workbook.handleWorkspaceRefresh,
+    domainInitial.session,
+  );
 
   useUrlSync(activeWorkspacePublicId);
 
@@ -62,30 +81,39 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
   );
 
   // Wrappers that refresh sidebar workbooksMap after workbook mutations
-  const wrappedWorkbookCreate = useCallback(async (workspaceId: number) => {
-    await workbook.handleCreateWorkbook(workspaceId);
-    await refreshWorkbooks(workspaces);
-  }, [workbook.handleCreateWorkbook, refreshWorkbooks, workspaces]);
+  const wrappedWorkbookCreate = useCallback(
+    async (workspaceId: number) => {
+      await workbook.handleCreateWorkbook(workspaceId);
+      await refreshWorkbooks(workspaces);
+    },
+    [workbook.handleCreateWorkbook, refreshWorkbooks, workspaces],
+  );
 
-  const wrappedWorkbookDelete = useCallback(async (workbookId: number) => {
-    await workbook.handleWorkbookDelete(workbookId);
-    await refreshWorkbooks(workspaces);
-  }, [workbook.handleWorkbookDelete, refreshWorkbooks, workspaces]);
+  const wrappedWorkbookDelete = useCallback(
+    async (workbookId: number) => {
+      await workbook.handleWorkbookDelete(workbookId);
+      await refreshWorkbooks(workspaces);
+    },
+    [workbook.handleWorkbookDelete, refreshWorkbooks, workspaces],
+  );
 
   const pendingWorkbookSwitch = useRef<number | null>(null);
   const { activateSheetByIndex } = useSheetActivation();
 
-  const handleWorkbookSelect = useCallback((workspaceId: number, workbookId: number) => {
-    if (workspaceId !== activeWorkspaceId) {
-      setActiveWorkspaceId(workspaceId);
-      pendingWorkbookSwitch.current = workbookId;
-    } else {
-      const idx = workbook.workbooks.findIndex((wb) => wb.id === workbookId);
-      if (idx >= 0) {
-        void workbook.handleSwitchWorkbook(idx);
+  const handleWorkbookSelect = useCallback(
+    (workspaceId: number, workbookId: number) => {
+      if (workspaceId !== activeWorkspaceId) {
+        setActiveWorkspaceId(workspaceId);
+        pendingWorkbookSwitch.current = workbookId;
+      } else {
+        const idx = workbook.workbooks.findIndex((wb) => wb.id === workbookId);
+        if (idx >= 0) {
+          void workbook.handleSwitchWorkbook(idx);
+        }
       }
-    }
-  }, [activeWorkspaceId, setActiveWorkspaceId, workbook]);
+    },
+    [activeWorkspaceId, setActiveWorkspaceId, workbook],
+  );
 
   useEffect(() => {
     if (pendingWorkbookSwitch.current == null) return;
@@ -97,14 +125,17 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
     }
   }, [activeWorkspaceId, workbook.workbooks, workbook]);
 
-  const handleNavigateSheet = useCallback((sheetId: number) => {
-    if (!workbook.currentWorkbook) return;
-    const idx = workbook.currentWorkbook.sheets.findIndex((s: any) => s.id === sheetId);
-    if (idx >= 0) {
-      workbook.setCurrentSheetIndex(idx);
-      activateSheetByIndex(idx);
-    }
-  }, [workbook.currentWorkbook, workbook.setCurrentSheetIndex, activateSheetByIndex]);
+  const handleNavigateSheet = useCallback(
+    (sheetId: number) => {
+      if (!workbook.currentWorkbook) return;
+      const idx = workbook.currentWorkbook.sheets.findIndex((s: any) => s.id === sheetId);
+      if (idx >= 0) {
+        workbook.setCurrentSheetIndex(idx);
+        activateSheetByIndex(idx);
+      }
+    },
+    [workbook.currentWorkbook, workbook.setCurrentSheetIndex, activateSheetByIndex],
+  );
 
   const handleResizeMouseDown = useCallback(
     (e: React.MouseEvent) => {
@@ -176,10 +207,7 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
           handleWorkbookStructureChanged={workbook.handleWorkbookStructureChanged}
           handleWorkbookRefresh={workbook.handleWorkbookRefresh}
         />
-        <div
-          className={styles.resizeHandle}
-          onMouseDown={handleResizeMouseDown}
-        />
+        <div className={styles.resizeHandle} onMouseDown={handleResizeMouseDown} />
       </div>
       <ChatSidebar
         workspaceId={activeWorkspaceId}

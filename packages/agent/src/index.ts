@@ -1,5 +1,6 @@
 export { createChatModel, createTitleModel, type ModelConfig } from "./model.js";
-export { DEFAULT_PROMPT, buildSystemPrompt } from "./prompt/systemPrompt.js";
+export { buildSystemPrompt, DEFAULT_PROMPT } from "./prompt/systemPrompt.js";
+export { type StreamChatInput, streamChat } from "./runtime/streamChat.js";
 export {
   buildWorkspaceContext,
   type WorkspaceSheetSummary,
@@ -11,11 +12,10 @@ export {
   buildExcelToolContext,
   buildRunToolContext,
   buildWorkspaceToolContext,
-  excelToolSpecs,
-  runToolContextSchema,
-  workspaceToolContextSchema,
   type ExcelToolName,
+  excelToolSpecs,
   type RunToolContext,
+  runToolContextSchema,
   type WorkspaceToolContext,
+  workspaceToolContextSchema,
 } from "./tools/index.js";
-export { streamChat, type StreamChatInput } from "./runtime/streamChat.js";

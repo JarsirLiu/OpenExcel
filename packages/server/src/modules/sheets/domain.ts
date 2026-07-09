@@ -1,8 +1,4 @@
-import {
-  celldataToGrid,
-  toOneBasedIndex,
-  type FortuneCell,
-} from "@openexcel/core";
+import { celldataToGrid, type FortuneCell, toOneBasedIndex } from "@openexcel/core";
 
 export interface SheetChangePreviewMerge {
   startRow: number;
@@ -30,7 +26,15 @@ export type CellWriteValue = string | number | boolean;
 
 export type WriteCellOperation =
   | { type: "cell"; row: number; col: number; value: CellWriteValue; formula?: string }
-  | { type: "range"; startRow: number; startCol: number; endRow: number; endCol: number; value: CellWriteValue; formula?: string };
+  | {
+      type: "range";
+      startRow: number;
+      startCol: number;
+      endRow: number;
+      endCol: number;
+      value: CellWriteValue;
+      formula?: string;
+    };
 
 export type WriteCellsInput = {
   sheetId: number;
@@ -76,7 +80,12 @@ export function toA1CellRef(row1: number, col1: number): string {
   return `${toColRef(col1 - 1)}${row1}`;
 }
 
-export function toA1Range(rowStart1: number, colStart1: number, rowEnd1: number, colEnd1: number): string {
+export function toA1Range(
+  rowStart1: number,
+  colStart1: number,
+  rowEnd1: number,
+  colEnd1: number,
+): string {
   return `${toA1CellRef(rowStart1, colStart1)}:${toA1CellRef(rowEnd1, colEnd1)}`;
 }
 
@@ -127,7 +136,7 @@ export function buildSheetChangePreview(
 export function normalizeWriteOperations(input: WriteCellsInput): NormalizedWriteCellsInput {
   return {
     sheetId: input.sheetId,
-    operations: input.operations.map((operation) => (
+    operations: input.operations.map((operation) =>
       operation.type === "cell"
         ? {
             type: "cell",
@@ -144,8 +153,8 @@ export function normalizeWriteOperations(input: WriteCellsInput): NormalizedWrit
             endCol: operation.endCol,
             value: operation.value,
             formula: operation.formula,
-          }
-    )),
+          },
+    ),
   };
 }
 
@@ -156,7 +165,9 @@ function normalizeFormula(formula?: string): string | undefined {
   return trimmed.startsWith("=") ? trimmed.slice(1) : trimmed;
 }
 
-export function stripCellContent(value: Record<string, unknown> | undefined | null): Record<string, unknown> | null {
+export function stripCellContent(
+  value: Record<string, unknown> | undefined | null,
+): Record<string, unknown> | null {
   if (!value) return null;
   const { v: _cellValue, m: _displayValue, f: _formula, ...rest } = value;
   return Object.keys(rest).length > 0 ? rest : null;
@@ -213,7 +224,9 @@ export function applyCellWrite(
 
 export function applyClearOperation(
   cellMap: Map<string, any>,
-  operation: { type: "cell"; row: number; col: number } | { type: "range"; startRow: number; startCol: number; endRow: number; endCol: number },
+  operation:
+    | { type: "cell"; row: number; col: number }
+    | { type: "range"; startRow: number; startCol: number; endRow: number; endCol: number },
 ) {
   const touchedKeys: string[] = [];
 

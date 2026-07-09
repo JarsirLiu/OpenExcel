@@ -1,6 +1,6 @@
 import { fileURLToPath, URL } from "node:url";
-import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [
@@ -40,7 +40,12 @@ export default defineConfig({
 
           const packageName = packageId.replace("@", "").replace("/", "-");
 
-          if (packageId === "react" || packageId === "react-dom" || packageId === "scheduler" || packageId === "use-sync-external-store") {
+          if (
+            packageId === "react" ||
+            packageId === "react-dom" ||
+            packageId === "scheduler" ||
+            packageId === "use-sync-external-store"
+          ) {
             return "vendor-react";
           }
 

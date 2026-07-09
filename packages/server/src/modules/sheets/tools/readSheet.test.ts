@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockFindFirst = vi.fn();
 
@@ -40,10 +40,7 @@ describe("readSheet", () => {
         workbook: { workspaceId: 1 },
       });
 
-      const result = await readSheet.execute(
-        { sheetId: 1 },
-        { context: { workspaceId: 1 } },
-      );
+      const result = await readSheet.execute({ sheetId: 1 }, { context: { workspaceId: 1 } });
 
       expect(result.headers).toEqual(["Name", "Age"]);
       expect(result.totalRowCount).toBe(100);
@@ -69,10 +66,7 @@ describe("readSheet", () => {
         workbook: { workspaceId: 1 },
       });
 
-      const result = await readSheet.execute(
-        { sheetId: 1 },
-        { context: { workspaceId: 1 } },
-      );
+      const result = await readSheet.execute({ sheetId: 1 }, { context: { workspaceId: 1 } });
 
       expect(result.endRow).toBe(2);
       expect(result.data.length).toBe(2);
@@ -92,10 +86,7 @@ describe("readSheet", () => {
         id: 1,
         name: "Sheet1",
         sheetNo: 1,
-        uploadedData: JSON.stringify([
-          { r: 0, c: 0, v: { v: "Name" } },
-          ...rows,
-        ]),
+        uploadedData: JSON.stringify([{ r: 0, c: 0, v: { v: "Name" } }, ...rows]),
         workbook: { workspaceId: 1 },
       });
 
@@ -159,10 +150,7 @@ describe("readSheet", () => {
         workbook: { workspaceId: 1 },
       });
 
-      const result = await readSheet.execute(
-        { sheetId: 1 },
-        { context: { workspaceId: 1 } },
-      );
+      const result = await readSheet.execute({ sheetId: 1 }, { context: { workspaceId: 1 } });
 
       expect(result.hasFirstRowAsHeader).toBe(true);
       expect(result.headers).toEqual(["Name", "Score"]);
@@ -215,10 +203,7 @@ describe("readSheet", () => {
         workbook: { workspaceId: 1 },
       });
 
-      const all = await readSheet.execute(
-        { sheetId: 1 },
-        { context: { workspaceId: 1 } },
-      );
+      const all = await readSheet.execute({ sheetId: 1 }, { context: { workspaceId: 1 } });
 
       expect(all.merges.length).toBe(2);
 
@@ -241,10 +226,7 @@ describe("readSheet", () => {
         workbook: { workspaceId: 1 },
       });
 
-      const result = await readSheet.execute(
-        { sheetId: 1 },
-        { context: { workspaceId: 1 } },
-      );
+      const result = await readSheet.execute({ sheetId: 1 }, { context: { workspaceId: 1 } });
 
       expect(result.totalRowCount).toBe(0);
       expect(result.totalColumnCount).toBe(0);

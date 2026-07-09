@@ -5,10 +5,7 @@ export function useUrlSync(workspacePublicId: string | null) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const targetPath = useMemo(
-    () => `/workspaces/${workspacePublicId ?? ""}`,
-    [workspacePublicId],
-  );
+  const targetPath = useMemo(() => `/workspaces/${workspacePublicId ?? ""}`, [workspacePublicId]);
 
   useEffect(() => {
     if (targetPath !== location.pathname) {

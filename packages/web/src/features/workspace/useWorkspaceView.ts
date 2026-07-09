@@ -1,17 +1,17 @@
-import { useCallback, useEffect, useRef, useState } from "react";
 import type { SheetChangeDelta } from "@openexcel/core";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { WorkbookFull, WorkbookMeta } from "@/api/workbooks";
 import {
   createWorkbook,
   deleteWorkbook,
   fetchWorkbook,
   fetchWorkbooks,
-  uploadNewWorkbook,
   updateWorkbookName,
+  uploadNewWorkbook,
 } from "@/api/workbooks";
-import type { WorkbookFull, WorkbookMeta } from "@/api/workbooks";
+import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatchSync";
 import { patchWorkbookWithDelta } from "../workbook/utils/patchWorkbook";
 import { useWorkbookCatalog } from "./useWorkbookCatalog";
-import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatchSync";
 
 function sortWorkbooks(list: WorkbookMeta[]): WorkbookMeta[] {
   return [...list].sort((a, b) => a.order - b.order || a.id - b.id);
@@ -87,9 +87,10 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
       setWorkbooks(safeList);
       invalidateReferenceCache();
 
-      const nextWorkbookId = currentWorkbook && safeList.some((workbook) => workbook.id === currentWorkbook.id)
-        ? currentWorkbook.id
-        : safeList[workbookIdx]?.id ?? safeList[0]?.id ?? null;
+      const nextWorkbookId =
+        currentWorkbook && safeList.some((workbook) => workbook.id === currentWorkbook.id)
+          ? currentWorkbook.id
+          : (safeList[workbookIdx]?.id ?? safeList[0]?.id ?? null);
 
       if (nextWorkbookId == null) {
         replaceCurrentWorkbook(null);
@@ -103,9 +104,10 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
       const nextIndex = safeList.findIndex((workbook) => workbook.id === nextWorkbookId);
       setWorkbookIdx(nextIndex >= 0 ? nextIndex : 0);
 
-      const nextSheetIndex = currentWorkbook?.id === nextWorkbookId
-        ? Math.min(currentSheetIndex, Math.max(0, nextWorkbook.sheets.length - 1))
-        : 0;
+      const nextSheetIndex =
+        currentWorkbook?.id === nextWorkbookId
+          ? Math.min(currentSheetIndex, Math.max(0, nextWorkbook.sheets.length - 1))
+          : 0;
       setCurrentSheetIndex(nextSheetIndex);
     } catch {
       // ignore
@@ -122,45 +124,61 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
     workspaceId,
   ]);
 
-  const handleSheetChanged = useCallback(async (sheetId: number, delta: SheetChangeDelta | null) => {
-    const workbook = currentWorkbookRef.current;
-    if (!workbook || workspaceId == null) return;
-    const hasSheet = workbook.sheets.some((sheet) => sheet.id === sheetId);
-    if (!hasSheet) return;
+  const handleSheetChanged = useCallback(
+    async (sheetId: number, delta: SheetChangeDelta | null) => {
+      const workbook = currentWorkbookRef.current;
+      if (!workbook || workspaceId == null) return;
+      const hasSheet = workbook.sheets.some((sheet) => sheet.id === sheetId);
+      if (!hasSheet) return;
 
-    if (delta) {
-      const patched = patchWorkbookWithDelta(workbook, sheetId, delta);
-      if (patched) {
-        currentWorkbookRef.current = patched;
-        replaceCurrentWorkbook(patched);
+      if (delta) {
+        const patched = patchWorkbookWithDelta(workbook, sheetId, delta);
+        if (patched) {
+          currentWorkbookRef.current = patched;
+          replaceCurrentWorkbook(patched);
+          return;
+        }
+      }
+
+      try {
+        const full = await fetchWorkbook(workspaceId, workbook.id);
+        currentWorkbookRef.current = full;
+        replaceCurrentWorkbook(full);
+      } catch {
+        // ignore
+      }
+    },
+    [replaceCurrentWorkbook, workspaceId],
+  );
+
+  const handleWorkbookStructureChanged = useCallback(
+    async (update: WorkbookStructureUpdate) => {
+      if (workspaceId == null) return;
+      invalidateReferenceCache();
+
+      if (update.kind === "workbook-created") {
+        const list = await fetchWorkbooks(workspaceId);
+        const safeList = Array.isArray(list) ? sortWorkbooks(list) : [];
+        setWorkbooks(safeList);
+        const nextIndex = safeList.findIndex((wb) => wb.id === update.workbookId);
+        setWorkbookIdx(nextIndex >= 0 ? nextIndex : 0);
+        setCurrentSheetIndex(0);
         return;
       }
-    }
 
-    try {
-      const full = await fetchWorkbook(workspaceId, workbook.id);
-      currentWorkbookRef.current = full;
-      replaceCurrentWorkbook(full);
-    } catch {
-      // ignore
-    }
-  }, [replaceCurrentWorkbook, workspaceId]);
+      if (update.kind === "sheet-deleted") {
+        if (currentWorkbook?.id !== update.workbookId) {
+          return;
+        }
 
-  const handleWorkbookStructureChanged = useCallback(async (update: WorkbookStructureUpdate) => {
-    if (workspaceId == null) return;
-    invalidateReferenceCache();
+        const nextWorkbook = await fetchWorkbook(workspaceId, update.workbookId);
+        replaceCurrentWorkbook(nextWorkbook);
+        const nextIndex = nextWorkbook.sheets.findIndex((sheet) => sheet.id === update.sheetId);
+        const fallbackIndex = Math.min(update.order, nextWorkbook.sheets.length - 1);
+        setCurrentSheetIndex(nextIndex >= 0 ? nextIndex : fallbackIndex);
+        return;
+      }
 
-    if (update.kind === "workbook-created") {
-      const list = await fetchWorkbooks(workspaceId);
-      const safeList = Array.isArray(list) ? sortWorkbooks(list) : [];
-      setWorkbooks(safeList);
-      const nextIndex = safeList.findIndex((wb) => wb.id === update.workbookId);
-      setWorkbookIdx(nextIndex >= 0 ? nextIndex : 0);
-      setCurrentSheetIndex(0);
-      return;
-    }
-
-    if (update.kind === "sheet-deleted") {
       if (currentWorkbook?.id !== update.workbookId) {
         return;
       }
@@ -168,104 +186,126 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
       const nextWorkbook = await fetchWorkbook(workspaceId, update.workbookId);
       replaceCurrentWorkbook(nextWorkbook);
       const nextIndex = nextWorkbook.sheets.findIndex((sheet) => sheet.id === update.sheetId);
-      const fallbackIndex = Math.min(update.order, nextWorkbook.sheets.length - 1);
-      setCurrentSheetIndex(nextIndex >= 0 ? nextIndex : fallbackIndex);
-      return;
-    }
+      setCurrentSheetIndex(
+        nextIndex >= 0 ? nextIndex : Math.min(update.order, nextWorkbook.sheets.length - 1),
+      );
+    },
+    [
+      currentWorkbook?.id,
+      invalidateReferenceCache,
+      replaceCurrentWorkbook,
+      setCurrentSheetIndex,
+      setWorkbookIdx,
+      setWorkbooks,
+      workspaceId,
+    ],
+  );
 
-    if (currentWorkbook?.id !== update.workbookId) {
-      return;
-    }
-
-    const nextWorkbook = await fetchWorkbook(workspaceId, update.workbookId);
-    replaceCurrentWorkbook(nextWorkbook);
-    const nextIndex = nextWorkbook.sheets.findIndex((sheet) => sheet.id === update.sheetId);
-    setCurrentSheetIndex(nextIndex >= 0 ? nextIndex : Math.min(update.order, nextWorkbook.sheets.length - 1));
-  }, [currentWorkbook?.id, invalidateReferenceCache, replaceCurrentWorkbook, setCurrentSheetIndex, setWorkbookIdx, setWorkbooks, workspaceId]);
-
-  const handleSwitchWorkbook = useCallback(async (index: number) => {
-    await switchWorkbook(index);
-    setCurrentSheetIndex(0);
-  }, [switchWorkbook]);
-
-  const handleNewWorkbookFileChange = useCallback(async (file: File) => {
-    if (workspaceId == null) return;
-    setStatus("上传中...");
-    try {
-      const result = await uploadNewWorkbook(workspaceId, file);
-      const list = await fetchWorkbooks(workspaceId);
-      const safeList = Array.isArray(list) ? sortWorkbooks(list) : [];
-      setWorkbooks(safeList);
-      invalidateReferenceCache();
-      const idx = safeList.findIndex((wb) => wb.id === result.id);
-      if (idx >= 0) {
-        setWorkbookIdx(idx);
-        setCurrentSheetIndex(0);
-      }
-      setStatus("上传完成");
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "上传失败";
-      setStatus(`上传失败：${message}`);
-    }
-  }, [invalidateReferenceCache, setStatus, setWorkbooks, setWorkbookIdx, workspaceId]);
-
-  const handleWorkbookDelete = useCallback(async (workbookId: number) => {
-    if (workspaceId == null) return;
-    await deleteWorkbook(workspaceId, workbookId);
-    const list = await fetchWorkbooks(workspaceId);
-    const safeList = Array.isArray(list) ? sortWorkbooks(list) : [];
-    setWorkbooks(safeList);
-    invalidateReferenceCache();
-    const remaining = safeList.filter((wb) => wb.id !== workbookId);
-    if (remaining.length > 0) {
-      setWorkbookIdx(0);
+  const handleSwitchWorkbook = useCallback(
+    async (index: number) => {
+      await switchWorkbook(index);
       setCurrentSheetIndex(0);
-    } else {
-      setWorkbookIdx(0);
-      replaceCurrentWorkbook(null);
-    }
-    setStatus("已删除");
-  }, [invalidateReferenceCache, replaceCurrentWorkbook, setWorkbookIdx, setWorkbooks, workspaceId]);
+    },
+    [switchWorkbook],
+  );
 
-  const handleCreateWorkbook = useCallback(async (workspaceId: number) => {
-    if (workspaceId == null) return;
-    setStatus("创建中...");
-    try {
-      const result = await createWorkbook(workspaceId);
+  const handleNewWorkbookFileChange = useCallback(
+    async (file: File) => {
+      if (workspaceId == null) return;
+      setStatus("上传中...");
+      try {
+        const result = await uploadNewWorkbook(workspaceId, file);
+        const list = await fetchWorkbooks(workspaceId);
+        const safeList = Array.isArray(list) ? sortWorkbooks(list) : [];
+        setWorkbooks(safeList);
+        invalidateReferenceCache();
+        const idx = safeList.findIndex((wb) => wb.id === result.id);
+        if (idx >= 0) {
+          setWorkbookIdx(idx);
+          setCurrentSheetIndex(0);
+        }
+        setStatus("上传完成");
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "上传失败";
+        setStatus(`上传失败：${message}`);
+      }
+    },
+    [invalidateReferenceCache, setStatus, setWorkbooks, setWorkbookIdx, workspaceId],
+  );
+
+  const handleWorkbookDelete = useCallback(
+    async (workbookId: number) => {
+      if (workspaceId == null) return;
+      await deleteWorkbook(workspaceId, workbookId);
       const list = await fetchWorkbooks(workspaceId);
       const safeList = Array.isArray(list) ? sortWorkbooks(list) : [];
       setWorkbooks(safeList);
       invalidateReferenceCache();
-      const idx = safeList.findIndex((wb) => wb.id === result.id);
-      if (idx >= 0) {
-        setWorkbookIdx(idx);
+      const remaining = safeList.filter((wb) => wb.id !== workbookId);
+      if (remaining.length > 0) {
+        setWorkbookIdx(0);
         setCurrentSheetIndex(0);
+      } else {
+        setWorkbookIdx(0);
+        replaceCurrentWorkbook(null);
       }
-      setStatus("已创建");
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "创建失败";
-      setStatus(`创建失败：${message}`);
-    }
-  }, [invalidateReferenceCache, setStatus, setWorkbookIdx, setWorkbooks, workspaceId]);
+      setStatus("已删除");
+    },
+    [invalidateReferenceCache, replaceCurrentWorkbook, setWorkbookIdx, setWorkbooks, workspaceId],
+  );
 
-  const handleWorkbookRename = useCallback(async (workbookId: number, newName: string) => {
-    if (workspaceId == null) return;
-    setStatus("重命名中...");
-    try {
-      await updateWorkbookName(workspaceId, workbookId, newName);
-      const list = await fetchWorkbooks(workspaceId);
-      const safeList = Array.isArray(list) ? sortWorkbooks(list) : [];
-      setWorkbooks(safeList);
-      if (currentWorkbook?.id === workbookId) {
-        replaceCurrentWorkbook({ ...currentWorkbook, name: newName });
+  const handleCreateWorkbook = useCallback(
+    async (workspaceId: number) => {
+      if (workspaceId == null) return;
+      setStatus("创建中...");
+      try {
+        const result = await createWorkbook(workspaceId);
+        const list = await fetchWorkbooks(workspaceId);
+        const safeList = Array.isArray(list) ? sortWorkbooks(list) : [];
+        setWorkbooks(safeList);
+        invalidateReferenceCache();
+        const idx = safeList.findIndex((wb) => wb.id === result.id);
+        if (idx >= 0) {
+          setWorkbookIdx(idx);
+          setCurrentSheetIndex(0);
+        }
+        setStatus("已创建");
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "创建失败";
+        setStatus(`创建失败：${message}`);
       }
-      invalidateReferenceCache();
-      setStatus("已重命名");
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "重命名失败";
-      setStatus(`重命名失败：${message}`);
-    }
-  }, [currentWorkbook, invalidateReferenceCache, replaceCurrentWorkbook, setStatus, setWorkbooks, workspaceId]);
+    },
+    [invalidateReferenceCache, setStatus, setWorkbookIdx, setWorkbooks, workspaceId],
+  );
+
+  const handleWorkbookRename = useCallback(
+    async (workbookId: number, newName: string) => {
+      if (workspaceId == null) return;
+      setStatus("重命名中...");
+      try {
+        await updateWorkbookName(workspaceId, workbookId, newName);
+        const list = await fetchWorkbooks(workspaceId);
+        const safeList = Array.isArray(list) ? sortWorkbooks(list) : [];
+        setWorkbooks(safeList);
+        if (currentWorkbook?.id === workbookId) {
+          replaceCurrentWorkbook({ ...currentWorkbook, name: newName });
+        }
+        invalidateReferenceCache();
+        setStatus("已重命名");
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "重命名失败";
+        setStatus(`重命名失败：${message}`);
+      }
+    },
+    [
+      currentWorkbook,
+      invalidateReferenceCache,
+      replaceCurrentWorkbook,
+      setStatus,
+      setWorkbooks,
+      workspaceId,
+    ],
+  );
 
   return {
     workbooks,

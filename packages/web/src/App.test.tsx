@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, waitFor } from "@testing-library/react";
 import { HashRouter } from "react-router-dom";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SheetSchema } from "./api/workbooks";
 
 vi.mock("./app/Workbench.js", () => ({
@@ -12,7 +12,9 @@ vi.mock("./features/auth/AuthScreen.js", () => ({
 }));
 
 vi.mock("./api/auth.js", () => ({
-  fetchCurrentUser: vi.fn().mockResolvedValue({ id: 1, email: "user@example.com", displayName: "User" }),
+  fetchCurrentUser: vi
+    .fn()
+    .mockResolvedValue({ id: 1, email: "user@example.com", displayName: "User" }),
   logout: vi.fn(),
 }));
 
@@ -54,7 +56,11 @@ describe("App", () => {
   });
 
   it("renders the workbench when authenticated", async () => {
-    const { container } = render(<HashRouter><App /></HashRouter>);
+    const { container } = render(
+      <HashRouter>
+        <App />
+      </HashRouter>,
+    );
     await waitFor(() => {
       expect(container.querySelector('[data-testid="workbench"]')).toBeTruthy();
     });

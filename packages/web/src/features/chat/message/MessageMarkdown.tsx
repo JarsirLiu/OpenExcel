@@ -21,7 +21,16 @@ function extractText(node: ReactNode): string {
 
 function CopyIcon() {
   return (
-    <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width={13}
+      height={13}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
       <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
     </svg>
@@ -45,16 +54,18 @@ function CodeBlock({ children, ...props }: JSX.IntrinsicElements["pre"]) {
         position: "relative",
       }}
     >
-      <pre style={{
-        margin: 0,
-        padding: "14px 40px 14px 16px",
-        overflowX: "auto",
-        fontSize: 14,
-        lineHeight: 1.6,
-        color: "var(--foreground)",
-        whiteSpace: "pre",
-        fontFamily: "ui-monospace, 'Cascadia Code', 'JetBrains Mono', 'Fira Code', monospace",
-      }}>
+      <pre
+        style={{
+          margin: 0,
+          padding: "14px 40px 14px 16px",
+          overflowX: "auto",
+          fontSize: 14,
+          lineHeight: 1.6,
+          color: "var(--foreground)",
+          whiteSpace: "pre",
+          fontFamily: "ui-monospace, 'Cascadia Code', 'JetBrains Mono', 'Fira Code', monospace",
+        }}
+      >
         <code>{children}</code>
       </pre>
       <button
@@ -88,29 +99,42 @@ function CodeBlock({ children, ...props }: JSX.IntrinsicElements["pre"]) {
 function MarkdownTable({ children, ...props }: Record<string, unknown> & { children?: ReactNode }) {
   return (
     <div style={{ maxWidth: "100%", overflowX: "auto", whiteSpace: "nowrap" }}>
-      <table {...(props as ComponentPropsWithoutRef<"table">)} style={{ minWidth: "max-content" }}>{children}</table>
+      <table {...(props as ComponentPropsWithoutRef<"table">)} style={{ minWidth: "max-content" }}>
+        {children}
+      </table>
     </div>
   );
 }
 
-export function MessageMarkdown({ content, isStreaming = false }: { content: string; isStreaming?: boolean }) {
+export function MessageMarkdown({
+  content,
+  isStreaming = false,
+}: {
+  content: string;
+  isStreaming?: boolean;
+}) {
   return (
-    <div className="md-content" style={{
-      fontSize: 15,
-      lineHeight: 1.7,
-      color: "var(--foreground)",
-      maxWidth: "100%",
-      minWidth: 0,
-    }}>
+    <div
+      className="md-content"
+      style={{
+        fontSize: 15,
+        lineHeight: 1.7,
+        color: "var(--foreground)",
+        maxWidth: "100%",
+        minWidth: 0,
+      }}
+    >
       <Streamdown
         animated
         isAnimating={isStreaming}
         remarkPlugins={[remarkGfm]}
         controls={{ code: { copy: false, download: false } }}
-        components={{
-          table: MarkdownTable,
-          pre: CodeBlock,
-        } as any}
+        components={
+          {
+            table: MarkdownTable,
+            pre: CodeBlock,
+          } as any
+        }
       >
         {content}
       </Streamdown>

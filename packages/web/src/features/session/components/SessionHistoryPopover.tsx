@@ -26,9 +26,7 @@ export function SessionHistoryPopover({
             onClick={() => onSelectSession(session.id)}
             className={`${styles.item} ${session.id === currentSessionId ? styles.itemActive : styles.itemInactive}`}
           >
-            <span className={styles.itemName}>
-              {session.name}
-            </span>
+            <span className={styles.itemName}>{session.name}</span>
             <button
               onClick={(e) => {
                 e.stopPropagation();

@@ -11,7 +11,12 @@ export async function updateSheetName(workspaceId: number, sheetId: number, name
   return { success: true, id: updated.id, name: updated.name };
 }
 
-export async function updateSheetData(workspaceId: number, sheetId: number, celldata: any[], config?: any) {
+export async function updateSheetData(
+  workspaceId: number,
+  sheetId: number,
+  celldata: any[],
+  config?: any,
+) {
   if (!Array.isArray(celldata)) {
     return { error: "Invalid data format" };
   }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { fetchWorkspaces, type Workspace } from "@/api/workspaces";
 import { fetchWorkbooks, type WorkbookMeta } from "@/api/workbooks";
+import { fetchWorkspaces, type Workspace } from "@/api/workspaces";
 
 const STORAGE_KEY = "openexcel:activeWorkspaceId";
 
@@ -20,8 +20,7 @@ function saveWorkspaceId(id: number | null) {
     } else {
       sessionStorage.removeItem(STORAGE_KEY);
     }
-  } catch {
-  }
+  } catch {}
 }
 
 function sortWorkbooks(list: WorkbookMeta[]): WorkbookMeta[] {

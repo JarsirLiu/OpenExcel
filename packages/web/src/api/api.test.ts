@@ -1,15 +1,15 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { fetchMessages, fetchRuns, undoLatestRun } from "./chat";
+import { generateSessionTitle } from "./sessions";
 import {
-  fetchWorkbooks,
-  fetchWorkbookReferenceCandidates,
-  fetchWorkbook,
-  updateSheetData,
   createSheet,
   deleteSheet,
   downloadTemplateUrl,
+  fetchWorkbook,
+  fetchWorkbookReferenceCandidates,
+  fetchWorkbooks,
+  updateSheetData,
 } from "./workbooks";
-import { fetchMessages, fetchRuns, undoLatestRun } from "./chat";
-import { generateSessionTitle } from "./sessions";
 
 const mockFetch = vi.fn();
 globalThis.fetch = mockFetch;
@@ -66,7 +66,10 @@ describe("updateSheetData", () => {
   it("sends PATCH with celldata", async () => {
     mockFetch.mockResolvedValue(new Response(null, { status: 200 }));
 
-    const data = [["a", "b"], ["c", "d"]];
+    const data = [
+      ["a", "b"],
+      ["c", "d"],
+    ];
     await updateSheetData(9, 5, data);
 
     expect(mockFetch).toHaveBeenCalledWith("/api/workspaces/9/sheets/5", {
@@ -79,7 +82,11 @@ describe("updateSheetData", () => {
 
 describe("createSheet", () => {
   it("sends POST with sourceSheetId", async () => {
-    mockFetch.mockResolvedValue(new Response(JSON.stringify({ workbookId: 1, id: 10, sheetNo: 4, name: "New", order: 2 }), { status: 200 }));
+    mockFetch.mockResolvedValue(
+      new Response(JSON.stringify({ workbookId: 1, id: 10, sheetNo: 4, name: "New", order: 2 }), {
+        status: 200,
+      }),
+    );
 
     const result = await createSheet(9, 1, { sourceSheetId: 3 });
     expect(result.workbookId).toBe(1);
@@ -97,7 +104,9 @@ describe("deleteSheet", () => {
   it("sends DELETE", async () => {
     mockFetch.mockResolvedValue(new Response(null, { status: 200 }));
     await deleteSheet(9, 3, 7);
-    expect(mockFetch).toHaveBeenCalledWith("/api/workspaces/9/workbooks/3/sheets/7", { method: "DELETE" });
+    expect(mockFetch).toHaveBeenCalledWith("/api/workspaces/9/workbooks/3/sheets/7", {
+      method: "DELETE",
+    });
   });
 });
 
@@ -109,7 +118,10 @@ describe("fetchMessages", () => {
 
     const result = await fetchMessages(9, 3);
     expect(result).toEqual(body);
-    expect(mockFetch).toHaveBeenCalledWith("/api/workspaces/9/sessions/3/messages?limit=40&offset=0", {});
+    expect(mockFetch).toHaveBeenCalledWith(
+      "/api/workspaces/9/sessions/3/messages?limit=40&offset=0",
+      {},
+    );
   });
 });
 
@@ -132,11 +144,16 @@ describe("downloadTemplateUrl", () => {
 
 describe("undoLatestRun", () => {
   it("posts undo request for latest run", async () => {
-    mockFetch.mockResolvedValue(new Response(JSON.stringify({
-      runId: 8,
-      restoredSheetIds: [1, 2],
-      undoneUserText: "分析这些数据",
-    }), { status: 200 }));
+    mockFetch.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          runId: 8,
+          restoredSheetIds: [1, 2],
+          undoneUserText: "分析这些数据",
+        }),
+        { status: 200 },
+      ),
+    );
 
     const result = await undoLatestRun(9, 3);
     expect(result).toEqual({
@@ -144,13 +161,17 @@ describe("undoLatestRun", () => {
       restoredSheetIds: [1, 2],
       undoneUserText: "分析这些数据",
     });
-    expect(mockFetch).toHaveBeenCalledWith("/api/workspaces/9/sessions/3/runs/undo-latest", { method: "POST" });
+    expect(mockFetch).toHaveBeenCalledWith("/api/workspaces/9/sessions/3/runs/undo-latest", {
+      method: "POST",
+    });
   });
 });
 
 describe("generateSessionTitle", () => {
   it("posts first user text to title endpoint", async () => {
-    mockFetch.mockResolvedValue(new Response(JSON.stringify({ title: "数据分析" }), { status: 200 }));
+    mockFetch.mockResolvedValue(
+      new Response(JSON.stringify({ title: "数据分析" }), { status: 200 }),
+    );
 
     const result = await generateSessionTitle(9, 3, "分析这些数据");
     expect(result).toEqual({ title: "数据分析" });

@@ -12,7 +12,13 @@ type SessionInfra = {
 
 const ctx = createContext<SessionInfra | null>(null);
 
-export function SessionShellProvider({ children, value }: { children: React.ReactNode; value: SessionInfra }) {
+export function SessionShellProvider({
+  children,
+  value,
+}: {
+  children: React.ReactNode;
+  value: SessionInfra;
+}) {
   return <ctx.Provider value={value}>{children}</ctx.Provider>;
 }
 

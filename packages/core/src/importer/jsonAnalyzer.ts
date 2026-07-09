@@ -1,4 +1,4 @@
-import type { Template, SheetDef } from "../types/index.js";
+import type { SheetDef, Template } from "../types/index.js";
 
 /**
  * 将任意嵌套 JSON 动态拆解为多 Sheet 模板。
@@ -56,12 +56,25 @@ function flattenGroup(groupKey: string, value: Record<string, any>, depth = 0): 
 }
 
 function isPrimitive(v: any): boolean {
-  return v === null || v === undefined || typeof v === "string" || typeof v === "number" || typeof v === "boolean";
+  return (
+    v === null ||
+    v === undefined ||
+    typeof v === "string" ||
+    typeof v === "number" ||
+    typeof v === "boolean"
+  );
 }
 
 function isSimpleObject(v: any): boolean {
   if (typeof v !== "object" || v === null || Array.isArray(v)) return false;
-  return Object.values(v).every((x) => isPrimitive(x) || (typeof x === "object" && x !== null && !Array.isArray(x) && Object.values(x).every(isPrimitive)));
+  return Object.values(v).every(
+    (x) =>
+      isPrimitive(x) ||
+      (typeof x === "object" &&
+        x !== null &&
+        !Array.isArray(x) &&
+        Object.values(x).every(isPrimitive)),
+  );
 }
 
 /** 简单键值对 → [指标, 数值] 表 */
@@ -85,9 +98,19 @@ function kvToSheet(sheetName: string, obj: Record<string, any>): SheetDef {
 
   return {
     name: sheetName,
-    columns: colCount <= 2
-      ? [{ label: "指标名称", width: 250 }, { label: "数值", width: 250 }]
-      : [{ label: "项目", width: 200 }, ...Array.from({ length: colCount - 1 }, (_, i) => ({ label: `列${i + 1}`, width: 180 }))],
+    columns:
+      colCount <= 2
+        ? [
+            { label: "指标名称", width: 250 },
+            { label: "数值", width: 250 },
+          ]
+        : [
+            { label: "项目", width: 200 },
+            ...Array.from({ length: colCount - 1 }, (_, i) => ({
+              label: `列${i + 1}`,
+              width: 180,
+            })),
+          ],
     rows,
   };
 }
@@ -113,7 +136,10 @@ function nestedObjectToSheet(sheetName: string, obj: Record<string, any>): Sheet
     }
   }
 
-  const columns = [{ label: "项目", width: 150 }, ...sortedKeys.map((k) => ({ label: k, width: 180 }))];
+  const columns = [
+    { label: "项目", width: 150 },
+    ...sortedKeys.map((k) => ({ label: k, width: 180 })),
+  ];
   return { name: sheetName, columns, rows };
 }
 
@@ -130,11 +156,13 @@ function arrayToSheet(sheetName: string, arr: Record<string, any>[]): SheetDef |
 
   const sortedKeys = Array.from(allKeys);
   const columns = sortedKeys.map((k) => ({ label: k, width: 180 }));
-  const rows = arr.map((item) => sortedKeys.map((k) => {
-    const v = item[k];
-    if (typeof v === "object" && v !== null) return JSON.stringify(v);
-    return String(v ?? "");
-  }));
+  const rows = arr.map((item) =>
+    sortedKeys.map((k) => {
+      const v = item[k];
+      if (typeof v === "object" && v !== null) return JSON.stringify(v);
+      return String(v ?? "");
+    }),
+  );
 
   return { name: sheetName, columns, rows: rows.length > 0 ? rows : [sortedKeys.map(() => "")] };
 }

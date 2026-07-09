@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef } from "react";
-import { ChatPanel } from "@/features/chat/conversation/ChatPanel";
+import type { Session } from "@/api/sessions";
 import { DraftComposer } from "@/features/chat/composer/DraftComposer";
+import { ChatPanel } from "@/features/chat/conversation/ChatPanel";
+import { t } from "@/lib/i18n";
 import { SessionHeader } from "./components/SessionHeader";
 import { SessionHistoryPopover } from "./components/SessionHistoryPopover";
-import { SessionShellProvider } from "./SessionShellContext";
-import type { Session } from "@/api/sessions";
-import { t } from "@/lib/i18n";
 import styles from "./SessionShell.module.css";
+import { SessionShellProvider } from "./SessionShellContext";
 
 type CurrentUser = {
   email: string;
@@ -68,26 +68,38 @@ export function SessionShell({
     return () => document.removeEventListener("mousedown", handler);
   }, [historyOpen, setHistoryOpen]);
 
-  const handleDraftSend = useCallback(async (text: string) => {
-    const newId = await handleSendInDraft(text);
-    pendingDraftTextRef.current[newId] = text;
-    return newId;
-  }, [handleSendInDraft]);
+  const handleDraftSend = useCallback(
+    async (text: string) => {
+      const newId = await handleSendInDraft(text);
+      pendingDraftTextRef.current[newId] = text;
+      return newId;
+    },
+    [handleSendInDraft],
+  );
 
-  const currentSession = currentSessionId != null
-    ? sessions.find((session) => session.id === currentSessionId)
-    : null;
+  const currentSession =
+    currentSessionId != null ? sessions.find((session) => session.id === currentSessionId) : null;
 
   if (workspaceId == null) {
     return (
-    <div className={styles.container}>
-      <div className={styles.emptyState}>{t("loading_workspace", "加载工作区中...")}</div>
+      <div className={styles.container}>
+        <div className={styles.emptyState}>{t("loading_workspace", "加载工作区中...")}</div>
       </div>
     );
   }
 
   return (
-    <SessionShellProvider value={{ workspaceId, onAttachExcel, referenceCacheRevision, onWorkspaceRefresh, onUndoComplete: handleUndoComplete, onNavigateSheet, initialMessages }}>
+    <SessionShellProvider
+      value={{
+        workspaceId,
+        onAttachExcel,
+        referenceCacheRevision,
+        onWorkspaceRefresh,
+        onUndoComplete: handleUndoComplete,
+        onNavigateSheet,
+        initialMessages,
+      }}
+    >
       <div className={styles.container}>
         <SessionHeader
           sessionName={currentSession?.name ?? t("ai_chat", "AI 对话")}

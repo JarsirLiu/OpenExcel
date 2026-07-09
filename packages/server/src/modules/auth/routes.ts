@@ -1,8 +1,8 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
 import { requireCurrentUser } from "../../middleware/requestContext.js";
-import * as service from "./service.js";
 import { PASSWORD_MIN_LENGTH } from "./password.js";
+import * as service from "./service.js";
 
 const credentialsSchema = z.object({
   email: z.string().trim().email("请输入有效邮箱"),

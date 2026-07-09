@@ -1,7 +1,11 @@
 import { z } from "zod";
 
 const writeCellValueSchema = z.union([z.string(), z.number(), z.boolean()]);
-const writeFormulaSchema = z.string().trim().min(1).describe("Excel 公式表达式，支持 A1 引用；可带或不带前导等号，系统会自动规范化");
+const writeFormulaSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .describe("Excel 公式表达式，支持 A1 引用；可带或不带前导等号，系统会自动规范化");
 
 export type ExcelToolSpec = {
   description: string;
@@ -27,7 +31,12 @@ export const excelToolSpecs = {
     inputSchema: z.object({
       name: z.string().trim().min(1).optional().describe("工作簿名称"),
       sheetName: z.string().trim().min(1).optional().describe("初始 Sheet 名称"),
-      sourceSheetId: z.coerce.number().int().positive().optional().describe("可选的源 Sheet ID，用于复制初始结构"),
+      sourceSheetId: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe("可选的源 Sheet ID，用于复制初始结构"),
     }),
   },
   createSheet: {
@@ -36,7 +45,12 @@ export const excelToolSpecs = {
     inputSchema: z.object({
       workbookId: z.coerce.number().int().positive().describe("工作簿 ID"),
       name: z.string().trim().min(1).optional().describe("Sheet 名称"),
-      sourceSheetId: z.coerce.number().int().positive().optional().describe("可选的源 Sheet ID，用于复制初始结构"),
+      sourceSheetId: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe("可选的源 Sheet ID，用于复制初始结构"),
     }),
   },
   readSheet: {
@@ -44,10 +58,30 @@ export const excelToolSpecs = {
       "读取指定 Sheet 的数据。始终返回 sheet 元信息（行数列数、列名、列类型、数值列统计）和指定范围的稀疏数据。不传范围参数时默认返回前30行。返回结果中包含 hasMoreRows 等导航提示，便于继续读取剩余数据。行号和列号按 Excel 视觉顺序从 1 开始。",
     inputSchema: z.object({
       sheetId: z.coerce.number().describe("Sheet ID"),
-      startRow: z.coerce.number().int().positive().optional().describe("起始行号（含），从 1 开始，默认 1"),
-      endRow: z.coerce.number().int().positive().optional().describe("结束行号（含），从 1 开始，默认 30"),
-      startCol: z.coerce.number().int().positive().optional().describe("起始列号（含），从 1 开始，默认 1"),
-      endCol: z.coerce.number().int().positive().optional().describe("结束列号（含），从 1 开始，默认全部列"),
+      startRow: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe("起始行号（含），从 1 开始，默认 1"),
+      endRow: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe("结束行号（含），从 1 开始，默认 30"),
+      startCol: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe("起始列号（含），从 1 开始，默认 1"),
+      endCol: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe("结束列号（含），从 1 开始，默认全部列"),
     }),
   },
   writeCells: {

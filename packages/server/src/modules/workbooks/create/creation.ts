@@ -42,7 +42,9 @@ export function buildBlankSheetInitialization(): SheetInitializationPayload {
   };
 }
 
-export function buildSourceSheetInitialization(sourceSheet: SourceSheetPayload): SheetInitializationPayload {
+export function buildSourceSheetInitialization(
+  sourceSheet: SourceSheetPayload,
+): SheetInitializationPayload {
   const payload: SheetInitializationPayload = {
     columns: sourceSheet.columns,
     merges: sourceSheet.merges,

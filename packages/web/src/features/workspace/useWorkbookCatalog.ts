@@ -15,8 +15,7 @@ function loadStoredIdx(): number {
 function saveIdx(idx: number) {
   try {
     sessionStorage.setItem(STORAGE_KEY_IDX, String(idx));
-  } catch {
-  }
+  } catch {}
 }
 
 type WorkbookInitial = {
@@ -27,7 +26,9 @@ type WorkbookInitial = {
 export function useWorkbookCatalog(workspaceId: number | null, initial?: WorkbookInitial) {
   const [workbooks, setWorkbooks] = useState<WorkbookMeta[]>(initial?.workbooks ?? []);
   const [workbookIdx, setWorkbookIdx] = useState(loadStoredIdx);
-  const [currentWorkbook, setCurrentWorkbook] = useState<WorkbookFull | null>(initial?.currentWorkbook ?? null);
+  const [currentWorkbook, setCurrentWorkbook] = useState<WorkbookFull | null>(
+    initial?.currentWorkbook ?? null,
+  );
   const [workbookRevision, setWorkbookRevision] = useState(0);
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(!initial);

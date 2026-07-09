@@ -1,4 +1,5 @@
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+
 const PASSWORD_SALT_BYTES = 16;
 const PASSWORD_KEY_LENGTH = 64;
 const PASSWORD_SCRYPT_N = 16384;
@@ -34,7 +35,11 @@ export function verifyPassword(password: string, storedHash: string): boolean {
   const iterations = Number(n);
   const blockSize = Number(r);
   const parallelization = Number(p);
-  if (!Number.isFinite(iterations) || !Number.isFinite(blockSize) || !Number.isFinite(parallelization)) {
+  if (
+    !Number.isFinite(iterations) ||
+    !Number.isFinite(blockSize) ||
+    !Number.isFinite(parallelization)
+  ) {
     return false;
   }
 

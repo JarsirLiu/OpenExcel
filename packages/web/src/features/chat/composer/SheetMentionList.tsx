@@ -1,6 +1,6 @@
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { ReactRenderer } from "@tiptap/react";
 import type { SuggestionKeyDownProps, SuggestionProps } from "@tiptap/suggestion";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 
 type MentionItem = {
   id: string;
@@ -78,8 +78,8 @@ export const MentionList = forwardRef<
       return;
     }
 
-    const workbookExists = activeWorkbookId != null
-      && groups.some((group) => group.workbookId === activeWorkbookId);
+    const workbookExists =
+      activeWorkbookId != null && groups.some((group) => group.workbookId === activeWorkbookId);
     if (!workbookExists) {
       setActiveWorkbookId(groups[0].workbookId);
       setActivePane("workbook");
@@ -105,7 +105,9 @@ export const MentionList = forwardRef<
   }, [activeGroup, activePane, activeSheetIndex]);
 
   useEffect(() => {
-    const selectedEl = listRef.current?.querySelector<HTMLElement>("[data-mention-selected='true']");
+    const selectedEl = listRef.current?.querySelector<HTMLElement>(
+      "[data-mention-selected='true']",
+    );
     selectedEl?.scrollIntoView({ block: "nearest" });
   }, [activePane, activeSheetIndex, activeWorkbookId, groups]);
 
@@ -123,7 +125,10 @@ export const MentionList = forwardRef<
 
   const moveWorkbook = (delta: number) => {
     if (groups.length === 0) return;
-    const currentIndex = Math.max(0, groups.findIndex((group) => group.workbookId === activeWorkbookId));
+    const currentIndex = Math.max(
+      0,
+      groups.findIndex((group) => group.workbookId === activeWorkbookId),
+    );
     const nextIndex = (currentIndex + delta + groups.length) % groups.length;
     setActiveWorkbookId(groups[nextIndex].workbookId);
     setActivePane("workbook");
@@ -132,7 +137,8 @@ export const MentionList = forwardRef<
 
   const moveSheet = (delta: number) => {
     if (!activeGroup || activeGroup.sheets.length === 0) return;
-    const nextIndex = (activeSheetIndex + delta + activeGroup.sheets.length) % activeGroup.sheets.length;
+    const nextIndex =
+      (activeSheetIndex + delta + activeGroup.sheets.length) % activeGroup.sheets.length;
     setActiveSheetIndex(nextIndex);
     setActivePane("sheet");
   };
@@ -200,7 +206,8 @@ export const MentionList = forwardRef<
     <div
       ref={listRef}
       style={{
-        background: "linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(250,252,255,0.98) 100%)",
+        background:
+          "linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(250,252,255,0.98) 100%)",
         border: "1px solid rgba(148, 163, 184, 0.28)",
         borderRadius: 14,
         boxShadow: "0 18px 40px rgba(15, 23, 42, 0.12)",
@@ -213,7 +220,9 @@ export const MentionList = forwardRef<
       }}
     >
       {groups.length === 0 ? (
-        <div style={{ padding: "12px 14px", fontSize: 13, color: "var(--hint-foreground)" }}>无匹配的 Sheet</div>
+        <div style={{ padding: "12px 14px", fontSize: 13, color: "var(--hint-foreground)" }}>
+          无匹配的 Sheet
+        </div>
       ) : (
         <div style={{ display: "flex", minHeight: 0, flex: 1 }}>
           <div
@@ -221,32 +230,38 @@ export const MentionList = forwardRef<
               width: 212,
               borderRight: "1px solid rgba(148, 163, 184, 0.18)",
               overflowY: "auto",
-              background: "linear-gradient(180deg, rgba(248,250,252,0.95) 0%, rgba(241,245,249,0.92) 100%)",
+              background:
+                "linear-gradient(180deg, rgba(248,250,252,0.95) 0%, rgba(241,245,249,0.92) 100%)",
             }}
           >
-            <div style={{
-              padding: "10px 12px 8px",
-              fontSize: 11,
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-              color: "var(--hint-foreground)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}>
+            <div
+              style={{
+                padding: "10px 12px 8px",
+                fontSize: 11,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                color: "var(--hint-foreground)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
               <span>工作簿</span>
-              <span style={{
-                padding: "2px 8px",
-                borderRadius: 999,
-                background: "rgba(255,255,255,0.7)",
-                color: "var(--muted-foreground)",
-                border: "1px solid rgba(148, 163, 184, 0.18)",
-              }}>
+              <span
+                style={{
+                  padding: "2px 8px",
+                  borderRadius: 999,
+                  background: "rgba(255,255,255,0.7)",
+                  color: "var(--muted-foreground)",
+                  border: "1px solid rgba(148, 163, 184, 0.18)",
+                }}
+              >
                 {groups.length}
               </span>
             </div>
             {groups.map((group) => {
-              const isSelected = activeGroup?.workbookId === group.workbookId && activePane === "workbook";
+              const isSelected =
+                activeGroup?.workbookId === group.workbookId && activePane === "workbook";
               const countLabel = group.sheets.length > 99 ? "99+" : String(group.sheets.length);
 
               return (
@@ -272,17 +287,21 @@ export const MentionList = forwardRef<
                     fontSize: 13,
                     color: "var(--foreground)",
                     borderRadius: 12,
-                    border: isSelected ? "1px solid rgba(59, 130, 246, 0.18)" : "1px solid transparent",
+                    border: isSelected
+                      ? "1px solid rgba(59, 130, 246, 0.18)"
+                      : "1px solid transparent",
                     boxShadow: isSelected ? "0 8px 18px rgba(59, 130, 246, 0.08)" : "none",
                   }}
                 >
-                  <span style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: 999,
-                    background: isSelected ? "#3b82f6" : "#cbd5e1",
-                    flexShrink: 0,
-                  }} />
+                  <span
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: 999,
+                      background: isSelected ? "#3b82f6" : "#cbd5e1",
+                      flexShrink: 0,
+                    }}
+                  />
                   <span
                     style={{
                       fontWeight: 600,
@@ -295,16 +314,18 @@ export const MentionList = forwardRef<
                   >
                     {group.workbookName}
                   </span>
-                  <span style={{
-                    fontSize: 11,
-                    color: isSelected ? "#1d4ed8" : "#64748b",
-                    flexShrink: 0,
-                    fontWeight: 600,
-                    padding: "3px 8px",
-                    borderRadius: 999,
-                    background: isSelected ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.65)",
-                    border: "1px solid rgba(148, 163, 184, 0.16)",
-                  }}>
+                  <span
+                    style={{
+                      fontSize: 11,
+                      color: isSelected ? "#1d4ed8" : "#64748b",
+                      flexShrink: 0,
+                      fontWeight: 600,
+                      padding: "3px 8px",
+                      borderRadius: 999,
+                      background: isSelected ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.65)",
+                      border: "1px solid rgba(148, 163, 184, 0.16)",
+                    }}
+                  >
                     {countLabel}
                   </span>
                 </div>
@@ -312,53 +333,64 @@ export const MentionList = forwardRef<
             })}
           </div>
 
-          <div style={{
-            flex: 1,
-            minWidth: 0,
-            overflowY: "auto",
-            background: "linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(248,250,252,0.98) 100%)",
-          }}>
+          <div
+            style={{
+              flex: 1,
+              minWidth: 0,
+              overflowY: "auto",
+              background:
+                "linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(248,250,252,0.98) 100%)",
+            }}
+          >
             {activeGroup ? (
               activeGroup.sheets.length > 0 ? (
                 <>
-                  <div style={{
-                    padding: "10px 14px 8px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: 12,
-                  }}>
+                  <div
+                    style={{
+                      padding: "10px 14px 8px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 12,
+                    }}
+                  >
                     <div style={{ minWidth: 0 }}>
-                      <div style={{
-                        fontSize: 11,
-                        letterSpacing: "0.08em",
-                        textTransform: "uppercase",
-              color: "var(--hint-foreground)",
-                        marginBottom: 3,
-                      }}>
+                      <div
+                        style={{
+                          fontSize: 11,
+                          letterSpacing: "0.08em",
+                          textTransform: "uppercase",
+                          color: "var(--hint-foreground)",
+                          marginBottom: 3,
+                        }}
+                      >
                         Sheet
                       </div>
-                      <div style={{
-                        fontSize: 14,
-                        fontWeight: 700,
-                        color: "var(--foreground)",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                        maxWidth: 240,
-                      }}>
+                      <div
+                        style={{
+                          fontSize: 14,
+                          fontWeight: 700,
+                          color: "var(--foreground)",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                          maxWidth: 240,
+                        }}
+                      >
                         {activeGroup.workbookName}
                       </div>
                     </div>
-                    <div style={{
-                      padding: "4px 10px",
-                      borderRadius: 999,
-                      background: "rgba(59, 130, 246, 0.08)",
-                      color: "#1d4ed8",
-                      fontSize: 12,
-                      fontWeight: 600,
-                      flexShrink: 0,
-                    }}>
+                    <div
+                      style={{
+                        padding: "4px 10px",
+                        borderRadius: 999,
+                        background: "rgba(59, 130, 246, 0.08)",
+                        color: "#1d4ed8",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        flexShrink: 0,
+                      }}
+                    >
                       {activeGroup.sheets.length} 个 sheet
                     </div>
                   </div>
@@ -366,8 +398,11 @@ export const MentionList = forwardRef<
                     {activeGroup.sheets.map((item, index) => {
                       const sheetId = Number(item.id.replace("sheet:", ""));
                       const visibleIndex = getSelectedIndexForSheet(sheetId);
-                      const isSelected = activePane === "sheet" && activeGroup.sheets[activeSheetIndex]?.id === item.id;
-                      const sheetBadge = item.sheetNo != null ? `#${item.sheetNo}` : String(index + 1);
+                      const isSelected =
+                        activePane === "sheet" &&
+                        activeGroup.sheets[activeSheetIndex]?.id === item.id;
+                      const sheetBadge =
+                        item.sheetNo != null ? `#${item.sheetNo}` : String(index + 1);
 
                       return (
                         <div
@@ -390,35 +425,43 @@ export const MentionList = forwardRef<
                               ? "linear-gradient(135deg, rgba(219, 234, 254, 0.85) 0%, rgba(239, 246, 255, 0.9) 100%)"
                               : "rgba(255,255,255,0.7)",
                             borderRadius: 12,
-                            border: isSelected ? "1px solid rgba(59, 130, 246, 0.18)" : "1px solid rgba(148, 163, 184, 0.12)",
+                            border: isSelected
+                              ? "1px solid rgba(59, 130, 246, 0.18)"
+                              : "1px solid rgba(148, 163, 184, 0.12)",
                             boxShadow: isSelected ? "0 8px 16px rgba(59, 130, 246, 0.08)" : "none",
                             display: "flex",
                             alignItems: "center",
                             gap: 10,
                           }}
                         >
-                          <span style={{
-                            width: 24,
-                            height: 24,
-                            borderRadius: 8,
-                            display: "inline-flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            background: isSelected ? "rgba(59, 130, 246, 0.12)" : "rgba(148, 163, 184, 0.12)",
-                            color: isSelected ? "#1d4ed8" : "#64748b",
-                            fontSize: 12,
-                            fontWeight: 700,
-                            flexShrink: 0,
-                          }}>
+                          <span
+                            style={{
+                              width: 24,
+                              height: 24,
+                              borderRadius: 8,
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              background: isSelected
+                                ? "rgba(59, 130, 246, 0.12)"
+                                : "rgba(148, 163, 184, 0.12)",
+                              color: isSelected ? "#1d4ed8" : "#64748b",
+                              fontSize: 12,
+                              fontWeight: 700,
+                              flexShrink: 0,
+                            }}
+                          >
                             {sheetBadge}
                           </span>
-                          <span style={{
-                            fontWeight: 600,
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                            flex: 1,
-                          }}>
+                          <span
+                            style={{
+                              fontWeight: 600,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                              flex: 1,
+                            }}
+                          >
                             {item.label}
                           </span>
                         </div>
@@ -427,29 +470,42 @@ export const MentionList = forwardRef<
                   </div>
                 </>
               ) : (
-                <div style={{ padding: "14px", fontSize: 13, color: "var(--hint-foreground)", lineHeight: 1.6 }}>
+                <div
+                  style={{
+                    padding: "14px",
+                    fontSize: 13,
+                    color: "var(--hint-foreground)",
+                    lineHeight: 1.6,
+                  }}
+                >
                   这个工作簿下没有可引用的 sheet，按 Enter 可直接引用工作簿。
                 </div>
               )
             ) : (
-              <div style={{ padding: "14px", fontSize: 13, color: "var(--hint-foreground)" }}>请选择一个工作簿。</div>
+              <div style={{ padding: "14px", fontSize: 13, color: "var(--hint-foreground)" }}>
+                请选择一个工作簿。
+              </div>
             )}
           </div>
         </div>
       )}
       {groups.length > 0 && (
-        <div style={{
-          padding: "6px 12px",
-          borderTop: "1px solid rgba(148, 163, 184, 0.18)",
-          fontSize: 11,
-          color: "var(--muted-foreground)",
-          background: "rgba(248, 250, 252, 0.92)",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: 12,
-        }}>
-          <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>↑↓ 切换，→ 进入 sheet，← 返回工作簿，Enter 选中</span>
+        <div
+          style={{
+            padding: "6px 12px",
+            borderTop: "1px solid rgba(148, 163, 184, 0.18)",
+            fontSize: 11,
+            color: "var(--muted-foreground)",
+            background: "rgba(248, 250, 252, 0.92)",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 12,
+          }}
+        >
+          <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            ↑↓ 切换，→ 进入 sheet，← 返回工作簿，Enter 选中
+          </span>
           <span style={{ color: "var(--hint-foreground)" }}>
             {activePane === "sheet" ? "当前在 sheet 列" : "当前在工作簿列"}
           </span>
@@ -482,11 +538,13 @@ export function createMentionSuggestion(
 
       for (const [workbookId, sheets] of grouped.entries()) {
         const workbookName = sheets[0]?.workbookName ?? "";
-        const matchingSheets = sheets.filter((sheet) =>
-          sheet.sheetName.toLowerCase().includes(normalized)
-          || workbookName.toLowerCase().includes(normalized),
+        const matchingSheets = sheets.filter(
+          (sheet) =>
+            sheet.sheetName.toLowerCase().includes(normalized) ||
+            workbookName.toLowerCase().includes(normalized),
         );
-        const workbookMatches = workbookName.toLowerCase().includes(normalized) || matchingSheets.length > 0;
+        const workbookMatches =
+          workbookName.toLowerCase().includes(normalized) || matchingSheets.length > 0;
         if (!workbookMatches) continue;
 
         items.push({

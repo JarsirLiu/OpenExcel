@@ -1,8 +1,12 @@
-import { useState, useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { t } from "@/lib/i18n";
 import { Button } from "@/components/ui/Button/Button";
-import { clearConfirmDialog, resolveConfirmDialog, type ConfirmOptions } from "@/shared/lib/confirmDialog";
+import { t } from "@/lib/i18n";
+import {
+  type ConfirmOptions,
+  clearConfirmDialog,
+  resolveConfirmDialog,
+} from "@/shared/lib/confirmDialog";
 import styles from "./ConfirmDialog.module.css";
 
 export function ConfirmDialog() {

@@ -3,7 +3,11 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gridToCelldata, type InitConfig } from "@openexcel/core";
 import { prisma } from "../../infra/database/db.js";
-import { generateWorkspacePublicId, generateWorkbookPublicId, generateSessionPublicId } from "../../shared/utils/publicId.js";
+import {
+  generateSessionPublicId,
+  generateWorkbookPublicId,
+  generateWorkspacePublicId,
+} from "../../shared/utils/publicId.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const exampleTemplatePath = resolve(__dirname, "../../../../../templates/init.json");
@@ -18,7 +22,10 @@ function normalizeName(name: string | undefined, fallback: string) {
   return trimmed && trimmed.length > 0 ? trimmed : fallback;
 }
 
-export async function seedExampleWorkspaceForUser(ownerUserId: number, template = loadExampleTemplate()) {
+export async function seedExampleWorkspaceForUser(
+  ownerUserId: number,
+  template = loadExampleTemplate(),
+) {
   return prisma.$transaction(async (tx) => {
     const user = await tx.user.findUnique({
       where: { id: ownerUserId },

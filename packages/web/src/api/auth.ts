@@ -15,7 +15,11 @@ export async function fetchCurrentUser(): Promise<CurrentUser> {
   return data.user ?? data;
 }
 
-export async function register(input: { email: string; password: string; displayName?: string }): Promise<CurrentUser> {
+export async function register(input: {
+  email: string;
+  password: string;
+  displayName?: string;
+}): Promise<CurrentUser> {
   const res = await apiFetch("/auth/register", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

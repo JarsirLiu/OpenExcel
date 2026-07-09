@@ -84,7 +84,9 @@ describe("undoLatestRun", () => {
       ],
       snapshots: [],
     });
-    mocks.transaction.mockImplementationOnce(async (callback: (tx: any) => Promise<any>) => callback(buildTx()));
+    mocks.transaction.mockImplementationOnce(async (callback: (tx: any) => Promise<any>) =>
+      callback(buildTx()),
+    );
     mocks.sessionFindFirst.mockResolvedValueOnce({
       id: 5,
       chatMessages: JSON.stringify([
@@ -134,7 +136,9 @@ describe("undoLatestRun", () => {
       ],
       snapshots: [],
     });
-    mocks.transaction.mockImplementationOnce(async (callback: (tx: any) => Promise<any>) => callback(buildTx()));
+    mocks.transaction.mockImplementationOnce(async (callback: (tx: any) => Promise<any>) =>
+      callback(buildTx()),
+    );
     mocks.sessionFindFirst.mockResolvedValueOnce({
       id: 6,
       chatMessages: JSON.stringify([

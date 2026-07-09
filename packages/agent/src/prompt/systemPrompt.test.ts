@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_PROMPT, buildSystemPrompt } from "./systemPrompt.js";
+import { buildSystemPrompt, DEFAULT_PROMPT } from "./systemPrompt.js";
 
 describe("system prompt", () => {
   it("keeps a strict permission boundary for Excel operations", () => {

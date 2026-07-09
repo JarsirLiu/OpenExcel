@@ -1,6 +1,6 @@
 import { buildWorkspaceContext as buildAgentWorkspaceContext } from "@openexcel/agent";
-import type { findRunsBySession } from "../runs/repository.js";
 import * as workbookRepo from "../../workbooks/repository.js";
+import type { findRunsBySession } from "../runs/repository.js";
 
 const MAX_TURNS = 20;
 
@@ -13,7 +13,9 @@ export function historyFromRuns(runs: Awaited<ReturnType<typeof findRunsBySessio
   return trim(transcript);
 }
 
-function trim(messages: { role: string; content: string }[]): { role: "user" | "assistant"; content: string }[] {
+function trim(
+  messages: { role: string; content: string }[],
+): { role: "user" | "assistant"; content: string }[] {
   if (messages.length <= MAX_TURNS * 2) {
     return messages.slice() as any;
   }

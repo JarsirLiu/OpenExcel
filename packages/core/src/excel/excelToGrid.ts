@@ -1,5 +1,5 @@
 import XLSX from "xlsx-js-style";
-import type { Template, MergeDef } from "../types/index.js";
+import type { MergeDef, Template } from "../types/index.js";
 import type { FortuneCell, FortuneCellValue } from "./celldataUtils.js";
 import { parseWorkbookStyleMaps } from "./xlsxStyleParser.js";
 
@@ -56,7 +56,10 @@ function extractSheetConfig(ws: XLSX.WorkSheet): Record<string, any> {
   if (freeze) {
     config.frozen = {
       type: "rangeRow",
-      range: { row_focus: freeze.yflaten ?? freeze.y ?? 0, column_focus: freeze.xflaten ?? freeze.x ?? 0 },
+      range: {
+        row_focus: freeze.yflaten ?? freeze.y ?? 0,
+        column_focus: freeze.xflaten ?? freeze.x ?? 0,
+      },
     };
   }
 
@@ -96,15 +99,29 @@ export function extractCellStyle(cell: XLSX.CellObject): FortuneCellValue {
   const align = cell.s?.alignment;
   if (align) {
     switch (align.horizontal) {
-      case "left": v.ht = 0; break;
-      case "center": v.ht = 1; break;
-      case "right": v.ht = 2; break;
-      case "centerContinuous": v.ht = 1; break;
+      case "left":
+        v.ht = 0;
+        break;
+      case "center":
+        v.ht = 1;
+        break;
+      case "right":
+        v.ht = 2;
+        break;
+      case "centerContinuous":
+        v.ht = 1;
+        break;
     }
     switch (align.vertical) {
-      case "top": v.vt = 0; break;
-      case "center": v.vt = 1; break;
-      case "bottom": v.vt = 2; break;
+      case "top":
+        v.vt = 0;
+        break;
+      case "center":
+        v.vt = 1;
+        break;
+      case "bottom":
+        v.vt = 2;
+        break;
     }
     if (align.wrapText) v.tb = "1";
   }
@@ -112,10 +129,7 @@ export function extractCellStyle(cell: XLSX.CellObject): FortuneCellValue {
   const border = cell.s?.border;
   if (border) {
     const bd: FortuneCellValue["bd"] = {};
-    const mapSide = (
-      side: "top" | "bottom" | "left" | "right",
-      key: "t" | "b" | "l" | "r",
-    ) => {
+    const mapSide = (side: "top" | "bottom" | "left" | "right", key: "t" | "b" | "l" | "r") => {
       const b = border[side];
       if (!b) return;
       const s = BORDER_STYLE_MAP[b.style ?? "none"];
@@ -187,13 +201,22 @@ function worksheetToCelldata(
       if (mc) v.mc = mc;
 
       const hasValue = cell.v != null;
-      const hasStyle = cell.s && (
-        cell.s.font?.b || cell.s.font?.i || cell.s.font?.s || cell.s.font?.u ||
-        cell.s.font?.sz || cell.s.font?.name || cell.s.font?.color?.rgb ||
-        cell.s.fill?.fgColor?.rgb ||
-        cell.s.alignment?.horizontal || cell.s.alignment?.vertical || cell.s.alignment?.wrapText ||
-        cell.s.numFmt || cell.f || mc
-      );
+      const hasStyle =
+        cell.s &&
+        (cell.s.font?.b ||
+          cell.s.font?.i ||
+          cell.s.font?.s ||
+          cell.s.font?.u ||
+          cell.s.font?.sz ||
+          cell.s.font?.name ||
+          cell.s.font?.color?.rgb ||
+          cell.s.fill?.fgColor?.rgb ||
+          cell.s.alignment?.horizontal ||
+          cell.s.alignment?.vertical ||
+          cell.s.alignment?.wrapText ||
+          cell.s.numFmt ||
+          cell.f ||
+          mc);
 
       if (hasValue || hasStyle) {
         celldata.push({ r: row, c: col, v });

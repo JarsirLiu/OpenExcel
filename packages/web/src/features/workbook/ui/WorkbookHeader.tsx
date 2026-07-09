@@ -1,9 +1,18 @@
-import { useCallback, useState, useRef, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { t } from "@/lib/i18n";
 import styles from "./WorkbookHeader.module.css";
 
 const FileIcon = () => (
-  <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    width={12}
+    height={12}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
     <polyline points="14 2 14 8 20 8" />
   </svg>
@@ -43,20 +52,29 @@ export function WorkbookHeader({
     }
   }, [editingIdx]);
 
-  const startEditing = useCallback((index: number) => {
-    setEditingIdx(index);
-    setEditValue(workbooks[index]?.name ?? "");
-  }, [workbooks]);
+  const startEditing = useCallback(
+    (index: number) => {
+      setEditingIdx(index);
+      setEditValue(workbooks[index]?.name ?? "");
+    },
+    [workbooks],
+  );
 
-  const finishEditing = useCallback((index: number) => {
-    const wb = workbooks[index];
-    if (!wb) { setEditingIdx(null); return; }
-    const trimmed = editValue.trim();
-    if (trimmed && trimmed !== wb.name && onWorkbookRename) {
-      void onWorkbookRename(wb.id, trimmed);
-    }
-    setEditingIdx(null);
-  }, [editValue, workbooks, onWorkbookRename]);
+  const finishEditing = useCallback(
+    (index: number) => {
+      const wb = workbooks[index];
+      if (!wb) {
+        setEditingIdx(null);
+        return;
+      }
+      const trimmed = editValue.trim();
+      if (trimmed && trimmed !== wb.name && onWorkbookRename) {
+        void onWorkbookRename(wb.id, trimmed);
+      }
+      setEditingIdx(null);
+    },
+    [editValue, workbooks, onWorkbookRename],
+  );
 
   const cancelEditing = useCallback(() => {
     setEditingIdx(null);
@@ -65,13 +83,9 @@ export function WorkbookHeader({
   return (
     <div className={styles.header}>
       <div className={styles.tabList}>
-        {workbooks.map((wb, i) => (
+        {workbooks.map((wb, i) =>
           editingIdx === i ? (
-            <div
-              key={wb.id}
-              className={`${styles.tab} ${styles.tabActive}`}
-              onClick={() => {}}
-            >
+            <div key={wb.id} className={`${styles.tab} ${styles.tabActive}`} onClick={() => {}}>
               <input
                 ref={inputRef}
                 className={styles.renameInput}
@@ -93,15 +107,17 @@ export function WorkbookHeader({
             >
               {wb.name}
             </div>
-          )
-        ))}
+          ),
+        )}
       </div>
       <div className={styles.actions}>
         <button onClick={onUploadNewWorkbookClick} className={styles.pillBtn}>
           <FileIcon /> {t("upload", "上传Excel")}
         </button>
         {status && (
-          <span className={`${styles.status} ${status.includes("失败") ? styles.statusError : styles.statusOk}`}>
+          <span
+            className={`${styles.status} ${status.includes("失败") ? styles.statusError : styles.statusOk}`}
+          >
             {status}
           </span>
         )}

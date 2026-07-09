@@ -1,19 +1,19 @@
 import { excelToolSpecs, runToolContextSchema } from "@openexcel/agent";
-import { prisma } from "../../../infra/database/db.js";
 import {
+  type SheetChangeDelta,
   sheetChangeCellToZeroBased,
   sheetChangePatchOutputSchema,
   sheetChangeRangeToZeroBased,
-  type SheetChangeDelta,
 } from "@openexcel/core";
+import { prisma } from "../../../infra/database/db.js";
+import { sheetRecordToCelldata } from "../../../shared/utils/sheetData.js";
+import * as repo from "../../sessions/runs/repository.js";
 import {
   applyCellWrite,
   buildSheetChangePreview,
   normalizeWriteOperations,
   type WriteCellsInput,
 } from "../domain.js";
-import * as repo from "../../sessions/runs/repository.js";
-import { sheetRecordToCelldata } from "../../../shared/utils/sheetData.js";
 
 export const writeCells = {
   ...excelToolSpecs.writeCells,
@@ -28,7 +28,8 @@ export const writeCells = {
       include: { workbook: true },
     });
     if (!sheet) throw new Error(`Sheet ${sheetId} 不存在`);
-    if (sheet.workbook.workspaceId !== context.workspaceId) throw new Error(`Sheet ${sheetId} 不存在`);
+    if (sheet.workbook.workspaceId !== context.workspaceId)
+      throw new Error(`Sheet ${sheetId} 不存在`);
 
     await repo.upsertRunSheetSnapshot({
       runId: context.runId,
@@ -45,7 +46,10 @@ export const writeCells = {
       cellMap.set(`${cell.r},${cell.c}`, cell);
     }
 
-    const touchedCells = new Map<string, { row: number; col: number; value: string | number | boolean; formula?: string }>();
+    const touchedCells = new Map<
+      string,
+      { row: number; col: number; value: string | number | boolean; formula?: string }
+    >();
     for (const operation of operations) {
       if (operation.type === "cell") {
         const storageCell = sheetChangeCellToZeroBased(operation);

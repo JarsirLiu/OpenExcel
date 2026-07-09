@@ -9,7 +9,9 @@ export async function findSessionsByWorkspace(workspaceId: number) {
 }
 
 export async function createSession(workspaceId: number, name: string) {
-  return prisma.session.create({ data: { publicId: generateSessionPublicId(), workspaceId, name, sheetId: null } });
+  return prisma.session.create({
+    data: { publicId: generateSessionPublicId(), workspaceId, name, sheetId: null },
+  });
 }
 
 export async function deleteSession(id: number, workspaceId: number) {
@@ -20,7 +22,11 @@ export async function deleteSession(id: number, workspaceId: number) {
   return prisma.session.delete({ where: { id: session.id } });
 }
 
-export async function updateSession(id: number, data: { name?: string; chatMessages?: string }, workspaceId: number) {
+export async function updateSession(
+  id: number,
+  data: { name?: string; chatMessages?: string },
+  workspaceId: number,
+) {
   const session = await prisma.session.findFirst({
     where: { id, workspaceId },
   });

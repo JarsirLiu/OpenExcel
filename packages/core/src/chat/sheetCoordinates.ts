@@ -1,8 +1,4 @@
-import type {
-  SheetChangeCell,
-  SheetChangeDelta,
-  SheetChangeRange,
-} from "./sheetChange.js";
+import type { SheetChangeCell, SheetChangeDelta, SheetChangeRange } from "./sheetChange.js";
 
 export type ZeroBasedSheetChangeCell = {
   row: number;
@@ -117,7 +113,9 @@ export function sheetChangeDeltaToZeroBased(delta: SheetChangeDelta): ZeroBasedS
   throw new Error("Unsupported sheet change delta");
 }
 
-export function zeroBasedSheetChangeCellToSheetChangeCell(cell: ZeroBasedSheetChangeCell): SheetChangeCell {
+export function zeroBasedSheetChangeCellToSheetChangeCell(
+  cell: ZeroBasedSheetChangeCell,
+): SheetChangeCell {
   return {
     row: toOneBasedIndex(cell.row),
     col: toOneBasedIndex(cell.col),
@@ -126,7 +124,9 @@ export function zeroBasedSheetChangeCellToSheetChangeCell(cell: ZeroBasedSheetCh
   };
 }
 
-export function zeroBasedSheetChangeRangeToSheetChangeRange(range: ZeroBasedSheetChangeRange): SheetChangeRange {
+export function zeroBasedSheetChangeRangeToSheetChangeRange(
+  range: ZeroBasedSheetChangeRange,
+): SheetChangeRange {
   return {
     startRow: toOneBasedIndex(range.startRow),
     startCol: toOneBasedIndex(range.startCol),
@@ -135,7 +135,9 @@ export function zeroBasedSheetChangeRangeToSheetChangeRange(range: ZeroBasedShee
   };
 }
 
-export function zeroBasedSheetChangeDeltaToSheetChangeDelta(delta: ZeroBasedSheetChangeDelta): SheetChangeDelta {
+export function zeroBasedSheetChangeDeltaToSheetChangeDelta(
+  delta: ZeroBasedSheetChangeDelta,
+): SheetChangeDelta {
   if (delta.type === "write") {
     return {
       type: "write",

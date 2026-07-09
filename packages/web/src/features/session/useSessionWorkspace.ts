@@ -1,9 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  createSession,
-  generateSessionTitle,
-  type Session,
-} from "@/api/sessions";
+import { useCallback, useEffect, useRef } from "react";
+import { createSession, generateSessionTitle, type Session } from "@/api/sessions";
 import { getFirstUserText } from "@/features/shared/messageUtils";
 import { useSessionsList } from "./useSessionsList";
 
@@ -44,42 +40,54 @@ export function useSessionWorkspace(
     prevWorkspaceIdRef.current = workspaceId;
   }, [workspaceId, refreshSessions]);
 
-  const handleSendInDraft = useCallback(async (text: string) => {
-    if (workspaceId == null) throw new Error("No workspace");
-    const session = await createSession(workspaceId);
-    setCurrentSessionId(session.id);
-    setSessions((prev) => [session, ...prev]);
-    return session.id;
-  }, [workspaceId, setCurrentSessionId, setSessions]);
+  const handleSendInDraft = useCallback(
+    async (_text: string) => {
+      if (workspaceId == null) throw new Error("No workspace");
+      const session = await createSession(workspaceId);
+      setCurrentSessionId(session.id);
+      setSessions((prev) => [session, ...prev]);
+      return session.id;
+    },
+    [workspaceId, setCurrentSessionId, setSessions],
+  );
 
   const handleNewSession = useCallback(() => {
     listNewSession();
   }, [listNewSession]);
 
-  const handleSelectSession = useCallback((id: number) => {
-    listSelectSession(id);
-  }, [listSelectSession]);
+  const handleSelectSession = useCallback(
+    (id: number) => {
+      listSelectSession(id);
+    },
+    [listSelectSession],
+  );
 
-  const handleDeleteSession = useCallback(async (id: number) => {
-    await listDeleteSession(id);
-  }, [listDeleteSession]);
+  const handleDeleteSession = useCallback(
+    async (id: number) => {
+      await listDeleteSession(id);
+    },
+    [listDeleteSession],
+  );
 
-  const handleRunComplete = useCallback(async (sessionId: number, finishedMessages: any[]) => {
-    const firstUserText = getFirstUserText(finishedMessages).trim();
-    try {
-      if (firstUserText && workspaceId != null) {
-        await generateSessionTitle(workspaceId, sessionId, firstUserText);
+  const handleRunComplete = useCallback(
+    async (sessionId: number, finishedMessages: any[]) => {
+      const firstUserText = getFirstUserText(finishedMessages).trim();
+      try {
+        if (firstUserText && workspaceId != null) {
+          await generateSessionTitle(workspaceId, sessionId, firstUserText);
+        }
+      } catch (error) {
+        console.error("[session] Failed to generate session title:", error);
       }
-    } catch (error) {
-      console.error("[session] Failed to generate session title:", error);
-    }
 
-    try {
-      await refreshSessions();
-    } catch (error) {
-      console.error("[session] Failed to refresh sessions after title update:", error);
-    }
-  }, [refreshSessions, workspaceId]);
+      try {
+        await refreshSessions();
+      } catch (error) {
+        console.error("[session] Failed to refresh sessions after title update:", error);
+      }
+    },
+    [refreshSessions, workspaceId],
+  );
 
   const handleUndoComplete = useCallback(async () => {
     await onUndoComplete?.();

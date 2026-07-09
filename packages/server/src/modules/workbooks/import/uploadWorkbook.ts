@@ -6,8 +6,7 @@ function bufferToArrayBuffer(buffer: Buffer): ArrayBuffer | SharedArrayBuffer {
   return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
 }
 
-export type WorkbookUploadErrorCode =
-  | "INVALID_EXCEL_FILE";
+export type WorkbookUploadErrorCode = "INVALID_EXCEL_FILE";
 
 export class WorkbookUploadError extends Error {
   statusCode: number;

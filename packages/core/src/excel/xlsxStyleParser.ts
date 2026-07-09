@@ -5,7 +5,7 @@ type ParsedStyle = Record<string, any>;
 
 function decodeXmlEntities(value: string): string {
   return value
-    .replace(/&quot;/g, "\"")
+    .replace(/&quot;/g, '"')
     .replace(/&apos;/g, "'")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
@@ -80,7 +80,9 @@ function parseFills(xml: string): ParsedStyle[] {
   const fills: ParsedStyle[] = [];
   for (const match of section.matchAll(/<fill>([\s\S]*?)<\/fill>/g)) {
     const fillXml = match[1];
-    const patternMatch = fillXml.match(/<patternFill\b([^>]*)>([\s\S]*?)<\/patternFill>|<patternFill\b([^>]*)\/>/);
+    const patternMatch = fillXml.match(
+      /<patternFill\b([^>]*)>([\s\S]*?)<\/patternFill>|<patternFill\b([^>]*)\/>/,
+    );
     if (!patternMatch) {
       fills.push({});
       continue;
@@ -88,7 +90,9 @@ function parseFills(xml: string): ParsedStyle[] {
 
     const attrs = parseAttributes(patternMatch[1] ?? patternMatch[3] ?? "");
     const inner = patternMatch[2] ?? "";
-    const fgColorMatch = inner.match(/<fgColor\b[^>]*rgb="([^"]+)"/) ?? patternMatch[1]?.match(/<fgColor\b[^>]*rgb="([^"]+)"/);
+    const fgColorMatch =
+      inner.match(/<fgColor\b[^>]*rgb="([^"]+)"/) ??
+      patternMatch[1]?.match(/<fgColor\b[^>]*rgb="([^"]+)"/);
     const fill: ParsedStyle = {};
     if (attrs.patternType) fill.patternType = attrs.patternType;
     if (fgColorMatch) fill.fgColor = { rgb: fgColorMatch[1] };
@@ -154,7 +158,8 @@ function parseAlignment(xfXml: string): ParsedStyle | undefined {
   const alignment: ParsedStyle = {};
   if (attrs.horizontal) alignment.horizontal = attrs.horizontal;
   if (attrs.vertical) alignment.vertical = attrs.vertical;
-  if (attrs.wrapText != null) alignment.wrapText = attrs.wrapText === "1" || attrs.wrapText === "true";
+  if (attrs.wrapText != null)
+    alignment.wrapText = attrs.wrapText === "1" || attrs.wrapText === "true";
   return Object.keys(alignment).length > 0 ? alignment : undefined;
 }
 
@@ -259,7 +264,10 @@ function buildStyleFromIndex(
   return Object.keys(style).length > 0 ? style : undefined;
 }
 
-function parseSheetStyleMap(sheetXml: string, tables: ReturnType<typeof buildStyleTables>): Map<string, ParsedStyle> {
+function parseSheetStyleMap(
+  sheetXml: string,
+  tables: ReturnType<typeof buildStyleTables>,
+): Map<string, ParsedStyle> {
   const map = new Map<string, ParsedStyle>();
   for (const match of sheetXml.matchAll(/<c\b([^>]*)>/g)) {
     const attrs = parseAttributes(match[1]);
@@ -275,7 +283,9 @@ function parseSheetStyleMap(sheetXml: string, tables: ReturnType<typeof buildSty
   return map;
 }
 
-export function parseWorkbookStyleMaps(file: ArrayBuffer | SharedArrayBuffer): Map<string, ParsedStyle>[] {
+export function parseWorkbookStyleMaps(
+  file: ArrayBuffer | SharedArrayBuffer,
+): Map<string, ParsedStyle>[] {
   const zip = unzipSync(new Uint8Array(file));
   const stylesXml = new TextDecoder().decode(zip["xl/styles.xml"] ?? new Uint8Array());
   if (!stylesXml) return [];

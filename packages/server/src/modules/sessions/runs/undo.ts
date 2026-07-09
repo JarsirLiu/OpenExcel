@@ -68,7 +68,10 @@ function findLatestUserMessageIndex(messages: ChatMessageLike[], userText: strin
   return -1;
 }
 
-function trimMessagesAfterUserTurn(messages: ChatMessageLike[], userText: string): ChatMessageLike[] {
+function trimMessagesAfterUserTurn(
+  messages: ChatMessageLike[],
+  userText: string,
+): ChatMessageLike[] {
   const turnStartIndex = findLatestUserMessageIndex(messages, userText);
   if (turnStartIndex < 0) {
     throw new Error("会话记录与运行输入不一致，无法撤销");
@@ -81,9 +84,13 @@ function parseStructuralUndoEffects(steps: UndoableRunStep[]): StructuralUndoEff
   const effects: StructuralUndoEffect[] = [];
 
   for (const step of steps) {
-    const toolNames = typeof step.toolName === "string"
-      ? step.toolName.split(",").map((name) => name.trim()).filter(Boolean)
-      : [];
+    const toolNames =
+      typeof step.toolName === "string"
+        ? step.toolName
+            .split(",")
+            .map((name) => name.trim())
+            .filter(Boolean)
+        : [];
 
     if (toolNames.includes("createWorkbook")) {
       const output = parseJson<{
@@ -192,13 +199,17 @@ export async function undoLatestRun(workspaceId: number, sessionId: number) {
 
   const structuralEffects = parseStructuralUndoEffects(run.steps as UndoableRunStep[]);
   const createdWorkbookEffects = structuralEffects.filter(
-    (effect): effect is Extract<StructuralUndoEffect, { kind: "createWorkbook" }> => effect.kind === "createWorkbook",
+    (effect): effect is Extract<StructuralUndoEffect, { kind: "createWorkbook" }> =>
+      effect.kind === "createWorkbook",
   );
   const createdSheetEffects = structuralEffects.filter(
-    (effect): effect is Extract<StructuralUndoEffect, { kind: "createSheet" }> => effect.kind === "createSheet",
+    (effect): effect is Extract<StructuralUndoEffect, { kind: "createSheet" }> =>
+      effect.kind === "createSheet",
   );
   const createdWorkbookIds = new Set(createdWorkbookEffects.map((effect) => effect.workbookId));
-  const createdSheetIds = new Set<number>(createdWorkbookEffects.map((effect) => effect.initialSheetId));
+  const createdSheetIds = new Set<number>(
+    createdWorkbookEffects.map((effect) => effect.initialSheetId),
+  );
 
   for (const effect of createdSheetEffects) {
     if (createdWorkbookIds.has(effect.workbookId)) {

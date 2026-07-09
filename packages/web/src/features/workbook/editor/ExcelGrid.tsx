@@ -1,9 +1,9 @@
 import { Workbook } from "@fortune-sheet/react";
 import "@fortune-sheet/react/dist/index.css";
 import type { WorkbookFull } from "@/api/workbooks";
-import { useExcelGridWorkspace } from "./useExcelGridWorkspace";
 import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatchSync";
 import styles from "./ExcelGrid.module.css";
+import { useExcelGridWorkspace } from "./useExcelGridWorkspace";
 
 interface Props {
   workspaceId: number | null;
@@ -63,18 +63,44 @@ export function ExcelGrid({
           showToolbar={true}
           showFormulaBar={true}
           toolbarItems={[
-            "merge-cell", "|",
-            "bold", "italic", "strike-through", "underline", "|",
-            "font-color", "background", "border", "|",
-            "horizontal-align", "vertical-align", "text-wrap", "|",
-            "clear", "filter", "link", "comment",
+            "merge-cell",
+            "|",
+            "bold",
+            "italic",
+            "strike-through",
+            "underline",
+            "|",
+            "font-color",
+            "background",
+            "border",
+            "|",
+            "horizontal-align",
+            "vertical-align",
+            "text-wrap",
+            "|",
+            "clear",
+            "filter",
+            "link",
+            "comment",
           ]}
           cellContextMenu={[
-            "copy", "paste", "|",
-            "insert-row", "insert-column",
-            "delete-row", "delete-column", "delete-cell", "|",
-            "clear", "sort", "orderAZ", "orderZA", "filter", "|",
-            "data", "cell-format",
+            "copy",
+            "paste",
+            "|",
+            "insert-row",
+            "insert-column",
+            "delete-row",
+            "delete-column",
+            "delete-cell",
+            "|",
+            "clear",
+            "sort",
+            "orderAZ",
+            "orderZA",
+            "filter",
+            "|",
+            "data",
+            "cell-format",
           ]}
           // @ts-expect-error allowUpdate is a valid prop but missing from types
           allowUpdate={true}

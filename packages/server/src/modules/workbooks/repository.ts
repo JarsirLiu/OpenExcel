@@ -46,7 +46,11 @@ export async function createSheet(data: {
   });
 }
 
-export async function deleteSheetAndReindex(workbookId: number, sheetId: number, workspaceId: number) {
+export async function deleteSheetAndReindex(
+  workbookId: number,
+  sheetId: number,
+  workspaceId: number,
+) {
   return prisma.$transaction(async (tx) => {
     const workbook = await tx.workbook.findFirst({ where: { id: workbookId, workspaceId } });
     if (!workbook) return;

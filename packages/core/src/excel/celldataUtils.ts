@@ -42,9 +42,7 @@ export function isCelldata(data: any): data is FortuneCell[] {
 
 export function celldataToGrid(celldata: FortuneCell[], columnCount: number): string[][] {
   const maxRow = Math.max(...celldata.map((c) => c.r), 0);
-  const grid: string[][] = Array.from({ length: maxRow + 1 }, () =>
-    Array(columnCount).fill(""),
-  );
+  const grid: string[][] = Array.from({ length: maxRow + 1 }, () => Array(columnCount).fill(""));
   for (const cell of celldata) {
     grid[cell.r][cell.c] = String(cell.v?.v ?? "");
   }

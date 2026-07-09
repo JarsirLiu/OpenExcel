@@ -1,6 +1,12 @@
 import { prisma } from "../../../infra/database/db.js";
-import { normalizeSheetName, normalizeWorkbookName, buildBlankSheetInitialization, buildSourceSheetInitialization, WorkbookCreationError } from "./creation.js";
 import { generateWorkbookPublicId } from "../../../shared/utils/publicId.js";
+import {
+  buildBlankSheetInitialization,
+  buildSourceSheetInitialization,
+  normalizeSheetName,
+  normalizeWorkbookName,
+  WorkbookCreationError,
+} from "./creation.js";
 
 export type CreateWorkbookResult = {
   id: number;
@@ -41,14 +47,18 @@ export async function createWorkbook(
       },
     });
 
-    const sourceSheet = sourceSheetId == null
-      ? null
-      : await tx.sheet.findUnique({
-          where: { id: sourceSheetId },
-          include: { workbook: true },
-        });
+    const sourceSheet =
+      sourceSheetId == null
+        ? null
+        : await tx.sheet.findUnique({
+            where: { id: sourceSheetId },
+            include: { workbook: true },
+          });
 
-    if (sourceSheetId != null && (!sourceSheet || sourceSheet.workbook.workspaceId !== workspaceId)) {
+    if (
+      sourceSheetId != null &&
+      (!sourceSheet || sourceSheet.workbook.workspaceId !== workspaceId)
+    ) {
       throw new WorkbookCreationError("源 Sheet 不存在", "SOURCE_SHEET_NOT_FOUND", 404);
     }
 
