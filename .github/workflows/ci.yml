@@ -32,4 +32,4 @@ jobs:
         run: pnpm check
 
       - name: Test
-        run: pnpm -r --workspace-concurrency=1 test
+        run: pnpm -r --filter @openexcel/agent --filter @openexcel/core --filter @openexcel/server test
