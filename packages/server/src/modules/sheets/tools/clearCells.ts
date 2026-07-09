@@ -1,15 +1,15 @@
 import { excelToolSpecs, runToolContextSchema } from "@openexcel/agent";
-import { prisma } from "../../../infra/database/db.js";
 import {
+  type SheetChangeClearOperation,
+  type SheetChangeDelta,
   sheetChangePatchOutputSchema,
   sheetChangeRangeToZeroBased,
   toZeroBasedIndex,
-  type SheetChangeDelta,
-  type SheetChangeClearOperation,
 } from "@openexcel/core";
-import { applyClearOperation, buildSheetChangePreview } from "../domain.js";
-import * as repo from "../../sessions/runs/repository.js";
+import { prisma } from "../../../infra/database/db.js";
 import { sheetRecordToCelldata } from "../../../shared/utils/sheetData.js";
+import * as repo from "../../sessions/runs/repository.js";
+import { applyClearOperation, buildSheetChangePreview } from "../domain.js";
 
 export const clearCells = {
   ...excelToolSpecs.clearCells,
@@ -23,7 +23,8 @@ export const clearCells = {
       include: { workbook: true },
     });
     if (!sheet) throw new Error(`Sheet ${sheetId} 不存在`);
-    if (sheet.workbook.workspaceId !== context.workspaceId) throw new Error(`Sheet ${sheetId} 不存在`);
+    if (sheet.workbook.workspaceId !== context.workspaceId)
+      throw new Error(`Sheet ${sheetId} 不存在`);
 
     await repo.upsertRunSheetSnapshot({
       runId: context.runId,
@@ -43,9 +44,14 @@ export const clearCells = {
     const touchedCellKeys = new Set<string>();
     const touchedRowIndices = new Set<number>();
     for (const operation of operations) {
-      const zeroBased = operation.type === "cell"
-        ? { type: "cell" as const, row: toZeroBasedIndex(operation.row), col: toZeroBasedIndex(operation.col) }
-        : sheetChangeRangeToZeroBased(operation);
+      const zeroBased =
+        operation.type === "cell"
+          ? {
+              type: "cell" as const,
+              row: toZeroBasedIndex(operation.row),
+              col: toZeroBasedIndex(operation.col),
+            }
+          : { type: "range" as const, ...sheetChangeRangeToZeroBased(operation) };
       const touchedKeys = applyClearOperation(cellMap, zeroBased);
       for (const key of touchedKeys) {
         touchedCellKeys.add(key);

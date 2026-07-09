@@ -1,0 +1,4 @@
+#!/bin/sh
+echo "Running pre-commit checks..."
+npx lint-staged
+pnpm typecheck

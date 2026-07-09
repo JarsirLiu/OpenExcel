@@ -14,7 +14,20 @@ Keep feature code inside the owning package’s `src/` tree. Avoid generated out
 - `pnpm build` - typecheck and build the web app
 - `pnpm test` - run tests across all packages
 - `pnpm test:web`, `pnpm test:server`, `pnpm test:core` - run one package’s test suite
+- `pnpm typecheck` - run TypeScript type checking across all packages
+- `pnpm check` - run Biome lint+format + typecheck (same as pre-commit hook)
 - `pnpm db:migrate` - apply the server database migrations
+- `pnpm changeset` - create a new changeset entry for changelog
+- `pnpm version` - apply changesets and bump versions
+
+## Pre-commit Quality Gates
+The project uses **Husky** to enforce code quality before every commit:
+
+1. **lint-staged** — runs `biome check --write` only on staged files (format + lint + organize imports)
+2. **TypeScript type checking** — runs `tsc --noEmit` across all packages
+3. **commitlint** — validates commit messages follow Conventional Commits format
+
+To bypass hooks temporarily: `git commit --no-verify`
 
 ## Coding Style & Naming Conventions
 This repo uses TypeScript ESM. Follow the existing style: 2-space indentation, small modules, explicit exports/imports, `PascalCase` for components, and `camelCase` for functions and variables.

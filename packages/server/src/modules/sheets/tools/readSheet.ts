@@ -1,12 +1,12 @@
 import { excelToolSpecs, workspaceToolContextSchema } from "@openexcel/agent";
-import { prisma } from "../../../infra/database/db.js";
-import { parseMergesFromCelldata } from "../domain.js";
-import { sheetRecordToCelldata } from "../../../shared/utils/sheetData.js";
 import type { FortuneCell } from "@openexcel/core";
+import { prisma } from "../../../infra/database/db.js";
+import { sheetRecordToCelldata } from "../../../shared/utils/sheetData.js";
+import { parseMergesFromCelldata } from "../domain.js";
 
 const DEFAULT_PAGE_SIZE = 30;
 
-interface SparseCell {
+export interface SparseCell {
   row: number;
   col: number;
   value: string;
@@ -92,11 +92,7 @@ function filterCelldataByRange(
   endCol0: number,
 ): FortuneCell[] {
   return celldata.filter(
-    (c) =>
-      c.r >= startRow0 &&
-      c.r <= endRow0 &&
-      c.c >= startCol0 &&
-      c.c <= endCol0,
+    (c) => c.r >= startRow0 && c.r <= endRow0 && c.c >= startCol0 && c.c <= endCol0,
   );
 }
 

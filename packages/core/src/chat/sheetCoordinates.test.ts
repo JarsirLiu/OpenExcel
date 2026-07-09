@@ -22,16 +22,12 @@ describe("sheet coordinate conversions", () => {
   it("converts a zero-based delta back to one-based", () => {
     const delta = zeroBasedSheetChangeDeltaToSheetChangeDelta({
       type: "merge",
-      operations: [
-        { type: "range", startRow: 0, startCol: 1, endRow: 2, endCol: 3 },
-      ],
+      operations: [{ startRow: 0, startCol: 1, endRow: 2, endCol: 3 }],
     });
 
     expect(delta).toEqual({
       type: "merge",
-      operations: [
-        { type: "range", startRow: 1, startCol: 2, endRow: 3, endCol: 4 },
-      ],
+      operations: [{ type: "range", startRow: 1, startCol: 2, endRow: 3, endCol: 4 }],
     });
   });
 

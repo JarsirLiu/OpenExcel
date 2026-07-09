@@ -1,13 +1,13 @@
-import { describe, it, expect } from "vitest";
-import * as XLSX from "xlsx";
 import { unzipSync } from "fflate";
-import { excelToGrid, extractCellStyle } from "./excelToGrid.js";
-import { templateToExcel } from "../exporter/templateToExcel.js";
+import { describe, expect, it } from "vitest";
+import * as XLSX from "xlsx";
 import { celldataToExcel } from "../exporter/celldataToExcel.js";
-import { matrixToCelldata, celldataToGrid, isCelldata } from "./celldataUtils.js";
-import { extractSheetConfig, restoreSheetConfig } from "./sheetConfig.js";
+import { templateToExcel } from "../exporter/templateToExcel.js";
 import type { Template } from "../types/index.js";
+import { celldataToGrid, isCelldata, matrixToCelldata } from "./celldataUtils.js";
+import { excelToGrid, extractCellStyle } from "./excelToGrid.js";
 import type { FortuneSheetData } from "./sheetConfig.js";
+import { extractSheetConfig, restoreSheetConfig } from "./sheetConfig.js";
 
 describe("excelToGrid", () => {
   function makeWorkbook(sheets: Record<string, string[][]>): ArrayBuffer {
@@ -37,12 +37,24 @@ describe("excelToGrid", () => {
     expect(result).toHaveLength(2);
     // Sheet1: 3 rows x 2 cols = 6 cells, but sheet_to_json produces sparse data
     expect(result[0].celldata).toHaveLength(6);
-    expect(result[0].celldata[0]).toEqual({ r: 0, c: 0, v: expect.objectContaining({ v: "Name" }) });
+    expect(result[0].celldata[0]).toEqual({
+      r: 0,
+      c: 0,
+      v: expect.objectContaining({ v: "Name" }),
+    });
     expect(result[0].celldata[1]).toEqual({ r: 0, c: 1, v: expect.objectContaining({ v: "Age" }) });
-    expect(result[0].celldata[2]).toEqual({ r: 1, c: 0, v: expect.objectContaining({ v: "Alice" }) });
+    expect(result[0].celldata[2]).toEqual({
+      r: 1,
+      c: 0,
+      v: expect.objectContaining({ v: "Alice" }),
+    });
 
     expect(result[1].celldata).toHaveLength(4);
-    expect(result[1].celldata[0]).toEqual({ r: 0, c: 0, v: expect.objectContaining({ v: "Product" }) });
+    expect(result[1].celldata[0]).toEqual({
+      r: 0,
+      c: 0,
+      v: expect.objectContaining({ v: "Product" }),
+    });
   });
 
   it("returns empty celldata for missing sheet", () => {
@@ -56,7 +68,10 @@ describe("excelToGrid", () => {
 
   it("accepts a Template object with sheets by name", () => {
     const wb = makeWorkbook({
-      Sales: [["Q", "Amount"], ["Q1", "100"]],
+      Sales: [
+        ["Q", "Amount"],
+        ["Q1", "100"],
+      ],
     });
     const template: Template = {
       id: "t1",
@@ -82,7 +97,10 @@ describe("templateToExcel", () => {
         {
           name: "Sheet1",
           columns: [{ label: "Name" }, { label: "Score" }],
-          rows: [["Alice", "95"], ["Bob", "87"]],
+          rows: [
+            ["Alice", "95"],
+            ["Bob", "87"],
+          ],
         },
       ],
     };
@@ -230,7 +248,10 @@ describe("celldataToExcel", () => {
 describe("matrixToCelldata", () => {
   it("converts FortuneSheet 2D matrix to sparse celldata", () => {
     const matrix = [
-      [{ v: "A1", m: "A1" }, { v: "B1", m: "B1" }],
+      [
+        { v: "A1", m: "A1" },
+        { v: "B1", m: "B1" },
+      ],
       [null, { v: "B2", m: "B2" }],
     ];
     const result = matrixToCelldata(matrix);
@@ -316,7 +337,10 @@ describe("Excel parsing: all rows, merges, config", () => {
 
   it("preserves merge info (mc) on the top-left cell", () => {
     const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet([["Title", "", ""], ["A", "B", "C"]]);
+    const ws = XLSX.utils.aoa_to_sheet([
+      ["Title", "", ""],
+      ["A", "B", "C"],
+    ]);
     ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 2 } }];
     XLSX.utils.book_append_sheet(wb, ws, "S1");
 
@@ -406,7 +430,12 @@ describe("border extraction", () => {
 
 describe("formatting extraction", () => {
   it("extracts alignment from cell styles", () => {
-    const cell = { t: "s", v: "居中", w: "居中", s: { alignment: { horizontal: "center", vertical: "center", wrapText: true } } };
+    const cell = {
+      t: "s" as const,
+      v: "居中",
+      w: "居中",
+      s: { alignment: { horizontal: "center", vertical: "center", wrapText: true } },
+    };
     const r = extractCellStyle(cell);
     expect(r.ht).toBe(1);
     expect(r.vt).toBe(1);
@@ -435,13 +464,23 @@ describe("formatting extraction", () => {
   });
 
   it("treats centerContinuous as centered alignment", () => {
-    const cell = { t: "s", v: "居中", w: "居中", s: { alignment: { horizontal: "centerContinuous" } } };
+    const cell = {
+      t: "s",
+      v: "居中",
+      w: "居中",
+      s: { alignment: { horizontal: "centerContinuous" } },
+    };
     const r = extractCellStyle(cell as any);
     expect(r.ht).toBe(1);
   });
 
   it("strips HTML tags from display text", () => {
-    const cell = { t: "s", v: "预计执行订单\n（MW）", h: "预计执行订单<br/>（MW）", w: "预计执行订单\n（MW）" };
+    const cell = {
+      t: "s" as const,
+      v: "预计执行订单\n（MW）",
+      h: "预计执行订单<br/>（MW）",
+      w: "预计执行订单\n（MW）",
+    };
     const r = extractCellStyle(cell);
     expect(r.m).toBe("预计执行订单\n（MW）");
     expect(r.m.includes("<br")).toBe(false);
