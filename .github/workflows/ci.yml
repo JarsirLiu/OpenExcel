@@ -28,8 +28,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Check (lint + format + typecheck)
-        run: pnpm check
+      - name: Check (lint + typecheck)
+        run: npx biome check --error-on-warnings . && pnpm typecheck
 
       - name: Test
         run: pnpm test
