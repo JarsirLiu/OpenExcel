@@ -47,6 +47,7 @@ COPY --from=build /app/packages/server/src ./packages/server/src
 COPY --from=build /app/packages/core/src ./packages/core/src
 COPY --from=build /app/packages/agent/src ./packages/agent/src
 COPY --from=build /app/packages/web/dist ./packages/web/dist
+COPY --from=build /app/templates ./templates
 
 RUN mkdir -p /app/.data
 
