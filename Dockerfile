@@ -13,6 +13,8 @@ RUN pnpm install --frozen-lockfile --ignore-scripts
 
 COPY packages/server/prisma ./packages/server/prisma
 RUN pnpm --filter @openexcel/server exec prisma generate --schema prisma/schema.prisma
+RUN pnpm --filter @openexcel/server exec prisma generate --schema prisma/postgresql/schema.prisma
+RUN pnpm --filter @openexcel/server exec prisma generate --schema prisma/mysql/schema.prisma
 
 COPY packages/core/src ./packages/core/src
 COPY packages/agent/src ./packages/agent/src
@@ -31,8 +33,6 @@ FROM node:22-alpine
 RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /app
 
-RUN addgroup -g 1001 -S nodejs && adduser node nodejs
-
 COPY --from=build /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml ./
 COPY --from=build /app/packages/server/package.json ./packages/server/
 COPY --from=build /app/packages/core/package.json ./packages/core/
@@ -43,18 +43,12 @@ RUN pnpm install --prod --frozen-lockfile --ignore-scripts
 
 COPY --from=build /app/packages/server/prisma ./packages/server/prisma
 COPY --from=build /app/packages/server/scripts ./packages/server/scripts
-RUN chmod +x /app/packages/server/scripts/docker-entrypoint.sh
 COPY --from=build /app/packages/server/src ./packages/server/src
 COPY --from=build /app/packages/core/src ./packages/core/src
 COPY --from=build /app/packages/agent/src ./packages/agent/src
 COPY --from=build /app/packages/web/dist ./packages/web/dist
 
-RUN apk add --no-cache su-exec
-
-RUN mkdir -p /app/.data && chown -R node:nodejs /app
-
-# 预缓存 prisma 引擎，避免首次 db:migrate 下载
-RUN pnpm --filter @openexcel/server exec prisma --version
+RUN mkdir -p /app/.data
 
 EXPOSE 4000
 

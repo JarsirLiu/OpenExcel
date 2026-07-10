@@ -1,24 +1,36 @@
-import { PrismaClient as MySQLPrismaClient } from "../../../prisma/generated/mysql/client/index.js";
-import { PrismaClient as PostgreSQLPrismaClient } from "../../../prisma/generated/postgresql/client/index.js";
-import { PrismaClient as SqlitePrismaClient } from "../../../prisma/generated/sqlite/client/index.js";
 import { loadDatabaseConfig } from "./databaseConfig.js";
 
-type PrismaClientLike = InstanceType<typeof SqlitePrismaClient>;
+type PrismaClientLike = {
+  $connect: () => Promise<void>;
+  $disconnect: () => Promise<void>;
+};
 
-function createPrismaClient(): PrismaClientLike {
+async function createPrismaClient(): Promise<PrismaClientLike> {
   const { provider, url } = loadDatabaseConfig();
   const datasource = { db: { url } };
 
   switch (provider) {
-    case "sqlite":
-      return new SqlitePrismaClient({ datasources: datasource });
-    case "postgresql":
-      return new PostgreSQLPrismaClient({ datasources: datasource }) as unknown as PrismaClientLike;
-    case "mysql":
-      return new MySQLPrismaClient({ datasources: datasource }) as unknown as PrismaClientLike;
+    case "sqlite": {
+      const { PrismaClient } = await import(
+        "../../../prisma/generated/sqlite/client/index.js"
+      );
+      return new PrismaClient({ datasources: datasource });
+    }
+    case "postgresql": {
+      const { PrismaClient } = await import(
+        "../../../prisma/generated/postgresql/client/index.js"
+      );
+      return new PrismaClient({ datasources: datasource }) as unknown as PrismaClientLike;
+    }
+    case "mysql": {
+      const { PrismaClient } = await import(
+        "../../../prisma/generated/mysql/client/index.js"
+      );
+      return new PrismaClient({ datasources: datasource }) as unknown as PrismaClientLike;
+    }
     default:
       throw new Error(`Unsupported database provider: ${String(provider)}`);
   }
 }
 
-export const prisma = createPrismaClient();
+export const prisma = await createPrismaClient();
