@@ -49,6 +49,8 @@ COPY --from=build /app/packages/core/src ./packages/core/src
 COPY --from=build /app/packages/agent/src ./packages/agent/src
 COPY --from=build /app/packages/web/dist ./packages/web/dist
 
+RUN apk add --no-cache su-exec
+
 RUN mkdir -p /app/.data && chown -R node:nodejs /app
 
 # 预缓存 prisma 引擎，避免首次 db:migrate 下载
@@ -58,8 +60,6 @@ EXPOSE 4000
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:4000/api/health || exit 1
-
-USER node
 
 ENTRYPOINT ["/app/packages/server/scripts/docker-entrypoint.sh"]
 CMD ["pnpm", "--filter", "@openexcel/server", "start"]
