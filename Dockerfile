@@ -43,6 +43,7 @@ RUN pnpm install --prod --frozen-lockfile --ignore-scripts
 
 COPY --from=build /app/packages/server/prisma ./packages/server/prisma
 COPY --from=build /app/packages/server/scripts ./packages/server/scripts
+RUN chmod +x /app/packages/server/scripts/docker-entrypoint.sh
 COPY --from=build /app/packages/server/src ./packages/server/src
 COPY --from=build /app/packages/core/src ./packages/core/src
 COPY --from=build /app/packages/agent/src ./packages/agent/src
@@ -60,4 +61,5 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 
 USER node
 
+ENTRYPOINT ["/app/packages/server/scripts/docker-entrypoint.sh"]
 CMD ["pnpm", "--filter", "@openexcel/server", "start"]
