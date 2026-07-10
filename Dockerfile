@@ -23,7 +23,6 @@ COPY packages/web/index.html ./packages/web/
 COPY packages/web/tsconfig.json ./packages/web/
 COPY packages/web/vite.config.ts ./packages/web/
 COPY packages/web/vitest.config.ts ./packages/web/
-COPY config ./config
 
 RUN pnpm --filter @openexcel/web build
 
@@ -43,11 +42,11 @@ COPY --from=build /app/packages/web/package.json ./packages/web/
 RUN pnpm install --prod --frozen-lockfile
 
 COPY --from=build /app/packages/server/prisma ./packages/server/prisma
+COPY --from=build /app/packages/server/scripts ./packages/server/scripts
 COPY --from=build /app/packages/server/src ./packages/server/src
 COPY --from=build /app/packages/core/src ./packages/core/src
 COPY --from=build /app/packages/agent/src ./packages/agent/src
 COPY --from=build /app/packages/web/dist ./packages/web/dist
-COPY --from=build /app/config ./config
 
 RUN mkdir -p /app/.data && chown -R node:nodejs /app
 
