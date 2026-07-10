@@ -31,7 +31,7 @@ FROM node:22-alpine
 RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /app
 
-RUN addgroup -g 1001 -S nodejs && adduser -S node -u 1001 -G nodejs
+RUN addgroup -g 1001 -S nodejs && adduser node nodejs
 
 COPY --from=build /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml ./
 COPY --from=build /app/packages/server/package.json ./packages/server/
