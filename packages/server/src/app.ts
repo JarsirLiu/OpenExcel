@@ -31,6 +31,8 @@ export async function createApp() {
   await app.register(sheetRoutes);
   await app.register(sessionRoutes);
 
+  app.get("/api/health", async () => ({ status: "ok" }));
+
   // 生产环境：server 自 serve 前端静态文件
   const webDist = resolve(__dirname, "../../web/dist");
   await app.register(fastifyStatic, {

@@ -11,13 +11,9 @@ COPY packages/web/package.json packages/web/
 
 RUN pnpm install --frozen-lockfile --ignore-scripts
 
-# 复制 prisma schema 后再生成 client
 COPY packages/server/prisma ./packages/server/prisma
 RUN pnpm --filter @openexcel/server exec prisma generate --schema prisma/schema.prisma
-RUN pnpm --filter @openexcel/server exec prisma generate --schema prisma/postgresql/schema.prisma
-RUN pnpm --filter @openexcel/server exec prisma generate --schema prisma/mysql/schema.prisma
 
-# 只复制源码，避免 pnpm symlink 污染构建上下文
 COPY packages/core/src ./packages/core/src
 COPY packages/agent/src ./packages/agent/src
 COPY packages/server/src ./packages/server/src
@@ -36,24 +32,30 @@ FROM node:22-alpine
 RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /app
 
-# server 源码（tsx 运行时编译）和 prisma 生成文件
-COPY --from=build /app/packages/server/prisma ./packages/server/prisma
-COPY --from=build /app/packages/server/src ./packages/server/src
-# workspace 依赖源码（tsx 按需转译）
-COPY --from=build /app/packages/core/src ./packages/core/src
-COPY --from=build /app/packages/agent/src ./packages/agent/src
-# 构建好的前端
-COPY --from=build /app/packages/web/dist ./packages/web/dist
-# 模型配置
-COPY --from=build /app/config ./config
+RUN addgroup -g 1001 -S nodejs && adduser -S node -u 1001 -G nodejs
 
 COPY --from=build /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml ./
 COPY --from=build /app/packages/server/package.json ./packages/server/
 COPY --from=build /app/packages/core/package.json ./packages/core/
 COPY --from=build /app/packages/agent/package.json ./packages/agent/
 COPY --from=build /app/packages/web/package.json ./packages/web/
-COPY --from=build /app/node_modules ./node_modules
+
+RUN pnpm install --prod --frozen-lockfile
+
+COPY --from=build /app/packages/server/prisma ./packages/server/prisma
+COPY --from=build /app/packages/server/src ./packages/server/src
+COPY --from=build /app/packages/core/src ./packages/core/src
+COPY --from=build /app/packages/agent/src ./packages/agent/src
+COPY --from=build /app/packages/web/dist ./packages/web/dist
+COPY --from=build /app/config ./config
+
+RUN mkdir -p /app/.data && chown -R node:nodejs /app
 
 EXPOSE 4000
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:4000/api/health || exit 1
+
+USER node
 
 CMD ["pnpm", "--filter", "@openexcel/server", "start"]

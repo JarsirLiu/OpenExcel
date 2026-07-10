@@ -11,7 +11,7 @@ services:
       - PORT=4000
       - NODE_ENV=production
       - DATABASE_PROVIDER=sqlite
-      - DATABASE_URL=file:../../.data/prod.db
+      - DATABASE_URL=file:/app/.data/prod.db
     volumes:
       - openexcel-data:/app/.data
       - ./config/config.toml:/app/config/config.toml:ro
