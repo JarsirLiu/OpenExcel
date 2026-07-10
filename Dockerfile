@@ -39,7 +39,7 @@ COPY --from=build /app/packages/core/package.json ./packages/core/
 COPY --from=build /app/packages/agent/package.json ./packages/agent/
 COPY --from=build /app/packages/web/package.json ./packages/web/
 
-RUN pnpm install --prod --frozen-lockfile
+RUN pnpm install --prod --frozen-lockfile --ignore-scripts
 
 COPY --from=build /app/packages/server/prisma ./packages/server/prisma
 COPY --from=build /app/packages/server/scripts ./packages/server/scripts
@@ -49,6 +49,9 @@ COPY --from=build /app/packages/agent/src ./packages/agent/src
 COPY --from=build /app/packages/web/dist ./packages/web/dist
 
 RUN mkdir -p /app/.data && chown -R node:nodejs /app
+
+# 预缓存 prisma 引擎，避免首次 db:migrate 下载
+RUN pnpm --filter @openexcel/server exec prisma --version
 
 EXPOSE 4000
 

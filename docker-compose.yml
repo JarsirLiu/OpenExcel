@@ -3,6 +3,7 @@ name: openexcel
 services:
   server:
     build: .
+    image: ccr.ccs.tencentyun.com/openexcel/openexcel:0.1.0
     container_name: openexcel-server
     restart: unless-stopped
     ports:
