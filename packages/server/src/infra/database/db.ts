@@ -1,9 +1,7 @@
+import type { PrismaClient as PrismaClientType } from "../../../prisma/generated/sqlite/client/index.js";
 import { loadDatabaseConfig } from "./databaseConfig.js";
 
-type PrismaClientLike = {
-  $connect: () => Promise<void>;
-  $disconnect: () => Promise<void>;
-};
+type PrismaClientLike = InstanceType<typeof PrismaClientType>;
 
 async function createPrismaClient(): Promise<PrismaClientLike> {
   const { provider, url } = loadDatabaseConfig();

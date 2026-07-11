@@ -2,7 +2,7 @@
   "$schema": "https://biomejs.dev/schemas/2.5.2/schema.json",
   "assist": { "actions": { "source": { "organizeImports": "on" } } },
   "files": {
-    "includes": ["**", "!!packages/server/prisma/generated"]
+    "includes": ["**", "!!packages/server/prisma/generated", "!!**/dist"]
   },
   "linter": {
     "enabled": true,
