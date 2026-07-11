@@ -1,0 +1,63 @@
+import { describe, expect, it } from "vitest";
+import { applyDocumentOperation, createDocumentState, readDocumentCell } from "./operations.js";
+
+describe("document operations", () => {
+  it("writes and clears cells without materializing unrelated chunks", () => {
+    const initial = createDocumentState();
+    const written = applyDocumentOperation(
+      initial,
+      {
+        type: "setRangeValues",
+        range: { startRow: 0, startCol: 0, endRow: 1, endCol: 1 },
+        values: [
+          ["Name", "Value"],
+          ["East", 120],
+        ],
+      },
+      1,
+    );
+
+    expect(written.chunks.size).toBe(1);
+    expect(readDocumentCell(written, 1, 1)?.value).toBe(120);
+
+    const cleared = applyDocumentOperation(
+      written,
+      { type: "clearRange", range: { startRow: 0, startCol: 0, endRow: 1, endCol: 1 } },
+      2,
+    );
+    expect(cleared.chunks.size).toBe(0);
+  });
+
+  it("stores chart-like objects separately from cell chunks", () => {
+    const state = applyDocumentOperation(
+      createDocumentState(),
+      {
+        type: "createObject",
+        object: {
+          id: "chart-1",
+          type: "chart",
+          position: { startRow: 0, startColumn: 4 },
+          data: { chartType: "bar", sourceRange: "A1:B4" },
+        },
+      },
+      1,
+    );
+
+    expect(state.chunks.size).toBe(0);
+    expect(state.objects.get("chart-1")?.data.sourceRange).toBe("A1:B4");
+
+    const updated = applyDocumentOperation(
+      state,
+      {
+        type: "updateObject",
+        id: "chart-1",
+        patch: { data: { title: "Revenue" } },
+      },
+      2,
+    );
+    expect(updated.objects.get("chart-1")?.data.title).toBe("Revenue");
+
+    const removed = applyDocumentOperation(updated, { type: "deleteObject", id: "chart-1" }, 3);
+    expect(removed.objects.has("chart-1")).toBe(false);
+  });
+});

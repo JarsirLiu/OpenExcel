@@ -43,7 +43,9 @@ function readWorkbookOrThrow(buffer: Buffer) {
 export async function uploadAsNewWorkbook(workspaceId: number, buffer: Buffer, fileName: string) {
   const wbFile = readWorkbookOrThrow(buffer);
   const sheetNames = wbFile.SheetNames;
-  const { excelToGrid } = await import("@openexcel/core");
+  const { encodeDocumentJson, excelToGrid, fortuneCelldataToChunks } = await import(
+    "@openexcel/core"
+  );
   const results = excelToGrid(bufferToArrayBuffer(buffer), sheetNames);
   const wbName = fileName.replace(/\.[^.]+$/, "");
 
@@ -59,7 +61,7 @@ export async function uploadAsNewWorkbook(workspaceId: number, buffer: Buffer, f
 
     for (let i = 0; i < sheetNames.length; i++) {
       const parsed = results[i] ?? { celldata: [], merges: [], config: {} };
-      await tx.sheet.create({
+      const sheet = await tx.sheet.create({
         data: {
           workbookId: wb.id,
           sheetNo: i + 1,
@@ -69,8 +71,25 @@ export async function uploadAsNewWorkbook(workspaceId: number, buffer: Buffer, f
           merges: JSON.stringify(parsed.merges),
           uploadedData: JSON.stringify(parsed.celldata),
           config: JSON.stringify(parsed.config ?? {}),
+          documentFormat: "openexcel-document-v1",
+          documentVersion: 1,
+          documentRevision: 0,
         },
       });
+
+      const chunks = fortuneCelldataToChunks(parsed.celldata, 0);
+      for (const chunk of chunks.values()) {
+        await tx.sheetChunk.create({
+          data: {
+            sheetId: sheet.id,
+            rowBlock: chunk.rowBlock,
+            colBlock: chunk.colBlock,
+            revision: chunk.revision,
+            codec: chunk.codec,
+            data: encodeDocumentJson({ cells: chunk.cells }),
+          },
+        });
+      }
     }
 
     return { id: wb.id, publicId: wb.publicId, name: wbName, sheets: sheetNames.length };

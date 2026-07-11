@@ -27,6 +27,8 @@ const schemaFiles = [
   },
 ] as const;
 
+const documentEngineMigration = "20260711000000_document_engine";
+
 function readSchema(schemaPath: string): string {
   return readFileSync(schemaPath, "utf-8").replace(/\r\n/g, "\n");
 }
@@ -65,6 +67,16 @@ describe("Prisma schema consistency", () => {
       expect(existsSync(lockFilePath)).toBe(true);
       expect(existsSync(initMigrationPath)).toBe(true);
       expect(readFileSync(lockFilePath, "utf-8")).toContain(`provider = "${provider}"`);
+    }
+  });
+
+  it("keeps the document engine migration available for every provider", () => {
+    for (const { migrationsPath } of schemaFiles) {
+      const migrationPath = resolve(migrationsPath, documentEngineMigration, "migration.sql");
+      expect(existsSync(migrationPath)).toBe(true);
+      expect(readFileSync(migrationPath, "utf-8")).toContain("documentRevision");
+      expect(readFileSync(migrationPath, "utf-8")).toContain("SheetChunk");
+      expect(readFileSync(migrationPath, "utf-8")).toContain("SheetOperation");
     }
   });
 });

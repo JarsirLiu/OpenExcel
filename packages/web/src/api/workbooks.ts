@@ -28,6 +28,9 @@ export interface SheetSchema {
   merges: { row: [number, number]; col: [number, number] }[];
   uploadedData: any[] | null;
   config: any | null;
+  documentFormat?: string;
+  documentVersion?: number;
+  documentRevision?: number;
 }
 
 export interface WorkbookFull {

@@ -34,6 +34,56 @@ export {
   zeroBasedSheetChangeDeltaToSheetChangeDelta,
   zeroBasedSheetChangeRangeToSheetChangeRange,
 } from "./chat/sheetCoordinates.js";
+export type {
+  DocumentAdapter,
+  DocumentMutationResult,
+  DocumentRange,
+  DocumentRangeData,
+} from "./document/adapter.js";
+export {
+  createEmptyChunk,
+  getChunkCellKey,
+  getChunkKey,
+  getChunkPosition,
+  getChunkRange,
+  readChunkCell,
+  writeChunkCell,
+} from "./document/chunk.js";
+export {
+  chunksToFortuneCelldata,
+  documentValueToFortuneValue,
+  fortuneCelldataToChunks,
+  fortuneCellToDocumentValue,
+} from "./document/fortuneAdapter.js";
+export {
+  type CellRange,
+  type CreateChartOperation,
+  DEFAULT_CHUNK_COLUMN_SIZE,
+  DEFAULT_CHUNK_ROW_SIZE,
+  type DocumentCell,
+  type DocumentCellValue,
+  type DocumentChunk,
+  type DocumentObject,
+  type DocumentObjectPatch,
+  type DocumentOperation,
+  type DocumentScalar,
+} from "./document/model.js";
+export {
+  applyDocumentOperation,
+  applyDocumentOperations,
+  createDocumentState,
+  type DocumentState,
+  readDocumentCell,
+} from "./document/operations.js";
+export {
+  cellRangeSize,
+  formatA1Cell,
+  formatA1Range,
+  parseA1Cell,
+  parseA1Range,
+  validateCellRange,
+} from "./document/range.js";
+export { decodeDocumentJson, encodeDocumentJson } from "./document/serialization.js";
 export type { FortuneCell, FortuneCellValue } from "./excel/celldataUtils.js";
 export {
   celldataToGrid,

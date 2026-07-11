@@ -15,6 +15,8 @@ model Workbook {
   name        String
   order       Int
   sheets      Sheet[]
+  styles      CellStyle[]
+  operations  SheetOperation[]
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -60,9 +62,17 @@ model Sheet {
   merges       String                  @default("[]")
   uploadedData String?
   config       String?
+  documentFormat   String   @default("fortune-celldata-v1")
+  documentVersion  Int      @default(1)
+  documentRevision Int      @default(0)
   workbook     Workbook                @relation(fields: [workbookId], references: [id], onDelete: Cascade)
   sessions     Session[]
   runSnapshots AgentRunSheetSnapshot[]
+  chunks       SheetChunk[]
+  operations   SheetOperation[]
+  objects      SheetObject[]
+  formulaCells FormulaCell[]
+  pivotTables  PivotTable[]
   createdAt    DateTime                @default(now())
   updatedAt    DateTime                @updatedAt
 
@@ -144,4 +154,96 @@ model AgentRunSheetSnapshot {
 
   @@unique([runId, sheetId])
   @@index([runId])
+}
+
+model SheetChunk {
+  id        Int      @id @default(autoincrement())
+  sheetId   Int
+  rowBlock  Int
+  colBlock  Int
+  revision  Int
+  codec     String   @default("json-v1")
+  data      Bytes
+  sheet     Sheet    @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([sheetId, rowBlock, colBlock])
+  @@index([sheetId, rowBlock])
+  @@index([sheetId, colBlock])
+}
+
+model SheetOperation {
+  id         Int      @id @default(autoincrement())
+  workbookId Int
+  sheetId    Int
+  revision   Int
+  actorId    Int?
+  type       String
+  payload    Bytes
+  workbook   Workbook @relation(fields: [workbookId], references: [id], onDelete: Cascade)
+  sheet      Sheet    @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([sheetId, revision])
+  @@index([sheetId, revision])
+  @@index([workbookId, createdAt])
+}
+
+model CellStyle {
+  id         Int      @id @default(autoincrement())
+  workbookId Int
+  hash       String
+  data       Bytes
+  workbook   Workbook @relation(fields: [workbookId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([workbookId, hash])
+  @@index([workbookId])
+}
+
+model SheetObject {
+  id        Int      @id @default(autoincrement())
+  sheetId   Int
+  type      String
+  position  Bytes
+  data      Bytes
+  sheet     Sheet    @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sheetId, type])
+}
+
+model FormulaCell {
+  id           Int      @id @default(autoincrement())
+  sheetId      Int
+  address      String
+  formula      String
+  ast          Bytes?
+  dependencies Bytes?
+  cachedValue  Bytes?
+  sheet        Sheet    @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([sheetId, address])
+  @@index([sheetId])
+}
+
+model PivotTable {
+  id        Int      @id @default(autoincrement())
+  sheetId   Int
+  source    Bytes
+  rows      Bytes
+  columns   Bytes
+  values    Bytes
+  filters   Bytes
+  layout    Bytes?
+  cache     Bytes?
+  sheet     Sheet    @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sheetId])
 }
