@@ -122,6 +122,11 @@ export async function streamChat(
       modelConfig: config,
       systemPrompt,
       messages,
+      maxRetries: config.maxRetries,
+      timeout: {
+        totalMs: config.timeoutMs,
+        chunkMs: config.chunkTimeoutMs,
+      },
       tools: { ...workbookTools, ...excelTools },
       toolsContext,
       abortSignal,
@@ -136,6 +141,7 @@ export async function streamChat(
         await finalizeRunOnce({ status: "aborted" });
       },
       onError: async (error: any) => {
+        console.error(`[session] AI stream error for run ${run.id}:`, error);
         await finalizeRunOnce({
           status: "error",
           errorMessage: error instanceof Error ? error.message : String(error),

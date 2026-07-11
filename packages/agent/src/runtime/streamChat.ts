@@ -4,6 +4,7 @@ import {
   convertToModelMessages,
   isLoopFinished,
   streamText,
+  type TimeoutConfiguration,
   type ToolSet,
   toUIMessageStream,
   validateUIMessages,
@@ -17,6 +18,8 @@ export interface StreamChatInput {
   tools: ToolSet;
   toolsContext?: Record<string, unknown>;
   abortSignal?: AbortSignal;
+  maxRetries?: number;
+  timeout?: TimeoutConfiguration<ToolSet>;
   onStepFinish?: (...args: any[]) => void | Promise<void>;
   onFinish?: (...args: any[]) => void | Promise<void>;
   onAbort?: (...args: any[]) => void | Promise<void>;
@@ -39,6 +42,8 @@ export async function streamChat(
     tools: input.tools as any,
     toolsContext: input.toolsContext as any,
     stopWhen: isLoopFinished(),
+    maxRetries: input.maxRetries ?? 2,
+    timeout: input.timeout ?? { totalMs: 120_000, chunkMs: 30_000 },
     abortSignal: input.abortSignal,
     onStepFinish: input.onStepFinish,
     onFinish: async ({ text }: any) => {
@@ -55,6 +60,10 @@ export async function streamChat(
   return toUIMessageStream({
     stream: result.stream,
     originalMessages: validatedMessages,
+    onError: (error) => {
+      console.error("[agent] AI stream error:", error);
+      return "AI 服务暂时不可用，请稍后重试";
+    },
     onEnd: async ({ messages }) => {
       await input.onEnd?.({ messages });
     },

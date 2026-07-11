@@ -1,12 +1,28 @@
-import "dotenv/config";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { config as loadDotenv } from "dotenv";
+
+loadDotenv({
+  path: resolve(dirname(fileURLToPath(import.meta.url)), "../../../.env"),
+});
 
 export interface ModelConfig {
   baseUrl: string;
   apiKey: string;
   modelName: string;
+  maxRetries: number;
+  timeoutMs: number;
+  chunkTimeoutMs: number;
 }
 
 let cachedConfig: ModelConfig | null = null;
+
+function readNonNegativeInt(name: string, fallback: number): number {
+  const value = process.env[name]?.trim();
+  if (!value) return fallback;
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : fallback;
+}
 
 export function loadModelConfig(): ModelConfig {
   if (cachedConfig) return cachedConfig;
@@ -29,6 +45,9 @@ export function loadModelConfig(): ModelConfig {
     baseUrl: baseUrl as string,
     apiKey: apiKey as string,
     modelName: modelName as string,
+    maxRetries: readNonNegativeInt("MODEL_MAX_RETRIES", 2),
+    timeoutMs: readNonNegativeInt("MODEL_TIMEOUT_MS", 120_000),
+    chunkTimeoutMs: readNonNegativeInt("MODEL_CHUNK_TIMEOUT_MS", 30_000),
   };
   console.log(`[config] Loaded model config: ${modelName} @ ${baseUrl}`);
   return cachedConfig;

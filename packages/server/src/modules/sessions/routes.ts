@@ -168,21 +168,34 @@ export async function sessionRoutes(app: FastifyInstance) {
     const { messages } = req.body;
     const controller = new AbortController();
 
+    const abort = () => {
+      if (!controller.signal.aborted) controller.abort();
+    };
+
+    req.raw.on("aborted", abort);
     reply.raw.on("close", () => {
       if (!reply.raw.writableEnded) {
-        controller.abort();
+        abort();
       }
     });
 
-    reply.hijack();
+    try {
+      const stream = await service.streamChat(
+        ids.workspaceId,
+        sessionId,
+        messages,
+        controller.signal,
+      );
 
-    const stream = await service.streamChat(
-      ids.workspaceId,
-      sessionId,
-      messages,
-      controller.signal,
-    );
-
-    pipeUIMessageStreamToResponse({ response: reply.raw, stream });
+      if (controller.signal.aborted) return;
+      reply.hijack();
+      pipeUIMessageStreamToResponse({ response: reply.raw, stream });
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      console.error(`[session] Failed to start chat stream for session ${sessionId}:`, error);
+      if (!reply.sent) {
+        return reply.status(502).send({ error: "AI 服务暂时不可用，请稍后重试" });
+      }
+    }
   });
 }
