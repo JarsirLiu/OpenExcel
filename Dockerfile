@@ -1,6 +1,6 @@
 FROM node:22-alpine AS build
 
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@10.20.0 --activate
 WORKDIR /app
 
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
@@ -31,7 +31,7 @@ RUN pnpm --filter @openexcel/web build
 
 FROM node:22-alpine
 
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@10.20.0 --activate
 WORKDIR /app
 
 COPY --from=build /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml ./
@@ -51,6 +51,7 @@ COPY --from=build /app/packages/web/dist ./packages/web/dist
 COPY --from=build /app/templates ./templates
 
 RUN mkdir -p /app/.data
+RUN chmod +x /app/packages/server/scripts/docker-entrypoint.sh
 
 EXPOSE 4000
 

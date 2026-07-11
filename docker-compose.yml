@@ -3,8 +3,13 @@ name: openexcel
 services:
   server:
     image: ghcr.io/openexcel/openexcel:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: openexcel-server
     restart: unless-stopped
+    env_file:
+      - .env
     ports:
       - "4000:4000"
     environment:
@@ -14,7 +19,6 @@ services:
       - DATABASE_URL=file:/app/.data/prod.db
     volumes:
       - openexcel-data:/app/.data
-      - ./config:/app/config
 
 volumes:
   openexcel-data:

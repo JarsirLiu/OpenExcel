@@ -1,10 +1,4 @@
-import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import toml from "@iarna/toml";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const configPath = resolve(__dirname, "../../../config/config.toml");
+import "dotenv/config";
 
 export interface ModelConfig {
   baseUrl: string;
@@ -17,16 +11,25 @@ let cachedConfig: ModelConfig | null = null;
 export function loadModelConfig(): ModelConfig {
   if (cachedConfig) return cachedConfig;
 
-  try {
-    const raw = readFileSync(configPath, "utf-8");
-    const parsed = toml.parse(raw) as unknown as { model: ModelConfig };
-    cachedConfig = parsed.model;
-    console.log(
-      `[config] Loaded model config: ${parsed.model.modelName} @ ${parsed.model.baseUrl}`,
-    );
-    return cachedConfig;
-  } catch (err) {
-    console.error(`[config] Failed to load config from ${configPath}:`, err);
-    throw new Error("无法加载模型配置，请检查 config/config.toml");
+  const baseUrl = process.env.MODEL_BASE_URL?.trim();
+  const apiKey = process.env.MODEL_API_KEY?.trim();
+  const modelName = process.env.MODEL_NAME?.trim();
+
+  const missing = [
+    !baseUrl && "MODEL_BASE_URL",
+    !apiKey && "MODEL_API_KEY",
+    !modelName && "MODEL_NAME",
+  ].filter((name): name is string => Boolean(name));
+
+  if (missing.length > 0) {
+    throw new Error(`缺少模型环境变量: ${missing.join(", ")}`);
   }
+
+  cachedConfig = {
+    baseUrl: baseUrl as string,
+    apiKey: apiKey as string,
+    modelName: modelName as string,
+  };
+  console.log(`[config] Loaded model config: ${modelName} @ ${baseUrl}`);
+  return cachedConfig;
 }

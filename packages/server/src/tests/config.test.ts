@@ -1,45 +1,29 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import toml from "@iarna/toml";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-describe("config parsing", () => {
-  let tmpDir: string;
-
-  beforeEach(() => {
-    tmpDir = mkdtempSync(join(tmpdir(), "openexcel-test-"));
-  });
-
+describe("environment model config", () => {
   afterEach(() => {
-    rmSync(tmpDir, { recursive: true, force: true });
+    vi.unstubAllEnvs();
+    vi.resetModules();
   });
 
-  it("parses a valid config.toml", () => {
-    const configPath = join(tmpDir, "config.toml");
-    writeFileSync(
-      configPath,
-      `[model]
-baseUrl = "https://test.api.com/v1"
-apiKey = "sk-test123"
-modelName = "gpt-4o-mini"
-`,
-      "utf-8",
-    );
+  it("loads model config from environment variables", async () => {
+    vi.stubEnv("MODEL_BASE_URL", "https://test.api.com/v1");
+    vi.stubEnv("MODEL_API_KEY", "sk-test123");
+    vi.stubEnv("MODEL_NAME", "gpt-4o-mini");
 
-    const raw = readFileSync(configPath, "utf-8");
-    const parsed = toml.parse(raw) as unknown as {
-      model: { baseUrl: string; apiKey: string; modelName: string };
-    };
-
-    expect(parsed.model.baseUrl).toBe("https://test.api.com/v1");
-    expect(parsed.model.apiKey).toBe("sk-test123");
-    expect(parsed.model.modelName).toBe("gpt-4o-mini");
+    const { loadModelConfig } = await import("../config.js");
+    expect(loadModelConfig()).toEqual({
+      baseUrl: "https://test.api.com/v1",
+      apiKey: "sk-test123",
+      modelName: "gpt-4o-mini",
+    });
   });
 
-  it("throws on missing config file", () => {
-    expect(() => {
-      const raw = readFileSync(join(tmpDir, "nonexistent.toml"), "utf-8");
-    }).toThrow();
+  it("throws when a required variable is missing", async () => {
+    vi.stubEnv("MODEL_BASE_URL", "https://test.api.com/v1");
+    vi.stubEnv("MODEL_NAME", "gpt-4o-mini");
+
+    const { loadModelConfig } = await import("../config.js");
+    expect(() => loadModelConfig()).toThrow("MODEL_API_KEY");
   });
 });
