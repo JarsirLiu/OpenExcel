@@ -15,7 +15,6 @@ services:
       - DATABASE_URL=file:/app/.data/prod.db
     volumes:
       - openexcel-data:/app/.data
-      - ./config/config.toml:/app/config/config.toml:ro
 
 volumes:
   openexcel-data:
