@@ -36,16 +36,16 @@ MODEL_NAME=your-model-name
 
 ```env
 DATABASE_PROVIDER=sqlite
-DATABASE_URL=file:../../../.data/openexcel.db
 ```
 
-生产 Docker Compose 会覆盖为：
+SQLite 的数据库文件默认位于项目根目录的 `.data/openexcel.db`。Docker Compose 会将同名数据库保存在 `/app/.data/openexcel.db`，并通过 volume 持久化。
+
+如果切换到 PostgreSQL 或 MySQL，再配置对应的连接串：
 
 ```env
-DATABASE_URL=file:/app/.data/openexcel.db
+DATABASE_PROVIDER=postgresql
+DATABASE_URL=postgresql://user:password@db-host:5432/openexcel
 ```
-
-不要把真实 API Key 提交到 Git。`.env` 和 `config/config.toml` 已被忽略；旧的 TOML 配置不再被程序读取。
 
 ## 本地启动
 

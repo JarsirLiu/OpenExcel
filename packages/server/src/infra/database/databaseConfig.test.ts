@@ -6,11 +6,11 @@ describe("databaseConfig", () => {
     vi.unstubAllEnvs();
   });
 
-  it("defaults to sqlite with the repo dev database", () => {
+  it("defaults to sqlite with the repo database", () => {
     const config = loadDatabaseConfig();
 
     expect(config.provider).toBe("sqlite");
-    expect(config.url).toContain("/.data/dev.db");
+    expect(config.url).toContain("/.data/openexcel.db");
   });
 
   it("uses the configured provider and url", () => {
@@ -32,7 +32,7 @@ describe("databaseConfig", () => {
   });
 
   it("provides built-in defaults for each provider", () => {
-    expect(getDefaultDatabaseUrl("sqlite")).toContain("/.data/dev.db");
+    expect(getDefaultDatabaseUrl("sqlite")).toContain("/.data/openexcel.db");
     expect(getDefaultDatabaseUrl("postgresql")).toContain("postgresql://");
     expect(getDefaultDatabaseUrl("mysql")).toContain("mysql://");
   });
