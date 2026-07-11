@@ -39,6 +39,10 @@ function trimMessagesAfterUserTurn(messages: any[], userText: string): any[] {
   throw new Error("会话消息与撤销结果不一致，无法更新本地状态");
 }
 
+export function applyInitialMessages(currentMessages: any[], loadedMessages: any[]): any[] {
+  return currentMessages.length > 0 ? currentMessages : loadedMessages;
+}
+
 export function useChatConversation({
   sessionId,
   workspaceId,
@@ -102,7 +106,10 @@ export function useChatConversation({
           0,
         );
         if (!cancelled) {
-          setMessages(msgs);
+          // A newly created session can start streaming before its first history
+          // request completes. Do not let the stale empty response erase the
+          // optimistic user message already held by useChat.
+          setMessages((currentMessages) => applyInitialMessages(currentMessages, msgs));
           loadedOffsetRef.current = msgs.length;
           setHasOlder(msgs.length < total);
           setInitialLoaded(true);
