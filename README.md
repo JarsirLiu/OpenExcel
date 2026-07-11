@@ -36,13 +36,13 @@ MODEL_NAME=your-model-name
 
 ```env
 DATABASE_PROVIDER=sqlite
-DATABASE_URL=file:../../../.data/dev.db
+DATABASE_URL=file:../../../.data/openexcel.db
 ```
 
 生产 Docker Compose 会覆盖为：
 
 ```env
-DATABASE_URL=file:/app/.data/prod.db
+DATABASE_URL=file:/app/.data/openexcel.db
 ```
 
 不要把真实 API Key 提交到 Git。`.env` 和 `config/config.toml` 已被忽略；旧的 TOML 配置不再被程序读取。

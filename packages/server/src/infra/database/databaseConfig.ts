@@ -14,7 +14,7 @@ function normalizeProvider(value: string | undefined): DatabaseProvider {
 }
 
 function buildDefaultSqliteUrl(): string {
-  return "file:../../../.data/dev.db";
+  return "file:../../../.data/openexcel.db";
 }
 
 function normalizeUrl(provider: DatabaseProvider, value: string | undefined): string {
