@@ -2,7 +2,7 @@ name: openexcel
 
 services:
   server:
-    build: .
+    image: ghcr.io/openexcel/openexcel:latest
     container_name: openexcel-server
     restart: unless-stopped
     ports:
