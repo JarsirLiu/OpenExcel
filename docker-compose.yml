@@ -14,6 +14,7 @@ services:
       - DATABASE_URL=file:/app/.data/prod.db
     volumes:
       - openexcel-data:/app/.data
+      - ./config:/app/config
 
 volumes:
   openexcel-data:
