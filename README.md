@@ -82,26 +82,23 @@ pnpm db:migrate     # 执行数据库迁移
 
 ## Docker 部署
 
-### 本地构建并使用
-
-默认镜像名是 `openexcel:local`。首次使用时，复制 `.env.example` 并填写模型配置：
+复制 `.env.example` 并填写模型配置：
 
 ```bash
 cp .env.example .env
 vim .env
 ```
 
-构建并启动：
+构建镜像：
 
 ```bash
-docker compose build --pull
-docker compose up -d
+docker build -t openexcel:local .
 ```
 
-也可以一步完成：
+启动容器：
 
 ```bash
-docker compose up -d --build
+docker compose up -d
 ```
 
 查看状态和日志：
@@ -118,89 +115,3 @@ curl http://127.0.0.1:4000/api/health
 ```
 
 SQLite 数据保存在 Docker volume `openexcel-data` 中。删除容器不会删除该 volume；不要执行 `docker compose down -v`，除非确认要删除数据库。
-
-### 使用远程镜像
-
-将 `.env` 中的 `OPENEXCEL_IMAGE` 改成你自己的镜像仓库和固定版本，例如：
-
-```env
-OPENEXCEL_IMAGE=registry.example.com/openexcel:1.0.0
-```
-
-服务器登录镜像仓库并拉取：
-
-```bash
-docker login registry.example.com
-docker compose pull
-docker compose up -d --no-build
-```
-
-本地构建并推送镜像：
-
-```bash
-docker build -t registry.example.com/openexcel:1.0.0 .
-docker push registry.example.com/openexcel:1.0.0
-```
-
-建议使用版本 tag（例如 `1.0.0` 或 Git commit id），不要依赖 `latest`。
-
-## Nginx 反向代理
-
-项目默认监听容器端口 `4000`。本项目配套的 Gateway Nginx 配置位于 `D:\learn\xx\nginx`，其中 `gateway.yml` 的上游配置示例：
-
-```yaml
-services:
-  - domain: your-domain.example
-    upstream: host.docker.internal:4000
-    ssl: true
-```
-
-Nginx 配置需要关闭代理缓冲，以便 AI 对话的 HTTP 流式响应及时到达浏览器。当前配套脚本已经包含：
-
-```nginx
-proxy_http_version 1.1;
-proxy_buffering off;
-proxy_cache off;
-proxy_read_timeout 300s;
-```
-
-部署 Gateway：
-
-```bash
-cd D:\learn\xx\nginx
-docker compose up -d --build
-```
-
-聊天接口是 HTTP `POST` 流式响应，不是 WebSocket，因此 OpenExcel 服务不需要设置 `websocket: true`。
-
-## 生产建议
-
-- 使用固定镜像 tag 或 digest，不要长期依赖 `latest`。
-- 将 `MODEL_API_KEY` 放在服务器 Secret 或权限受限的 `.env` 中。
-- 生产环境使用 HTTPS 和 Nginx，不要长期直接暴露 `4000` 端口。
-- SQLite 适合单实例部署；多副本部署应切换到 PostgreSQL 或 MySQL。
-- 生产环境应限制 CORS 来源，并定期备份 `openexcel-data` volume。
-
-## 对话失败排查
-
-1. 检查服务端环境变量：
-
-   ```bash
-   docker compose exec server printenv MODEL_BASE_URL MODEL_NAME
-   ```
-
-2. 检查服务端日志：
-
-   ```bash
-   docker compose logs --tail=200 server
-   ```
-
-3. 直接检查 API：
-
-   ```bash
-   curl -i http://127.0.0.1:4000/api/health
-   ```
-
-4. 如果直连 `4000` 可以对话、域名访问不行，重点检查 Nginx 的 `proxy_buffering off`、上游地址和证书域名。
-
-5. 如果健康检查正常但对话报模型配置错误，检查 `MODEL_BASE_URL`、`MODEL_API_KEY` 和 `MODEL_NAME` 是否在容器内存在，并确认运行的是最新镜像。
