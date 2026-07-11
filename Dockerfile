@@ -25,6 +25,7 @@ COPY packages/web/index.html ./packages/web/
 COPY packages/web/tsconfig.json ./packages/web/
 COPY packages/web/vite.config.ts ./packages/web/
 COPY packages/web/vitest.config.ts ./packages/web/
+COPY templates ./templates
 
 RUN pnpm --filter @openexcel/web build
 
