@@ -39,6 +39,17 @@ function trimMessagesAfterUserTurn(messages: any[], userText: string): any[] {
   throw new Error("会话消息与撤销结果不一致，无法更新本地状态");
 }
 
+function removeEmptyAssistantMessages(messages: any[]): any[] {
+  return messages.filter(
+    (message) =>
+      !(
+        message?.role === "assistant" &&
+        Array.isArray(message.parts) &&
+        message.parts.length === 0
+      ),
+  );
+}
+
 export function applyInitialMessages(currentMessages: any[], loadedMessages: any[]): any[] {
   return currentMessages.length > 0 ? currentMessages : loadedMessages;
 }
@@ -133,6 +144,11 @@ export function useChatConversation({
   useEffect(() => {
     onStreamingChange?.(isStreaming);
   }, [isStreaming, onStreamingChange]);
+
+  useEffect(() => {
+    if (!error) return;
+    setMessages(removeEmptyAssistantMessages);
+  }, [error, setMessages]);
 
   useEffect(() => {
     const toolCallIds = collectWorkbookMutationToolCallIds(

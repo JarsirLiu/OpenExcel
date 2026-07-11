@@ -10,6 +10,7 @@ import {
   validateUIMessages,
 } from "ai";
 import { createChatModel, type ModelConfig } from "../model.js";
+import { formatAIError } from "./formatAIError.js";
 
 export interface StreamChatInput {
   modelConfig: ModelConfig;
@@ -27,11 +28,23 @@ export interface StreamChatInput {
   onEnd?: ({ messages }: { messages: any[] }) => void | Promise<void>;
 }
 
+export function removeEmptyAssistantMessages(messages: any[]): any[] {
+  return messages.filter(
+    (message) =>
+      !(
+        message?.role === "assistant" &&
+        Array.isArray(message.parts) &&
+        message.parts.length === 0
+      ),
+  );
+}
+
 export async function streamChat(
   input: StreamChatInput,
 ): Promise<ReturnType<typeof toUIMessageStream>> {
+  const normalizedMessages = removeEmptyAssistantMessages(input.messages);
   const validatedMessages = await validateUIMessages({
-    messages: input.messages,
+    messages: normalizedMessages,
     tools: input.tools as any,
   });
 
@@ -60,10 +73,7 @@ export async function streamChat(
   return toUIMessageStream({
     stream: result.stream,
     originalMessages: validatedMessages,
-    onError: (error) => {
-      console.error("[agent] AI stream error:", error);
-      return "AI 服务暂时不可用，请稍后重试";
-    },
+    onError: (error) => formatAIError(error),
     onEnd: async ({ messages }) => {
       await input.onEnd?.({ messages });
     },

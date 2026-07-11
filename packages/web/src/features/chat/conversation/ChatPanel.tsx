@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Alert } from "@/components/ui/Alert/Alert";
 import { ChatComposer, type ChatComposerHandle } from "@/features/chat/composer/ChatComposer";
 import { useChatConversation } from "@/features/chat/hooks/useChatConversation";
 import { MessageList } from "@/features/chat/message/MessageList";
@@ -124,9 +125,9 @@ export function ChatPanel({
 
       {error && (
         <div className={styles.error}>
-          <div className={styles.errorBox}>
+          <Alert variant="error">
             {t("chat_failed", "对话失败")}：{error.message}
-          </div>
+          </Alert>
         </div>
       )}
 

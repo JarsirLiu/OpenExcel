@@ -1,5 +1,6 @@
 export { createChatModel, createTitleModel, type ModelConfig } from "./model.js";
 export { buildSystemPrompt, DEFAULT_PROMPT } from "./prompt/systemPrompt.js";
+export { formatAIError } from "./runtime/formatAIError.js";
 export { type StreamChatInput, streamChat } from "./runtime/streamChat.js";
 export {
   buildWorkspaceContext,

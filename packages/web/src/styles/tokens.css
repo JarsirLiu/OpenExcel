@@ -20,6 +20,15 @@
   --color-border: #e8eaed;
   --color-border-strong: #d8dde6;
   --color-accent: #5b9bd5;
+  --color-danger-border: #fecaca;
+  --color-danger-surface: #fef2f2;
+  --color-danger-text: #b91c1c;
+  --color-warning-border: #fde68a;
+  --color-warning-surface: #fffbeb;
+  --color-warning-text: #92400e;
+  --color-success-border: #bbf7d0;
+  --color-success-surface: #f0fdf4;
+  --color-success-text: #166534;
 
   /* ---- Avatar ---- */
   --avatar-ai: #3b82f6;

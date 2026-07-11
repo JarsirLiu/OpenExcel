@@ -3,6 +3,7 @@ import {
   buildRunToolContext,
   buildSystemPrompt,
   buildWorkspaceToolContext,
+  formatAIError,
   streamChat as streamAgentChat,
 } from "@openexcel/agent";
 import { loadModelConfig } from "../../../config.js";
@@ -141,10 +142,11 @@ export async function streamChat(
         await finalizeRunOnce({ status: "aborted" });
       },
       onError: async (error: any) => {
-        console.error(`[session] AI stream error for run ${run.id}:`, error);
+        const errorMessage = formatAIError(error);
+        console.error(`[session] AI stream error for run ${run.id}: ${errorMessage}`);
         await finalizeRunOnce({
           status: "error",
-          errorMessage: error instanceof Error ? error.message : String(error),
+          errorMessage,
         });
       },
       onEnd: async ({ messages: newMessages }) => {
@@ -167,7 +169,7 @@ export async function streamChat(
   } catch (error) {
     await finalizeRunOnce({
       status: "error",
-      errorMessage: error instanceof Error ? error.message : String(error),
+      errorMessage: formatAIError(error),
     });
     throw error;
   }

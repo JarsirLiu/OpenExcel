@@ -1,3 +1,4 @@
+import { formatAIError } from "@openexcel/agent";
 import { pipeUIMessageStreamToResponse } from "ai";
 import type { FastifyInstance } from "fastify";
 import {
@@ -192,9 +193,12 @@ export async function sessionRoutes(app: FastifyInstance) {
       pipeUIMessageStreamToResponse({ response: reply.raw, stream });
     } catch (error) {
       if (controller.signal.aborted) return;
-      console.error(`[session] Failed to start chat stream for session ${sessionId}:`, error);
+      const errorMessage = formatAIError(error);
+      console.error(
+        `[session] Failed to start chat stream for session ${sessionId}: ${errorMessage}`,
+      );
       if (!reply.sent) {
-        return reply.status(502).send({ error: "AI 服务暂时不可用，请稍后重试" });
+        return reply.status(502).send({ error: errorMessage });
       }
     }
   });
