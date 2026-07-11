@@ -1,5 +1,0 @@
-services:
-  server:
-    build: .
-    image: openexcel:dev
-    pull_policy: never
