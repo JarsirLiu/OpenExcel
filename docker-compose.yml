@@ -2,7 +2,7 @@ name: openexcel
 
 services:
   server:
-    image: ghcr.io/openexcel/openexcel:latest
+    image: ${OPENEXCEL_IMAGE:-openexcel:local}
     build:
       context: .
       dockerfile: Dockerfile

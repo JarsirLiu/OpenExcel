@@ -82,9 +82,9 @@ pnpm db:migrate     # 执行数据库迁移
 
 ## Docker 部署
 
-### 使用当前源码构建
+### 本地构建并使用
 
-确保服务器上存在 `.env`，并填写模型配置：
+默认镜像名是 `openexcel:local`。首次使用时，复制 `.env.example` 并填写模型配置：
 
 ```bash
 cp .env.example .env
@@ -96,6 +96,12 @@ vim .env
 ```bash
 docker compose build --pull
 docker compose up -d
+```
+
+也可以一步完成：
+
+```bash
+docker compose up -d --build
 ```
 
 查看状态和日志：
@@ -113,16 +119,30 @@ curl http://127.0.0.1:4000/api/health
 
 SQLite 数据保存在 Docker volume `openexcel-data` 中。删除容器不会删除该 volume；不要执行 `docker compose down -v`，除非确认要删除数据库。
 
-### 使用 GHCR 镜像
+### 使用远程镜像
 
-Compose 同时声明了 `image` 和 `build`。如果使用已经发布的镜像，可以执行：
+将 `.env` 中的 `OPENEXCEL_IMAGE` 改成你自己的镜像仓库和固定版本，例如：
 
-```bash
-docker compose pull
-docker compose up -d
+```env
+OPENEXCEL_IMAGE=registry.example.com/openexcel:1.0.0
 ```
 
-如果修改了源码，必须重新构建并发布镜像，或者在服务器上执行 `docker compose build --pull`，否则服务器可能仍然运行旧的 `latest` 镜像。
+服务器登录镜像仓库并拉取：
+
+```bash
+docker login registry.example.com
+docker compose pull
+docker compose up -d --no-build
+```
+
+本地构建并推送镜像：
+
+```bash
+docker build -t registry.example.com/openexcel:1.0.0 .
+docker push registry.example.com/openexcel:1.0.0
+```
+
+建议使用版本 tag（例如 `1.0.0` 或 Git commit id），不要依赖 `latest`。
 
 ## Nginx 反向代理
 
