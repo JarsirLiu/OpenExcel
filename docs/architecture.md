@@ -530,9 +530,13 @@ If a bug affects two panes at once, treat it as a boundary bug and add a regress
 1. User sends a chat message.
 2. Web posts the current transcript to the server.
 3. The agent removes empty placeholders and compacts the recent contiguous transcript to the configured context budget. The default model input budget is 180,000 tokens, with 16,000 tokens reserved for the response.
+   It also keeps only the latest 20 complete user turns by default (`MODEL_MAX_CONVERSATION_TURNS`); turn trimming happens before token trimming, so an assistant tool call and its result are not split across the window.
+   Each user message sent to the model is independently capped at 16,000 tokens (`MODEL_MAX_USER_INPUT_TOKENS`). Only the model-facing copy is truncated; the complete user message remains in the persisted transcript.
 4. Server creates a run and streams the assistant response.
 5. Server persists the complete transcript, run, and step data; compaction only affects the model request and does not remove history from the session.
 6. Web renders streaming messages and tool output.
+
+Tool results are processed at one run-scoped boundary before they are returned to the model. The default shared result budget is 32,000 tokens per run, each result is capped at 8,000 tokens, and `readSheet` has a 24,000-token sub-budget. A result larger than its remaining allowance is structurally compacted, retaining scalar metadata and representative array items. When no allowance remains, the wrapper returns a normal `truncated` result without executing the underlying tool; on the next model step, exhausted tools are removed from `activeTools`, allowing the model to finish without an error or an unbounded tool loop. These limits are configured with `MODEL_TOOL_RESULT_BUDGET_TOKENS`, `MODEL_TOOL_RESULT_MAX_TOKENS`, and `MODEL_READ_SHEET_BUDGET_TOKENS`.
 
 Spreadsheet reads are bounded at the tool boundary. A default `readSheet` call returns an overview of the whole Sheet (dimensions, column profiles, numeric statistics, and representative samples) without returning all raw cells. Explicit `mode=range` calls return up to approximately 4,000 grid cells and expose the next row or column through `hasMoreRows`, `hasMoreCols`, and the range in the response. This lets the model understand a large Sheet before requesting a focused range and keeps repeated analysis from filling the context with an unbounded tool result.
 

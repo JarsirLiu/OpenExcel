@@ -11,6 +11,8 @@ import {
 } from "ai";
 import { createChatModel, type ModelConfig } from "../model.js";
 import {
+  DEFAULT_MAX_CONVERSATION_TURNS,
+  DEFAULT_MAX_USER_INPUT_TOKENS,
   DEFAULT_OUTPUT_RESERVE_TOKENS,
   trimMessagesToContextWindow,
 } from "../session/contextWindow.js";
@@ -27,6 +29,9 @@ export interface StreamChatInput {
   timeout?: TimeoutConfiguration<ToolSet>;
   contextWindowTokens?: number;
   outputReserveTokens?: number;
+  maxConversationTurns?: number;
+  maxUserInputTokens?: number;
+  prepareStep?: (...args: any[]) => unknown;
   onStepFinish?: (...args: any[]) => void | Promise<void>;
   onFinish?: (...args: any[]) => void | Promise<void>;
   onAbort?: (...args: any[]) => void | Promise<void>;
@@ -52,10 +57,16 @@ export async function streamChat(
   const contextWindow = trimMessagesToContextWindow(normalizedMessages, {
     contextWindowTokens: input.contextWindowTokens,
     outputReserveTokens: input.outputReserveTokens,
+    maxConversationTurns: input.maxConversationTurns ?? DEFAULT_MAX_CONVERSATION_TURNS,
+    maxUserInputTokens: input.maxUserInputTokens ?? DEFAULT_MAX_USER_INPUT_TOKENS,
     systemPrompt: input.systemPrompt,
   });
   const validatedMessages = await validateUIMessages({
     messages: contextWindow.messages,
+    tools: input.tools as any,
+  });
+  const persistenceMessages = await validateUIMessages({
+    messages: normalizedMessages,
     tools: input.tools as any,
   });
 
@@ -65,6 +76,7 @@ export async function streamChat(
     messages: await convertToModelMessages(validatedMessages as any),
     tools: input.tools as any,
     toolsContext: input.toolsContext as any,
+    prepareStep: input.prepareStep as any,
     stopWhen: isLoopFinished(),
     maxOutputTokens: input.outputReserveTokens ?? DEFAULT_OUTPUT_RESERVE_TOKENS,
     maxRetries: input.maxRetries ?? 2,
@@ -84,7 +96,7 @@ export async function streamChat(
 
   return toUIMessageStream({
     stream: result.stream,
-    originalMessages: validatedMessages,
+    originalMessages: persistenceMessages,
     onError: (error) => formatAIError(error),
     onEnd: async ({ messages }) => {
       await input.onEnd?.({ messages });

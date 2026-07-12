@@ -21,6 +21,11 @@ describe("environment model config", () => {
       chunkTimeoutMs: 30_000,
       contextWindowTokens: 180_000,
       outputReserveTokens: 16_000,
+      maxConversationTurns: 20,
+      maxUserInputTokens: 16_000,
+      toolResultBudgetTokens: 32_000,
+      toolResultMaxTokens: 8_000,
+      readSheetBudgetTokens: 24_000,
     });
   });
 
@@ -41,6 +46,11 @@ describe("environment model config", () => {
       chunkTimeoutMs: 15_000,
       contextWindowTokens: 120_000,
       outputReserveTokens: 12_000,
+      maxConversationTurns: 20,
+      maxUserInputTokens: 16_000,
+      toolResultBudgetTokens: 32_000,
+      toolResultMaxTokens: 8_000,
+      readSheetBudgetTokens: 24_000,
     });
   });
 

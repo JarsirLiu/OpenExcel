@@ -5,6 +5,8 @@ import {
   buildWorkspaceToolContext,
   formatAIError,
   streamChat as streamAgentChat,
+  ToolResultBudget,
+  wrapToolSetWithResultBudget,
 } from "@openexcel/agent";
 import { loadModelConfig } from "../../../config.js";
 import { excelTools } from "../../sheets/tools/index.js";
@@ -73,6 +75,16 @@ export async function streamChat(
     ...buildWorkspaceToolContext(workspaceId),
     ...buildRunToolContext(run.id, workspaceId),
   };
+  const toolResultBudget = new ToolResultBudget({
+    totalTokens: config.toolResultBudgetTokens,
+    maxResultTokens: config.toolResultMaxTokens,
+    toolBudgets: { readSheet: config.readSheetBudgetTokens },
+  });
+  const tools = wrapToolSetWithResultBudget(
+    { ...workbookTools, ...excelTools } as any,
+    toolResultBudget,
+  );
+  const toolNames = Object.keys(tools);
 
   let finalized = false;
   let stepOrder = 0;
@@ -126,12 +138,17 @@ export async function streamChat(
       maxRetries: config.maxRetries,
       contextWindowTokens: config.contextWindowTokens,
       outputReserveTokens: config.outputReserveTokens,
+      maxConversationTurns: config.maxConversationTurns,
+      maxUserInputTokens: config.maxUserInputTokens,
       timeout: {
         totalMs: config.timeoutMs,
         chunkMs: config.chunkTimeoutMs,
       },
-      tools: { ...workbookTools, ...excelTools },
+      tools: tools as any,
       toolsContext,
+      prepareStep: async () => ({
+        activeTools: toolNames.filter((name) => !toolResultBudget.isToolExhausted(name)) as any,
+      }),
       abortSignal,
       onStepFinish: persistStepOnce,
       onFinish: async ({ text }: any) => {

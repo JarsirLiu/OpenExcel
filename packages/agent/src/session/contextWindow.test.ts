@@ -9,7 +9,7 @@ describe("trimMessagesToContextWindow", () => {
     }));
 
     const result = trimMessagesToContextWindow(messages, {
-      contextWindowTokens: 100,
+      contextWindowTokens: 120,
       outputReserveTokens: 10,
     });
 
@@ -37,5 +37,41 @@ describe("trimMessagesToContextWindow", () => {
 
     expect(result.messages).toHaveLength(1);
     expect(result.messages[0].content).toContain("内容已按上下文预算截断");
+  });
+
+  it("keeps complete recent turns instead of splitting tool messages", () => {
+    const messages = [
+      { role: "user", content: "第一轮" },
+      { role: "assistant", parts: [{ type: "tool-readSheet", state: "output" }] },
+      { role: "user", content: "第二轮" },
+      { role: "assistant", parts: [{ type: "tool-readSheet", state: "output" }] },
+      { role: "user", content: "第三轮" },
+      { role: "assistant", content: "完成" },
+    ];
+
+    const result = trimMessagesToContextWindow(messages, {
+      maxConversationTurns: 2,
+      contextWindowTokens: 10_000,
+      outputReserveTokens: 0,
+    });
+
+    expect(result.messages).toEqual(messages.slice(2));
+    expect(result.conversationTurns).toBe(2);
+    expect(result.droppedTurns).toBe(1);
+  });
+
+  it("caps each oversized user message before building model context", () => {
+    const result = trimMessagesToContextWindow(
+      [{ role: "user", content: "用户粘贴的数据 ".repeat(10_000) }],
+      {
+        contextWindowTokens: 10_000,
+        outputReserveTokens: 0,
+        maxUserInputTokens: 30,
+      },
+    );
+
+    expect(estimateTokens(result.messages[0])).toBeLessThanOrEqual(30);
+    expect(result.messages[0].content).toContain("内容已按上下文预算截断");
+    expect(result.truncatedUserMessages).toBe(1);
   });
 });

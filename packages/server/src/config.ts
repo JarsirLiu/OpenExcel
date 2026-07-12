@@ -1,5 +1,12 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  DEFAULT_MAX_CONVERSATION_TURNS,
+  DEFAULT_MAX_USER_INPUT_TOKENS,
+  DEFAULT_READ_SHEET_BUDGET_TOKENS,
+  DEFAULT_TOOL_RESULT_BUDGET_TOKENS,
+  DEFAULT_TOOL_RESULT_MAX_TOKENS,
+} from "@openexcel/agent";
 import { config as loadDotenv } from "dotenv";
 
 loadDotenv({
@@ -15,6 +22,11 @@ export interface ModelConfig {
   chunkTimeoutMs: number;
   contextWindowTokens: number;
   outputReserveTokens: number;
+  maxConversationTurns: number;
+  maxUserInputTokens: number;
+  toolResultBudgetTokens: number;
+  toolResultMaxTokens: number;
+  readSheetBudgetTokens: number;
 }
 
 let cachedConfig: ModelConfig | null = null;
@@ -57,6 +69,26 @@ export function loadModelConfig(): ModelConfig {
     chunkTimeoutMs: readNonNegativeInt("MODEL_CHUNK_TIMEOUT_MS", 30_000),
     contextWindowTokens: readPositiveInt("MODEL_CONTEXT_WINDOW_TOKENS", 180_000),
     outputReserveTokens: readPositiveInt("MODEL_OUTPUT_RESERVE_TOKENS", 16_000),
+    maxConversationTurns: readPositiveInt(
+      "MODEL_MAX_CONVERSATION_TURNS",
+      DEFAULT_MAX_CONVERSATION_TURNS,
+    ),
+    maxUserInputTokens: readPositiveInt(
+      "MODEL_MAX_USER_INPUT_TOKENS",
+      DEFAULT_MAX_USER_INPUT_TOKENS,
+    ),
+    toolResultBudgetTokens: readPositiveInt(
+      "MODEL_TOOL_RESULT_BUDGET_TOKENS",
+      DEFAULT_TOOL_RESULT_BUDGET_TOKENS,
+    ),
+    toolResultMaxTokens: readPositiveInt(
+      "MODEL_TOOL_RESULT_MAX_TOKENS",
+      DEFAULT_TOOL_RESULT_MAX_TOKENS,
+    ),
+    readSheetBudgetTokens: readPositiveInt(
+      "MODEL_READ_SHEET_BUDGET_TOKENS",
+      DEFAULT_READ_SHEET_BUDGET_TOKENS,
+    ),
   };
   console.log(`[config] Loaded model config: ${modelName} @ ${baseUrl}`);
   return cachedConfig;
