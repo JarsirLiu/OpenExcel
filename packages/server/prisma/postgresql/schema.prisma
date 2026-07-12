@@ -65,6 +65,7 @@ model Sheet {
   documentFormat   String   @default("fortune-celldata-v1")
   documentVersion  Int      @default(1)
   documentRevision Int      @default(0)
+  compactedRevision Int     @default(0)
   maxRow           Int      @default(0)
   maxColumn        Int      @default(0)
   workbook     Workbook                @relation(fields: [workbookId], references: [id], onDelete: Cascade)
@@ -72,6 +73,8 @@ model Sheet {
   runSnapshots AgentRunSheetSnapshot[]
   chunks       SheetChunk[]
   operations   SheetOperation[]
+  operationRequests SheetOperationRequest[]
+  snapshots    SheetSnapshot[]
   objects      SheetObject[]
   formulaCells FormulaCell[]
   formulaDependenciesFrom FormulaDependency[] @relation("FormulaDependencySource")
@@ -188,6 +191,8 @@ model SheetOperation {
   sheetId    Int
   revision   Int
   actorId    Int?
+  batchId    String?
+  batchIndex Int?
   type       String
   payload    Bytes
   workbook   Workbook @relation(fields: [workbookId], references: [id], onDelete: Cascade)
@@ -196,7 +201,40 @@ model SheetOperation {
 
   @@unique([sheetId, revision])
   @@index([sheetId, revision])
+  @@index([sheetId, batchId, batchIndex])
   @@index([workbookId, createdAt])
+}
+
+model SheetOperationRequest {
+  id             Int      @id @default(autoincrement())
+  sheetId        Int
+  idempotencyKey String
+  requestHash    String
+  batchId        String
+  revision       Int
+  result         Bytes
+  sheet          Sheet    @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+
+  @@unique([sheetId, idempotencyKey])
+  @@index([sheetId, createdAt])
+}
+
+model SheetSnapshot {
+  id          Int      @id @default(autoincrement())
+  sheetId     Int
+  revision    Int
+  maxRow      Int
+  maxColumn   Int
+  codec       String   @default("json-v1")
+  chunks      Bytes
+  objects     Bytes
+  layout      String?
+  sheet       Sheet    @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@unique([sheetId, revision])
+  @@index([sheetId, revision])
 }
 
 model CellStyle {

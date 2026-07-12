@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { applyDocumentOperationSchema, applyDocumentOperationsSchema } from "./dto.js";
+import {
+  applyDocumentOperationSchema,
+  applyDocumentOperationsSchema,
+  compactDocumentOperationsSchema,
+} from "./dto.js";
 
 describe("applyDocumentOperationSchema", () => {
   it("accepts a sparse cell write with optimistic revision", () => {
@@ -42,5 +46,33 @@ describe("applyDocumentOperationSchema", () => {
     });
 
     expect(result.success).toBe(true);
+  });
+
+  it("accepts bounded batch and idempotency metadata", () => {
+    const result = applyDocumentOperationsSchema.safeParse({
+      batchId: "editor-batch-1",
+      idempotencyKey: "request-1",
+      operations: [
+        {
+          type: "setCell",
+          row: 0,
+          col: 0,
+          value: { value: "A" },
+        },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+    expect(
+      applyDocumentOperationsSchema.safeParse({
+        batchId: "x".repeat(129),
+        operations: [],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("accepts an optional revision precondition for compaction", () => {
+    expect(compactDocumentOperationsSchema.safeParse({ expectedRevision: 12 }).success).toBe(true);
+    expect(compactDocumentOperationsSchema.safeParse({ expectedRevision: -1 }).success).toBe(false);
   });
 });

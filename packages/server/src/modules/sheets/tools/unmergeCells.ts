@@ -11,7 +11,6 @@ import {
   buildToolPreview,
   isMergeObject,
   mergeRanges,
-  rangeForWriteOperation,
   readToolRange,
 } from "../../documents/toolAdapter.js";
 

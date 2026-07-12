@@ -49,7 +49,7 @@ export async function documentRoutes(app: FastifyInstance) {
         const status =
           result.error === "Sheet not found"
             ? 404
-            : result.error === "Revision conflict"
+            : result.error === "Revision conflict" || result.error === "Idempotency key conflict"
               ? 409
               : 400;
         return reply.status(status).send(result);
@@ -80,7 +80,7 @@ export async function documentRoutes(app: FastifyInstance) {
         const status =
           result.error === "Sheet not found"
             ? 404
-            : result.error === "Revision conflict"
+            : result.error === "Revision conflict" || result.error === "Idempotency key conflict"
               ? 409
               : 400;
         return reply.status(status).send(result);
@@ -101,6 +101,30 @@ export async function documentRoutes(app: FastifyInstance) {
     if (workspaceId == null) return;
 
     const result = await service.applyLayout(workspaceId, Number(req.params.sheetId), req.body);
+    if ("error" in result) {
+      const status =
+        result.error === "Sheet not found" ? 404 : result.error === "Revision conflict" ? 409 : 400;
+      return reply.status(status).send(result);
+    }
+    return result;
+  });
+
+  app.post<{
+    Params: { workspacePublicId: string; sheetId: string };
+    Body: unknown;
+  }>("/api/workspaces/:workspacePublicId/sheets/:sheetId/document/compact", async (req, reply) => {
+    const workspaceId = await resolveWorkspaceIdForRequest(
+      req,
+      req.params.workspacePublicId,
+      reply,
+    );
+    if (workspaceId == null) return;
+
+    const result = await service.compactOperations(
+      workspaceId,
+      Number(req.params.sheetId),
+      req.body,
+    );
     if ("error" in result) {
       const status =
         result.error === "Sheet not found" ? 404 : result.error === "Revision conflict" ? 409 : 400;

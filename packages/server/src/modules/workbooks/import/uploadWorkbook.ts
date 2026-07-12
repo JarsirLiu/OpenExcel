@@ -1,6 +1,13 @@
+import {
+  collectDocumentStyles,
+  encodeDocumentJson,
+  excelToGrid,
+  fortuneCelldataToChunks,
+} from "@openexcel/core";
 import * as XLSX from "xlsx";
 import { prisma } from "../../../infra/database/db.js";
 import { generateWorkbookPublicId } from "../../../shared/utils/publicId.js";
+import { registerCellStyles } from "../../documents/styleRegistry.js";
 
 function bufferToArrayBuffer(buffer: Buffer): ArrayBuffer | SharedArrayBuffer {
   return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
@@ -43,9 +50,6 @@ function readWorkbookOrThrow(buffer: Buffer) {
 export async function uploadAsNewWorkbook(workspaceId: number, buffer: Buffer, fileName: string) {
   const wbFile = readWorkbookOrThrow(buffer);
   const sheetNames = wbFile.SheetNames;
-  const { encodeDocumentJson, excelToGrid, fortuneCelldataToChunks } = await import(
-    "@openexcel/core"
-  );
   const { buildFormulaCellData } = await import("../../documents/formulaIndex.js");
   const results = excelToGrid(bufferToArrayBuffer(buffer), sheetNames);
   const wbName = fileName.replace(/\.[^.]+$/, "");
@@ -81,6 +85,11 @@ export async function uploadAsNewWorkbook(workspaceId: number, buffer: Buffer, f
       });
 
       const chunks = fortuneCelldataToChunks(parsed.celldata, 0);
+      const styles = [...collectDocumentStyles(parsed.celldata)].map(([id, style]) => ({
+        id,
+        style,
+      }));
+      await registerCellStyles(tx, wb.id, styles);
       for (const chunk of chunks.values()) {
         await tx.sheetChunk.create({
           data: {

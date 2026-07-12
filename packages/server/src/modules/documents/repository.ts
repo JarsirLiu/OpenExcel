@@ -1,5 +1,7 @@
+import { createHash, randomUUID } from "node:crypto";
 import {
   applyDocumentOperations,
+  type CanonicalCellStyle,
   type CellRange,
   createDocumentState,
   type DocumentCell,
@@ -16,6 +18,8 @@ import { prisma } from "../../infra/database/db.js";
 import type { Prisma } from "../../infra/database/prismaTypes.js";
 import { syncFormulaIndex } from "./formulaIndex.js";
 import { recalculateAffectedFormulas } from "./recalculation.js";
+import { encodeDocumentSnapshot } from "./snapshotCodec.js";
+import { loadCellStyles, registerCellStyles } from "./styleRegistry.js";
 
 const DOCUMENT_FORMAT = "openexcel-document-v1";
 const CHUNK_ROW_SIZE = 128;
@@ -182,6 +186,7 @@ export interface DocumentRangeResult extends DocumentRevision {
   range: CellRange;
   cells: DocumentCell[];
   objects: DocumentObject[];
+  styles: Record<string, CanonicalCellStyle>;
 }
 
 export interface DocumentSheetInfo extends DocumentRevision {
@@ -190,6 +195,7 @@ export interface DocumentSheetInfo extends DocumentRevision {
 }
 
 export interface DocumentMutationResult {
+  batchId: string;
   revision: number;
   changedRanges: CellRange[];
   objectIds: string[];
@@ -208,8 +214,23 @@ export interface DocumentRevisionConflict {
   currentRevision: number;
 }
 
-function bytesToNumbers(data: Uint8Array<ArrayBufferLike>): number[] {
-  return Array.from(data);
+export interface DocumentIdempotencyConflict {
+  idempotencyConflict: true;
+  currentRevision: number;
+}
+
+export interface DocumentCompactionResult {
+  revision: number;
+  snapshotId: number | null;
+  deletedOperations: number;
+}
+
+function decodeMutationResult(data: Uint8Array<ArrayBufferLike>): DocumentMutationResult {
+  return decodeDocumentJson<DocumentMutationResult>(data);
+}
+
+function hashDocumentRequest(value: unknown): string {
+  return createHash("sha256").update(encodeDocumentJson(value)).digest("hex");
 }
 
 async function captureDocumentSnapshot(
@@ -238,6 +259,8 @@ async function captureDocumentSnapshot(
   });
   if (existing) return;
 
+  const encodedSnapshot = encodeDocumentSnapshot(chunks, objects);
+
   await tx.agentRunSheetSnapshot.create({
     data: {
       runId,
@@ -245,22 +268,8 @@ async function captureDocumentSnapshot(
       documentRevision: revision,
       documentMaxRow: maxRow,
       documentMaxColumn: maxColumn,
-      documentChunks: encodeDocumentJson({
-        chunks: chunks.map((chunk) => ({
-          rowBlock: chunk.rowBlock,
-          colBlock: chunk.colBlock,
-          revision: chunk.revision,
-          codec: chunk.codec,
-          data: bytesToNumbers(chunk.data),
-        })),
-      }),
-      documentObjects: encodeDocumentJson({
-        objects: objects.map((object) => ({
-          type: object.type,
-          position: bytesToNumbers(object.position),
-          data: bytesToNumbers(object.data),
-        })),
-      }),
+      documentChunks: encodedSnapshot.chunks,
+      documentObjects: encodedSnapshot.objects,
     },
   });
 }
@@ -330,6 +339,7 @@ export async function readDocumentRange(
     where: { id: sheetId, workbook: { workspaceId } },
     select: {
       id: true,
+      workbookId: true,
       documentFormat: true,
       documentVersion: true,
       documentRevision: true,
@@ -350,6 +360,9 @@ export async function readDocumentRange(
     orderBy: [{ rowBlock: "asc" }, { colBlock: "asc" }],
   });
   const chunks = rows.map(decodeChunk);
+  const cells = cellsFromChunks(chunks, range);
+  const styleIds = cells.flatMap((cell) => (cell.value.styleId ? [cell.value.styleId] : []));
+  const styles = await loadCellStyles(prisma, sheet.workbookId, styleIds);
   const objectRows = await prisma.sheetObject.findMany({
     where: { sheetId },
     orderBy: { id: "asc" },
@@ -363,8 +376,9 @@ export async function readDocumentRange(
     maxRow: sheet.maxRow,
     maxColumn: sheet.maxColumn,
     range,
-    cells: cellsFromChunks(chunks, range),
+    cells,
     objects: objectRows.map(decodeObject).filter((object) => objectIntersectsRange(object, range)),
+    styles: Object.fromEntries(styles),
   };
 }
 
@@ -373,8 +387,21 @@ export async function applyStoredDocumentOperation(
   workspaceId: number,
   operation: DocumentOperation,
   expectedRevision?: number,
-): Promise<DocumentMutationResult | DocumentRevisionConflict | null> {
-  return applyStoredDocumentOperations(sheetId, workspaceId, [operation], expectedRevision);
+  runId?: number,
+  styleDefinitions: Array<{ id: string; style: CanonicalCellStyle }> = [],
+  batchId?: string,
+  idempotencyKey?: string,
+): Promise<DocumentMutationResult | DocumentRevisionConflict | DocumentIdempotencyConflict | null> {
+  return applyStoredDocumentOperations(
+    sheetId,
+    workspaceId,
+    [operation],
+    expectedRevision,
+    runId,
+    styleDefinitions,
+    batchId,
+    idempotencyKey,
+  );
 }
 
 export async function applyStoredDocumentOperations(
@@ -383,7 +410,10 @@ export async function applyStoredDocumentOperations(
   operations: DocumentOperation[],
   expectedRevision?: number,
   runId?: number,
-): Promise<DocumentMutationResult | DocumentRevisionConflict | null> {
+  styleDefinitions: Array<{ id: string; style: CanonicalCellStyle }> = [],
+  batchId?: string,
+  idempotencyKey?: string,
+): Promise<DocumentMutationResult | DocumentRevisionConflict | DocumentIdempotencyConflict | null> {
   return prisma.$transaction(async (tx) => {
     const sheet = await tx.sheet.findFirst({
       where: { id: sheetId, workbook: { workspaceId } },
@@ -396,9 +426,33 @@ export async function applyStoredDocumentOperations(
       },
     });
     if (!sheet) return null;
+    const requestHash = idempotencyKey
+      ? hashDocumentRequest({ operations, expectedRevision, styles: styleDefinitions })
+      : undefined;
+    if (idempotencyKey) {
+      const existing = await tx.sheetOperationRequest.findUnique({
+        where: { sheetId_idempotencyKey: { sheetId, idempotencyKey } },
+        select: { result: true, requestHash: true, batchId: true, revision: true },
+      });
+      if (existing) {
+        if (existing.requestHash !== requestHash) {
+          return { idempotencyConflict: true, currentRevision: sheet.documentRevision };
+        }
+        if (existing.result) return decodeMutationResult(existing.result);
+        return {
+          batchId: existing.batchId ?? batchId ?? randomUUID(),
+          revision: existing.revision,
+          changedRanges: [],
+          objectIds: [],
+          calculatedCells: [],
+        };
+      }
+    }
     if (expectedRevision !== undefined && expectedRevision !== sheet.documentRevision) {
       return { conflict: true, currentRevision: sheet.documentRevision };
     }
+    const resolvedBatchId = batchId ?? randomUUID();
+    await registerCellStyles(tx, sheet.workbookId, styleDefinitions);
 
     const chunkKeys = new Set<string>();
     let maxRow = sheet.maxRow;
@@ -552,19 +606,132 @@ export async function applyStoredDocumentOperations(
       }
     }
 
+    const mutationResult: DocumentMutationResult = {
+      batchId: resolvedBatchId,
+      revision,
+      changedRanges,
+      objectIds,
+      calculatedCells,
+    };
+
     if (operations.length > 0) {
       await tx.sheetOperation.createMany({
         data: operations.map((operation, index) => ({
           workbookId: sheet.workbookId,
           sheetId: sheet.id,
           revision: sheet.documentRevision + index + 1,
+          batchId: resolvedBatchId,
+          batchIndex: index,
           type: operation.type,
           payload: encodeDocumentJson(operation),
         })),
       });
     }
+    if (idempotencyKey) {
+      if (!requestHash) throw new Error("Idempotency request hash is missing");
+      await tx.sheetOperationRequest.create({
+        data: {
+          sheetId: sheet.id,
+          idempotencyKey,
+          batchId: resolvedBatchId,
+          revision,
+          requestHash,
+          result: encodeDocumentJson(mutationResult),
+        },
+      });
+    }
 
-    return { revision, changedRanges, objectIds, calculatedCells };
+    return mutationResult;
+  });
+}
+
+export async function compactStoredDocumentOperations(
+  sheetId: number,
+  workspaceId: number,
+  expectedRevision?: number,
+): Promise<DocumentCompactionResult | DocumentRevisionConflict | null> {
+  return prisma.$transaction(async (tx) => {
+    const sheet = await tx.sheet.findFirst({
+      where: { id: sheetId, workbook: { workspaceId } },
+      select: {
+        id: true,
+        documentRevision: true,
+        compactedRevision: true,
+        maxRow: true,
+        maxColumn: true,
+        config: true,
+      },
+    });
+    if (!sheet) return null;
+    if (expectedRevision !== undefined && expectedRevision !== sheet.documentRevision) {
+      return { conflict: true, currentRevision: sheet.documentRevision };
+    }
+    if (sheet.compactedRevision >= sheet.documentRevision) {
+      return { revision: sheet.documentRevision, snapshotId: null, deletedOperations: 0 };
+    }
+
+    // Updating the marker first serializes compaction with document writers that use the
+    // document revision predicate. A failed update means another writer changed the sheet.
+    const markerUpdate = await tx.sheet.updateMany({
+      where: {
+        id: sheet.id,
+        documentRevision: sheet.documentRevision,
+        compactedRevision: sheet.compactedRevision,
+      },
+      data: { compactedRevision: sheet.documentRevision },
+    });
+    if (markerUpdate.count !== 1) {
+      const current = await tx.sheet.findUnique({
+        where: { id: sheet.id },
+        select: { documentRevision: true },
+      });
+      return {
+        conflict: true,
+        currentRevision: current?.documentRevision ?? sheet.documentRevision,
+      };
+    }
+
+    const [chunkRows, objectRows] = await Promise.all([
+      tx.sheetChunk.findMany({ where: { sheetId: sheet.id } }),
+      tx.sheetObject.findMany({ where: { sheetId: sheet.id } }),
+    ]);
+    const encodedSnapshot = encodeDocumentSnapshot(chunkRows, objectRows);
+    const snapshot = await tx.sheetSnapshot.upsert({
+      where: {
+        sheetId_revision: { sheetId: sheet.id, revision: sheet.documentRevision },
+      },
+      create: {
+        sheetId: sheet.id,
+        revision: sheet.documentRevision,
+        maxRow: sheet.maxRow,
+        maxColumn: sheet.maxColumn,
+        codec: "json-v1",
+        chunks: encodedSnapshot.chunks,
+        objects: encodedSnapshot.objects,
+        layout: sheet.config,
+      },
+      update: {
+        maxRow: sheet.maxRow,
+        maxColumn: sheet.maxColumn,
+        codec: "json-v1",
+        chunks: encodedSnapshot.chunks,
+        objects: encodedSnapshot.objects,
+        layout: sheet.config,
+      },
+      select: { id: true },
+    });
+    await tx.sheetSnapshot.deleteMany({
+      where: { sheetId: sheet.id, revision: { lt: sheet.documentRevision } },
+    });
+    const deletedOperations = await tx.sheetOperation.deleteMany({
+      where: { sheetId: sheet.id, revision: { lte: sheet.documentRevision } },
+    });
+
+    return {
+      revision: sheet.documentRevision,
+      snapshotId: snapshot.id,
+      deletedOperations: deletedOperations.count,
+    };
   });
 }
 
@@ -573,17 +740,42 @@ export async function updateDocumentLayout(
   workspaceId: number,
   config: unknown,
   expectedRevision?: number,
-): Promise<DocumentMutationResult | DocumentRevisionConflict | null> {
+  batchId?: string,
+  idempotencyKey?: string,
+): Promise<DocumentMutationResult | DocumentRevisionConflict | DocumentIdempotencyConflict | null> {
   return prisma.$transaction(async (tx) => {
     const sheet = await tx.sheet.findFirst({
       where: { id: sheetId, workbook: { workspaceId } },
       select: { id: true, workbookId: true, documentRevision: true },
     });
     if (!sheet) return null;
+    const requestHash = idempotencyKey
+      ? hashDocumentRequest({ config, expectedRevision })
+      : undefined;
+    if (idempotencyKey) {
+      const existing = await tx.sheetOperationRequest.findUnique({
+        where: { sheetId_idempotencyKey: { sheetId, idempotencyKey } },
+        select: { result: true, requestHash: true, batchId: true, revision: true },
+      });
+      if (existing) {
+        if (existing.requestHash !== requestHash) {
+          return { idempotencyConflict: true, currentRevision: sheet.documentRevision };
+        }
+        if (existing.result) return decodeMutationResult(existing.result);
+        return {
+          batchId: existing.batchId ?? batchId ?? randomUUID(),
+          revision: existing.revision,
+          changedRanges: [],
+          objectIds: [],
+          calculatedCells: [],
+        };
+      }
+    }
     if (expectedRevision !== undefined && expectedRevision !== sheet.documentRevision) {
       return { conflict: true, currentRevision: sheet.documentRevision };
     }
 
+    const resolvedBatchId = batchId ?? randomUUID();
     const revision = sheet.documentRevision + 1;
     const updated = await tx.sheet.updateMany({
       where: { id: sheet.id, documentRevision: sheet.documentRevision },
@@ -605,15 +797,37 @@ export async function updateDocumentLayout(
       };
     }
 
+    const mutationResult: DocumentMutationResult = {
+      batchId: resolvedBatchId,
+      revision,
+      changedRanges: [],
+      objectIds: [],
+      calculatedCells: [],
+    };
     await tx.sheetOperation.create({
       data: {
         workbookId: sheet.workbookId,
         sheetId: sheet.id,
         revision,
+        batchId: resolvedBatchId,
+        batchIndex: 0,
         type: "updateLayout",
         payload: encodeDocumentJson({ type: "updateLayout", config }),
       },
     });
-    return { revision, changedRanges: [], objectIds: [], calculatedCells: [] };
+    if (idempotencyKey) {
+      if (!requestHash) throw new Error("Idempotency request hash is missing");
+      await tx.sheetOperationRequest.create({
+        data: {
+          sheetId: sheet.id,
+          idempotencyKey,
+          batchId: resolvedBatchId,
+          revision,
+          requestHash,
+          result: encodeDocumentJson(mutationResult),
+        },
+      });
+    }
+    return mutationResult;
   });
 }

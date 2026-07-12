@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { chunksToFortuneCelldata, fortuneCelldataToChunks } from "./fortuneAdapter.js";
+import { collectDocumentStyles } from "./style.js";
 
 describe("Fortune document adapter", () => {
   it("round-trips sparse cells through the OpenExcel chunk model", () => {
@@ -8,7 +9,7 @@ describe("Fortune document adapter", () => {
       { r: 130, c: 65, v: { v: 120, m: "120", f: "A1*2" } },
     ];
     const chunks = fortuneCelldataToChunks(celldata, 4);
-    const restored = chunksToFortuneCelldata(chunks);
+    const restored = chunksToFortuneCelldata(chunks, {}, collectDocumentStyles(celldata));
 
     expect(restored).toEqual(celldata);
   });

@@ -14,6 +14,36 @@ const cellValueSchema = z.object({
   styleId: z.string().optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
+const borderSideSchema = z.object({ s: z.number().int(), c: z.string().optional() });
+const styleDefinitionSchema = z.object({
+  id: z.string().regex(/^style_[0-9a-f]{16}$/),
+  style: z.object({
+    bg: z.string().optional(),
+    fc: z.string().optional(),
+    fs: z.number().optional(),
+    ff: z.string().optional(),
+    bl: z.number().optional(),
+    it: z.number().optional(),
+    cl: z.number().optional(),
+    un: z.number().optional(),
+    ht: z.number().optional(),
+    vt: z.number().optional(),
+    tb: z.string().optional(),
+    ct: z.object({ fa: z.string().optional(), t: z.string().optional() }).optional(),
+    bd: z
+      .object({
+        t: borderSideSchema.optional(),
+        b: borderSideSchema.optional(),
+        l: borderSideSchema.optional(),
+        r: borderSideSchema.optional(),
+      })
+      .optional(),
+  }),
+});
+const operationMetadataSchema = {
+  batchId: z.string().trim().min(1).max(128).optional(),
+  idempotencyKey: z.string().trim().min(1).max(128).optional(),
+};
 const objectSchema = z.object({
   id: z.string().min(1),
   type: z.enum(["chart", "image", "comment", "custom"]),
@@ -51,18 +81,28 @@ export const documentOperationSchema = z.discriminatedUnion("type", [
 export const applyDocumentOperationSchema = z.object({
   operation: documentOperationSchema,
   expectedRevision: z.number().int().nonnegative().optional(),
+  ...operationMetadataSchema,
+  styles: z.array(styleDefinitionSchema).max(2_000).optional(),
 });
 
 export const applyDocumentOperationsSchema = z.object({
   operations: z.array(documentOperationSchema).min(1).max(10_000),
   expectedRevision: z.number().int().nonnegative().optional(),
+  ...operationMetadataSchema,
+  styles: z.array(styleDefinitionSchema).max(2_000).optional(),
 });
 
 export const applyDocumentLayoutSchema = z.object({
   config: z.unknown(),
+  expectedRevision: z.number().int().nonnegative().optional(),
+  ...operationMetadataSchema,
+});
+
+export const compactDocumentOperationsSchema = z.object({
   expectedRevision: z.number().int().nonnegative().optional(),
 });
 
 export type ApplyDocumentOperationInput = z.infer<typeof applyDocumentOperationSchema>;
 export type ApplyDocumentOperationsInput = z.infer<typeof applyDocumentOperationsSchema>;
 export type ApplyDocumentLayoutInput = z.infer<typeof applyDocumentLayoutSchema>;
+export type CompactDocumentOperationsInput = z.infer<typeof compactDocumentOperationsSchema>;

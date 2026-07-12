@@ -1,5 +1,10 @@
 import type { WorkbookInstance } from "@fortune-sheet/react";
-import { extractSheetConfig, type FortuneCell, matrixToCelldata } from "@openexcel/core";
+import {
+  collectDocumentStyles,
+  extractSheetConfig,
+  type FortuneCell,
+  matrixToCelldata,
+} from "@openexcel/core";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { applyDocumentLayout, applyDocumentOperations, fetchDocumentRange } from "@/api/documents";
 import type { WorkbookFull } from "@/api/workbooks";
@@ -35,6 +40,10 @@ type UseExcelGridWorkspaceProps = {
   onWorkbookStructureChanged?: (update: WorkbookStructureUpdate) => void;
   onWorkbookRefresh?: () => Promise<void> | void;
 };
+
+function createRequestKey(): string {
+  return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
+}
 
 export function useExcelGridWorkspace({
   workspaceId,
@@ -228,12 +237,30 @@ export function useExcelGridWorkspace({
         );
         let revision = lastSavedRevisionRef.current[sheet.id] ?? sheet.documentRevision ?? 0;
         if (operations.length > 0) {
-          const result = await applyDocumentOperations(workspaceId, sheet.id, operations, revision);
+          const result = await applyDocumentOperations(
+            workspaceId,
+            sheet.id,
+            operations,
+            revision,
+            [...collectDocumentStyles(celldata as FortuneCell[])].map(([id, style]) => ({
+              id,
+              style,
+            })),
+            undefined,
+            createRequestKey(),
+          );
           revision = result.revision;
         }
         const previousConfig = lastSavedConfigRef.current[sheet.id];
         if (valueKey(previousConfig) !== valueKey(config)) {
-          const result = await applyDocumentLayout(workspaceId, sheet.id, config, revision);
+          const result = await applyDocumentLayout(
+            workspaceId,
+            sheet.id,
+            config,
+            revision,
+            undefined,
+            createRequestKey(),
+          );
           revision = result.revision;
         }
         lastSavedRevisionRef.current[sheet.id] = revision;

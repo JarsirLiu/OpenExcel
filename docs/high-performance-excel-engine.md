@@ -590,3 +590,37 @@ AI 工具不再读写 Fortune celldata。
 换成自研组件只需要实现渲染层。
 导入导出只是转换，不会成为核心数据源。
 组件崩溃或更换不会导致业务数据丢失。
+## Canonical style registry
+
+Cell presentation is stored separately from cell values. A canonical cell stores a deterministic
+`styleId`; the corresponding `CellStyle` row belongs to the workbook and is deduplicated by its
+content hash. Range reads return only the styles referenced by the returned cells. The renderer
+adapter resolves those definitions into FortuneSheet cell fields at the boundary.
+
+This keeps style changes compatible with chunk loading and prevents repeated font, fill, border,
+and number-format objects from inflating every cell payload. Import and UI writes register style
+definitions in the same transaction as the document mutation.
+
+## Operation compaction
+
+The current sheet state is stored in `SheetChunk`. `SheetOperation` is an incremental log and is
+not allowed to grow without a maintenance boundary. `SheetSnapshot` stores a checkpoint of the
+canonical chunks, objects, layout, and dimensions at a revision. `AgentRunSheetSnapshot` remains a
+separate undo concern and is not used for log compaction.
+
+Compaction first advances `Sheet.compactedRevision` with an optimistic revision predicate, then
+creates the checkpoint and deletes operations up to that revision in the same transaction. A
+concurrent edit causes a conflict instead of allowing a stale snapshot to delete a newer log
+entry. Compaction is exposed as a maintenance endpoint and can later be called by a scheduler.
+
+## Idempotent operation batches
+
+Every canonical write receives a `batchId`. Clients may provide an `idempotencyKey`; the first
+operation transaction stores its exact mutation result in `SheetOperationRequest`. A retry with
+the same key returns that result without reapplying cell writes, formulas, objects, or layout.
+The ledger is separate from `SheetOperation`, so operation compaction cannot make a retried request
+execute a second time. Ledger retention and cleanup should be implemented as a separate policy,
+with a retention period longer than the expected client retry window.
+
+The ledger also stores a SHA-256 request fingerprint. Reusing a key with different operations or
+layout data returns a conflict instead of replaying an unrelated result.

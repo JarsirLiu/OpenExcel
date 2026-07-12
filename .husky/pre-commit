@@ -1,4 +1,22 @@
 #!/bin/sh
 echo "Running pre-commit checks..."
-npx lint-staged
-pnpm --recursive --filter @openexcel/agent --filter @openexcel/core --filter @openexcel/server --filter @openexcel/web typecheck
+
+# Git GUI and POSIX shells may not inherit the Node.js directory from the parent shell.
+if ! command -v node >/dev/null 2>&1; then
+  npx_path="$(command -v npx 2>/dev/null || true)"
+  if [ -n "$npx_path" ]; then
+    PATH="$(dirname "$npx_path"):$PATH"
+    export PATH
+  fi
+fi
+
+if ! command -v node >/dev/null 2>&1; then
+  echo "Node.js is required to run pre-commit checks."
+  exit 1
+fi
+
+node node_modules/lint-staged/bin/lint-staged.js
+node packages/agent/node_modules/typescript/bin/tsc --noEmit -p packages/agent/tsconfig.json
+node packages/core/node_modules/typescript/bin/tsc --noEmit -p packages/core/tsconfig.json
+node packages/server/node_modules/typescript/bin/tsc --noEmit -p packages/server/tsconfig.json
+node packages/web/node_modules/typescript/bin/tsc --noEmit -p packages/web/tsconfig.json

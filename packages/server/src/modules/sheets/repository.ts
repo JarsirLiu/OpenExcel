@@ -1,5 +1,6 @@
 import {
   chunksToFortuneCelldata,
+  collectDocumentStyles,
   decodeDocumentJson,
   encodeDocumentJson,
   type FortuneCell,
@@ -8,6 +9,7 @@ import {
 import { prisma } from "../../infra/database/db.js";
 import { deserializeSheet } from "../../shared/utils/sheetSerialization.js";
 import { buildFormulaCellData } from "../documents/formulaIndex.js";
+import { loadCellStyles, registerCellStyles } from "../documents/styleRegistry.js";
 
 function normalizeRendererCelldata(
   celldata: FortuneCell[],
@@ -94,6 +96,8 @@ export async function updateSheetData(
     }
 
     const formulaCells = buildFormulaCellData(sheet.id, celldata);
+    const styles = [...collectDocumentStyles(celldata)].map(([id, style]) => ({ id, style }));
+    await registerCellStyles(tx, sheet.workbookId, styles);
     await tx.formulaCell.deleteMany({ where: { sheetId: sheet.id } });
     if (formulaCells.length > 0) {
       await tx.formulaCell.createMany({ data: formulaCells });
@@ -190,7 +194,11 @@ export async function getSheet(sheetId: number, workspaceId: number) {
     revision: row.revision,
     codec: row.codec as "json-v1",
   }));
-  const rawCelldata = chunksToFortuneCelldata(chunks);
+  const styleIds = chunks.flatMap((chunk) =>
+    Object.values(chunk.cells).flatMap((cell) => (cell.styleId ? [cell.styleId] : [])),
+  );
+  const styles = await loadCellStyles(prisma, sheet.workbookId, styleIds);
+  const rawCelldata = chunksToFortuneCelldata(chunks, {}, styles);
   let legacyCelldata: unknown = null;
   try {
     legacyCelldata = sheet.uploadedData ? JSON.parse(sheet.uploadedData) : null;

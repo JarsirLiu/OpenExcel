@@ -130,7 +130,7 @@ export function mergeDocumentRange(
     cache.cells.set(`${cell.row},${cell.col}`, {
       r: cell.row + 1,
       c: cell.col,
-      v: documentValueToFortuneValue(cell.value),
+      v: documentValueToFortuneValue(cell.value, result.styles ?? {}),
     });
   }
 

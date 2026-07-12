@@ -546,6 +546,48 @@ canonical document operations and range APIs.
 
 Formula text and calculated cell values belong to canonical document chunks. `FormulaCell` and `FormulaDependency` are database indexes used to locate formulas efficiently; they are rebuildable and are not renderer state. A cell write queries overlapping source ranges, walks dependent formulas level by level, recalculates only that set, and writes updated chunk values in the same transaction.
 
+### 7.0.2 Canonical style flow
+
+Cell formatting follows the same source-of-truth rule:
+
+```text
+renderer style fields
+    -> core normalization and deterministic styleId
+    -> workbook CellStyle registry
+    -> canonical chunk cell reference
+    -> range response style definitions
+    -> renderer adapter fields
+```
+
+`CellStyle` is workbook-scoped and deduplicated by content hash. A cell must not persist a repeated
+FortuneSheet style object. Style definitions are registered with imports and document mutations;
+the web layer only submits definitions observed in the current renderer payload.
+
+### 7.0.3 Canonical operation compaction
+
+`SheetChunk` stores the current canonical state. `SheetOperation` stores the append-only delta log
+after the current snapshot boundary. `SheetSnapshot` is a rebuildable checkpoint for maintenance
+and recovery; it is separate from `AgentRunSheetSnapshot`, which exists only to undo an Agent run.
+`SheetOperationRequest` is a durable idempotency ledger and is intentionally retained when old
+operation rows are compacted.
+
+Compaction is an optimistic transaction:
+
+```text
+read current revision
+    -> advance compactedRevision with a revision predicate
+    -> serialize current chunks, objects, and layout
+    -> persist SheetSnapshot
+    -> delete operations at or before snapshot revision
+```
+
+If another writer changes the sheet before the marker update, compaction returns a revision
+conflict and retries can start from the new revision. The compaction endpoint is a maintenance
+boundary; normal edits do not synchronously serialize a full-sheet snapshot.
+
+The document engine API surface includes range reads, operation writes, layout updates, and
+`POST /api/workspaces/:workspaceId/sheets/:id/document/compact` for maintenance compaction.
+
 ### 7.1 Workbook editing flow
 
 1. User edits sheet content in the workbook area.

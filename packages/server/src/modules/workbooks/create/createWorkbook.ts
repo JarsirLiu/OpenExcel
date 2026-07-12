@@ -1,5 +1,7 @@
+import { type CanonicalCellStyle, decodeDocumentJson } from "@openexcel/core";
 import { prisma } from "../../../infra/database/db.js";
 import { generateWorkbookPublicId } from "../../../shared/utils/publicId.js";
+import { registerCellStyles } from "../../documents/styleRegistry.js";
 import {
   buildBlankSheetInitialization,
   buildSourceSheetInitialization,
@@ -7,7 +9,6 @@ import {
   normalizeWorkbookName,
   WorkbookCreationError,
 } from "./creation.js";
-
 export type CreateWorkbookResult = {
   id: number;
   publicId: string;
@@ -53,7 +54,7 @@ export async function createWorkbook(
         : await tx.sheet.findUnique({
             where: { id: sourceSheetId },
             include: {
-              workbook: true,
+              workbook: { include: { styles: true } },
               chunks: true,
               objects: true,
               formulaCells: true,
@@ -88,6 +89,14 @@ export async function createWorkbook(
     });
 
     if (sourceSheet) {
+      await registerCellStyles(
+        tx,
+        workbook.id,
+        sourceSheet.workbook.styles.map((style) => ({
+          id: style.hash,
+          style: decodeDocumentJson<CanonicalCellStyle>(style.data),
+        })),
+      );
       for (const chunk of sourceSheet.chunks) {
         await tx.sheetChunk.create({
           data: {

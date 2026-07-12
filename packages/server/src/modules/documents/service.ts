@@ -6,6 +6,7 @@ import {
   applyDocumentLayoutSchema,
   applyDocumentOperationSchema,
   applyDocumentOperationsSchema,
+  compactDocumentOperationsSchema,
 } from "./dto.js";
 import * as repository from "./repository.js";
 
@@ -62,8 +63,15 @@ export async function applyOperation(workspaceId: number, sheetId: number, input
     workspaceId,
     operationInput.operation,
     operationInput.expectedRevision,
+    undefined,
+    operationInput.styles,
+    operationInput.batchId,
+    operationInput.idempotencyKey,
   );
   if (!result) return { error: "Sheet not found" } as const;
+  if ("idempotencyConflict" in result) {
+    return { error: "Idempotency key conflict", ...result } as const;
+  }
   if ("conflict" in result) return { error: "Revision conflict", ...result } as const;
   return result;
 }
@@ -106,8 +114,14 @@ export async function applyOperations(
     operationInput.operations,
     operationInput.expectedRevision,
     runId,
+    operationInput.styles,
+    operationInput.batchId,
+    operationInput.idempotencyKey,
   );
   if (!result) return { error: "Sheet not found" } as const;
+  if ("idempotencyConflict" in result) {
+    return { error: "Idempotency key conflict", ...result } as const;
+  }
   if ("conflict" in result) return { error: "Revision conflict", ...result } as const;
   return result;
 }
@@ -121,6 +135,25 @@ export async function applyLayout(workspaceId: number, sheetId: number, input: u
     workspaceId,
     layoutInput.config,
     layoutInput.expectedRevision,
+    layoutInput.batchId,
+    layoutInput.idempotencyKey,
+  );
+  if (!result) return { error: "Sheet not found" } as const;
+  if ("idempotencyConflict" in result) {
+    return { error: "Idempotency key conflict", ...result } as const;
+  }
+  if ("conflict" in result) return { error: "Revision conflict", ...result } as const;
+  return result;
+}
+
+export async function compactOperations(workspaceId: number, sheetId: number, input: unknown) {
+  const parsed = compactDocumentOperationsSchema.safeParse(input ?? {});
+  if (!parsed.success) return { error: "Invalid document compaction request" } as const;
+
+  const result = await repository.compactStoredDocumentOperations(
+    sheetId,
+    workspaceId,
+    parsed.data.expectedRevision,
   );
   if (!result) return { error: "Sheet not found" } as const;
   if ("conflict" in result) return { error: "Revision conflict", ...result } as const;

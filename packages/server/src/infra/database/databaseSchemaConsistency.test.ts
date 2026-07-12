@@ -28,6 +28,10 @@ const schemaFiles = [
 ] as const;
 
 const documentEngineMigration = "20260711000000_document_engine";
+const operationCompactionMigration = "20260712030000_operation_compaction";
+const operationIdempotencyMigration = "20260712040000_operation_idempotency";
+const operationRequestLedgerMigration = "20260712050000_operation_request_ledger";
+const operationRequestFingerprintMigration = "20260712060000_operation_request_fingerprint";
 
 function readSchema(schemaPath: string): string {
   return readFileSync(schemaPath, "utf-8").replace(/\r\n/g, "\n");
@@ -77,6 +81,53 @@ describe("Prisma schema consistency", () => {
       expect(readFileSync(migrationPath, "utf-8")).toContain("documentRevision");
       expect(readFileSync(migrationPath, "utf-8")).toContain("SheetChunk");
       expect(readFileSync(migrationPath, "utf-8")).toContain("SheetOperation");
+    }
+  });
+
+  it("keeps the operation compaction migration available for every provider", () => {
+    for (const { migrationsPath } of schemaFiles) {
+      const migrationPath = resolve(migrationsPath, operationCompactionMigration, "migration.sql");
+      expect(existsSync(migrationPath)).toBe(true);
+      const migration = readFileSync(migrationPath, "utf-8");
+      expect(migration).toContain("compactedRevision");
+      expect(migration).toContain("SheetSnapshot");
+    }
+  });
+
+  it("keeps the operation idempotency migration available for every provider", () => {
+    for (const { migrationsPath } of schemaFiles) {
+      const migrationPath = resolve(migrationsPath, operationIdempotencyMigration, "migration.sql");
+      expect(existsSync(migrationPath)).toBe(true);
+      const migration = readFileSync(migrationPath, "utf-8");
+      expect(migration).toContain("idempotencyKey");
+      expect(migration).toContain("batchId");
+      expect(migration).toContain("result");
+    }
+  });
+
+  it("keeps the operation request ledger migration available for every provider", () => {
+    for (const { migrationsPath } of schemaFiles) {
+      const migrationPath = resolve(
+        migrationsPath,
+        operationRequestLedgerMigration,
+        "migration.sql",
+      );
+      expect(existsSync(migrationPath)).toBe(true);
+      const migration = readFileSync(migrationPath, "utf-8");
+      expect(migration).toContain("SheetOperationRequest");
+      expect(migration).toContain("DROP COLUMN");
+    }
+  });
+
+  it("keeps the operation request fingerprint migration available for every provider", () => {
+    for (const { migrationsPath } of schemaFiles) {
+      const migrationPath = resolve(
+        migrationsPath,
+        operationRequestFingerprintMigration,
+        "migration.sql",
+      );
+      expect(existsSync(migrationPath)).toBe(true);
+      expect(readFileSync(migrationPath, "utf-8")).toContain("requestHash");
     }
   });
 });

@@ -1,3 +1,4 @@
+import type { CanonicalCellStyle, DocumentStyleDefinition } from "@openexcel/core";
 import { apiFetch, readErrorMessage } from "./http";
 
 export interface DocumentRangeCell {
@@ -21,6 +22,7 @@ export interface DocumentRangeResult {
   maxColumn: number;
   range: { startRow: number; startCol: number; endRow: number; endCol: number };
   cells: DocumentRangeCell[];
+  styles?: Record<string, CanonicalCellStyle>;
   objects: Array<{
     id: string;
     type: "chart" | "image" | "comment" | "custom";
@@ -36,6 +38,14 @@ export interface CalculatedCell {
   value: string | number | boolean | null;
   formula?: string;
   error?: string;
+}
+
+export interface DocumentMutationResponse {
+  batchId: string;
+  revision: number;
+  changedRanges: unknown[];
+  objectIds: string[];
+  calculatedCells: CalculatedCell[];
 }
 
 export async function fetchDocumentRange(
@@ -55,16 +65,14 @@ export async function applyDocumentOperation(
   sheetId: number,
   operation: unknown,
   expectedRevision?: number,
-): Promise<{
-  revision: number;
-  changedRanges: unknown[];
-  objectIds: string[];
-  calculatedCells: CalculatedCell[];
-}> {
+  styles?: DocumentStyleDefinition[],
+  batchId?: string,
+  idempotencyKey?: string,
+): Promise<DocumentMutationResponse> {
   const res = await apiFetch(`/workspaces/${workspaceId}/sheets/${sheetId}/document/operations`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ operation, expectedRevision }),
+    body: JSON.stringify({ operation, expectedRevision, styles, batchId, idempotencyKey }),
   });
   if (!res.ok) throw new Error(await readErrorMessage(res, "保存文档操作失败"));
   return res.json();
@@ -75,18 +83,16 @@ export async function applyDocumentOperations(
   sheetId: number,
   operations: unknown[],
   expectedRevision?: number,
-): Promise<{
-  revision: number;
-  changedRanges: unknown[];
-  objectIds: string[];
-  calculatedCells: CalculatedCell[];
-}> {
+  styles?: DocumentStyleDefinition[],
+  batchId?: string,
+  idempotencyKey?: string,
+): Promise<DocumentMutationResponse> {
   const res = await apiFetch(
     `/workspaces/${workspaceId}/sheets/${sheetId}/document/operations/batch`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ operations, expectedRevision }),
+      body: JSON.stringify({ operations, expectedRevision, styles, batchId, idempotencyKey }),
     },
   );
   if (!res.ok) throw new Error(await readErrorMessage(res, "保存文档操作失败"));
@@ -98,11 +104,13 @@ export async function applyDocumentLayout(
   sheetId: number,
   config: unknown,
   expectedRevision?: number,
-): Promise<{ revision: number; calculatedCells: CalculatedCell[] }> {
+  batchId?: string,
+  idempotencyKey?: string,
+): Promise<DocumentMutationResponse> {
   const res = await apiFetch(`/workspaces/${workspaceId}/sheets/${sheetId}/document/layout`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ config, expectedRevision }),
+    body: JSON.stringify({ config, expectedRevision, batchId, idempotencyKey }),
   });
   if (!res.ok) throw new Error(await readErrorMessage(res, "保存文档布局失败"));
   return res.json();

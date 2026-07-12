@@ -86,6 +86,20 @@ export {
   validateCellRange,
 } from "./document/range.js";
 export { decodeDocumentJson, encodeDocumentJson } from "./document/serialization.js";
+export type {
+  CanonicalCellStyle,
+  DocumentStyleDefinition,
+  DocumentStyleResolver,
+} from "./document/style.js";
+export {
+  applyCellStyle,
+  cellStyleId,
+  collectDocumentStyles,
+  extractCellStyle,
+  normalizeCellStyle,
+  resolveCellStyle,
+  stripCellStyle,
+} from "./document/style.js";
 export type { FortuneCell, FortuneCellValue } from "./excel/celldataUtils.js";
 export {
   celldataToGrid,
