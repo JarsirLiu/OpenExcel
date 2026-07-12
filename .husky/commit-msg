@@ -1,2 +1,21 @@
 #!/bin/sh
-npx --no -- commitlint --edit $1
+set -e
+
+if ! command -v node >/dev/null 2>&1; then
+  echo "husky - Node.js was not found in the Git hook PATH." >&2
+  echo "husky - Configure your Git client/IDE to inherit the Node.js PATH, then retry." >&2
+  exit 127
+fi
+
+if command -v pnpm >/dev/null 2>&1; then
+  PNPM_COMMAND="pnpm"
+elif command -v pnpm.cmd >/dev/null 2>&1; then
+  PNPM_COMMAND="pnpm.cmd"
+elif command -v corepack >/dev/null 2>&1; then
+  PNPM_COMMAND="corepack pnpm"
+else
+  echo "husky - pnpm was not found. Install pnpm or enable it with Corepack." >&2
+  exit 127
+fi
+
+$PNPM_COMMAND exec node node_modules/@commitlint/cli/cli.js --edit "$1"

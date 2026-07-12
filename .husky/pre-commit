@@ -1,4 +1,27 @@
 #!/bin/sh
+set -e
+
 echo "Running pre-commit checks..."
-npx lint-staged
-pnpm --recursive --filter @openexcel/agent --filter @openexcel/core --filter @openexcel/server --filter @openexcel/web typecheck
+
+if ! command -v node >/dev/null 2>&1; then
+  echo "husky - Node.js was not found in the Git hook PATH." >&2
+  echo "husky - Configure your Git client/IDE to inherit the Node.js PATH, then retry." >&2
+  exit 127
+fi
+
+if command -v pnpm >/dev/null 2>&1; then
+  PNPM_COMMAND="pnpm"
+elif command -v pnpm.cmd >/dev/null 2>&1; then
+  PNPM_COMMAND="pnpm.cmd"
+elif command -v corepack >/dev/null 2>&1; then
+  PNPM_COMMAND="corepack pnpm"
+else
+  echo "husky - pnpm was not found. Install pnpm or enable it with Corepack." >&2
+  exit 127
+fi
+
+$PNPM_COMMAND exec node node_modules/lint-staged/bin/lint-staged.js
+$PNPM_COMMAND exec node packages/agent/node_modules/typescript/bin/tsc --noEmit -p packages/agent/tsconfig.json
+$PNPM_COMMAND exec node packages/core/node_modules/typescript/bin/tsc --noEmit -p packages/core/tsconfig.json
+$PNPM_COMMAND exec node packages/server/node_modules/typescript/bin/tsc --noEmit -p packages/server/tsconfig.json
+$PNPM_COMMAND exec node packages/web/node_modules/typescript/bin/tsc --noEmit -p packages/web/tsconfig.json

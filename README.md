@@ -115,3 +115,7 @@ curl http://127.0.0.1:4000/api/health
 ```
 
 SQLite 数据保存在 Docker volume `openexcel-data` 中。删除容器不会删除该 volume；不要执行 `docker compose down -v`，除非确认要删除数据库。
+
+## Git 提交检查
+
+提交时 Husky 会执行 lint-staged、类型检查和 commitlint。Git 客户端或 IDE 启动提交时，需要让它继承 Node.js 和 pnpm 的 PATH；项目 hook 不依赖固定的 Node.js 安装目录。也可以先执行 `corepack enable` 启用项目使用的 pnpm。
