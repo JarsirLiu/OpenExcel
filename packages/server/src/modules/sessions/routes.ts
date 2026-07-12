@@ -5,7 +5,19 @@ import {
   resolveSessionIdForRequest,
   resolveWorkspaceIdForRequest,
 } from "../../shared/utils/resolvePublicId.js";
+import { SessionBusyError } from "./concurrency.js";
 import * as service from "./service.js";
+
+function isDatabaseError(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const record = error as Record<string, unknown>;
+  const code = typeof record.code === "string" ? record.code : "";
+  const message = error instanceof Error ? error.message : String(record.message ?? "");
+  return (
+    code === "P1008" ||
+    /database failed to respond|database is locked|database is busy|socket timeout/i.test(message)
+  );
+}
 
 export async function sessionRoutes(app: FastifyInstance) {
   app.get<{ Params: { workspacePublicId: string } }>(
@@ -193,7 +205,10 @@ export async function sessionRoutes(app: FastifyInstance) {
       pipeUIMessageStreamToResponse({ response: reply.raw, stream });
     } catch (error) {
       if (controller.signal.aborted) return;
-      const errorMessage = formatAIError(error);
+      if (error instanceof SessionBusyError) {
+        return reply.status(error.statusCode).send({ error: error.message });
+      }
+      const errorMessage = isDatabaseError(error) ? "数据库繁忙，请稍后重试" : formatAIError(error);
       console.error(
         `[session] Failed to start chat stream for session ${sessionId}: ${errorMessage}`,
       );

@@ -1,6 +1,7 @@
 import { createTitleModel, type ModelConfig } from "@openexcel/agent";
 import { generateText, type LanguageModel } from "ai";
 import { loadModelConfig } from "../../config.js";
+import { withSessionLock } from "./concurrency.js";
 import * as repo from "./repository.js";
 
 export async function generateTitle(model: LanguageModel, prompt: string): Promise<string> {
@@ -38,7 +39,9 @@ export async function generateSessionTitleForSession(
 
   const config: ModelConfig = loadModelConfig();
   const title = await generateTitle(createTitleModel(config), firstUserText);
-  await repo.updateSession(sessionId, { name: title }, workspaceId);
+  await withSessionLock(sessionId, () =>
+    repo.updateSession(sessionId, { name: title }, workspaceId),
+  );
   return title;
 }
 

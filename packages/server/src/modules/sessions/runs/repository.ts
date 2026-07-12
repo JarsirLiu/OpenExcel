@@ -1,6 +1,7 @@
 import { prisma } from "../../../infra/database/db.js";
 
 const DEFAULT_UNDO_SNAPSHOT_RETENTION = 1;
+const STALE_RUN_AFTER_MS = 5 * 60 * 1000;
 
 export async function createRun(data: {
   sessionId: number;
@@ -10,6 +11,28 @@ export async function createRun(data: {
   inputText?: string;
 }) {
   return prisma.agentRun.create({ data });
+}
+
+export async function findActiveRun(sessionId: number) {
+  return prisma.agentRun.findFirst({
+    where: { sessionId, status: "running" },
+    orderBy: [{ startedAt: "desc" }, { id: "desc" }],
+  });
+}
+
+export function isRunStale(startedAt: Date, now = Date.now()) {
+  return now - startedAt.getTime() >= STALE_RUN_AFTER_MS;
+}
+
+export async function markRunStale(id: number) {
+  return prisma.agentRun.update({
+    where: { id },
+    data: {
+      status: "error",
+      errorMessage: "运行超时，服务已回收未完成的运行记录",
+      endedAt: new Date(),
+    },
+  });
 }
 
 export async function updateRun(id: number, data: Record<string, unknown>) {

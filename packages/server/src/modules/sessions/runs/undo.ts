@@ -1,5 +1,6 @@
 import { prisma } from "../../../infra/database/db.js";
 import type { Prisma } from "../../../infra/database/prismaTypes.js";
+import { withSessionLock } from "../concurrency.js";
 import * as repo from "./repository.js";
 
 type ChatMessageLike = {
@@ -191,7 +192,7 @@ async function deleteSheetAndReindex(
   }
 }
 
-export async function undoLatestRun(workspaceId: number, sessionId: number) {
+async function undoLatestRunInternal(workspaceId: number, sessionId: number) {
   const run = await repo.findLatestUndoableRun(workspaceId, sessionId);
   if (!run) {
     throw new Error("没有可撤销的本轮修改");
@@ -275,4 +276,8 @@ export async function undoLatestRun(workspaceId: number, sessionId: number) {
     restoredSheetIds,
     undoneUserText: transcriptInputText,
   };
+}
+
+export async function undoLatestRun(workspaceId: number, sessionId: number) {
+  return withSessionLock(sessionId, () => undoLatestRunInternal(workspaceId, sessionId));
 }

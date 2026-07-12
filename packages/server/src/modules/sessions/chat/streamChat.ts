@@ -11,6 +11,7 @@ import {
 import { loadModelConfig } from "../../../config.js";
 import { excelTools } from "../../sheets/tools/index.js";
 import { workbookTools } from "../../workbooks/tools/index.js";
+import { SessionBusyError, withSessionLock } from "../concurrency.js";
 import * as repo from "../repository.js";
 import * as runRepo from "../runs/repository.js";
 import { persistSessionMessages } from "../transcript.js";
@@ -64,12 +65,23 @@ export async function streamChat(
   const systemPrompt = buildSystemPrompt(workspaceContext, buildExcelToolCatalog());
   const inputText = extractLatestUserText(messages);
 
-  const run = await runRepo.createRun({
-    sessionId,
-    status: "running",
-    model: config.modelName,
-    systemPrompt,
-    inputText,
+  const run = await withSessionLock(sessionId, async () => {
+    const activeRun = await runRepo.findActiveRun(sessionId);
+    if (activeRun) {
+      if (runRepo.isRunStale(activeRun.startedAt)) {
+        await runRepo.markRunStale(activeRun.id);
+      } else {
+        throw new SessionBusyError();
+      }
+    }
+
+    return runRepo.createRun({
+      sessionId,
+      status: "running",
+      model: config.modelName,
+      systemPrompt,
+      inputText,
+    });
   });
   const toolsContext = {
     ...buildWorkspaceToolContext(workspaceId),
@@ -93,10 +105,12 @@ export async function streamChat(
     if (finalized) return;
     finalized = true;
     try {
-      await runRepo.updateRun(run.id, {
-        ...data,
-        endedAt: new Date(),
-      });
+      await withSessionLock(sessionId, () =>
+        runRepo.updateRun(run.id, {
+          ...data,
+          endedAt: new Date(),
+        }),
+      );
     } catch (error) {
       console.error(`[session] Failed to finalize run ${run.id}:`, error);
     }
@@ -104,27 +118,29 @@ export async function streamChat(
 
   const persistStepOnce = async (step: any) => {
     try {
-      await runRepo.createStep({
-        runId: run.id,
-        type: String(step?.stepType ?? "step"),
-        status:
-          Array.isArray(step?.toolResults) &&
-          step.toolResults.some((result: any) => result?.isError)
-            ? "error"
-            : String(step?.finishReason ?? "completed"),
-        content: typeof step?.text === "string" ? step.text : null,
-        toolName: Array.isArray(step?.toolCalls)
-          ? step.toolCalls
-              .map((call: any) => call?.toolName)
-              .filter(
-                (name: unknown): name is string => typeof name === "string" && name.length > 0,
-              )
-              .join(",") || null
-          : null,
-        input: serializeJson(step?.toolCalls ?? []),
-        output: serializeJson(step?.toolResults ?? []),
-        order: stepOrder++,
-      });
+      await withSessionLock(sessionId, () =>
+        runRepo.createStep({
+          runId: run.id,
+          type: String(step?.stepType ?? "step"),
+          status:
+            Array.isArray(step?.toolResults) &&
+            step.toolResults.some((result: any) => result?.isError)
+              ? "error"
+              : String(step?.finishReason ?? "completed"),
+          content: typeof step?.text === "string" ? step.text : null,
+          toolName: Array.isArray(step?.toolCalls)
+            ? step.toolCalls
+                .map((call: any) => call?.toolName)
+                .filter(
+                  (name: unknown): name is string => typeof name === "string" && name.length > 0,
+                )
+                .join(",") || null
+            : null,
+          input: serializeJson(step?.toolCalls ?? []),
+          output: serializeJson(step?.toolResults ?? []),
+          order: stepOrder++,
+        }),
+      );
     } catch (error) {
       console.error(`[session] Failed to persist step for run ${run.id}:`, error);
     }
@@ -170,13 +186,17 @@ export async function streamChat(
       },
       onEnd: async ({ messages: newMessages }) => {
         try {
-          await persistSessionMessages(workspaceId, sessionId, newMessages);
+          await withSessionLock(sessionId, () =>
+            persistSessionMessages(workspaceId, sessionId, newMessages),
+          );
         } catch (error) {
           console.error(`[session] Failed to persist transcript for session ${sessionId}:`, error);
         }
 
         try {
-          await runRepo.pruneUndoSnapshots(workspaceId, sessionId);
+          await withSessionLock(sessionId, () =>
+            runRepo.pruneUndoSnapshots(workspaceId, sessionId),
+          );
         } catch (error) {
           console.error(
             `[session] Failed to prune undo snapshots for session ${sessionId}:`,

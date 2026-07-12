@@ -21,5 +21,5 @@ export function createChatModel(config: ModelConfig): LanguageModel {
 
 export function createTitleModel(config: ModelConfig): LanguageModel {
   const openai = createOpenAIProvider(config);
-  return openai.completion(config.modelName);
+  return openai.chat(config.modelName);
 }
