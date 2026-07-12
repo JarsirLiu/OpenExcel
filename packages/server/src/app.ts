@@ -17,7 +17,10 @@ import { workspaceRoutes } from "./modules/workspaces/routes.js";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export async function createApp() {
-  const app = Fastify({ logger: { stream: pinoStream, level: "info" } });
+  const app = Fastify({
+    bodyLimit: 4 * 1024 * 1024,
+    logger: { stream: pinoStream, level: "info" },
+  });
   app.decorateRequest("currentUser", null);
 
   app.addHook("onRequest", startTimerHook);

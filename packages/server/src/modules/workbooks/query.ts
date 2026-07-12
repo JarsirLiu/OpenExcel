@@ -1,4 +1,4 @@
-import { deserializeSheetMetadata } from "../../shared/utils/sheetSerialization.js";
+import { deserializeSheetMetadataRecord } from "../../shared/utils/sheetSerialization.js";
 import * as repo from "./repository.js";
 
 export async function getWorkbooks(workspaceId: number) {
@@ -27,8 +27,7 @@ export async function getWorkbook(id: number, workspaceId: number) {
     publicId: wb.publicId,
     name: wb.name,
     sheets: wb.sheets.map((sheet) => ({
-      ...deserializeSheetMetadata(sheet),
-      uploadedData: null,
+      ...deserializeSheetMetadataRecord(sheet),
     })),
   };
 }

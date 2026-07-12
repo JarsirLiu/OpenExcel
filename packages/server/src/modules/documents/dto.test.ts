@@ -48,6 +48,33 @@ describe("applyDocumentOperationSchema", () => {
     expect(result.success).toBe(true);
   });
 
+  it("rejects range matrices that do not match their range", () => {
+    const result = applyDocumentOperationsSchema.safeParse({
+      operations: [
+        {
+          type: "setRangeValues",
+          range: { startRow: 0, startCol: 0, endRow: 1, endCol: 1 },
+          values: [["only one row"]],
+        },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects ranges whose end precedes their start", () => {
+    const result = applyDocumentOperationsSchema.safeParse({
+      operations: [
+        {
+          type: "clearRange",
+          range: { startRow: 2, startCol: 0, endRow: 1, endCol: 1 },
+        },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+  });
+
   it("accepts bounded batch and idempotency metadata", () => {
     const result = applyDocumentOperationsSchema.safeParse({
       batchId: "editor-batch-1",

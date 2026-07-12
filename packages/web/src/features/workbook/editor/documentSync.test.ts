@@ -3,6 +3,22 @@ import { describe, expect, it } from "vitest";
 import { buildDocumentOperations } from "./documentSync";
 
 describe("buildDocumentOperations", () => {
+  it("coalesces adjacent plain value edits", () => {
+    const previous: FortuneCell[] = [];
+    const next: FortuneCell[] = [
+      { r: 0, c: 0, v: { v: "A", m: "A" } },
+      { r: 0, c: 1, v: { v: "B", m: "B" } },
+    ];
+
+    expect(buildDocumentOperations(previous, next, 0)).toEqual([
+      {
+        type: "setRangeValues",
+        range: { startRow: 0, startCol: 0, endRow: 0, endCol: 1 },
+        values: [["A", "B"]],
+      },
+    ]);
+  });
+
   it("skips the renderer-only header row and writes changed cells", () => {
     const previous: FortuneCell[] = [
       { r: 0, c: 0, v: { v: "Name", m: "Name" } },

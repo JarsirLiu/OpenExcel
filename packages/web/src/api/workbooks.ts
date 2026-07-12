@@ -25,8 +25,6 @@ export interface SheetSchema {
   name: string;
   order: number;
   columns: { label: string; width?: number }[];
-  merges: { row: [number, number]; col: [number, number] }[];
-  uploadedData: any[] | null;
   config: any | null;
   documentFormat?: string;
   documentVersion?: number;
@@ -135,22 +133,6 @@ export async function downloadWorkbook(
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
-}
-
-export async function updateSheetData(
-  workspaceId: number,
-  sheetId: number,
-  celldata: any[],
-  config?: any,
-): Promise<void> {
-  const body: any = { celldata };
-  if (config !== undefined) body.config = config;
-  const res = await apiFetch(`/workspaces/${workspaceId}/sheets/${sheetId}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error("保存失败");
 }
 
 export async function updateSheetName(

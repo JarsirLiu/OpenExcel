@@ -19,22 +19,16 @@ describe("workbook creation helpers", () => {
     const payload = buildBlankSheetInitialization();
 
     expect(payload.columns).toBe(JSON.stringify([]));
-    expect(payload.merges).toBe(JSON.stringify([]));
-    expect(JSON.parse(payload.uploadedData)).toEqual([]);
     expect(payload.config).toBeUndefined();
   });
 
   it("copies source sheet payload fields", () => {
     const payload = buildSourceSheetInitialization({
       columns: JSON.stringify([{ label: "A", width: 120 }]),
-      merges: JSON.stringify([{ row: [0, 1], col: [0, 1] }]),
-      uploadedData: JSON.stringify([{ r: 0, c: 0, v: { v: "x" } }]),
       config: JSON.stringify({ merge: { A1: { r: 0, c: 0, rs: 1, cs: 1 } } }),
     });
 
     expect(payload.columns).toContain("width");
-    expect(payload.merges).toContain("row");
-    expect(payload.uploadedData).toContain("x");
     expect(payload.config).toContain("merge");
   });
 

@@ -39,7 +39,6 @@ export async function findWorkbookWithSheetMetadata(id: number, workspaceId: num
           name: true,
           order: true,
           columns: true,
-          merges: true,
           config: true,
           documentFormat: true,
           documentVersion: true,
@@ -62,8 +61,6 @@ export async function createSheet(data: {
   name: string;
   order: number;
   columns: string;
-  merges: string;
-  uploadedData: string;
   config?: string;
   maxRow: number;
   maxColumn: number;

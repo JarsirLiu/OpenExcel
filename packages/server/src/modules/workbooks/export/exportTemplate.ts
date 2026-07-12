@@ -7,11 +7,13 @@ export async function exportTemplate(workspaceId: number, id: number) {
   if (!wb) return null;
 
   const sheets = (
-    await Promise.all(wb.sheets.map((sheet) => sheetRepository.getSheet(sheet.id, workspaceId)))
+    await Promise.all(
+      wb.sheets.map((sheet) => sheetRepository.readSheetForExport(sheet.id, workspaceId)),
+    )
   )
     .filter((sheet): sheet is NonNullable<typeof sheet> => sheet !== null)
     .map((parsed) => {
-      const celldata = parsed.uploadedData ?? [];
+      const celldata = parsed.celldata;
       const fallbackRows =
         celldata.length > 0 ? undefined : [parsed.columns.map((column) => column.label)];
       const columnWidths = parsed.columns.reduce(

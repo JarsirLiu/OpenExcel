@@ -1,4 +1,4 @@
-import { decodeDocumentJson, encodeDocumentJson, extractFormulaReferences } from "@openexcel/core";
+import { decodeDocumentChunk, encodeDocumentJson, extractFormulaReferences } from "@openexcel/core";
 import { describe, expect, it, vi } from "vitest";
 import { recalculateAffectedFormulas } from "./recalculation.js";
 
@@ -70,9 +70,8 @@ describe("recalculateAffectedFormulas", () => {
     expect(chunkUpsert).toHaveBeenCalledTimes(1);
     expect(formulaUpdate).toHaveBeenCalledTimes(2);
 
-    const finalChunk = decodeDocumentJson<{ cells: Record<string, { value: unknown }> }>(
-      chunkUpsert.mock.calls.at(-1)?.[0].update.data,
-    );
+    const finalUpsert = chunkUpsert.mock.calls.at(-1)?.[0];
+    const finalChunk = decodeDocumentChunk(finalUpsert.update.data, finalUpsert.update.codec);
     expect(finalChunk.cells["0,1"]?.value).toBe(20);
     expect(finalChunk.cells["0,2"]?.value).toBe(40);
   });

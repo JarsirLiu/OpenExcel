@@ -1,12 +1,29 @@
 import { z } from "zod";
 
 const scalarSchema = z.union([z.string(), z.number(), z.boolean(), z.null()]);
-const rangeSchema = z.object({
-  startRow: z.number().int().nonnegative(),
-  startCol: z.number().int().nonnegative(),
-  endRow: z.number().int().nonnegative(),
-  endCol: z.number().int().nonnegative(),
-});
+const rangeSchema = z
+  .object({
+    startRow: z.number().int().nonnegative(),
+    startCol: z.number().int().nonnegative(),
+    endRow: z.number().int().nonnegative(),
+    endCol: z.number().int().nonnegative(),
+  })
+  .superRefine((range, ctx) => {
+    if (range.endRow < range.startRow) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["endRow"],
+        message: "End row must not precede start row",
+      });
+    }
+    if (range.endCol < range.startCol) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["endCol"],
+        message: "End column must not precede start column",
+      });
+    }
+  });
 const cellValueSchema = z.object({
   value: scalarSchema,
   displayValue: z.string().optional(),
@@ -51,6 +68,35 @@ const objectSchema = z.object({
   data: z.record(z.string(), z.unknown()),
 });
 
+const setRangeValuesSchema = z
+  .object({
+    type: z.literal("setRangeValues"),
+    range: rangeSchema,
+    values: z.array(z.array(scalarSchema)),
+    formulas: z.array(z.array(z.string().nullable())).optional(),
+  })
+  .superRefine((operation, ctx) => {
+    const rows = operation.range.endRow - operation.range.startRow + 1;
+    const cols = operation.range.endCol - operation.range.startCol + 1;
+    if (operation.values.length !== rows || operation.values.some((row) => row.length !== cols)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["values"],
+        message: "Values dimensions must match range",
+      });
+    }
+    if (
+      operation.formulas &&
+      (operation.formulas.length !== rows || operation.formulas.some((row) => row.length !== cols))
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["formulas"],
+        message: "Formulas dimensions must match range",
+      });
+    }
+  });
+
 export const documentOperationSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("setCell"),
@@ -58,12 +104,7 @@ export const documentOperationSchema = z.discriminatedUnion("type", [
     col: z.number().int().nonnegative(),
     value: cellValueSchema.nullable(),
   }),
-  z.object({
-    type: z.literal("setRangeValues"),
-    range: rangeSchema,
-    values: z.array(z.array(scalarSchema)),
-    formulas: z.array(z.array(z.string().nullable())).optional(),
-  }),
+  setRangeValuesSchema,
   z.object({ type: z.literal("clearRange"), range: rangeSchema }),
   z.object({ type: z.literal("createObject"), object: objectSchema }),
   z.object({

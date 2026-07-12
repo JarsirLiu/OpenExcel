@@ -1,6 +1,8 @@
 export const DEFAULT_CHUNK_ROW_SIZE = 128;
 export const DEFAULT_CHUNK_COLUMN_SIZE = 64;
 
+export type DocumentCodec = "json-v1" | "json-gzip-v1";
+
 export type DocumentScalar = string | number | boolean | null;
 
 export interface DocumentCellValue {
@@ -28,7 +30,7 @@ export interface DocumentChunk {
   rowBlock: number;
   colBlock: number;
   revision: number;
-  codec: "json-v1";
+  codec: DocumentCodec;
   cells: Record<string, DocumentCellValue>;
 }
 

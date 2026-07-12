@@ -1,7 +1,13 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { gridToCelldata, type InitConfig } from "@openexcel/core";
+import {
+  encodeDocumentChunk,
+  encodeDocumentJson,
+  fortuneCelldataToChunks,
+  gridToCelldata,
+  type InitConfig,
+} from "@openexcel/core";
 import { prisma } from "../../infra/database/db.js";
 import {
   generateSessionPublicId,
@@ -84,18 +90,49 @@ export async function seedExampleWorkspaceForUser(
       });
 
       for (const [sheetIndex, sheetDef] of workbookDef.sheets.entries()) {
-        await tx.sheet.create({
+        const celldata = gridToCelldata(sheetDef.rows ?? []);
+        const sheet = await tx.sheet.create({
           data: {
             workbookId: workbook.id,
             sheetNo: sheetIndex + 1,
             name: normalizeName(sheetDef.name, `Sheet${sheetIndex + 1}`),
             order: sheetIndex,
             columns: JSON.stringify(sheetDef.columns ?? []),
-            merges: JSON.stringify(sheetDef.merges ?? []),
-            uploadedData: JSON.stringify(gridToCelldata(sheetDef.rows ?? [])),
             config: null,
+            documentFormat: "openexcel-document-v1",
+            documentVersion: 1,
+            documentRevision: 0,
+            maxRow: celldata.reduce((max, cell) => Math.max(max, cell.r + 1), 0),
+            maxColumn: celldata.reduce((max, cell) => Math.max(max, cell.c + 1), 0),
           },
         });
+        const chunks = fortuneCelldataToChunks(celldata, 0);
+        for (const chunk of chunks.values()) {
+          await tx.sheetChunk.create({
+            data: {
+              sheetId: sheet.id,
+              rowBlock: chunk.rowBlock,
+              colBlock: chunk.colBlock,
+              revision: chunk.revision,
+              ...encodeDocumentChunk(chunk.cells),
+            },
+          });
+        }
+        for (const merge of sheetDef.merges ?? []) {
+          await tx.sheetObject.create({
+            data: {
+              sheetId: sheet.id,
+              type: "custom",
+              position: encodeDocumentJson({
+                startRow: merge.row[0],
+                startCol: merge.col[0],
+                endRow: merge.row[1],
+                endCol: merge.col[1],
+              }),
+              data: encodeDocumentJson({ kind: "merge" }),
+            },
+          });
+        }
       }
     }
 

@@ -75,8 +75,6 @@ describe("SheetSchema type", () => {
       name: "TestSheet",
       order: 0,
       columns: [{ label: "Name" }, { label: "Value" }],
-      merges: [],
-      uploadedData: null,
       config: null,
     };
     expect(sheet.name).toBe("TestSheet");

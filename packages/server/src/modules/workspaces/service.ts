@@ -85,8 +85,6 @@ export async function createWorkspace(ownerUserId: number, name?: string) {
         name: "Sheet1",
         order: 0,
         columns: sheetInitialization.columns,
-        merges: sheetInitialization.merges,
-        uploadedData: sheetInitialization.uploadedData,
         config: sheetInitialization.config ?? null,
         maxRow: sheetInitialization.maxRow,
         maxColumn: sheetInitialization.maxColumn,

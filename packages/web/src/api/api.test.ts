@@ -9,7 +9,6 @@ import {
   fetchWorkbook,
   fetchWorkbookReferenceCandidates,
   fetchWorkbooks,
-  updateSheetData,
 } from "./workbooks";
 
 const mockFetch = vi.fn();
@@ -85,24 +84,6 @@ describe("fetchWorkbookReferenceCandidates", () => {
     const result = await fetchWorkbookReferenceCandidates(9);
     expect(result).toEqual(data);
     expect(mockFetch).toHaveBeenCalledWith("/api/workspaces/9/workbooks/reference-candidates", {});
-  });
-});
-
-describe("updateSheetData", () => {
-  it("sends PATCH with celldata", async () => {
-    mockFetch.mockResolvedValue(new Response(null, { status: 200 }));
-
-    const data = [
-      ["a", "b"],
-      ["c", "d"],
-    ];
-    await updateSheetData(9, 5, data);
-
-    expect(mockFetch).toHaveBeenCalledWith("/api/workspaces/9/sheets/5", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ celldata: data }),
-    });
   });
 });
 

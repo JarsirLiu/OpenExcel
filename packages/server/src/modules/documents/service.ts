@@ -1,4 +1,11 @@
-import { type CellRange, cellRangeSize, parseA1Range } from "@openexcel/core";
+import {
+  type CellRange,
+  cellRangeSize,
+  coalesceDocumentOperations,
+  getChunkKey,
+  getChunkPosition,
+  parseA1Range,
+} from "@openexcel/core";
 import {
   type ApplyDocumentLayoutInput,
   type ApplyDocumentOperationInput,
@@ -11,6 +18,50 @@ import {
 import * as repository from "./repository.js";
 
 const MAX_RANGE_CELLS = 100_000;
+const MAX_BATCH_CHUNKS = 1_024;
+const MAX_BATCH_PAYLOAD_BYTES = 3 * 1024 * 1024;
+
+function payloadSize(value: unknown): number {
+  return new TextEncoder().encode(JSON.stringify(value)).byteLength;
+}
+
+function operationRanges(
+  operation: ApplyDocumentOperationsInput["operations"][number],
+): CellRange[] {
+  switch (operation.type) {
+    case "setCell":
+      return [
+        {
+          startRow: operation.row,
+          startCol: operation.col,
+          endRow: operation.row,
+          endCol: operation.col,
+        },
+      ];
+    case "setRangeValues":
+    case "clearRange":
+      return [operation.range];
+    default:
+      return [];
+  }
+}
+
+function affectedChunkCount(operations: ApplyDocumentOperationsInput["operations"]): number {
+  const keys = new Set<string>();
+  for (const operation of operations) {
+    for (const range of operationRanges(operation)) {
+      const first = getChunkPosition(range.startRow, range.startCol);
+      const last = getChunkPosition(range.endRow, range.endCol);
+      for (let rowBlock = first.rowBlock; rowBlock <= last.rowBlock; rowBlock += 1) {
+        for (let colBlock = first.colBlock; colBlock <= last.colBlock; colBlock += 1) {
+          keys.add(getChunkKey(rowBlock, colBlock));
+          if (keys.size > MAX_BATCH_CHUNKS) return keys.size;
+        }
+      }
+    }
+  }
+  return keys.size;
+}
 
 export function parseDocumentRange(reference: string): CellRange {
   return parseA1Range(reference);
@@ -86,8 +137,13 @@ export async function applyOperations(
   if (!parsed.success) return { error: "Invalid document operations" } as const;
 
   const operationInput: ApplyDocumentOperationsInput = parsed.data;
+  if (payloadSize(operationInput) > MAX_BATCH_PAYLOAD_BYTES) {
+    return { error: "Document operation batch is too large" } as const;
+  }
+
+  const operations = coalesceDocumentOperations(operationInput.operations);
   let totalCells = 0;
-  for (const operation of operationInput.operations) {
+  for (const operation of operations) {
     const range =
       operation.type === "setRangeValues" || operation.type === "clearRange"
         ? operation.range
@@ -107,11 +163,14 @@ export async function applyOperations(
       }
     }
   }
+  if (affectedChunkCount(operations) > MAX_BATCH_CHUNKS) {
+    return { error: "Document operation batch touches too many chunks" } as const;
+  }
 
   const result = await repository.applyStoredDocumentOperations(
     sheetId,
     workspaceId,
-    operationInput.operations,
+    operations,
     operationInput.expectedRevision,
     runId,
     operationInput.styles,

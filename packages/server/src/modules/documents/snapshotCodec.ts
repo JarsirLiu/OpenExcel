@@ -1,4 +1,9 @@
-import { type DocumentChunk, decodeDocumentJson, encodeDocumentJson } from "@openexcel/core";
+import {
+  type DocumentChunk,
+  decodeDocumentChunk,
+  decodeDocumentJson,
+  encodeDocumentJson,
+} from "@openexcel/core";
 
 interface EncodedChunk {
   rowBlock: number;
@@ -73,8 +78,7 @@ export function decodeDocumentSnapshot(
       colBlock: chunk.colBlock,
       revision: chunk.revision,
       codec: chunk.codec as DocumentChunk["codec"],
-      cells: decodeDocumentJson<{ cells: DocumentChunk["cells"] }>(new Uint8Array(chunk.data))
-        .cells,
+      cells: decodeDocumentChunk(new Uint8Array(chunk.data), chunk.codec).cells,
     })),
     objects: encodedObjects.map((object) => ({
       type: object.type,

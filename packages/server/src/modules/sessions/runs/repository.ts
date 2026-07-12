@@ -94,24 +94,6 @@ export async function findStepsByRun(runId: number) {
   });
 }
 
-export async function upsertRunSheetSnapshot(data: {
-  runId: number;
-  sheetId: number;
-  uploadedData: string | null;
-  config: string | null;
-}) {
-  return prisma.agentRunSheetSnapshot.upsert({
-    where: {
-      runId_sheetId: {
-        runId: data.runId,
-        sheetId: data.sheetId,
-      },
-    },
-    create: data,
-    update: {},
-  });
-}
-
 export async function findRunSheetSnapshots(runId: number) {
   return prisma.agentRunSheetSnapshot.findMany({
     where: { runId },
@@ -159,35 +141,4 @@ export async function pruneUndoSnapshots(
   });
 
   return result.count;
-}
-
-export async function restoreRunSheetSnapshots(runId: number) {
-  const snapshots = await findRunSheetSnapshots(runId);
-  if (snapshots.length === 0) {
-    throw new Error("当前运行没有可撤销的 Sheet 修改");
-  }
-
-  await prisma.$transaction([
-    ...snapshots.map((snapshot: (typeof snapshots)[number]) =>
-      prisma.sheet.update({
-        where: { id: snapshot.sheetId },
-        data: {
-          uploadedData: snapshot.uploadedData,
-          config: snapshot.config,
-        },
-      }),
-    ),
-    prisma.agentRun.update({
-      where: { id: runId },
-      data: {
-        status: "reverted",
-        revertedAt: new Date(),
-      },
-    }),
-    prisma.agentRunSheetSnapshot.deleteMany({
-      where: { runId },
-    }),
-  ]);
-
-  return snapshots.map((snapshot: (typeof snapshots)[number]) => snapshot.sheetId);
 }

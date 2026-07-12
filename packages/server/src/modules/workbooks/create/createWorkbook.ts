@@ -80,8 +80,6 @@ export async function createWorkbook(
         name: initialSheetName,
         order: 0,
         columns: payload.columns,
-        merges: payload.merges,
-        uploadedData: payload.uploadedData,
         config: payload.config ?? null,
         maxRow: payload.maxRow,
         maxColumn: payload.maxColumn,

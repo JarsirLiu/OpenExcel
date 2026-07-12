@@ -65,6 +65,7 @@ export {
   type DocumentCell,
   type DocumentCellValue,
   type DocumentChunk,
+  type DocumentCodec,
   type DocumentObject,
   type DocumentObjectPatch,
   type DocumentOperation,
@@ -73,6 +74,7 @@ export {
 export {
   applyDocumentOperation,
   applyDocumentOperations,
+  coalesceDocumentOperations,
   createDocumentState,
   type DocumentState,
   readDocumentCell,
@@ -85,7 +87,14 @@ export {
   parseA1Range,
   validateCellRange,
 } from "./document/range.js";
-export { decodeDocumentJson, encodeDocumentJson } from "./document/serialization.js";
+export {
+  decodeDocumentChunk,
+  decodeDocumentJson,
+  decodeDocumentPayload,
+  encodeDocumentChunk,
+  encodeDocumentJson,
+  encodeDocumentPayload,
+} from "./document/serialization.js";
 export type {
   CanonicalCellStyle,
   DocumentStyleDefinition,

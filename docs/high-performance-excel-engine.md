@@ -3,7 +3,7 @@
 
 ## Background
 
-OpenExcel 当前已经具备工作区、工作簿、多 Sheet、Excel 导入导出、基础单元格编辑和 AI 工具调用能力。现有 Sheet 内容主要围绕 Fortune Sheet 的 `celldata/config/merges` 格式持久化。
+OpenExcel 当前已经具备工作区、工作簿、多 Sheet、Excel 导入导出、基础单元格编辑和 AI 工具调用能力。当前 Sheet 内容由 OpenExcel canonical 文档模型持久化，Fortune Sheet 只在渲染边界生成临时视图。
 
 这套方案适合 MVP 和中小型表格，但不适合作为长期 Excel 引擎基础。主要问题包括：
 
@@ -88,9 +88,7 @@ model Sheet {
   documentVersion  Int      @default(1)
   documentRevision Int      @default(0)
 
-  uploadedData     Json?
   config           Json?
-  merges           Json?
 
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
@@ -99,10 +97,10 @@ model Sheet {
 
 字段含义：
 
-- `documentFormat`: 当前 Sheet 内容格式，例如 `fortune-celldata-v1`、`openexcel-document-v1`、`univer-snapshot-v1`。
+- `documentFormat`: 当前 Sheet 内容格式，例如 `openexcel-document-v1`。
 - `documentVersion`: 文档模型版本，用于后续 schema migration。
 - `documentRevision`: 当前 Sheet 最新 revision，用于增量操作、并发校验和快照回放。
-- `uploadedData/config/merges`: 第一阶段保留，用于兼容现有 Fortune Sheet 逻辑。
+- `config`: 只保存文档布局，并通过 revisioned layout API 更新；渲染器私有的 `celldata` 和 merge 数组不进入数据库。
 
 ## Chunked Cell Storage
 
@@ -131,7 +129,7 @@ model SheetChunk {
 
   revision  Int
   codec     String   @default("json-v1")
-  data      Json
+  data      Bytes
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -161,6 +159,17 @@ Chunk 内只保存非空单元格：
 - chunk 内部坐标为局部 row/col offset。
 
 这样读取视口 `A1:Z200` 时，只查询相关 chunks；编辑一个单元格时，只更新对应 chunk。
+
+### Chunk Codec
+
+Chunk 的 codec 是文档引擎协议的一部分，不属于 Fortune Sheet 或其他渲染器协议。当前支持：
+
+- `json-v1`: 可读的兼容格式，作为历史数据和小 payload 的回退格式。
+- `json-gzip-v1`: 使用现有 `fflate` 依赖压缩 JSON；只有压缩结果更小才写入该格式。
+
+核心层通过 `encodeDocumentChunk` / `decodeDocumentChunk` 统一编解码。服务端读取时必须根据数据库中的 `codec` 分派，不能假设所有 chunk 都是 JSON。新增 codec 必须先加入核心协议、读取兼容逻辑和测试，再启用写入。
+
+该设计不引入商业许可依赖，也保留了未来替换为二进制 codec 的边界。数据库只保存 codec 标识和 bytes，不保存渲染器私有的整表 JSON。
 
 ## Operation Log
 
@@ -224,6 +233,8 @@ Operation Log 用途：
 - Debug 和数据恢复
 
 For a multi-operation mutation, the server groups state changes by chunk and persists the operation records with one `createMany` call. Formula results are also grouped by destination chunk, so one recalculation batch writes each touched chunk at most once.
+
+Mutation requests have explicit backpressure: a batch is limited to 10,000 operations, 100,000 addressed cells, 1,024 affected chunks, and a 3 MiB canonical JSON payload. The HTTP server accepts up to 4 MiB JSON bodies so the document service can return a structured rejection for oversized batches. The core layer losslessly coalesces horizontal scalar `setCell` writes into `setRangeValues`; writes carrying formulas, styles, display metadata, or arbitrary metadata remain unmerged.
 
 ## Snapshot Strategy
 
@@ -563,7 +574,8 @@ The current implementation has moved the active edit and AI mutation paths onto 
 - Fortune layout/config changes use a revisioned layout endpoint without rewriting cell chunks.
 - Undo snapshots capture canonical chunks and objects before the first mutation in a run.
 
-The old full-sheet endpoint and Fortune-shaped fields remain only as import/export and compatibility boundaries. They are not the target persistence path and should be removed after viewport loading and canonical export are fully covered by integration tests.
+The old full-sheet endpoint and Fortune-shaped persistence fields have been removed. FortuneSheet
+remains a renderer adapter; import/export is the only place where Fortune-shaped data is materialized.
 
 OpenExcel 的长期文档模型应遵循：
 

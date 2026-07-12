@@ -64,7 +64,11 @@ UI components should be thin. They should render state and dispatch actions, not
 The web layer is also the main stability boundary for user experience.
 It must make cross-feature interference visible and prevent it by design.
 
-### 2.5 Session title is independent from chat
+### 2.5 Canonical document data has an explicit codec boundary
+
+`packages/core` owns the canonical cell/chunk payload protocol. A `SheetChunk` stores a codec identifier plus bytes, and server repositories use the codec-aware core functions to read and write it. `json-v1` remains readable for existing data; `json-gzip-v1` is selected when compression reduces the payload size. Renderer formats such as FortuneSheet `celldata` are adapters and must not become persistence formats again.
+
+### 2.6 Session title is independent from chat
 
 Title generation must be a separate API and a separate service path.
 
@@ -77,7 +81,7 @@ It must not:
 
 If title generation fails, the fallback title is the first user message, truncated to a short length.
 
-### 2.6 Use chat/completions compatibility only
+### 2.7 Use chat/completions compatibility only
 
 The model integration must stay compatible with chat/completions style providers.
 
@@ -539,8 +543,9 @@ The renderer is allowed to materialize a FortuneSheet-compatible sparse view, bu
 source of truth. Scrolling requests missing chunks incrementally. Export uses the server-side
 canonical workbook export path so a partially hydrated viewport can never produce a partial file.
 
-Legacy `uploadedData` is import/export transition state only. New reads and mutations must use the
-canonical document operations and range APIs.
+Renderer-shaped `celldata` and persisted merge arrays are not part of the database
+model. Import/export adapters convert at the boundary; all runtime reads and mutations use canonical
+document ranges, chunks, objects, and operations.
 
 ### 7.0.1 Formula dependency flow
 
@@ -591,7 +596,7 @@ The document engine API surface includes range reads, operation writes, layout u
 ### 7.1 Workbook editing flow
 
 1. User edits sheet content in the workbook area.
-2. Web emits a workbook delta or full-sheet update.
+2. Web diffs the renderer view into canonical cell/object/layout operations.
 3. Server persists the change.
 4. Web refreshes only the affected workbook or sheet.
 

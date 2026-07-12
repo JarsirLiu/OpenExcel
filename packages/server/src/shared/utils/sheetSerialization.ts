@@ -1,13 +1,10 @@
-import type { FortuneCell } from "@openexcel/core";
 import type { Prisma } from "../../infra/database/prismaTypes.js";
 
-export interface SheetJson {
+export interface SheetMetadata {
   id: number;
   sheetNo: number;
   name: string;
   columns: { label: string; width?: number }[];
-  merges: { row: [number, number]; col: [number, number] }[];
-  uploadedData: FortuneCell[] | null;
   config: any | null;
   documentFormat: string;
   documentVersion: number;
@@ -22,7 +19,6 @@ type SheetMetadataRecord = Pick<
   | "sheetNo"
   | "name"
   | "columns"
-  | "merges"
   | "config"
   | "documentFormat"
   | "documentVersion"
@@ -39,14 +35,12 @@ function safeParse<T>(value: string, fallback: T): T {
   }
 }
 
-export function deserializeSheet(sheet: Prisma.SheetGetPayload<{}>): SheetJson {
+export function deserializeSheetMetadata(sheet: Prisma.SheetGetPayload<{}>): SheetMetadata {
   return {
     id: sheet.id,
     sheetNo: sheet.sheetNo,
     name: sheet.name,
     columns: safeParse(sheet.columns, []),
-    merges: safeParse(sheet.merges, []),
-    uploadedData: sheet.uploadedData ? safeParse(sheet.uploadedData, null) : null,
     config: sheet.config ? safeParse(sheet.config, null) : null,
     documentFormat: sheet.documentFormat,
     documentVersion: sheet.documentVersion,
@@ -56,15 +50,12 @@ export function deserializeSheet(sheet: Prisma.SheetGetPayload<{}>): SheetJson {
   };
 }
 
-export function deserializeSheetMetadata(
-  sheet: SheetMetadataRecord,
-): Omit<SheetJson, "uploadedData"> {
+export function deserializeSheetMetadataRecord(sheet: SheetMetadataRecord): SheetMetadata {
   return {
     id: sheet.id,
     sheetNo: sheet.sheetNo,
     name: sheet.name,
     columns: safeParse(sheet.columns, []),
-    merges: safeParse(sheet.merges, []),
     config: sheet.config ? safeParse(sheet.config, null) : null,
     documentFormat: sheet.documentFormat,
     documentVersion: sheet.documentVersion,

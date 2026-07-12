@@ -1,11 +1,8 @@
 import type { FortuneCell, FortuneSheetData, SheetConfig } from "@openexcel/core";
-import { isCelldata, restoreSheetConfig } from "@openexcel/core";
+import { restoreSheetConfig } from "@openexcel/core";
 
 export type { FortuneCell, FortuneSheetData, SheetConfig };
 
-/**
- * 从 celldata 的 mc 属性提取合并范围。
- */
 export function extractMergesFromCelldata(
   celldata: FortuneCell[],
 ): { row: [number, number]; col: [number, number] }[] {
@@ -29,48 +26,9 @@ export function toFortuneSheetData(sheet: {
   id: number;
   name: string;
   columns: { label: string; width?: number }[];
-  merges: { row: [number, number]; col: [number, number] }[];
-  uploadedData: any[] | null;
   config: any | null;
 }): FortuneSheetData {
-  let celldata: FortuneCell[];
-  let merges: { row: [number, number]; col: [number, number] }[];
-
-  if (sheet.uploadedData && isCelldata(sheet.uploadedData)) {
-    celldata = sheet.uploadedData as FortuneCell[];
-    merges = extractMergesFromCelldata(celldata);
-    if (merges.length === 0) {
-      merges = (sheet.merges || []).map((m) => ({
-        row: [m.row[0], m.row[1]],
-        col: [m.col[0], m.col[1]],
-      }));
-    }
-    if (sheet.columns.length > 0 && celldata.length > 0) {
-      const headerCells = sheet.columns.map((col, ci) => ({
-        r: 0,
-        c: ci,
-        v: { v: col.label, m: col.label },
-      }));
-      celldata = [
-        ...headerCells,
-        ...celldata.map((c) => ({
-          ...c,
-          r: c.r + 1,
-          v: c.v?.mc ? { ...c.v, mc: { ...c.v.mc, r: c.v.mc.r + 1 } } : c.v,
-        })),
-      ];
-      merges = merges.map((m) => ({
-        row: [m.row[0] + 1, m.row[1] + 1],
-        col: [m.col[0], m.col[1]],
-      }));
-    }
-  } else {
-    celldata = [];
-    merges = (sheet.merges || []).map((m) => ({
-      row: [m.row[0], m.row[1]],
-      col: [m.col[0], m.col[1]],
-    }));
-  }
+  const celldata: FortuneCell[] = [];
 
   const result: FortuneSheetData = {
     id: String(sheet.id),
@@ -80,7 +38,7 @@ export function toFortuneSheetData(sheet: {
       if (col.width) acc[i] = col.width;
       return acc;
     }, {}),
-    merges,
+    merges: [],
   };
 
   if (sheet.config && typeof sheet.config === "object") {

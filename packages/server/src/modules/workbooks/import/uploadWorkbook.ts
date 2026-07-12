@@ -1,5 +1,6 @@
 import {
   collectDocumentStyles,
+  encodeDocumentChunk,
   encodeDocumentJson,
   excelToGrid,
   fortuneCelldataToChunks,
@@ -73,8 +74,6 @@ export async function uploadAsNewWorkbook(workspaceId: number, buffer: Buffer, f
           name: sheetNames[i],
           order: i,
           columns: JSON.stringify([]),
-          merges: JSON.stringify(parsed.merges),
-          uploadedData: JSON.stringify(parsed.celldata),
           config: JSON.stringify(parsed.config ?? {}),
           documentFormat: "openexcel-document-v1",
           documentVersion: 1,
@@ -97,14 +96,28 @@ export async function uploadAsNewWorkbook(workspaceId: number, buffer: Buffer, f
             rowBlock: chunk.rowBlock,
             colBlock: chunk.colBlock,
             revision: chunk.revision,
-            codec: chunk.codec,
-            data: encodeDocumentJson({ cells: chunk.cells }),
+            ...encodeDocumentChunk(chunk.cells),
           },
         });
       }
       const formulaCells = buildFormulaCellData(sheet.id, parsed.celldata);
       if (formulaCells.length > 0) {
         await tx.formulaCell.createMany({ data: formulaCells });
+      }
+      for (const merge of parsed.merges) {
+        await tx.sheetObject.create({
+          data: {
+            sheetId: sheet.id,
+            type: "custom",
+            position: encodeDocumentJson({
+              startRow: merge.row[0],
+              startCol: merge.col[0],
+              endRow: merge.row[1],
+              endCol: merge.col[1],
+            }),
+            data: encodeDocumentJson({ kind: "merge" }),
+          },
+        });
       }
     }
 

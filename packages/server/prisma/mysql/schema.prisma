@@ -59,8 +59,6 @@ model Sheet {
   name         String
   order        Int
   columns      String
-  merges       String                  @default("[]")
-  uploadedData String?
   config       String?
   documentFormat   String   @default("fortune-celldata-v1")
   documentVersion  Int      @default(1)
@@ -153,8 +151,6 @@ model AgentRunSheetSnapshot {
   id           Int      @id @default(autoincrement())
   runId        Int
   sheetId      Int
-  uploadedData String?
-  config       String?
   documentRevision Int?
   documentMaxRow    Int?
   documentMaxColumn Int?

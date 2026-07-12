@@ -35,8 +35,6 @@ export async function createSheet(
     name: nextName,
     order: nextOrder,
     columns: payload.columns,
-    merges: payload.merges,
-    uploadedData: payload.uploadedData,
     config: payload.config,
     maxRow: payload.maxRow,
     maxColumn: payload.maxColumn,

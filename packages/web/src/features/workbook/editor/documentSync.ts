@@ -1,4 +1,5 @@
 import {
+  coalesceDocumentOperations,
   type DocumentOperation,
   type FortuneCell,
   fortuneCellToDocumentValue,
@@ -84,5 +85,5 @@ export function buildDocumentOperations(
     operations.push({ type: "deleteObject", id: mergeId(merge) });
   }
 
-  return operations;
+  return coalesceDocumentOperations(operations);
 }

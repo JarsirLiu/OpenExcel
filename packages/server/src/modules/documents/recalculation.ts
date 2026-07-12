@@ -2,7 +2,9 @@ import {
   type CellRange,
   type DocumentCell,
   type DocumentChunk,
+  decodeDocumentChunk,
   decodeDocumentJson,
+  encodeDocumentChunk,
   encodeDocumentJson,
   type FormulaReference,
   formatA1Cell,
@@ -211,7 +213,7 @@ export async function recalculateAffectedFormulas(
         colBlock: row.colBlock,
         revision: row.revision,
         codec: row.codec as DocumentChunk["codec"],
-        cells: decodeDocumentJson<{ cells: DocumentChunk["cells"] }>(row.data).cells ?? {},
+        cells: decodeDocumentChunk(row.data, row.codec).cells,
       })),
     );
   }
@@ -306,13 +308,11 @@ export async function recalculateAffectedFormulas(
           rowBlock: chunk.rowBlock,
           colBlock: chunk.colBlock,
           revision,
-          codec: "json-v1",
-          data: encodeDocumentJson({ cells: chunk.cells }),
+          ...encodeDocumentChunk(chunk.cells),
         },
         update: {
           revision,
-          codec: "json-v1",
-          data: encodeDocumentJson({ cells: chunk.cells }),
+          ...encodeDocumentChunk(chunk.cells),
         },
       });
     }

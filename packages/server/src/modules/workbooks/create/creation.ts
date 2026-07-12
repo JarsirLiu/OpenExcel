@@ -1,7 +1,5 @@
 export type SheetInitializationPayload = {
   columns: string;
-  merges: string;
-  uploadedData: string;
   config?: string;
   maxRow: number;
   maxColumn: number;
@@ -9,8 +7,6 @@ export type SheetInitializationPayload = {
 
 export type SourceSheetPayload = {
   columns: string;
-  merges: string;
-  uploadedData: string | null;
   config: string | null;
   maxRow?: number;
   maxColumn?: number;
@@ -41,8 +37,6 @@ export function normalizeSheetName(name: string | undefined, fallbackIndex: numb
 export function buildBlankSheetInitialization(): SheetInitializationPayload {
   return {
     columns: JSON.stringify([]),
-    merges: JSON.stringify([]),
-    uploadedData: JSON.stringify([]),
     maxRow: 0,
     maxColumn: 0,
   };
@@ -53,8 +47,6 @@ export function buildSourceSheetInitialization(
 ): SheetInitializationPayload {
   const payload: SheetInitializationPayload = {
     columns: sourceSheet.columns,
-    merges: sourceSheet.merges,
-    uploadedData: sourceSheet.uploadedData ?? JSON.stringify([]),
     maxRow: sourceSheet.maxRow ?? 0,
     maxColumn: sourceSheet.maxColumn ?? 0,
   };

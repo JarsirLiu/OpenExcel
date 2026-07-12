@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
   workspaceCreate: vi.fn(),
   workbookCreate: vi.fn(),
   sheetCreate: vi.fn(),
+  sheetChunkCreate: vi.fn(),
+  sheetObjectCreate: vi.fn(),
   sessionCreate: vi.fn(),
 }));
 
@@ -28,6 +30,8 @@ describe("seedExampleWorkspaceForUser", () => {
     mocks.workspaceCreate.mockReset();
     mocks.workbookCreate.mockReset();
     mocks.sheetCreate.mockReset();
+    mocks.sheetChunkCreate.mockReset();
+    mocks.sheetObjectCreate.mockReset();
     mocks.sessionCreate.mockReset();
   });
 
@@ -38,6 +42,8 @@ describe("seedExampleWorkspaceForUser", () => {
         workspace: { aggregate: mocks.workspaceAggregate, create: mocks.workspaceCreate },
         workbook: { create: mocks.workbookCreate },
         sheet: { create: mocks.sheetCreate },
+        sheetChunk: { create: mocks.sheetChunkCreate },
+        sheetObject: { create: mocks.sheetObjectCreate },
         session: { create: mocks.sessionCreate },
       }),
     );
@@ -112,10 +118,7 @@ describe("seedExampleWorkspaceForUser", () => {
 
     const firstSheetData = mocks.sheetCreate.mock.calls[0][0].data;
     expect(firstSheetData.columns).toContain("指标名称");
-    expect(JSON.parse(firstSheetData.uploadedData)).toEqual([
-      { r: 0, c: 0, v: { v: "A", m: "A" } },
-      { r: 0, c: 1, v: { v: "1", m: "1" } },
-    ]);
+    expect(mocks.sheetChunkCreate).toHaveBeenCalled();
   });
 
   it("marks an existing user as seeded without creating an example workspace", async () => {
@@ -125,6 +128,8 @@ describe("seedExampleWorkspaceForUser", () => {
         workspace: { aggregate: mocks.workspaceAggregate, create: mocks.workspaceCreate },
         workbook: { create: mocks.workbookCreate },
         sheet: { create: mocks.sheetCreate },
+        sheetChunk: { create: mocks.sheetChunkCreate },
+        sheetObject: { create: mocks.sheetObjectCreate },
         session: { create: mocks.sessionCreate },
       }),
     );

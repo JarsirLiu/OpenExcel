@@ -1,3 +1,4 @@
+import { encodeDocumentJson } from "@openexcel/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -7,6 +8,10 @@ const mocks = vi.hoisted(() => ({
   agentRunSheetSnapshotFindMany: vi.fn(),
   agentRunSheetSnapshotDeleteMany: vi.fn(),
   sheetUpdate: vi.fn(),
+  sheetChunkDeleteMany: vi.fn(),
+  sheetChunkCreate: vi.fn(),
+  sheetObjectDeleteMany: vi.fn(),
+  sheetObjectCreate: vi.fn(),
   sheetDelete: vi.fn(),
   sheetFindMany: vi.fn(),
   workbookFindFirst: vi.fn(),
@@ -42,6 +47,14 @@ function buildTx() {
       delete: mocks.sheetDelete,
       findMany: mocks.sheetFindMany,
     },
+    sheetChunk: {
+      deleteMany: mocks.sheetChunkDeleteMany,
+      create: mocks.sheetChunkCreate,
+    },
+    sheetObject: {
+      deleteMany: mocks.sheetObjectDeleteMany,
+      create: mocks.sheetObjectCreate,
+    },
     workbook: {
       findFirst: mocks.workbookFindFirst,
       delete: mocks.workbookDelete,
@@ -60,6 +73,10 @@ describe("undoLatestRun", () => {
     mocks.agentRunSheetSnapshotFindMany.mockReset();
     mocks.agentRunSheetSnapshotDeleteMany.mockReset();
     mocks.sheetUpdate.mockReset();
+    mocks.sheetChunkDeleteMany.mockReset();
+    mocks.sheetChunkCreate.mockReset();
+    mocks.sheetObjectDeleteMany.mockReset();
+    mocks.sheetObjectCreate.mockReset();
     mocks.sheetDelete.mockReset();
     mocks.sheetFindMany.mockReset();
     mocks.workbookFindFirst.mockReset();
@@ -147,8 +164,22 @@ describe("undoLatestRun", () => {
       ]),
     });
     mocks.agentRunSheetSnapshotFindMany.mockResolvedValueOnce([
-      { sheetId: 15, uploadedData: "[1]", config: null },
-      { sheetId: 77, uploadedData: "[2]", config: null },
+      {
+        sheetId: 15,
+        documentRevision: 3,
+        documentMaxRow: 10,
+        documentMaxColumn: 4,
+        documentChunks: encodeDocumentJson({ chunks: [] }),
+        documentObjects: encodeDocumentJson({ objects: [] }),
+      },
+      {
+        sheetId: 77,
+        documentRevision: 2,
+        documentMaxRow: 5,
+        documentMaxColumn: 2,
+        documentChunks: encodeDocumentJson({ chunks: [] }),
+        documentObjects: encodeDocumentJson({ objects: [] }),
+      },
     ]);
     mocks.workbookFindFirst.mockResolvedValueOnce({ id: 9 });
     mocks.sheetFindMany.mockResolvedValueOnce([
@@ -171,8 +202,11 @@ describe("undoLatestRun", () => {
     expect(mocks.sheetUpdate).toHaveBeenCalledWith({
       where: { id: 15 },
       data: {
-        uploadedData: "[1]",
-        config: null,
+        documentFormat: "openexcel-document-v1",
+        documentVersion: 1,
+        documentRevision: 3,
+        maxRow: 10,
+        maxColumn: 4,
       },
     });
     expect(mocks.sheetDelete).toHaveBeenCalledWith({ where: { id: 77 } });

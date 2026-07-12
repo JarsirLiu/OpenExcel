@@ -9,7 +9,9 @@ import {
   type DocumentObject,
   type DocumentOperation,
   type DocumentState,
+  decodeDocumentChunk,
   decodeDocumentJson,
+  encodeDocumentChunk,
   encodeDocumentJson,
   getChunkKey,
   getChunkPosition,
@@ -32,7 +34,7 @@ function decodeChunk(row: {
   codec: string;
   data: Uint8Array<ArrayBufferLike>;
 }): DocumentChunk {
-  const payload = decodeDocumentJson<{ cells: DocumentChunk["cells"] }>(row.data);
+  const payload = decodeDocumentChunk(row.data, row.codec);
   return {
     rowBlock: row.rowBlock,
     colBlock: row.colBlock,
@@ -552,13 +554,11 @@ export async function applyStoredDocumentOperations(
           rowBlock,
           colBlock,
           revision,
-          codec: "json-v1",
-          data: encodeDocumentJson({ cells: chunk.cells }),
+          ...encodeDocumentChunk(chunk.cells),
         },
         update: {
           revision,
-          codec: "json-v1",
-          data: encodeDocumentJson({ cells: chunk.cells }),
+          ...encodeDocumentChunk(chunk.cells),
         },
       });
     }

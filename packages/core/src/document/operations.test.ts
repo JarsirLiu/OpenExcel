@@ -2,11 +2,39 @@ import { describe, expect, it } from "vitest";
 import {
   applyDocumentOperation,
   applyDocumentOperations,
+  coalesceDocumentOperations,
   createDocumentState,
   readDocumentCell,
 } from "./operations.js";
 
 describe("document operations", () => {
+  it("coalesces only lossless horizontal scalar writes", () => {
+    expect(
+      coalesceDocumentOperations([
+        { type: "setCell", row: 2, col: 3, value: { value: "A", displayValue: "A" } },
+        { type: "setCell", row: 2, col: 4, value: { value: 42, displayValue: "42" } },
+        {
+          type: "setCell",
+          row: 2,
+          col: 5,
+          value: { value: 7, displayValue: "7", styleId: "style_1" },
+        },
+      ]),
+    ).toEqual([
+      {
+        type: "setRangeValues",
+        range: { startRow: 2, startCol: 3, endRow: 2, endCol: 4 },
+        values: [["A", 42]],
+      },
+      {
+        type: "setCell",
+        row: 2,
+        col: 5,
+        value: { value: 7, displayValue: "7", styleId: "style_1" },
+      },
+    ]);
+  });
+
   it("writes and clears cells without materializing unrelated chunks", () => {
     const initial = createDocumentState();
     const written = applyDocumentOperation(

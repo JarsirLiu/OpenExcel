@@ -201,6 +201,61 @@ export function applyDocumentOperations(
   return next;
 }
 
+function canCoalesceCellValue(value: DocumentCellValue | null): boolean {
+  if (value == null) return true;
+  if (value.formula || value.styleId || value.metadata) return false;
+  if (value.displayValue === undefined) return true;
+  return value.displayValue === (value.value == null ? "" : String(value.value));
+}
+
+function coalescedRangeOperation(
+  operations: Array<Extract<DocumentOperation, { type: "setCell" }>>,
+): DocumentOperation {
+  const first = operations[0];
+  const last = operations[operations.length - 1];
+  if (!first || !last || operations.length === 1) return first;
+  return {
+    type: "setRangeValues",
+    range: {
+      startRow: first.row,
+      startCol: first.col,
+      endRow: last.row,
+      endCol: last.col,
+    },
+    values: [operations.map((operation) => operation.value?.value ?? null)],
+  };
+}
+
+/**
+ * Compacts only lossless horizontal scalar writes. Rich cell values stay as
+ * setCell operations because setRangeValues intentionally has a scalar-only payload.
+ */
+export function coalesceDocumentOperations(operations: DocumentOperation[]): DocumentOperation[] {
+  const result: DocumentOperation[] = [];
+  let pending: Array<Extract<DocumentOperation, { type: "setCell" }>> = [];
+
+  const flush = () => {
+    if (pending.length > 0) result.push(coalescedRangeOperation(pending));
+    pending = [];
+  };
+
+  for (const operation of operations) {
+    if (
+      operation.type === "setCell" &&
+      canCoalesceCellValue(operation.value) &&
+      (pending.length === 0 ||
+        (pending.at(-1)?.row === operation.row && pending.at(-1)?.col === operation.col - 1))
+    ) {
+      pending.push(operation);
+      continue;
+    }
+    flush();
+    result.push(operation);
+  }
+  flush();
+  return result;
+}
+
 export function readDocumentCell(
   state: DocumentState,
   row: number,
