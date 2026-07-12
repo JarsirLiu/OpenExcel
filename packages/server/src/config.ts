@@ -13,6 +13,8 @@ export interface ModelConfig {
   maxRetries: number;
   timeoutMs: number;
   chunkTimeoutMs: number;
+  contextWindowTokens: number;
+  outputReserveTokens: number;
 }
 
 let cachedConfig: ModelConfig | null = null;
@@ -22,6 +24,11 @@ function readNonNegativeInt(name: string, fallback: number): number {
   if (!value) return fallback;
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+function readPositiveInt(name: string, fallback: number): number {
+  const value = readNonNegativeInt(name, fallback);
+  return value > 0 ? value : fallback;
 }
 
 export function loadModelConfig(): ModelConfig {
@@ -48,6 +55,8 @@ export function loadModelConfig(): ModelConfig {
     maxRetries: readNonNegativeInt("MODEL_MAX_RETRIES", 2),
     timeoutMs: readNonNegativeInt("MODEL_TIMEOUT_MS", 120_000),
     chunkTimeoutMs: readNonNegativeInt("MODEL_CHUNK_TIMEOUT_MS", 30_000),
+    contextWindowTokens: readPositiveInt("MODEL_CONTEXT_WINDOW_TOKENS", 180_000),
+    outputReserveTokens: readPositiveInt("MODEL_OUTPUT_RESERVE_TOKENS", 16_000),
   };
   console.log(`[config] Loaded model config: ${modelName} @ ${baseUrl}`);
   return cachedConfig;

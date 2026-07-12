@@ -55,9 +55,13 @@ export const excelToolSpecs = {
   },
   readSheet: {
     description:
-      "读取指定 Sheet 的数据。始终返回 sheet 元信息（行数列数、列名、列类型、数值列统计）和指定范围的稀疏数据。不传范围参数时默认返回前30行。返回结果中包含 hasMoreRows 等导航提示，便于继续读取剩余数据。行号和列号按 Excel 视觉顺序从 1 开始。",
+      "读取指定 Sheet。首次或不传范围时返回 overview：整表规模、列画像、数值统计、空值情况，以及头部/中部/尾部的少量代表性样本，不返回整表原始数据。传入 startRow/endRow/startCol/endCol 或 mode=range 时返回指定范围的稀疏数据。单次范围最多返回约4000个网格单元。需要统计、筛选、排序时不要连续分页读取整表，应优先使用其他分析工具（如果可用）。行号和列号按 Excel 视觉顺序从 1 开始。",
     inputSchema: z.object({
       sheetId: z.coerce.number().describe("Sheet ID"),
+      mode: z
+        .enum(["overview", "range"])
+        .optional()
+        .describe("读取模式；不传范围参数时默认 overview，传入范围参数时默认 range"),
       startRow: z.coerce
         .number()
         .int()
@@ -82,6 +86,10 @@ export const excelToolSpecs = {
         .positive()
         .optional()
         .describe("结束列号（含），从 1 开始，默认全部列"),
+      includeMetadata: z
+        .boolean()
+        .optional()
+        .describe("范围读取时是否重复返回列画像；默认 false，overview 模式始终返回"),
     }),
   },
   writeCells: {

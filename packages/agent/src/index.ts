@@ -7,6 +7,12 @@ export {
   type WorkspaceSheetSummary,
   type WorkspaceWorkbookSummary,
 } from "./session/context.js";
+export {
+  DEFAULT_CONTEXT_WINDOW_TOKENS,
+  DEFAULT_OUTPUT_RESERVE_TOKENS,
+  estimateTokens,
+  trimMessagesToContextWindow,
+} from "./session/contextWindow.js";
 export { historyFromRuns } from "./session/transcript.js";
 export {
   buildExcelToolCatalog,

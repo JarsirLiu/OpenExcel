@@ -22,7 +22,7 @@ describe("readSheet", () => {
   });
 
   describe("default call (no range params)", () => {
-    it("should return metadata and first 30 rows", async () => {
+    it("should return an overview with representative samples", async () => {
       const rows = Array.from({ length: 100 }, (_, i) => ({
         r: i + 1,
         c: 0,
@@ -42,18 +42,21 @@ describe("readSheet", () => {
 
       const result = await readSheet.execute({ sheetId: 1 }, { context: { workspaceId: 1 } });
 
+      expect(result.mode).toBe("overview");
       expect(result.headers).toEqual(["Name", "Age"]);
       expect(result.totalRowCount).toBe(100);
       expect(result.totalColumnCount).toBe(2);
-      expect(result.startRow).toBe(1);
-      expect(result.endRow).toBe(30);
-      expect(result.data.length).toBe(30);
-      expect(result.hasMoreRows).toBe(true);
+      expect(result.sampleRows.map((sample) => sample.row)).toEqual(
+        expect.arrayContaining([1, 25, 50, 75, 100]),
+      );
+      expect(result.sampleRows.length).toBeLessThanOrEqual(24);
+      expect(result.data).toEqual([]);
+      expect(result.hasMoreRows).toBe(false);
       expect(result.hasMoreRowsAbove).toBe(false);
-      expect(result.hint).toContain("70行未读取");
+      expect(result.hint).toContain("概览");
     });
 
-    it("should return all rows when sheet has fewer than 30 rows", async () => {
+    it("should include all rows as samples for a small sheet", async () => {
       mockFindFirst.mockResolvedValue({
         id: 1,
         name: "Sheet1",
@@ -68,10 +71,10 @@ describe("readSheet", () => {
 
       const result = await readSheet.execute({ sheetId: 1 }, { context: { workspaceId: 1 } });
 
-      expect(result.endRow).toBe(2);
-      expect(result.data.length).toBe(2);
+      expect(result.sampleRows.map((sample) => sample.row)).toEqual([1, 2]);
+      expect(result.data).toEqual([]);
       expect(result.hasMoreRows).toBe(false);
-      expect(result.hint).toContain("已读取全部数据");
+      expect(result.sampleRowCount).toBe(2);
     });
   });
 
@@ -130,6 +133,41 @@ describe("readSheet", () => {
       expect(result.data[0]).toEqual({ row: 1, col: 2, value: "y" });
       expect(result.data[1]).toEqual({ row: 1, col: 3, value: "z" });
       expect(result.hasMoreCols).toBe(false);
+    });
+
+    it("should cap wide ranges and return a pagination hint", async () => {
+      const cells = [
+        ...Array.from({ length: 200 }, (_, col) => ({
+          r: 0,
+          c: col,
+          v: { v: `Header${col + 1}` },
+        })),
+        ...Array.from({ length: 40 }, (_, row) =>
+          Array.from({ length: 200 }, (_, col) => ({
+            r: row + 1,
+            c: col,
+            v: { v: `${row + 1}-${col + 1}` },
+          })),
+        ).flat(),
+      ];
+      mockFindFirst.mockResolvedValue({
+        id: 1,
+        name: "WideSheet",
+        sheetNo: 1,
+        uploadedData: JSON.stringify(cells),
+        workbook: { workspaceId: 1 },
+      });
+
+      const result = await readSheet.execute(
+        { sheetId: 1, startRow: 1, endRow: 40, startCol: 1, endCol: 200 },
+        { context: { workspaceId: 1 } },
+      );
+
+      expect(result.endRow).toBe(20);
+      expect(result.endCol).toBe(200);
+      expect(result.data.length).toBe(4_000);
+      expect(result.hasMoreRows).toBe(true);
+      expect(result.hint).toContain("单次4000个单元格上限");
     });
   });
 
@@ -203,7 +241,10 @@ describe("readSheet", () => {
         workbook: { workspaceId: 1 },
       });
 
-      const all = await readSheet.execute({ sheetId: 1 }, { context: { workspaceId: 1 } });
+      const all = await readSheet.execute(
+        { sheetId: 1, mode: "range", startRow: 1, endRow: 2 },
+        { context: { workspaceId: 1 } },
+      );
 
       expect(all.merges.length).toBe(2);
 

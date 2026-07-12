@@ -124,6 +124,8 @@ export async function streamChat(
       systemPrompt,
       messages,
       maxRetries: config.maxRetries,
+      contextWindowTokens: config.contextWindowTokens,
+      outputReserveTokens: config.outputReserveTokens,
       timeout: {
         totalMs: config.timeoutMs,
         chunkMs: config.chunkTimeoutMs,

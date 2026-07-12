@@ -10,6 +10,10 @@ import {
   validateUIMessages,
 } from "ai";
 import { createChatModel, type ModelConfig } from "../model.js";
+import {
+  DEFAULT_OUTPUT_RESERVE_TOKENS,
+  trimMessagesToContextWindow,
+} from "../session/contextWindow.js";
 import { formatAIError } from "./formatAIError.js";
 
 export interface StreamChatInput {
@@ -21,6 +25,8 @@ export interface StreamChatInput {
   abortSignal?: AbortSignal;
   maxRetries?: number;
   timeout?: TimeoutConfiguration<ToolSet>;
+  contextWindowTokens?: number;
+  outputReserveTokens?: number;
   onStepFinish?: (...args: any[]) => void | Promise<void>;
   onFinish?: (...args: any[]) => void | Promise<void>;
   onAbort?: (...args: any[]) => void | Promise<void>;
@@ -43,8 +49,13 @@ export async function streamChat(
   input: StreamChatInput,
 ): Promise<ReturnType<typeof toUIMessageStream>> {
   const normalizedMessages = removeEmptyAssistantMessages(input.messages);
+  const contextWindow = trimMessagesToContextWindow(normalizedMessages, {
+    contextWindowTokens: input.contextWindowTokens,
+    outputReserveTokens: input.outputReserveTokens,
+    systemPrompt: input.systemPrompt,
+  });
   const validatedMessages = await validateUIMessages({
-    messages: normalizedMessages,
+    messages: contextWindow.messages,
     tools: input.tools as any,
   });
 
@@ -55,6 +66,7 @@ export async function streamChat(
     tools: input.tools as any,
     toolsContext: input.toolsContext as any,
     stopWhen: isLoopFinished(),
+    maxOutputTokens: input.outputReserveTokens ?? DEFAULT_OUTPUT_RESERVE_TOKENS,
     maxRetries: input.maxRetries ?? 2,
     timeout: input.timeout ?? { totalMs: 120_000, chunkMs: 30_000 },
     abortSignal: input.abortSignal,

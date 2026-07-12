@@ -19,6 +19,8 @@ describe("environment model config", () => {
       maxRetries: 2,
       timeoutMs: 120_000,
       chunkTimeoutMs: 30_000,
+      contextWindowTokens: 180_000,
+      outputReserveTokens: 16_000,
     });
   });
 
@@ -29,12 +31,16 @@ describe("environment model config", () => {
     vi.stubEnv("MODEL_MAX_RETRIES", "4");
     vi.stubEnv("MODEL_TIMEOUT_MS", "90000");
     vi.stubEnv("MODEL_CHUNK_TIMEOUT_MS", "15000");
+    vi.stubEnv("MODEL_CONTEXT_WINDOW_TOKENS", "120000");
+    vi.stubEnv("MODEL_OUTPUT_RESERVE_TOKENS", "12000");
 
     const { loadModelConfig } = await import("../config.js");
     expect(loadModelConfig()).toMatchObject({
       maxRetries: 4,
       timeoutMs: 90_000,
       chunkTimeoutMs: 15_000,
+      contextWindowTokens: 120_000,
+      outputReserveTokens: 12_000,
     });
   });
 

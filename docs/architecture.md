@@ -528,10 +528,13 @@ If a bug affects two panes at once, treat it as a boundary bug and add a regress
 ### 7.2 Chat flow
 
 1. User sends a chat message.
-2. Web posts the chat request to the server.
-3. Server creates a run and streams the assistant response.
-4. Server persists run and step data.
-5. Web renders streaming messages and tool output.
+2. Web posts the current transcript to the server.
+3. The agent removes empty placeholders and compacts the recent contiguous transcript to the configured context budget. The default model input budget is 180,000 tokens, with 16,000 tokens reserved for the response.
+4. Server creates a run and streams the assistant response.
+5. Server persists the complete transcript, run, and step data; compaction only affects the model request and does not remove history from the session.
+6. Web renders streaming messages and tool output.
+
+Spreadsheet reads are bounded at the tool boundary. A default `readSheet` call returns an overview of the whole Sheet (dimensions, column profiles, numeric statistics, and representative samples) without returning all raw cells. Explicit `mode=range` calls return up to approximately 4,000 grid cells and expose the next row or column through `hasMoreRows`, `hasMoreCols`, and the range in the response. This lets the model understand a large Sheet before requesting a focused range and keeps repeated analysis from filling the context with an unbounded tool result.
 
 ### 7.3 Title flow
 
