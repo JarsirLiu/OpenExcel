@@ -262,6 +262,7 @@ export async function recalculateAffectedFormulas(
       })
       .filter((result): result is CalculationCellResult => result !== null);
 
+    const touchedChunks = new Map<string, { sheetId: number; chunk: DocumentChunk }>();
     for (const result of results) {
       const sheetId = sheetIdsByName.get(result.sheetName);
       if (sheetId === undefined) continue;
@@ -279,19 +280,31 @@ export async function recalculateAffectedFormulas(
         displayValue: toDisplayValue(result.value),
         ...(result.formula ? { formula: result.formula } : {}),
       };
+      touchedChunks.set(`${sheetId}:${chunkKey}`, { sheetId, chunk });
+      await tx.formulaCell.update({
+        where: {
+          sheetId_address: {
+            sheetId,
+            address: formatA1Cell(result.row, result.col),
+          },
+        },
+        data: { cachedValue: toCachedValue(result) },
+      });
+    }
 
+    for (const { sheetId, chunk } of touchedChunks.values()) {
       await tx.sheetChunk.upsert({
         where: {
           sheetId_rowBlock_colBlock: {
             sheetId,
-            rowBlock: position.rowBlock,
-            colBlock: position.colBlock,
+            rowBlock: chunk.rowBlock,
+            colBlock: chunk.colBlock,
           },
         },
         create: {
           sheetId,
-          rowBlock: position.rowBlock,
-          colBlock: position.colBlock,
+          rowBlock: chunk.rowBlock,
+          colBlock: chunk.colBlock,
           revision,
           codec: "json-v1",
           data: encodeDocumentJson({ cells: chunk.cells }),
@@ -301,15 +314,6 @@ export async function recalculateAffectedFormulas(
           codec: "json-v1",
           data: encodeDocumentJson({ cells: chunk.cells }),
         },
-      });
-      await tx.formulaCell.update({
-        where: {
-          sheetId_address: {
-            sheetId,
-            address: formatA1Cell(result.row, result.col),
-          },
-        },
-        data: { cachedValue: toCachedValue(result) },
       });
     }
     return results;

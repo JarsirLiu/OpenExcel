@@ -552,15 +552,15 @@ export async function applyStoredDocumentOperations(
       }
     }
 
-    for (const [index, operation] of operations.entries()) {
-      await tx.sheetOperation.create({
-        data: {
+    if (operations.length > 0) {
+      await tx.sheetOperation.createMany({
+        data: operations.map((operation, index) => ({
           workbookId: sheet.workbookId,
           sheetId: sheet.id,
           revision: sheet.documentRevision + index + 1,
           type: operation.type,
           payload: encodeDocumentJson(operation),
-        },
+        })),
       });
     }
 

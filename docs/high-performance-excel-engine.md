@@ -223,6 +223,8 @@ Operation Log 用途：
 - Snapshot 回放
 - Debug 和数据恢复
 
+For a multi-operation mutation, the server groups state changes by chunk and persists the operation records with one `createMany` call. Formula results are also grouped by destination chunk, so one recalculation batch writes each touched chunk at most once.
+
 ## Snapshot Strategy
 
 Operation Log 不能无限增长。系统应定期把操作物化进 chunks。

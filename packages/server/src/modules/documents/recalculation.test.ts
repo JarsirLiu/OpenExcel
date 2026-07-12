@@ -67,7 +67,7 @@ describe("recalculateAffectedFormulas", () => {
       [0, 1, 20],
       [0, 2, 40],
     ]);
-    expect(chunkUpsert).toHaveBeenCalledTimes(2);
+    expect(chunkUpsert).toHaveBeenCalledTimes(1);
     expect(formulaUpdate).toHaveBeenCalledTimes(2);
 
     const finalChunk = decodeDocumentJson<{ cells: Record<string, { value: unknown }> }>(
