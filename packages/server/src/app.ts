@@ -8,6 +8,7 @@ import { pinoStream } from "./infra/observability/logger.js";
 import { responseLoggerHook, startTimerHook } from "./middleware/requestLogger.js";
 import { resolveUserHook } from "./middleware/resolveUser.js";
 import { authRoutes } from "./modules/auth/routes.js";
+import { documentRoutes } from "./modules/documents/routes.js";
 import { sessionRoutes } from "./modules/sessions/routes.js";
 import { sheetRoutes } from "./modules/sheets/routes.js";
 import { workbookRoutes } from "./modules/workbooks/routes.js";
@@ -28,6 +29,7 @@ export async function createApp() {
   await app.register(authRoutes);
   await app.register(workspaceRoutes);
   await app.register(workbookRoutes);
+  await app.register(documentRoutes);
   await app.register(sheetRoutes);
   await app.register(sessionRoutes);
 

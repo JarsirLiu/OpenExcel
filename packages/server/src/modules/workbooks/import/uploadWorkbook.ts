@@ -74,6 +74,8 @@ export async function uploadAsNewWorkbook(workspaceId: number, buffer: Buffer, f
           documentFormat: "openexcel-document-v1",
           documentVersion: 1,
           documentRevision: 0,
+          maxRow: parsed.celldata.reduce((max, cell) => Math.max(max, cell.r + 1), 0),
+          maxColumn: parsed.celldata.reduce((max, cell) => Math.max(max, cell.c + 1), 0),
         },
       });
 

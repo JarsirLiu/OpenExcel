@@ -1,14 +1,19 @@
 import { excelToolSpecs, runToolContextSchema } from "@openexcel/agent";
 import {
+  formatA1Range,
   type SheetChangeDelta,
   type SheetChangeRangeOperation,
   sheetChangePatchOutputSchema,
   sheetChangeRangeToZeroBased,
 } from "@openexcel/core";
-import { prisma } from "../../../infra/database/db.js";
-import { sheetRecordToCelldata } from "../../../shared/utils/sheetData.js";
-import * as repo from "../../sessions/runs/repository.js";
-import { buildSheetChangePreview, toA1Range } from "../domain.js";
+import {
+  applyToolOperations,
+  buildToolPreview,
+  isMergeObject,
+  mergeRanges,
+  rangeForWriteOperation,
+  readToolRange,
+} from "../../documents/toolAdapter.js";
 
 export const unmergeCells = {
   ...excelToolSpecs.unmergeCells,
@@ -17,83 +22,42 @@ export const unmergeCells = {
     { sheetId, operations }: { sheetId: number; operations: SheetChangeRangeOperation[] },
     { context }: { context: { runId: number; workspaceId: number } },
   ) => {
-    const sheet = await prisma.sheet.findFirst({
-      where: { id: sheetId },
-      include: { workbook: true },
-    });
-    if (!sheet) throw new Error(`Sheet ${sheetId} 不存在`);
-    if (sheet.workbook.workspaceId !== context.workspaceId)
-      throw new Error(`Sheet ${sheetId} 不存在`);
-
-    await repo.upsertRunSheetSnapshot({
-      runId: context.runId,
+    const ranges = operations.map((operation) => sheetChangeRangeToZeroBased(operation));
+    const previewRange = mergeRanges(ranges);
+    const before = await readToolRange(context.workspaceId, sheetId, previewRange);
+    const deleteOperations = before.objects
+      .filter(isMergeObject)
+      .filter((object) => {
+        const position = object.position;
+        return ranges.some(
+          (range) =>
+            typeof position.startRow === "number" &&
+            typeof position.endRow === "number" &&
+            typeof position.startCol === "number" &&
+            typeof position.endCol === "number" &&
+            position.startRow <= range.endRow &&
+            position.endRow >= range.startRow &&
+            position.startCol <= range.endCol &&
+            position.endCol >= range.startCol,
+        );
+      })
+      .map((object) => ({ type: "deleteObject" as const, id: object.id }));
+    const { sheet } = await applyToolOperations(
+      context.workspaceId,
       sheetId,
-      uploadedData: sheet.uploadedData ?? null,
-      config: sheet.config ?? null,
-    });
-
-    const celldata: any[] = sheetRecordToCelldata(sheet);
-    if (!Array.isArray(celldata)) throw new Error("celldata 格式错误");
-
-    const storageRanges = operations.map(sheetChangeRangeToZeroBased);
-
-    for (const range of storageRanges) {
-      for (const cell of celldata) {
-        if (
-          cell.r >= range.startRow &&
-          cell.r <= range.endRow &&
-          cell.c >= range.startCol &&
-          cell.c <= range.endCol
-        ) {
-          if (cell.v?.mc) {
-            const { mc, ...rest } = cell.v;
-            cell.v = rest;
-          }
-        }
-      }
-    }
-
-    const config = sheet.config ? JSON.parse(sheet.config) : {};
-    if (config.merge) {
-      for (const range of storageRanges) {
-        for (const key of Object.keys(config.merge)) {
-          const m = config.merge[key];
-          if (
-            m.r >= range.startRow &&
-            m.r <= range.endRow &&
-            m.c >= range.startCol &&
-            m.c <= range.endCol
-          ) {
-            delete config.merge[key];
-          }
-        }
-      }
-    }
-
-    await prisma.sheet.update({
-      where: { id: sheetId },
-      data: {
-        uploadedData: JSON.stringify(celldata),
-        config: JSON.stringify(config),
-      },
-    });
-
-    const minRow = Math.min(...storageRanges.map((range) => range.startRow));
-    const maxRow = Math.max(...storageRanges.map((range) => range.endRow));
-
-    const delta: SheetChangeDelta = {
-      type: "unmerge",
-      operations,
-    };
-
+      deleteOperations,
+      context.runId,
+    );
+    const after = await readToolRange(context.workspaceId, sheetId, previewRange);
+    const delta: SheetChangeDelta = { type: "unmerge", operations };
     const output = {
       success: true,
       unmergedRanges: operations.map((operation) =>
-        toA1Range(operation.startRow, operation.startCol, operation.endRow, operation.endCol),
+        formatA1Range(sheetChangeRangeToZeroBased(operation)),
       ),
       delta,
-      preview: buildSheetChangePreview(celldata, sheet.name, sheetId, minRow, maxRow),
-      sheetInfo: { sheetId: sheet.id, sheetNo: sheet.sheetNo, sheetName: sheet.name },
+      preview: buildToolPreview(sheet, previewRange, after.cells, after.objects),
+      sheetInfo: { sheetId: sheet.sheetId, sheetNo: sheet.sheetNo, sheetName: sheet.name },
     };
 
     sheetChangePatchOutputSchema.parse(output);

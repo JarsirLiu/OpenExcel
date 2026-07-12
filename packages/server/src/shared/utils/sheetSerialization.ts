@@ -1,3 +1,4 @@
+import type { FortuneCell } from "@openexcel/core";
 import type { Prisma } from "../../infra/database/prismaTypes.js";
 
 export interface SheetJson {
@@ -6,11 +7,13 @@ export interface SheetJson {
   name: string;
   columns: { label: string; width?: number }[];
   merges: { row: [number, number]; col: [number, number] }[];
-  uploadedData: any[] | null;
+  uploadedData: FortuneCell[] | null;
   config: any | null;
   documentFormat: string;
   documentVersion: number;
   documentRevision: number;
+  maxRow: number;
+  maxColumn: number;
 }
 
 function safeParse<T>(value: string, fallback: T): T {
@@ -33,5 +36,7 @@ export function deserializeSheet(sheet: Prisma.SheetGetPayload<{}>): SheetJson {
     documentFormat: sheet.documentFormat,
     documentVersion: sheet.documentVersion,
     documentRevision: sheet.documentRevision,
+    maxRow: sheet.maxRow,
+    maxColumn: sheet.maxColumn,
   };
 }

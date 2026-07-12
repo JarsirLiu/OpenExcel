@@ -3,6 +3,33 @@ import { createSession, generateSessionTitle, type Session } from "@/api/session
 import { getFirstUserText } from "@/features/shared/messageUtils";
 import { useSessionsList } from "./useSessionsList";
 
+function areSessionsEqual(left: Session[], right: Session[]): boolean {
+  if (left.length !== right.length) return false;
+  return left.every((session, index) => {
+    const other = right[index];
+    return (
+      other != null &&
+      session.id === other.id &&
+      session.publicId === other.publicId &&
+      session.sheetId === other.sheetId &&
+      session.name === other.name &&
+      session.createdAt === other.createdAt
+    );
+  });
+}
+
+function sessionSignature(sessions: Session[]): string {
+  return JSON.stringify(
+    sessions.map(({ id, publicId, sheetId, name, createdAt }) => ({
+      id,
+      publicId,
+      sheetId,
+      name,
+      createdAt,
+    })),
+  );
+}
+
 export function useSessionWorkspace(
   workspaceId: number | null,
   onUndoComplete?: () => Promise<void> | void,
@@ -23,10 +50,19 @@ export function useSessionWorkspace(
   } = useSessionsList(workspaceId, initial?.sessions);
 
   // Seed initial sessions from route loader
+  const seededInitialSessionsRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!initial) return;
-    setSessions(initial.sessions);
-  }, [initial, setSessions]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!initial) {
+      seededInitialSessionsRef.current = null;
+      return;
+    }
+    const signature = sessionSignature(initial.sessions);
+    if (signature === seededInitialSessionsRef.current) return;
+    seededInitialSessionsRef.current = signature;
+    setSessions((current) =>
+      areSessionsEqual(current, initial.sessions) ? current : initial.sessions,
+    );
+  }, [initial?.sessions, setSessions]);
 
   // Reset on workspace switch
   const prevWorkspaceIdRef = useRef(workspaceId);

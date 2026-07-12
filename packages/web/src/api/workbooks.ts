@@ -31,6 +31,8 @@ export interface SheetSchema {
   documentFormat?: string;
   documentVersion?: number;
   documentRevision?: number;
+  maxRow?: number;
+  maxColumn?: number;
 }
 
 export interface WorkbookFull {

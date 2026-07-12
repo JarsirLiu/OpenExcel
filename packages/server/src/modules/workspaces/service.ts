@@ -88,6 +88,8 @@ export async function createWorkspace(ownerUserId: number, name?: string) {
         merges: sheetInitialization.merges,
         uploadedData: sheetInitialization.uploadedData,
         config: sheetInitialization.config ?? null,
+        maxRow: sheetInitialization.maxRow,
+        maxColumn: sheetInitialization.maxColumn,
       },
     });
 

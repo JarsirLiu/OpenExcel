@@ -1,3 +1,4 @@
+import { decodeDocumentJson } from "@openexcel/core";
 import { prisma } from "../../../infra/database/db.js";
 import type { Prisma } from "../../../infra/database/prismaTypes.js";
 import * as repo from "./repository.js";
@@ -142,13 +143,71 @@ async function restoreSheetSnapshots(
     }
 
     restoredSheetIds.push(snapshot.sheetId);
-    await tx.sheet.update({
-      where: { id: snapshot.sheetId },
-      data: {
-        uploadedData: snapshot.uploadedData,
-        config: snapshot.config,
-      },
-    });
+    if (
+      snapshot.documentRevision != null &&
+      snapshot.documentMaxRow != null &&
+      snapshot.documentMaxColumn != null &&
+      snapshot.documentChunks != null &&
+      snapshot.documentObjects != null
+    ) {
+      const chunks = decodeDocumentJson<{
+        chunks: Array<{
+          rowBlock: number;
+          colBlock: number;
+          revision: number;
+          codec: string;
+          data: number[];
+        }>;
+      }>(snapshot.documentChunks);
+      const objects = decodeDocumentJson<{
+        objects: Array<{ type: string; position: number[]; data: number[] }>;
+      }>(snapshot.documentObjects);
+
+      await tx.sheetChunk.deleteMany({ where: { sheetId: snapshot.sheetId } });
+      await tx.sheetObject.deleteMany({ where: { sheetId: snapshot.sheetId } });
+      for (const chunk of chunks.chunks) {
+        await tx.sheetChunk.create({
+          data: {
+            sheetId: snapshot.sheetId,
+            rowBlock: chunk.rowBlock,
+            colBlock: chunk.colBlock,
+            revision: chunk.revision,
+            codec: chunk.codec,
+            data: Uint8Array.from(chunk.data),
+          },
+        });
+      }
+      for (const object of objects.objects) {
+        await tx.sheetObject.create({
+          data: {
+            sheetId: snapshot.sheetId,
+            type: object.type,
+            position: Uint8Array.from(object.position),
+            data: Uint8Array.from(object.data),
+          },
+        });
+      }
+      await tx.sheet.update({
+        where: { id: snapshot.sheetId },
+        data: {
+          uploadedData: null,
+          config: null,
+          documentFormat: "openexcel-document-v1",
+          documentVersion: 1,
+          documentRevision: snapshot.documentRevision,
+          maxRow: snapshot.documentMaxRow,
+          maxColumn: snapshot.documentMaxColumn,
+        },
+      });
+    } else {
+      await tx.sheet.update({
+        where: { id: snapshot.sheetId },
+        data: {
+          uploadedData: snapshot.uploadedData,
+          config: snapshot.config,
+        },
+      });
+    }
   }
 
   await tx.agentRunSheetSnapshot.deleteMany({

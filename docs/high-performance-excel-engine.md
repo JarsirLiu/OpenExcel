@@ -546,6 +546,17 @@ Univer UI
 
 ## Final Direction
 
+### Current `dev` Progress
+
+The current implementation has moved the active edit and AI mutation paths onto the document model:
+
+- AI cell and object mutations are submitted as an atomic operation batch.
+- Fortune editor changes are diffed into canonical cell and merge operations.
+- Fortune layout/config changes use a revisioned layout endpoint without rewriting cell chunks.
+- Undo snapshots capture canonical chunks and objects before the first mutation in a run.
+
+The old full-sheet endpoint and Fortune-shaped fields remain only as import/export and compatibility boundaries. They are not the target persistence path and should be removed after viewport loading and canonical export are fully covered by integration tests.
+
 OpenExcel 的长期文档模型应遵循：
 
 ```text

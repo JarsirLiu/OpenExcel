@@ -37,12 +37,45 @@ export async function createSheet(data: {
   merges: string;
   uploadedData: string;
   config?: string;
+  maxRow: number;
+  maxColumn: number;
 }) {
   return prisma.sheet.create({
     data: {
       ...data,
       config: data.config ?? null,
     },
+  });
+}
+
+export async function copySheetDocument(sourceSheetId: number, targetSheetId: number) {
+  const [chunks, objects] = await Promise.all([
+    prisma.sheetChunk.findMany({ where: { sheetId: sourceSheetId } }),
+    prisma.sheetObject.findMany({ where: { sheetId: sourceSheetId } }),
+  ]);
+  await prisma.$transaction(async (tx) => {
+    for (const chunk of chunks) {
+      await tx.sheetChunk.create({
+        data: {
+          sheetId: targetSheetId,
+          rowBlock: chunk.rowBlock,
+          colBlock: chunk.colBlock,
+          revision: 0,
+          codec: chunk.codec,
+          data: chunk.data,
+        },
+      });
+    }
+    for (const object of objects) {
+      await tx.sheetObject.create({
+        data: {
+          sheetId: targetSheetId,
+          type: object.type,
+          position: object.position,
+          data: object.data,
+        },
+      });
+    }
   });
 }
 

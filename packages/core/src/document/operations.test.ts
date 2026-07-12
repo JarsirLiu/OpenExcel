@@ -60,4 +60,18 @@ describe("document operations", () => {
     const removed = applyDocumentOperation(updated, { type: "deleteObject", id: "chart-1" }, 3);
     expect(removed.objects.has("chart-1")).toBe(false);
   });
+
+  it("rejects range matrices with the wrong dimensions", () => {
+    expect(() =>
+      applyDocumentOperation(
+        createDocumentState(),
+        {
+          type: "setRangeValues",
+          range: { startRow: 0, startCol: 0, endRow: 1, endCol: 1 },
+          values: [["only one row"]],
+        },
+        1,
+      ),
+    ).toThrow("Range values must match the target range dimensions");
+  });
 });

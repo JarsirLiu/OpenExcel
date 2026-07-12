@@ -3,6 +3,8 @@ export type SheetInitializationPayload = {
   merges: string;
   uploadedData: string;
   config?: string;
+  maxRow: number;
+  maxColumn: number;
 };
 
 export type SourceSheetPayload = {
@@ -10,6 +12,8 @@ export type SourceSheetPayload = {
   merges: string;
   uploadedData: string | null;
   config: string | null;
+  maxRow?: number;
+  maxColumn?: number;
 };
 
 export class WorkbookCreationError extends Error {
@@ -39,6 +43,8 @@ export function buildBlankSheetInitialization(): SheetInitializationPayload {
     columns: JSON.stringify([]),
     merges: JSON.stringify([]),
     uploadedData: JSON.stringify([]),
+    maxRow: 0,
+    maxColumn: 0,
   };
 }
 
@@ -49,6 +55,8 @@ export function buildSourceSheetInitialization(
     columns: sourceSheet.columns,
     merges: sourceSheet.merges,
     uploadedData: sourceSheet.uploadedData ?? JSON.stringify([]),
+    maxRow: sourceSheet.maxRow ?? 0,
+    maxColumn: sourceSheet.maxColumn ?? 0,
   };
 
   if (sourceSheet.config != null) {

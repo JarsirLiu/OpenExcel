@@ -65,6 +65,8 @@ model Sheet {
   documentFormat   String   @default("fortune-celldata-v1")
   documentVersion  Int      @default(1)
   documentRevision Int      @default(0)
+  maxRow           Int      @default(0)
+  maxColumn        Int      @default(0)
   workbook     Workbook                @relation(fields: [workbookId], references: [id], onDelete: Cascade)
   sessions     Session[]
   runSnapshots AgentRunSheetSnapshot[]
@@ -148,6 +150,11 @@ model AgentRunSheetSnapshot {
   sheetId      Int
   uploadedData String?
   config       String?
+  documentRevision Int?
+  documentMaxRow    Int?
+  documentMaxColumn Int?
+  documentChunks   Bytes?
+  documentObjects  Bytes?
   createdAt    DateTime @default(now())
   run          AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
   sheet        Sheet    @relation(fields: [sheetId], references: [id], onDelete: Cascade)

@@ -38,7 +38,12 @@ export async function createSheet(
     merges: payload.merges,
     uploadedData: payload.uploadedData,
     config: payload.config,
+    maxRow: payload.maxRow,
+    maxColumn: payload.maxColumn,
   });
+  if (sourceSheet) {
+    await repo.copySheetDocument(sourceSheet.id, sheet.id);
+  }
 
   return { workbookId, id: sheet.id, sheetNo: sheet.sheetNo, name: sheet.name, order: sheet.order };
 }

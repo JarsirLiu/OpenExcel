@@ -52,7 +52,7 @@ export async function createWorkbook(
         ? null
         : await tx.sheet.findUnique({
             where: { id: sourceSheetId },
-            include: { workbook: true },
+            include: { workbook: true, chunks: true, objects: true },
           });
 
     if (
@@ -76,8 +76,35 @@ export async function createWorkbook(
         merges: payload.merges,
         uploadedData: payload.uploadedData,
         config: payload.config ?? null,
+        maxRow: payload.maxRow,
+        maxColumn: payload.maxColumn,
       },
     });
+
+    if (sourceSheet) {
+      for (const chunk of sourceSheet.chunks) {
+        await tx.sheetChunk.create({
+          data: {
+            sheetId: initialSheet.id,
+            rowBlock: chunk.rowBlock,
+            colBlock: chunk.colBlock,
+            revision: 0,
+            codec: chunk.codec,
+            data: chunk.data,
+          },
+        });
+      }
+      for (const object of sourceSheet.objects) {
+        await tx.sheetObject.create({
+          data: {
+            sheetId: initialSheet.id,
+            type: object.type,
+            position: object.position,
+            data: object.data,
+          },
+        });
+      }
+    }
 
     return {
       id: workbook.id,

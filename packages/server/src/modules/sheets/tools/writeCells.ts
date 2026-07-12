@@ -1,19 +1,54 @@
 import { excelToolSpecs, runToolContextSchema } from "@openexcel/agent";
+import { type SheetChangeDelta, sheetChangePatchOutputSchema } from "@openexcel/core";
 import {
-  type SheetChangeDelta,
-  sheetChangeCellToZeroBased,
-  sheetChangePatchOutputSchema,
-  sheetChangeRangeToZeroBased,
-} from "@openexcel/core";
-import { prisma } from "../../../infra/database/db.js";
-import { sheetRecordToCelldata } from "../../../shared/utils/sheetData.js";
-import * as repo from "../../sessions/runs/repository.js";
-import {
-  applyCellWrite,
-  buildSheetChangePreview,
-  normalizeWriteOperations,
-  type WriteCellsInput,
-} from "../domain.js";
+  applyToolOperations,
+  buildToolPreview,
+  mergeRanges,
+  rangeForWriteOperation,
+  readToolRange,
+  type ToolWriteOperation,
+  writeOperationToDocument,
+} from "../../documents/toolAdapter.js";
+import { normalizeWriteOperations, type WriteCellsInput } from "../domain.js";
+
+function normalizeFormula(formula?: string): string | undefined {
+  if (!formula) return undefined;
+  const value = formula.trim();
+  if (!value) return undefined;
+  return value.startsWith("=") ? value.slice(1) : value;
+}
+
+function touchedCells(operations: ToolWriteOperation[]) {
+  const cells: Array<{
+    row: number;
+    col: number;
+    value: string | number | boolean;
+    formula?: string;
+  }> = [];
+  for (const operation of operations) {
+    const formula = normalizeFormula(operation.formula);
+    if (operation.type === "cell") {
+      cells.push({
+        row: operation.row,
+        col: operation.col,
+        value: operation.value,
+        ...(formula ? { formula } : {}),
+      });
+      continue;
+    }
+    for (let row = operation.startRow; row <= operation.endRow; row += 1) {
+      for (let col = operation.startCol; col <= operation.endCol; col += 1) {
+        cells.push({
+          row,
+          col,
+          value: operation.value,
+          ...(formula ? { formula } : {}),
+        });
+      }
+    }
+  }
+  return cells;
+}
 
 export const writeCells = {
   ...excelToolSpecs.writeCells,
@@ -23,83 +58,24 @@ export const writeCells = {
     { context }: { context: { runId: number; workspaceId: number } },
   ) => {
     const { sheetId, operations } = normalizeWriteOperations(input);
-    const sheet = await prisma.sheet.findFirst({
-      where: { id: sheetId },
-      include: { workbook: true },
-    });
-    if (!sheet) throw new Error(`Sheet ${sheetId} 不存在`);
-    if (sheet.workbook.workspaceId !== context.workspaceId)
-      throw new Error(`Sheet ${sheetId} 不存在`);
-
-    await repo.upsertRunSheetSnapshot({
-      runId: context.runId,
+    const documentOperations = operations.map(writeOperationToDocument);
+    const ranges = operations.map(rangeForWriteOperation);
+    const { sheet } = await applyToolOperations(
+      context.workspaceId,
       sheetId,
-      uploadedData: sheet.uploadedData ?? null,
-      config: sheet.config ?? null,
-    });
-
-    const celldata: any[] = sheetRecordToCelldata(sheet);
-    if (!Array.isArray(celldata)) throw new Error("celldata 格式错误");
-
-    const cellMap = new Map<string, any>();
-    for (const cell of celldata) {
-      cellMap.set(`${cell.r},${cell.c}`, cell);
-    }
-
-    const touchedCells = new Map<
-      string,
-      { row: number; col: number; value: string | number | boolean; formula?: string }
-    >();
-    for (const operation of operations) {
-      if (operation.type === "cell") {
-        const storageCell = sheetChangeCellToZeroBased(operation);
-        applyCellWrite(
-          cellMap,
-          touchedCells,
-          storageCell.row,
-          storageCell.col,
-          storageCell.value,
-          storageCell.formula,
-        );
-        continue;
-      }
-
-      const storageRange = sheetChangeRangeToZeroBased({
-        startRow: operation.startRow,
-        startCol: operation.startCol,
-        endRow: operation.endRow,
-        endCol: operation.endCol,
-      });
-
-      for (let row = storageRange.startRow; row <= storageRange.endRow; row += 1) {
-        for (let col = storageRange.startCol; col <= storageRange.endCol; col += 1) {
-          applyCellWrite(cellMap, touchedCells, row, col, operation.value, operation.formula);
-        }
-      }
-    }
-
-    const updatedCelldata = Array.from(cellMap.values());
-
-    await prisma.sheet.update({
-      where: { id: sheetId },
-      data: { uploadedData: JSON.stringify(updatedCelldata) },
-    });
-
-    const touchedValues = Array.from(touchedCells.values());
-    const minRow = Math.min(...touchedValues.map((cell) => cell.row - 1));
-    const maxRow = Math.max(...touchedValues.map((cell) => cell.row - 1));
-
-    const delta: SheetChangeDelta = {
-      type: "write",
-      cells: touchedValues,
-    };
-
+      documentOperations,
+      context.runId,
+    );
+    const previewRange = mergeRanges(ranges);
+    const previewData = await readToolRange(context.workspaceId, sheetId, previewRange);
+    const touched = touchedCells(operations);
+    const delta: SheetChangeDelta = { type: "write", cells: touched };
     const output = {
       success: true,
-      updatedCells: touchedValues.length,
+      updatedCells: touched.length,
       delta,
-      preview: buildSheetChangePreview(updatedCelldata, sheet.name, sheetId, minRow, maxRow),
-      sheetInfo: { sheetId: sheet.id, sheetNo: sheet.sheetNo, sheetName: sheet.name },
+      preview: buildToolPreview(sheet, previewRange, previewData.cells),
+      sheetInfo: { sheetId: sheet.sheetId, sheetNo: sheet.sheetNo, sheetName: sheet.name },
     };
 
     sheetChangePatchOutputSchema.parse(output);

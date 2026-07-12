@@ -1,16 +1,17 @@
 import type { WorkbookInstance } from "@fortune-sheet/react";
-import { celldataToExcel, extractSheetConfig, matrixToCelldata } from "@openexcel/core";
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { WorkbookFull } from "@/api/workbooks";
 import {
-  createSheet,
-  deleteSheet,
-  deleteWorkbook,
-  updateSheetData,
-  updateSheetName,
-} from "@/api/workbooks";
+  celldataToExcel,
+  extractSheetConfig,
+  type FortuneCell,
+  matrixToCelldata,
+} from "@openexcel/core";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { applyDocumentLayout, applyDocumentOperations } from "@/api/documents";
+import type { WorkbookFull } from "@/api/workbooks";
+import { createSheet, deleteSheet, deleteWorkbook, updateSheetName } from "@/api/workbooks";
 import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatchSync";
 import { confirm } from "@/shared/lib";
+import { buildDocumentOperations, valueKey } from "./documentSync";
 import { toFortuneSheetData } from "./fortuneSheet";
 import { useSheetActivation } from "./SheetActivationContext";
 import { useWorkbookEditorSession } from "./useWorkbookEditorSession";
@@ -39,7 +40,11 @@ export function useExcelGridWorkspace({
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveStatusResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveChainRef = useRef(Promise.resolve());
   const lastSavedSnapshotRef = useRef<Record<number, string>>({});
+  const lastSavedCelldataRef = useRef<Record<number, FortuneCell[]>>({});
+  const lastSavedConfigRef = useRef<Record<number, unknown>>({});
+  const lastSavedRevisionRef = useRef<Record<number, number>>({});
   const workbookRef = useRef<WorkbookInstance>(null);
   const { sheetData, sessionKey } = useWorkbookEditorSession(workbook, workbookRevision);
   const { registerActivateSheet } = useSheetActivation();
@@ -55,6 +60,9 @@ export function useExcelGridWorkspace({
     workbook.sheets.forEach((sheet) => {
       const fd = toFortuneSheetData(sheet);
       nextSnapshots[sheet.id] = getSnapshot(fd.celldata, extractSheetConfig(fd));
+      lastSavedCelldataRef.current[sheet.id] = fd.celldata;
+      lastSavedConfigRef.current[sheet.id] = extractSheetConfig(fd);
+      lastSavedRevisionRef.current[sheet.id] = sheet.documentRevision ?? 0;
     });
 
     lastSavedSnapshotRef.current = nextSnapshots;
@@ -86,9 +94,27 @@ export function useExcelGridWorkspace({
       setSaveStatus("saving");
       try {
         const sheet = workbook.sheets[currentSheetIndex];
-        await updateSheetData(workspaceId, sheet.id, celldata, config);
+        const previousCelldata = lastSavedCelldataRef.current[sheet.id] ?? [];
+        const operations = buildDocumentOperations(
+          previousCelldata,
+          celldata as FortuneCell[],
+          sheet.columns.length > 0 ? 1 : 0,
+        );
+        let revision = lastSavedRevisionRef.current[sheet.id] ?? sheet.documentRevision ?? 0;
+        if (operations.length > 0) {
+          const result = await applyDocumentOperations(workspaceId, sheet.id, operations, revision);
+          revision = result.revision;
+        }
+        const previousConfig = lastSavedConfigRef.current[sheet.id];
+        if (valueKey(previousConfig) !== valueKey(config)) {
+          const result = await applyDocumentLayout(workspaceId, sheet.id, config, revision);
+          revision = result.revision;
+        }
+        lastSavedRevisionRef.current[sheet.id] = revision;
         setSaveStatus("saved");
         lastSavedSnapshotRef.current[sheet.id] = getSnapshot(celldata, config);
+        lastSavedCelldataRef.current[sheet.id] = celldata as FortuneCell[];
+        lastSavedConfigRef.current[sheet.id] = config;
         if (saveStatusResetRef.current) clearTimeout(saveStatusResetRef.current);
         saveStatusResetRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
       } catch (error) {
@@ -110,7 +136,7 @@ export function useExcelGridWorkspace({
 
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = setTimeout(() => {
-        void syncSheetToServer(celldata, config);
+        saveChainRef.current = saveChainRef.current.then(() => syncSheetToServer(celldata, config));
       }, 500);
     },
     [currentSheetIndex, getSnapshot, syncSheetToServer, workbook],

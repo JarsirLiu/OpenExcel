@@ -1,14 +1,19 @@
 import { excelToolSpecs, runToolContextSchema } from "@openexcel/agent";
 import {
+  formatA1Range,
   type SheetChangeDelta,
   type SheetChangeRangeOperation,
   sheetChangePatchOutputSchema,
   sheetChangeRangeToZeroBased,
 } from "@openexcel/core";
-import { prisma } from "../../../infra/database/db.js";
-import { sheetRecordToCelldata } from "../../../shared/utils/sheetData.js";
-import * as repo from "../../sessions/runs/repository.js";
-import { applyMergeOperation, buildSheetChangePreview, toA1CellRef, toA1Range } from "../domain.js";
+import {
+  applyToolOperations,
+  buildToolPreview,
+  mergeOperationToDocument,
+  mergeRanges,
+  rangeForWriteOperation,
+  readToolRange,
+} from "../../documents/toolAdapter.js";
 
 export const mergeCells = {
   ...excelToolSpecs.mergeCells,
@@ -17,76 +22,31 @@ export const mergeCells = {
     { sheetId, operations }: { sheetId: number; operations: SheetChangeRangeOperation[] },
     { context }: { context: { runId: number; workspaceId: number } },
   ) => {
-    const sheet = await prisma.sheet.findFirst({
-      where: { id: sheetId },
-      include: { workbook: true },
-    });
-    if (!sheet) throw new Error(`Sheet ${sheetId} 不存在`);
-    if (sheet.workbook.workspaceId !== context.workspaceId)
-      throw new Error(`Sheet ${sheetId} 不存在`);
-
-    await repo.upsertRunSheetSnapshot({
-      runId: context.runId,
+    const ranges = operations.map((operation) => ({ ...operation, value: "" }));
+    const previewRange = mergeRanges(
+      ranges.map((operation) =>
+        rangeForWriteOperation({
+          ...operation,
+        }),
+      ),
+    );
+    const documentOperations = operations.map(mergeOperationToDocument);
+    const { sheet } = await applyToolOperations(
+      context.workspaceId,
       sheetId,
-      uploadedData: sheet.uploadedData ?? null,
-      config: sheet.config ?? null,
-    });
-
-    const celldata: any[] = sheetRecordToCelldata(sheet);
-    if (!Array.isArray(celldata)) throw new Error("celldata 格式错误");
-
-    const cellMap = new Map<string, any>();
-    for (const cell of celldata) {
-      cellMap.set(`${cell.r},${cell.c}`, cell);
-    }
-
-    const mergedRanges: string[] = [];
-    let minRow = Number.POSITIVE_INFINITY;
-    let maxRow = Number.NEGATIVE_INFINITY;
-
-    for (const operation of operations) {
-      const storageRange = sheetChangeRangeToZeroBased(operation);
-      applyMergeOperation(cellMap, storageRange);
-      mergedRanges.push(
-        toA1Range(operation.startRow, operation.startCol, operation.endRow, operation.endCol),
-      );
-      minRow = Math.min(minRow, storageRange.startRow);
-      maxRow = Math.max(maxRow, storageRange.endRow);
-    }
-
-    const updatedCelldata = Array.from(cellMap.values());
-    const config = sheet.config ? JSON.parse(sheet.config) : {};
-    config.merge = { ...(config.merge ?? {}) };
-    for (const operation of operations) {
-      const storageRange = sheetChangeRangeToZeroBased(operation);
-      const cellRef = toA1CellRef(operation.startRow, operation.startCol);
-      config.merge[cellRef] = {
-        r: storageRange.startRow,
-        c: storageRange.startCol,
-        rs: storageRange.endRow - storageRange.startRow + 1,
-        cs: storageRange.endCol - storageRange.startCol + 1,
-      };
-    }
-
-    await prisma.sheet.update({
-      where: { id: sheetId },
-      data: {
-        uploadedData: JSON.stringify(updatedCelldata),
-        config: JSON.stringify(config),
-      },
-    });
-
-    const delta: SheetChangeDelta = {
-      type: "merge",
-      operations,
-    };
-
+      documentOperations,
+      context.runId,
+    );
+    const previewData = await readToolRange(context.workspaceId, sheetId, previewRange);
+    const delta: SheetChangeDelta = { type: "merge", operations };
     const output = {
       success: true,
-      mergedRanges,
+      mergedRanges: operations.map((operation) =>
+        formatA1Range(sheetChangeRangeToZeroBased(operation)),
+      ),
       delta,
-      preview: buildSheetChangePreview(updatedCelldata, sheet.name, sheetId, minRow, maxRow),
-      sheetInfo: { sheetId: sheet.id, sheetNo: sheet.sheetNo, sheetName: sheet.name },
+      preview: buildToolPreview(sheet, previewRange, previewData.cells, previewData.objects),
+      sheetInfo: { sheetId: sheet.sheetId, sheetNo: sheet.sheetNo, sheetName: sheet.name },
     };
 
     sheetChangePatchOutputSchema.parse(output);

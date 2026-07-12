@@ -6,7 +6,7 @@ export type { FortuneCell, FortuneSheetData, SheetConfig };
 /**
  * 从 celldata 的 mc 属性提取合并范围。
  */
-function extractMergesFromCelldata(
+export function extractMergesFromCelldata(
   celldata: FortuneCell[],
 ): { row: [number, number]; col: [number, number] }[] {
   const seen = new Set<string>();
@@ -51,7 +51,14 @@ export function toFortuneSheetData(sheet: {
         c: ci,
         v: { v: col.label, m: col.label },
       }));
-      celldata = [...headerCells, ...celldata.map((c) => ({ ...c, r: c.r + 1 }))];
+      celldata = [
+        ...headerCells,
+        ...celldata.map((c) => ({
+          ...c,
+          r: c.r + 1,
+          v: c.v?.mc ? { ...c.v, mc: { ...c.v.mc, r: c.v.mc.r + 1 } } : c.v,
+        })),
+      ];
       merges = merges.map((m) => ({
         row: [m.row[0] + 1, m.row[1] + 1],
         col: [m.col[0], m.col[1]],

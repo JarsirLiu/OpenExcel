@@ -75,6 +75,16 @@ export function applyDocumentOperation(
     case "setRangeValues": {
       validateCellRange(operation.range);
       const { rows, cols } = cellRangeSize(operation.range);
+      if (operation.values.length !== rows || operation.values.some((row) => row.length !== cols)) {
+        throw new Error("Range values must match the target range dimensions");
+      }
+      if (
+        operation.formulas &&
+        (operation.formulas.length !== rows ||
+          operation.formulas.some((row) => row.length !== cols))
+      ) {
+        throw new Error("Range formulas must match the target range dimensions");
+      }
       for (let rowOffset = 0; rowOffset < rows; rowOffset += 1) {
         for (let colOffset = 0; colOffset < cols; colOffset += 1) {
           const rawValue: DocumentScalar = operation.values[rowOffset]?.[colOffset] ?? null;
