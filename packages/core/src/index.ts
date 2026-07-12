@@ -49,6 +49,8 @@ export {
   readChunkCell,
   writeChunkCell,
 } from "./document/chunk.js";
+export type { FormulaReference } from "./document/formula.js";
+export { extractFormulaReferences } from "./document/formula.js";
 export {
   chunksToFortuneCelldata,
   documentValueToFortuneValue,

@@ -1,5 +1,5 @@
 import {
-  applyDocumentOperation,
+  applyDocumentOperations,
   type CellRange,
   createDocumentState,
   type DocumentCell,
@@ -14,6 +14,8 @@ import {
 } from "@openexcel/core";
 import { prisma } from "../../infra/database/db.js";
 import type { Prisma } from "../../infra/database/prismaTypes.js";
+import { syncFormulaIndex } from "./formulaIndex.js";
+import { recalculateAffectedFormulas } from "./recalculation.js";
 
 const DOCUMENT_FORMAT = "openexcel-document-v1";
 const CHUNK_ROW_SIZE = 128;
@@ -191,6 +193,14 @@ export interface DocumentMutationResult {
   revision: number;
   changedRanges: CellRange[];
   objectIds: string[];
+  calculatedCells: Array<{
+    sheetName: string;
+    row: number;
+    col: number;
+    value: string | number | boolean | null;
+    formula?: string;
+    error?: string;
+  }>;
 }
 
 export interface DocumentRevisionConflict {
@@ -431,11 +441,10 @@ export async function applyStoredDocumentOperations(
       const object = decodeObject(row);
       state.objects.set(object.id, object);
     }
-    let nextState = state;
-    for (const [index, operation] of operations.entries()) {
-      nextState = applyDocumentOperation(nextState, operation, sheet.documentRevision + index + 1);
-    }
+    const nextState = applyDocumentOperations(state, operations, sheet.documentRevision);
     const revision = sheet.documentRevision + operations.length;
+
+    await syncFormulaIndex(tx, sheet.id, operations);
 
     if (runId != null) {
       const [snapshotChunks, snapshotObjects] = await Promise.all([
@@ -500,6 +509,13 @@ export async function applyStoredDocumentOperations(
       });
     }
 
+    const calculatedCells = await recalculateAffectedFormulas(
+      tx,
+      sheet.workbookId,
+      changedRanges.map((range) => ({ sheetId: sheet.id, range })),
+      revision,
+    );
+
     const objectIds = [...objectOperationIds];
     if (objectOperationIds.size > 0) {
       const objects = objectRows.map(decodeObject);
@@ -548,7 +564,7 @@ export async function applyStoredDocumentOperations(
       });
     }
 
-    return { revision, changedRanges, objectIds };
+    return { revision, changedRanges, objectIds, calculatedCells };
   });
 }
 
@@ -598,6 +614,6 @@ export async function updateDocumentLayout(
         payload: encodeDocumentJson({ type: "updateLayout", config }),
       },
     });
-    return { revision, changedRanges: [], objectIds: [] };
+    return { revision, changedRanges: [], objectIds: [], calculatedCells: [] };
   });
 }

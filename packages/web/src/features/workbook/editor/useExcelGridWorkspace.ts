@@ -1,20 +1,29 @@
 import type { WorkbookInstance } from "@fortune-sheet/react";
-import {
-  celldataToExcel,
-  extractSheetConfig,
-  type FortuneCell,
-  matrixToCelldata,
-} from "@openexcel/core";
+import { extractSheetConfig, type FortuneCell, matrixToCelldata } from "@openexcel/core";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { applyDocumentLayout, applyDocumentOperations } from "@/api/documents";
+import { applyDocumentLayout, applyDocumentOperations, fetchDocumentRange } from "@/api/documents";
 import type { WorkbookFull } from "@/api/workbooks";
-import { createSheet, deleteSheet, deleteWorkbook, updateSheetName } from "@/api/workbooks";
+import {
+  createSheet,
+  deleteSheet,
+  deleteWorkbook,
+  downloadWorkbook,
+  updateSheetName,
+} from "@/api/workbooks";
 import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatchSync";
 import { confirm } from "@/shared/lib";
 import { buildDocumentOperations, valueKey } from "./documentSync";
 import { toFortuneSheetData } from "./fortuneSheet";
 import { useSheetActivation } from "./SheetActivationContext";
 import { useWorkbookEditorSession } from "./useWorkbookEditorSession";
+import {
+  createViewportCache,
+  mergeDocumentRange,
+  missingChunksForRange,
+  rangeToA1,
+  viewportCelldata,
+  viewportRangeFromScroll,
+} from "./viewportCache";
 
 type UseExcelGridWorkspaceProps = {
   workspaceId: number | null;
@@ -46,6 +55,9 @@ export function useExcelGridWorkspace({
   const lastSavedConfigRef = useRef<Record<number, unknown>>({});
   const lastSavedRevisionRef = useRef<Record<number, number>>({});
   const workbookRef = useRef<WorkbookInstance>(null);
+  const gridRootRef = useRef<HTMLDivElement>(null);
+  const viewportCacheRef = useRef<Record<number, ReturnType<typeof createViewportCache>>>({});
+  const pendingViewportChunksRef = useRef<Record<number, Set<string>>>({});
   const { sheetData, sessionKey } = useWorkbookEditorSession(workbook, workbookRevision);
   const { registerActivateSheet } = useSheetActivation();
 
@@ -53,8 +65,77 @@ export function useExcelGridWorkspace({
     return JSON.stringify({ celldata, config });
   }, []);
 
+  const updateRenderedSheet = useCallback(
+    (sheetId: number) => {
+      const instance = workbookRef.current;
+      const sourceSheet = workbook?.sheets.find((sheet) => sheet.id === sheetId);
+      const cache = viewportCacheRef.current[sheetId];
+      if (!instance || !sourceSheet || !cache) return;
+
+      const renderedCells = viewportCelldata(cache);
+      const allSheets = instance.getAllSheets() as any[];
+      instance.updateSheet(
+        allSheets.map((sheet) =>
+          String(sheet.id) === String(sheetId)
+            ? {
+                ...sheet,
+                celldata: renderedCells,
+                row: Math.max(sourceSheet.maxRow ?? 0, cache.maxRow, 128) + 1,
+                column: Math.max(sourceSheet.maxColumn ?? 0, cache.maxColumn, 64),
+              }
+            : sheet,
+        ),
+      );
+      lastSavedCelldataRef.current[sheetId] = renderedCells;
+      lastSavedRevisionRef.current[sheetId] = cache.revision;
+    },
+    [workbook],
+  );
+
+  const loadViewport = useCallback(
+    async (
+      sheetId: number,
+      range: { startRow: number; startCol: number; endRow: number; endCol: number },
+    ) => {
+      if (workspaceId == null) return;
+      const sheet = workbook?.sheets.find((item) => item.id === sheetId);
+      if (!sheet) return;
+
+      let cache = viewportCacheRef.current[sheetId];
+      if (!cache) {
+        cache = createViewportCache();
+        viewportCacheRef.current[sheetId] = cache;
+      }
+      let pending = pendingViewportChunksRef.current[sheetId];
+      if (!pending) {
+        pending = new Set<string>();
+        pendingViewportChunksRef.current[sheetId] = pending;
+      }
+      const missing = missingChunksForRange(cache, range).filter((key) => !pending.has(key));
+      if (missing.length === 0) {
+        updateRenderedSheet(sheetId);
+        return;
+      }
+      for (const key of missing) pending.add(key);
+
+      try {
+        const result = await fetchDocumentRange(workspaceId, sheetId, rangeToA1(range));
+        mergeDocumentRange(cache, result, sheet.columns);
+        updateRenderedSheet(sheetId);
+      } catch (error) {
+        console.error("加载工作表视口失败:", error);
+      } finally {
+        for (const key of missing) pending.delete(key);
+      }
+    },
+    [updateRenderedSheet, workbook, workspaceId],
+  );
+
   useEffect(() => {
     if (!workbook) return;
+
+    viewportCacheRef.current = {};
+    pendingViewportChunksRef.current = {};
 
     const nextSnapshots: Record<number, string> = {};
     workbook.sheets.forEach((sheet) => {
@@ -67,6 +148,51 @@ export function useExcelGridWorkspace({
 
     lastSavedSnapshotRef.current = nextSnapshots;
   }, [workbook, getSnapshot]);
+
+  useEffect(() => {
+    const sheet = workbook?.sheets[currentSheetIndex];
+    if (!sheet) return;
+    void loadViewport(
+      sheet.id,
+      viewportRangeFromScroll(0, 0, sheet.maxRow ?? 0, sheet.maxColumn ?? 0),
+    );
+  }, [currentSheetIndex, loadViewport, workbook]);
+
+  useEffect(() => {
+    const sheet = workbook?.sheets[currentSheetIndex];
+    const root = gridRootRef.current;
+    if (!sheet || !root) return;
+
+    const scrollbars = root.querySelectorAll<HTMLElement>(
+      ".luckysheet-scrollbar-x, .luckysheet-scrollbar-y",
+    );
+    if (scrollbars.length === 0) return;
+
+    let frame: number | null = null;
+    const requestViewport = () => {
+      if (frame != null) return;
+      frame = requestAnimationFrame(() => {
+        frame = null;
+        const horizontal = root.querySelector<HTMLElement>(".luckysheet-scrollbar-x");
+        const vertical = root.querySelector<HTMLElement>(".luckysheet-scrollbar-y");
+        void loadViewport(
+          sheet.id,
+          viewportRangeFromScroll(
+            vertical?.scrollTop ?? 0,
+            horizontal?.scrollLeft ?? 0,
+            Math.max(sheet.maxRow ?? 0, viewportCacheRef.current[sheet.id]?.maxRow ?? 0),
+            Math.max(sheet.maxColumn ?? 0, viewportCacheRef.current[sheet.id]?.maxColumn ?? 0),
+          ),
+        );
+      });
+    };
+
+    for (const scrollbar of scrollbars) scrollbar.addEventListener("scroll", requestViewport);
+    return () => {
+      for (const scrollbar of scrollbars) scrollbar.removeEventListener("scroll", requestViewport);
+      if (frame != null) cancelAnimationFrame(frame);
+    };
+  }, [currentSheetIndex, loadViewport, sessionKey, sheetData, workbook]);
 
   useEffect(() => {
     if (!workbookRef.current) return;
@@ -153,6 +279,16 @@ export function useExcelGridWorkspace({
       const cellMatrix = fortuneSheet.data;
       if (!Array.isArray(cellMatrix)) return;
       const celldata = matrixToCelldata(cellMatrix);
+      let cache = viewportCacheRef.current[sheet.id];
+      if (!cache) {
+        cache = createViewportCache();
+        viewportCacheRef.current[sheet.id] = cache;
+      }
+      const headerRows = sheet.columns.length > 0 ? 1 : 0;
+      for (const cell of celldata) {
+        cache.maxRow = Math.max(cache.maxRow, Math.max(0, cell.r - headerRows + 1));
+        cache.maxColumn = Math.max(cache.maxColumn, cell.c + 1);
+      }
       const config = extractSheetConfig(fortuneSheet);
       scheduleSave(celldata, config);
     },
@@ -242,28 +378,10 @@ export function useExcelGridWorkspace({
     [workspaceId],
   );
 
-  const handleDownload = useCallback(() => {
-    const inst = workbookRef.current;
-    if (!inst) return;
-    const allSheets = inst.getAllSheets();
-    if (!allSheets || allSheets.length === 0) return;
-
-    const buf = celldataToExcel(
-      (allSheets as any[]).map((sheet) => ({
-        name: sheet.name,
-        celldata: matrixToCelldata(sheet.data ?? []),
-        config: extractSheetConfig(sheet),
-        columnWidths: sheet.columnWidths ?? null,
-        rowHeights: sheet.rowlen ?? sheet.rowHeights ?? null,
-      })),
-    );
-    const blob = new Blob([buf], { type: "application/octet-stream" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `${workbook?.name ?? "export"}.xlsx`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-  }, [workbook]);
+  const handleDownload = useCallback(async () => {
+    if (!workbook || workspaceId == null) return;
+    await downloadWorkbook(workspaceId, workbook.id, workbook.name);
+  }, [workbook, workspaceId]);
 
   const handleDeleteWorkbook = useCallback(async () => {
     if (!workbook) return;
@@ -282,6 +400,7 @@ export function useExcelGridWorkspace({
   return {
     saveStatus,
     workbookRef,
+    gridRootRef,
     sheetData,
     sessionKey,
     handleChange,

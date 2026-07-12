@@ -16,6 +16,21 @@ export interface SheetJson {
   maxColumn: number;
 }
 
+type SheetMetadataRecord = Pick<
+  Prisma.SheetGetPayload<{}>,
+  | "id"
+  | "sheetNo"
+  | "name"
+  | "columns"
+  | "merges"
+  | "config"
+  | "documentFormat"
+  | "documentVersion"
+  | "documentRevision"
+  | "maxRow"
+  | "maxColumn"
+>;
+
 function safeParse<T>(value: string, fallback: T): T {
   try {
     return JSON.parse(value) as T;
@@ -32,6 +47,24 @@ export function deserializeSheet(sheet: Prisma.SheetGetPayload<{}>): SheetJson {
     columns: safeParse(sheet.columns, []),
     merges: safeParse(sheet.merges, []),
     uploadedData: sheet.uploadedData ? safeParse(sheet.uploadedData, null) : null,
+    config: sheet.config ? safeParse(sheet.config, null) : null,
+    documentFormat: sheet.documentFormat,
+    documentVersion: sheet.documentVersion,
+    documentRevision: sheet.documentRevision,
+    maxRow: sheet.maxRow,
+    maxColumn: sheet.maxColumn,
+  };
+}
+
+export function deserializeSheetMetadata(
+  sheet: SheetMetadataRecord,
+): Omit<SheetJson, "uploadedData"> {
+  return {
+    id: sheet.id,
+    sheetNo: sheet.sheetNo,
+    name: sheet.name,
+    columns: safeParse(sheet.columns, []),
+    merges: safeParse(sheet.merges, []),
     config: sheet.config ? safeParse(sheet.config, null) : null,
     documentFormat: sheet.documentFormat,
     documentVersion: sheet.documentVersion,

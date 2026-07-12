@@ -29,6 +29,7 @@ export function ExcelGrid({
   const {
     saveStatus,
     workbookRef,
+    gridRootRef,
     sheetData,
     sessionKey,
     handleChange,
@@ -52,7 +53,7 @@ export function ExcelGrid({
   if (!workbook) return null;
 
   return (
-    <div className={styles.container}>
+    <div ref={gridRootRef} className={styles.container}>
       <div className={styles.inner}>
         <Workbook
           key={`${workbook.id}:${sessionKey}`}

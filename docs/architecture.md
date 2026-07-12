@@ -518,6 +518,30 @@ If a bug affects two panes at once, treat it as a boundary bug and add a regress
 
 ## 7. Data Flow
 
+### 7.0 Canonical viewport loading
+
+Workbook metadata must not contain the full cell grid. Opening a workbook returns sheet structure,
+layout metadata, revision, and maximum dimensions only. The editor loads canonical cell data through
+the range endpoint in chunk-aligned requests and keeps a client-side cache keyed by the canonical
+chunk coordinate.
+
+The flow is:
+
+```text
+sheet metadata
+    -> visible range + prefetch window
+    -> canonical range API
+    -> client chunk cache
+    -> renderer adapter
+```
+
+The renderer is allowed to materialize a FortuneSheet-compatible sparse view, but that view is not a
+source of truth. Scrolling requests missing chunks incrementally. Export uses the server-side
+canonical workbook export path so a partially hydrated viewport can never produce a partial file.
+
+Legacy `uploadedData` is import/export transition state only. New reads and mutations must use the
+canonical document operations and range APIs.
+
 ### 7.1 Workbook editing flow
 
 1. User edits sheet content in the workbook area.

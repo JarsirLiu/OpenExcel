@@ -7,6 +7,7 @@ import {
 } from "@openexcel/core";
 import { prisma } from "../../infra/database/db.js";
 import { deserializeSheet } from "../../shared/utils/sheetSerialization.js";
+import { buildFormulaCellData } from "../documents/formulaIndex.js";
 
 function normalizeRendererCelldata(
   celldata: FortuneCell[],
@@ -90,6 +91,12 @@ export async function updateSheetData(
           data: encodeDocumentJson({ cells: chunk.cells }),
         },
       });
+    }
+
+    const formulaCells = buildFormulaCellData(sheet.id, celldata);
+    await tx.formulaCell.deleteMany({ where: { sheetId: sheet.id } });
+    if (formulaCells.length > 0) {
+      await tx.formulaCell.createMany({ data: formulaCells });
     }
 
     await tx.sheetOperation.create({

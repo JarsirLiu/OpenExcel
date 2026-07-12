@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { applyDocumentOperation, createDocumentState, readDocumentCell } from "./operations.js";
+import {
+  applyDocumentOperation,
+  applyDocumentOperations,
+  createDocumentState,
+  readDocumentCell,
+} from "./operations.js";
 
 describe("document operations", () => {
   it("writes and clears cells without materializing unrelated chunks", () => {
@@ -73,5 +78,49 @@ describe("document operations", () => {
         1,
       ),
     ).toThrow("Range values must match the target range dimensions");
+  });
+
+  it("applies a batch without mutating the input state", () => {
+    const initial = applyDocumentOperation(
+      createDocumentState(),
+      { type: "setCell", row: 0, col: 0, value: { value: "before" } },
+      1,
+    );
+
+    const updated = applyDocumentOperations(
+      initial,
+      [
+        { type: "setCell", row: 0, col: 0, value: { value: "after" } },
+        { type: "setCell", row: 128, col: 64, value: { value: 42 } },
+      ],
+      1,
+    );
+
+    expect(readDocumentCell(initial, 0, 0)?.value).toBe("before");
+    expect(readDocumentCell(initial, 128, 64)).toBeNull();
+    expect(readDocumentCell(updated, 0, 0)?.value).toBe("after");
+    expect(readDocumentCell(updated, 128, 64)?.value).toBe(42);
+    expect(updated.chunks.size).toBe(2);
+  });
+
+  it("writes large ranges across chunk boundaries", () => {
+    const updated = applyDocumentOperation(
+      createDocumentState(),
+      {
+        type: "setRangeValues",
+        range: { startRow: 127, startCol: 63, endRow: 128, endCol: 64 },
+        values: [
+          ["a", "b"],
+          ["c", "d"],
+        ],
+      },
+      1,
+    );
+
+    expect(readDocumentCell(updated, 127, 63)?.value).toBe("a");
+    expect(readDocumentCell(updated, 127, 64)?.value).toBe("b");
+    expect(readDocumentCell(updated, 128, 63)?.value).toBe("c");
+    expect(readDocumentCell(updated, 128, 64)?.value).toBe("d");
+    expect(updated.chunks.size).toBe(4);
   });
 });

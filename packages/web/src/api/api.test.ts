@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fetchMessages, fetchRuns, undoLatestRun } from "./chat";
+import { fetchDocumentRange } from "./documents";
 import { generateSessionTitle } from "./sessions";
 import {
   createSheet,
@@ -42,6 +43,31 @@ describe("fetchWorkbook", () => {
     const result = await fetchWorkbook(9, 1);
     expect(result).toEqual(data);
     expect(mockFetch).toHaveBeenCalledWith("/api/workspaces/9/workbooks/1", {});
+  });
+});
+
+describe("fetchDocumentRange", () => {
+  it("loads only the requested canonical range", async () => {
+    const data = {
+      sheetId: 7,
+      format: "openexcel-document-v1",
+      version: 1,
+      revision: 4,
+      maxRow: 1000,
+      maxColumn: 50,
+      range: { startRow: 0, startCol: 0, endRow: 127, endCol: 63 },
+      cells: [],
+      objects: [],
+    };
+    mockFetch.mockResolvedValue(new Response(JSON.stringify(data), { status: 200 }));
+
+    const result = await fetchDocumentRange(9, 7, "A1:BL128");
+
+    expect(result).toEqual(data);
+    expect(mockFetch).toHaveBeenCalledWith(
+      "/api/workspaces/9/sheets/7/document/range?range=A1%3ABL128",
+      {},
+    );
   });
 });
 

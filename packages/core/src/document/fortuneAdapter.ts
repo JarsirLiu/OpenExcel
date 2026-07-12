@@ -1,11 +1,5 @@
 import type { FortuneCell, FortuneCellValue } from "../excel/celldataUtils.js";
-import {
-  type ChunkOptions,
-  createEmptyChunk,
-  getChunkKey,
-  getChunkPosition,
-  writeChunkCell,
-} from "./chunk.js";
+import { type ChunkOptions, createEmptyChunk, getChunkKey, getChunkPosition } from "./chunk.js";
 import type { DocumentCellValue, DocumentChunk } from "./model.js";
 
 function isDocumentScalar(value: unknown): value is string | number | boolean | null {
@@ -56,10 +50,8 @@ export function fortuneCelldataToChunks(
     const key = getChunkKey(position.rowBlock, position.colBlock);
     const chunk =
       chunks.get(key) ?? createEmptyChunk(position.rowBlock, position.colBlock, revision);
-    chunks.set(
-      key,
-      writeChunkCell(chunk, cell.r, cell.c, fortuneCellToDocumentValue(cell.v), options),
-    );
+    chunk.cells[`${position.rowOffset},${position.colOffset}`] = fortuneCellToDocumentValue(cell.v);
+    chunks.set(key, chunk);
   }
   return chunks;
 }

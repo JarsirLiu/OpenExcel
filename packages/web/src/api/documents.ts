@@ -29,6 +29,15 @@ export interface DocumentRangeResult {
   }>;
 }
 
+export interface CalculatedCell {
+  sheetName: string;
+  row: number;
+  col: number;
+  value: string | number | boolean | null;
+  formula?: string;
+  error?: string;
+}
+
 export async function fetchDocumentRange(
   workspaceId: number,
   sheetId: number,
@@ -46,7 +55,12 @@ export async function applyDocumentOperation(
   sheetId: number,
   operation: unknown,
   expectedRevision?: number,
-): Promise<{ revision: number; changedRanges: unknown[]; objectIds: string[] }> {
+): Promise<{
+  revision: number;
+  changedRanges: unknown[];
+  objectIds: string[];
+  calculatedCells: CalculatedCell[];
+}> {
   const res = await apiFetch(`/workspaces/${workspaceId}/sheets/${sheetId}/document/operations`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -61,7 +75,12 @@ export async function applyDocumentOperations(
   sheetId: number,
   operations: unknown[],
   expectedRevision?: number,
-): Promise<{ revision: number; changedRanges: unknown[]; objectIds: string[] }> {
+): Promise<{
+  revision: number;
+  changedRanges: unknown[];
+  objectIds: string[];
+  calculatedCells: CalculatedCell[];
+}> {
   const res = await apiFetch(
     `/workspaces/${workspaceId}/sheets/${sheetId}/document/operations/batch`,
     {
@@ -79,7 +98,7 @@ export async function applyDocumentLayout(
   sheetId: number,
   config: unknown,
   expectedRevision?: number,
-): Promise<{ revision: number }> {
+): Promise<{ revision: number; calculatedCells: CalculatedCell[] }> {
   const res = await apiFetch(`/workspaces/${workspaceId}/sheets/${sheetId}/document/layout`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },

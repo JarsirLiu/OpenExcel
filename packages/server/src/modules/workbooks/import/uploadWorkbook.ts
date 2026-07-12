@@ -46,6 +46,7 @@ export async function uploadAsNewWorkbook(workspaceId: number, buffer: Buffer, f
   const { encodeDocumentJson, excelToGrid, fortuneCelldataToChunks } = await import(
     "@openexcel/core"
   );
+  const { buildFormulaCellData } = await import("../../documents/formulaIndex.js");
   const results = excelToGrid(bufferToArrayBuffer(buffer), sheetNames);
   const wbName = fileName.replace(/\.[^.]+$/, "");
 
@@ -91,6 +92,10 @@ export async function uploadAsNewWorkbook(workspaceId: number, buffer: Buffer, f
             data: encodeDocumentJson({ cells: chunk.cells }),
           },
         });
+      }
+      const formulaCells = buildFormulaCellData(sheet.id, parsed.celldata);
+      if (formulaCells.length > 0) {
+        await tx.formulaCell.createMany({ data: formulaCells });
       }
     }
 

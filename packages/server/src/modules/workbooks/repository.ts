@@ -24,6 +24,34 @@ export async function findWorkbookWithSheets(id: number, workspaceId: number) {
   return workbook;
 }
 
+export async function findWorkbookWithSheetMetadata(id: number, workspaceId: number) {
+  return prisma.workbook.findFirst({
+    where: { id, workspaceId },
+    select: {
+      id: true,
+      publicId: true,
+      name: true,
+      sheets: {
+        orderBy: { order: "asc" },
+        select: {
+          id: true,
+          sheetNo: true,
+          name: true,
+          order: true,
+          columns: true,
+          merges: true,
+          config: true,
+          documentFormat: true,
+          documentVersion: true,
+          documentRevision: true,
+          maxRow: true,
+          maxColumn: true,
+        },
+      },
+    },
+  });
+}
+
 export async function findWorkbook(id: number, workspaceId: number) {
   return prisma.workbook.findFirst({ where: { id, workspaceId } });
 }
@@ -53,6 +81,7 @@ export async function copySheetDocument(sourceSheetId: number, targetSheetId: nu
     prisma.sheetChunk.findMany({ where: { sheetId: sourceSheetId } }),
     prisma.sheetObject.findMany({ where: { sheetId: sourceSheetId } }),
   ]);
+  const formulaCells = await prisma.formulaCell.findMany({ where: { sheetId: sourceSheetId } });
   await prisma.$transaction(async (tx) => {
     for (const chunk of chunks) {
       await tx.sheetChunk.create({
@@ -74,6 +103,18 @@ export async function copySheetDocument(sourceSheetId: number, targetSheetId: nu
           position: object.position,
           data: object.data,
         },
+      });
+    }
+    if (formulaCells.length > 0) {
+      await tx.formulaCell.createMany({
+        data: formulaCells.map((formulaCell) => ({
+          sheetId: targetSheetId,
+          address: formulaCell.address,
+          formula: formulaCell.formula,
+          ast: formulaCell.ast,
+          dependencies: formulaCell.dependencies,
+          cachedValue: formulaCell.cachedValue,
+        })),
       });
     }
   });

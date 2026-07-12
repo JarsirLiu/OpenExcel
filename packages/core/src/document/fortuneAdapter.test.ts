@@ -12,4 +12,18 @@ describe("Fortune document adapter", () => {
 
     expect(restored).toEqual(celldata);
   });
+
+  it("builds dense import data without duplicating chunk state", () => {
+    const celldata = Array.from({ length: 512 }, (_, index) => ({
+      r: index,
+      c: index % 8,
+      v: { v: index, m: String(index) },
+    }));
+
+    const chunks = fortuneCelldataToChunks(celldata, 7);
+
+    expect(chunks.size).toBe(4);
+    expect(chunks.get("0:0")?.revision).toBe(7);
+    expect(chunksToFortuneCelldata(chunks)).toEqual(celldata);
+  });
 });

@@ -1,4 +1,4 @@
-import * as sheetRepository from "../sheets/repository.js";
+import { deserializeSheetMetadata } from "../../shared/utils/sheetSerialization.js";
 import * as repo from "./repository.js";
 
 export async function getWorkbooks(workspaceId: number) {
@@ -20,16 +20,16 @@ export async function getReferenceCandidates(workspaceId: number) {
 }
 
 export async function getWorkbook(id: number, workspaceId: number) {
-  const wb = await repo.findWorkbookWithSheets(id, workspaceId);
+  const wb = await repo.findWorkbookWithSheetMetadata(id, workspaceId);
   if (!wb) return null;
-  const sheets = await Promise.all(
-    wb.sheets.map((sheet) => sheetRepository.getSheet(sheet.id, workspaceId)),
-  );
   return {
     id: wb.id,
     publicId: wb.publicId,
     name: wb.name,
-    sheets: sheets.filter((sheet): sheet is NonNullable<typeof sheet> => sheet !== null),
+    sheets: wb.sheets.map((sheet) => ({
+      ...deserializeSheetMetadata(sheet),
+      uploadedData: null,
+    })),
   };
 }
 

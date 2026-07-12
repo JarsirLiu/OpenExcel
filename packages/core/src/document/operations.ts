@@ -4,9 +4,14 @@ import {
   getChunkKey,
   getChunkPosition,
   readChunkCell,
-  writeChunkCell,
 } from "./chunk.js";
-import type { DocumentChunk, DocumentObject, DocumentOperation, DocumentScalar } from "./model.js";
+import type {
+  DocumentCellValue,
+  DocumentChunk,
+  DocumentObject,
+  DocumentOperation,
+  DocumentScalar,
+} from "./model.js";
 import { cellRangeSize, validateCellRange } from "./range.js";
 
 export interface DocumentState {
@@ -43,7 +48,7 @@ function setCell(
   state: DocumentState,
   row: number,
   col: number,
-  value: Parameters<typeof writeChunkCell>[3],
+  value: DocumentCellValue | null,
   revision: number,
   options: ChunkOptions,
 ): void {
@@ -51,26 +56,69 @@ function setCell(
   const key = getChunkKey(position.rowBlock, position.colBlock);
   const chunk =
     state.chunks.get(key) ?? createEmptyChunk(position.rowBlock, position.colBlock, revision);
-  const next = writeChunkCell(chunk, row, col, value, options);
-  next.revision = revision;
-  if (Object.keys(next.cells).length === 0) {
-    state.chunks.delete(key);
+  const cellKey = `${position.rowOffset},${position.colOffset}`;
+  if (value == null) {
+    delete chunk.cells[cellKey];
+    if (Object.keys(chunk.cells).length === 0) {
+      state.chunks.delete(key);
+      return;
+    }
   } else {
-    state.chunks.set(key, next);
+    chunk.cells[cellKey] = value;
+  }
+  chunk.revision = revision;
+  state.chunks.set(key, chunk);
+}
+
+function clearRange(
+  state: DocumentState,
+  range: { startRow: number; startCol: number; endRow: number; endCol: number },
+  revision: number,
+  options: ChunkOptions,
+): void {
+  const first = getChunkPosition(range.startRow, range.startCol, options);
+  const last = getChunkPosition(range.endRow, range.endCol, options);
+  const rowSize = options.rowSize ?? 128;
+  const columnSize = options.columnSize ?? 64;
+
+  for (let rowBlock = first.rowBlock; rowBlock <= last.rowBlock; rowBlock += 1) {
+    for (let colBlock = first.colBlock; colBlock <= last.colBlock; colBlock += 1) {
+      const key = getChunkKey(rowBlock, colBlock);
+      const chunk = state.chunks.get(key);
+      if (!chunk) continue;
+
+      for (const cellKey of Object.keys(chunk.cells)) {
+        const [rowOffset, colOffset] = cellKey.split(",").map(Number);
+        const row = rowBlock * rowSize + rowOffset;
+        const col = colBlock * columnSize + colOffset;
+        if (
+          row >= range.startRow &&
+          row <= range.endRow &&
+          col >= range.startCol &&
+          col <= range.endCol
+        ) {
+          delete chunk.cells[cellKey];
+        }
+      }
+
+      if (Object.keys(chunk.cells).length === 0) {
+        state.chunks.delete(key);
+      } else {
+        chunk.revision = revision;
+      }
+    }
   }
 }
 
-export function applyDocumentOperation(
+function applyDocumentOperationInPlace(
   state: DocumentState,
   operation: DocumentOperation,
   revision: number,
   options: ChunkOptions = {},
 ): DocumentState {
-  const next = cloneState(state);
-
   switch (operation.type) {
     case "setCell":
-      setCell(next, operation.row, operation.col, operation.value, revision, options);
+      setCell(state, operation.row, operation.col, operation.value, revision, options);
       break;
     case "setRangeValues": {
       validateCellRange(operation.range);
@@ -90,7 +138,7 @@ export function applyDocumentOperation(
           const rawValue: DocumentScalar = operation.values[rowOffset]?.[colOffset] ?? null;
           const formula = operation.formulas?.[rowOffset]?.[colOffset] ?? undefined;
           setCell(
-            next,
+            state,
             operation.range.startRow + rowOffset,
             operation.range.startCol + colOffset,
             formula || rawValue !== null ? { value: rawValue, formula } : null,
@@ -103,20 +151,16 @@ export function applyDocumentOperation(
     }
     case "clearRange": {
       validateCellRange(operation.range);
-      for (let row = operation.range.startRow; row <= operation.range.endRow; row += 1) {
-        for (let col = operation.range.startCol; col <= operation.range.endCol; col += 1) {
-          setCell(next, row, col, null, revision, options);
-        }
-      }
+      clearRange(state, operation.range, revision, options);
       break;
     }
     case "createObject":
-      next.objects.set(operation.object.id, { ...operation.object });
+      state.objects.set(operation.object.id, { ...operation.object });
       break;
     case "updateObject": {
-      const current = next.objects.get(operation.id);
+      const current = state.objects.get(operation.id);
       if (!current) break;
-      next.objects.set(operation.id, {
+      state.objects.set(operation.id, {
         ...current,
         position: operation.patch.position
           ? { ...current.position, ...operation.patch.position }
@@ -126,13 +170,22 @@ export function applyDocumentOperation(
       break;
     }
     case "deleteObject":
-      next.objects.delete(operation.id);
+      state.objects.delete(operation.id);
       break;
     case "replaceSnapshot":
       break;
   }
 
-  return next;
+  return state;
+}
+
+export function applyDocumentOperation(
+  state: DocumentState,
+  operation: DocumentOperation,
+  revision: number,
+  options: ChunkOptions = {},
+): DocumentState {
+  return applyDocumentOperationInPlace(cloneState(state), operation, revision, options);
 }
 
 export function applyDocumentOperations(
@@ -141,11 +194,11 @@ export function applyDocumentOperations(
   startRevision: number,
   options: ChunkOptions = {},
 ): DocumentState {
-  return operations.reduce(
-    (current, operation, index) =>
-      applyDocumentOperation(current, operation, startRevision + index + 1, options),
-    state,
-  );
+  const next = cloneState(state);
+  for (const [index, operation] of operations.entries()) {
+    applyDocumentOperationInPlace(next, operation, startRevision + index + 1, options);
+  }
+  return next;
 }
 
 export function readDocumentCell(

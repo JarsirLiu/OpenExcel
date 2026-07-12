@@ -10,7 +10,6 @@ import {
   uploadNewWorkbook,
 } from "@/api/workbooks";
 import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatchSync";
-import { patchWorkbookWithDelta } from "../workbook/utils/patchWorkbook";
 import { useWorkbookCatalog } from "./useWorkbookCatalog";
 
 function sortWorkbooks(list: WorkbookMeta[]): WorkbookMeta[] {
@@ -125,20 +124,11 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
   ]);
 
   const handleSheetChanged = useCallback(
-    async (sheetId: number, delta: SheetChangeDelta | null) => {
+    async (sheetId: number, _delta: SheetChangeDelta | null) => {
       const workbook = currentWorkbookRef.current;
       if (!workbook || workspaceId == null) return;
       const hasSheet = workbook.sheets.some((sheet) => sheet.id === sheetId);
       if (!hasSheet) return;
-
-      if (delta) {
-        const patched = patchWorkbookWithDelta(workbook, sheetId, delta);
-        if (patched) {
-          currentWorkbookRef.current = patched;
-          replaceCurrentWorkbook(patched);
-          return;
-        }
-      }
 
       try {
         const full = await fetchWorkbook(workspaceId, workbook.id);
