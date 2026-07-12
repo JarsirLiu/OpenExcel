@@ -1,4 +1,5 @@
 import {
+  type CalculationCellResult,
   type CellRange,
   type DocumentCell,
   type DocumentChunk,
@@ -6,6 +7,8 @@ import {
   decodeDocumentJson,
   encodeDocumentChunk,
   encodeDocumentJson,
+  type FormulaAst,
+  FormulaCalculationEngine,
   type FormulaReference,
   formatA1Cell,
   getChunkKey,
@@ -13,13 +16,13 @@ import {
   parseA1Cell,
 } from "@openexcel/core";
 import type { Prisma } from "../../infra/database/prismaTypes.js";
-import { type CalculationCellResult, FormulaCalculationEngine } from "./calculationEngine.js";
 
 interface StoredFormula {
   sheetId: number;
   address: string;
   formula: string;
   dependencies: FormulaReference[];
+  ast?: FormulaAst;
 }
 
 interface PendingRange {
@@ -43,6 +46,16 @@ function decodeDependencies(data: Uint8Array<ArrayBufferLike> | null): FormulaRe
     return Array.isArray(dependencies) ? dependencies : [];
   } catch {
     return [];
+  }
+}
+
+function decodeFormulaAst(data: Uint8Array<ArrayBufferLike> | null): FormulaAst | undefined {
+  if (!data) return undefined;
+  try {
+    const ast = decodeDocumentJson<FormulaAst>(data);
+    return ast && typeof ast === "object" ? ast : undefined;
+  } catch {
+    return undefined;
   }
 }
 
@@ -150,13 +163,14 @@ export async function recalculateAffectedFormulas(
         return { sheetId: Number(key.slice(0, separator)), address: key.slice(separator + 1) };
       }),
     },
-    select: { sheetId: true, address: true, formula: true, dependencies: true },
+    select: { sheetId: true, address: true, formula: true, dependencies: true, ast: true },
   });
   const formulas: StoredFormula[] = formulaRows.map((row) => ({
     sheetId: row.sheetId,
     address: row.address,
     formula: row.formula,
     dependencies: decodeDependencies(row.dependencies),
+    ast: decodeFormulaAst(row.ast),
   }));
   const affected = new Map(
     formulas.map((formula) => [`${formula.sheetId}:${formula.address}`, formula]),
@@ -252,7 +266,14 @@ export async function recalculateAffectedFormulas(
 
   const sheetNamesById = new Map(sheets.map((sheet) => [sheet.id, sheet.name]));
   const engine = new FormulaCalculationEngine(
-    sheets.map((sheet) => ({ name: sheet.name, cells: cellsBySheet.get(sheet.id) ?? [] })),
+    sheets.map((sheet) => ({
+      name: sheet.name,
+      cells: cellsBySheet.get(sheet.id) ?? [],
+      formulaAsts: formulas.reduce<Record<string, FormulaAst>>((asts, formula) => {
+        if (formula.sheetId === sheet.id && formula.ast) asts[formula.address] = formula.ast;
+        return asts;
+      }, {}),
+    })),
   );
   try {
     const results = [...affected.values()]

@@ -4,7 +4,12 @@ import {
   fortuneCelldataToChunks,
   fortuneCellToDocumentValue,
 } from "./fortuneAdapter.js";
-import { cellStyleId, collectDocumentStyles } from "./style.js";
+import {
+  cellStyleId,
+  collectDocumentStyles,
+  createStyleDefinition,
+  mergeCellStyles,
+} from "./style.js";
 
 describe("canonical cell styles", () => {
   it("creates the same style id regardless of property order", () => {
@@ -52,5 +57,14 @@ describe("canonical cell styles", () => {
         ]),
       ),
     ).toMatchObject({ bg: "#fff", fc: "#111", bl: 1 });
+  });
+
+  it("merges style patches into a reusable definition", () => {
+    const definition = createStyleDefinition(
+      mergeCellStyles({ bg: "#fff" }, { fc: "#000", ct: { fa: "0.00%" } }) ?? {},
+    );
+
+    expect(definition?.id).toMatch(/^style_[0-9a-f]{16}$/);
+    expect(definition?.style).toEqual({ bg: "#fff", fc: "#000", ct: { fa: "0.00%" } });
   });
 });

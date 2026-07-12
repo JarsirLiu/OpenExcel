@@ -87,6 +87,7 @@ function chunkKeysForOperation(operation: DocumentOperation): Set<string> {
       });
       break;
     case "setRangeValues":
+    case "setRangeStyle":
     case "clearRange":
       addRange(operation.range);
       break;
@@ -154,6 +155,7 @@ function operationRanges(operation: DocumentOperation): CellRange[] {
         },
       ];
     case "setRangeValues":
+    case "setRangeStyle":
     case "clearRange":
       return [operation.range];
     default:
@@ -168,6 +170,7 @@ function operationExtent(
     case "setCell":
       return { maxRow: operation.row + 1, maxColumn: operation.col + 1 };
     case "setRangeValues":
+    case "setRangeStyle":
     case "clearRange":
       return { maxRow: operation.range.endRow + 1, maxColumn: operation.range.endCol + 1 };
     default:

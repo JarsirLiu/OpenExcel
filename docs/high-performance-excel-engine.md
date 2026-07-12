@@ -370,7 +370,9 @@ A1 changed
   -> update cached values
 ```
 
-当前 `dev` 分支已经加入项目自有的纯 TypeScript 公式计算内核，不依赖 GPL 或商业授权计算库，支持算术表达式、跨 Sheet 引用、范围、常用聚合/逻辑函数和循环检测。它仍是第一版语义内核：服务端重算会构建受影响公式的计算上下文，后续需要把反向依赖边和脏集合持久化，避免大型工作簿扫描全部公式。
+当前 `dev` 分支已经加入项目自有的纯 TypeScript 公式计算内核，代码位于 `packages/core/src/document/calculation.ts`，不依赖 GPL 或商业授权计算库。当前支持算术表达式、绝对引用、百分比字面量、跨 Sheet 引用、范围、循环检测，以及常用聚合、逻辑、舍入、取整、查找、文本和错误处理函数，包括 `SUM`、`AVERAGE`、`MIN`、`MAX`、`PRODUCT`、`SUMPRODUCT`、`COUNT`、`COUNTA`、`COUNTBLANK`、`IF`、`IFERROR`、`IFNA`、`ISERROR`、`ISNA`、`AND`、`OR`、`NOT`、`ABS`、`ROUND`、`ROUNDUP`、`ROUNDDOWN`、`INT`、`MOD`、`CONCATENATE`、`LEN`、`LEFT`、`RIGHT`、`MID`、`TRIM`、`UPPER`、`LOWER`、`FIND`、`SEARCH`、`SUBSTITUTE`、`SUMIF`、`SUMIFS`、`AVERAGEIF`、`AVERAGEIFS`、`COUNTIF`、`COUNTIFS`、`MAXIFS`、`MINIFS`、`VLOOKUP`、`HLOOKUP`、`LOOKUP`、`XLOOKUP`、支持 `0/1/-1` 匹配模式的 `MATCH` 和二维 `INDEX`。因此，报表 Sheet 可以根据外来表 Sheet 的“门店 + 商品”两个条件计算或复核分佣比例。
+
+它仍是第一版语义内核，不等同于完整 Excel 兼容层：结构化表引用、外部工作簿引用、动态数组、日期函数完整语义、通配符完整语义、易失函数和完整的 Excel 错误传播规则尚未实现。公式索引已经支持跨 Sheet 依赖发现和受影响公式重算；公式会先编译为可序列化 AST，`FormulaCell.ast` 会保存并在服务端重算时优先使用。后续仍需增加 AST schema 校验、函数注册元数据、缓存淘汰和更细粒度的脏集合执行器，避免大工作簿中不必要的重算。
 
 ### Dependency index implementation
 
@@ -611,7 +613,10 @@ adapter resolves those definitions into FortuneSheet cell fields at the boundary
 
 This keeps style changes compatible with chunk loading and prevents repeated font, fill, border,
 and number-format objects from inflating every cell payload. Import and UI writes register style
-definitions in the same transaction as the document mutation.
+definitions in the same transaction as the document mutation. `setRangeStyle` is the canonical
+range formatting operation; it reuses a registered `styleId`, preserves formulas and values, and
+removes empty cells again when a style is cleared. The core exposes deterministic style merging and
+definition creation so importers, UI commands, and AI tools can construct the same style payload.
 
 ## Operation compaction
 

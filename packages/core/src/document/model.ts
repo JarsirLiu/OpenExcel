@@ -63,6 +63,11 @@ export type DocumentOperation =
       formulas?: (string | null)[][];
     }
   | {
+      type: "setRangeStyle";
+      range: CellRange;
+      styleId: string | null;
+    }
+  | {
       type: "clearRange";
       range: CellRange;
     }

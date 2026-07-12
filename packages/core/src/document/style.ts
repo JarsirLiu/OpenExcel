@@ -23,6 +23,35 @@ export interface DocumentStyleDefinition {
   style: CanonicalCellStyle;
 }
 
+export function mergeCellStyles(
+  base: CanonicalCellStyle | undefined,
+  patch: Partial<FortuneCellValue>,
+): CanonicalCellStyle | null {
+  const merged = {
+    ...(base ?? {}),
+    ...patch,
+    ...(base?.ct || patch.ct ? { ct: { ...base?.ct, ...patch.ct } } : {}),
+    ...(base?.bd || patch.bd
+      ? {
+          bd: {
+            ...base?.bd,
+            ...patch.bd,
+            ...(base?.bd?.t || patch.bd?.t ? { t: { ...base?.bd?.t, ...patch.bd?.t } } : {}),
+            ...(base?.bd?.b || patch.bd?.b ? { b: { ...base?.bd?.b, ...patch.bd?.b } } : {}),
+            ...(base?.bd?.l || patch.bd?.l ? { l: { ...base?.bd?.l, ...patch.bd?.l } } : {}),
+            ...(base?.bd?.r || patch.bd?.r ? { r: { ...base?.bd?.r, ...patch.bd?.r } } : {}),
+          },
+        }
+      : {}),
+  };
+  return normalizeCellStyle(merged as Partial<FortuneCellValue>);
+}
+
+export function createStyleDefinition(style: CanonicalCellStyle): DocumentStyleDefinition | null {
+  const normalized = normalizeCellStyle(style);
+  return normalized ? { id: cellStyleId(normalized), style: normalized } : null;
+}
+
 export type DocumentStyleResolver =
   | ReadonlyMap<string, CanonicalCellStyle>
   | Readonly<Record<string, CanonicalCellStyle>>

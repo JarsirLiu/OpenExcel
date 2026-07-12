@@ -151,4 +151,39 @@ describe("document operations", () => {
     expect(readDocumentCell(updated, 128, 64)?.value).toBe("d");
     expect(updated.chunks.size).toBe(4);
   });
+
+  it("applies and clears a canonical style across a range", () => {
+    const styled = applyDocumentOperation(
+      createDocumentState(),
+      {
+        type: "setRangeValues",
+        range: { startRow: 0, startCol: 0, endRow: 0, endCol: 1 },
+        values: [["A", "B"]],
+      },
+      1,
+    );
+    const withStyle = applyDocumentOperation(
+      styled,
+      {
+        type: "setRangeStyle",
+        range: { startRow: 0, startCol: 0, endRow: 0, endCol: 1 },
+        styleId: "style_0123456789abcdef",
+      },
+      2,
+    );
+
+    expect(readDocumentCell(withStyle, 0, 0)?.styleId).toBe("style_0123456789abcdef");
+    expect(readDocumentCell(withStyle, 0, 1)?.styleId).toBe("style_0123456789abcdef");
+
+    const cleared = applyDocumentOperation(
+      withStyle,
+      {
+        type: "setRangeStyle",
+        range: { startRow: 0, startCol: 0, endRow: 0, endCol: 1 },
+        styleId: null,
+      },
+      3,
+    );
+    expect(readDocumentCell(cleared, 0, 0)?.styleId).toBeUndefined();
+  });
 });

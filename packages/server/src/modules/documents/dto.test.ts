@@ -48,6 +48,18 @@ describe("applyDocumentOperationSchema", () => {
     expect(result.success).toBe(true);
   });
 
+  it("accepts a canonical range style operation", () => {
+    expect(
+      applyDocumentOperationSchema.safeParse({
+        operation: {
+          type: "setRangeStyle",
+          range: { startRow: 0, startCol: 0, endRow: 2, endCol: 2 },
+          styleId: "style_0123456789abcdef",
+        },
+      }).success,
+    ).toBe(true);
+  });
+
   it("rejects range matrices that do not match their range", () => {
     const result = applyDocumentOperationsSchema.safeParse({
       operations: [

@@ -110,6 +110,30 @@ function clearRange(
   }
 }
 
+function setRangeStyle(
+  state: DocumentState,
+  range: { startRow: number; startCol: number; endRow: number; endCol: number },
+  styleId: string | null,
+  revision: number,
+  options: ChunkOptions,
+): void {
+  for (let row = range.startRow; row <= range.endRow; row += 1) {
+    for (let col = range.startCol; col <= range.endCol; col += 1) {
+      const current = readDocumentCell(state, row, col, options);
+      if (!current && styleId === null) continue;
+      const next = current
+        ? { ...current, styleId: styleId ?? undefined }
+        : { value: null, styleId: styleId ?? undefined };
+      const hasContent =
+        next.value !== null ||
+        next.formula !== undefined ||
+        next.displayValue !== undefined ||
+        next.metadata !== undefined;
+      setCell(state, row, col, hasContent || next.styleId ? next : null, revision, options);
+    }
+  }
+}
+
 function applyDocumentOperationInPlace(
   state: DocumentState,
   operation: DocumentOperation,
@@ -149,6 +173,10 @@ function applyDocumentOperationInPlace(
       }
       break;
     }
+    case "setRangeStyle":
+      validateCellRange(operation.range);
+      setRangeStyle(state, operation.range, operation.styleId, revision, options);
+      break;
     case "clearRange": {
       validateCellRange(operation.range);
       clearRange(state, operation.range, revision, options);

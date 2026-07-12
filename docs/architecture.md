@@ -549,7 +549,7 @@ document ranges, chunks, objects, and operations.
 
 ### 7.0.1 Formula dependency flow
 
-Formula text and calculated cell values belong to canonical document chunks. `FormulaCell` and `FormulaDependency` are database indexes used to locate formulas efficiently; they are rebuildable and are not renderer state. A cell write queries overlapping source ranges, walks dependent formulas level by level, recalculates only that set, and writes updated chunk values in the same transaction.
+Formula text and calculated cell values belong to canonical document chunks. The pure calculation kernel is owned by `packages/core/src/document/calculation.ts`; the server only supplies canonical cells, queries dependency indexes, and persists results. `FormulaCell` and `FormulaDependency` are database indexes used to locate formulas efficiently; they are rebuildable and are not renderer state. A cell write queries overlapping source ranges, walks dependent formulas level by level, recalculates only that set, and writes updated chunk values in the same transaction.
 
 ### 7.0.2 Canonical style flow
 

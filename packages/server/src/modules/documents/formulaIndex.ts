@@ -6,6 +6,7 @@ import {
   type FortuneCell,
   formatA1Cell,
   parseA1Cell,
+  parseFormula,
 } from "@openexcel/core";
 import type { Prisma } from "../../infra/database/prismaTypes.js";
 
@@ -17,6 +18,14 @@ export interface FormulaIndexUpdate {
 function normalizeFormula(formula: string): string {
   const normalized = formula.trim();
   return normalized.startsWith("=") ? normalized.slice(1) : normalized;
+}
+
+function encodeFormulaAst(formula: string): Uint8Array<ArrayBuffer> | null {
+  try {
+    return encodeDocumentJson(parseFormula(formula));
+  } catch {
+    return null;
+  }
 }
 
 export function buildFormulaCellData(sheetId: number, celldata: FortuneCell[]) {
@@ -32,7 +41,7 @@ export function buildFormulaCellData(sheetId: number, celldata: FortuneCell[]) {
         address: formatA1Cell(cell.r, cell.c),
         formula,
         dependencies: encodeDocumentJson(extractFormulaReferences(formula)),
-        ast: null,
+        ast: encodeFormulaAst(formula),
         cachedValue: null,
       },
     ];
@@ -152,7 +161,7 @@ export async function syncFormulaIndex(
       address,
       formula,
       dependencies: encodeDocumentJson(extractFormulaReferences(formula)),
-      ast: null,
+      ast: encodeFormulaAst(formula),
       cachedValue: null,
     };
   });

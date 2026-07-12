@@ -41,6 +41,14 @@ export type {
   DocumentRangeData,
 } from "./document/adapter.js";
 export {
+  type CalculationCellInput,
+  type CalculationCellResult,
+  type CalculationSheetInput,
+  type FormulaAst,
+  FormulaCalculationEngine,
+  parseFormula,
+} from "./document/calculation.js";
+export {
   createEmptyChunk,
   getChunkCellKey,
   getChunkKey,
@@ -104,7 +112,9 @@ export {
   applyCellStyle,
   cellStyleId,
   collectDocumentStyles,
+  createStyleDefinition,
   extractCellStyle,
+  mergeCellStyles,
   normalizeCellStyle,
   resolveCellStyle,
   stripCellStyle,

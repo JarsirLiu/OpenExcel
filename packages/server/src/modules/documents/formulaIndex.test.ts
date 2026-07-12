@@ -62,5 +62,6 @@ describe("buildFormulaCellData", () => {
     expect(rows[0]?.address).toBe("B2");
     expect(rows[0]?.formula).toBe("A1*2");
     expect(rows[0]?.dependencies).toBeInstanceOf(Uint8Array);
+    expect(rows[0]?.ast).toBeInstanceOf(Uint8Array);
   });
 });

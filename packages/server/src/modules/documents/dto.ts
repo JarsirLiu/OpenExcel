@@ -97,6 +97,15 @@ const setRangeValuesSchema = z
     }
   });
 
+const setRangeStyleSchema = z.object({
+  type: z.literal("setRangeStyle"),
+  range: rangeSchema,
+  styleId: z
+    .string()
+    .regex(/^style_[0-9a-f]{16}$/)
+    .nullable(),
+});
+
 export const documentOperationSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("setCell"),
@@ -105,6 +114,7 @@ export const documentOperationSchema = z.discriminatedUnion("type", [
     value: cellValueSchema.nullable(),
   }),
   setRangeValuesSchema,
+  setRangeStyleSchema,
   z.object({ type: z.literal("clearRange"), range: rangeSchema }),
   z.object({ type: z.literal("createObject"), object: objectSchema }),
   z.object({
