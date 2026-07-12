@@ -25,15 +25,6 @@ interface PendingRange {
   range: CellRange;
 }
 
-function rangesIntersect(left: CellRange, right: CellRange): boolean {
-  return !(
-    left.endRow < right.startRow ||
-    left.startRow > right.endRow ||
-    left.endCol < right.startCol ||
-    left.startCol > right.endCol
-  );
-}
-
 function formulaCellRange(formula: StoredFormula): CellRange | null {
   try {
     const cell = parseA1Cell(formula.address);
@@ -82,51 +73,92 @@ export async function recalculateAffectedFormulas(
 ): Promise<CalculationCellResult[]> {
   if (changedRanges.length === 0) return [];
 
-  const [sheets, formulaRows] = await Promise.all([
-    tx.sheet.findMany({ where: { workbookId }, select: { id: true, name: true } }),
-    tx.formulaCell.findMany({
-      where: { sheet: { workbookId } },
-      select: { sheetId: true, address: true, formula: true, dependencies: true },
-    }),
-  ]);
-  if (formulaRows.length === 0) return [];
+  const sheets = await tx.sheet.findMany({
+    where: { workbookId },
+    select: { id: true, name: true },
+  });
+  if (sheets.length === 0) return [];
 
   const sheetIdsByName = new Map(sheets.map((sheet) => [sheet.name, sheet.id]));
+  const targetKeys = new Set<string>();
+  let frontier = changedRanges;
+
+  while (frontier.length > 0) {
+    const dependencyRows = await tx.formulaDependency.findMany({
+      where: {
+        OR: frontier.map((change) => ({
+          sourceSheetId: change.sheetId,
+          startRow: { lte: change.range.endRow },
+          endRow: { gte: change.range.startRow },
+          startCol: { lte: change.range.endCol },
+          endCol: { gte: change.range.startCol },
+        })),
+      },
+      select: { targetSheetId: true, targetAddress: true },
+    });
+    const nextFrontier: PendingRange[] = [];
+    for (const dependency of dependencyRows) {
+      const key = `${dependency.targetSheetId}:${dependency.targetAddress}`;
+      if (targetKeys.has(key)) continue;
+      targetKeys.add(key);
+      try {
+        const cell = parseA1Cell(dependency.targetAddress);
+        const range = {
+          startRow: cell.row,
+          startCol: cell.col,
+          endRow: cell.row,
+          endCol: cell.col,
+        };
+        nextFrontier.push({ sheetId: dependency.targetSheetId, range });
+      } catch {
+        // Ignore malformed index entries; the formula row remains untouched.
+      }
+    }
+
+    if (frontier === changedRanges) {
+      const directRows = await tx.formulaCell.findMany({
+        where: {
+          OR: changedRanges.map((change) => ({
+            sheetId: change.sheetId,
+            row: { gte: change.range.startRow, lte: change.range.endRow },
+            col: { gte: change.range.startCol, lte: change.range.endCol },
+          })),
+        },
+        select: { sheetId: true, address: true },
+      });
+      for (const formula of directRows) {
+        const key = `${formula.sheetId}:${formula.address}`;
+        if (targetKeys.has(key)) continue;
+        targetKeys.add(key);
+        const ownRange = formulaCellRange({ ...formula, formula: "", dependencies: [] });
+        if (ownRange) {
+          nextFrontier.push({ sheetId: formula.sheetId, range: ownRange });
+        }
+      }
+    }
+    frontier = nextFrontier;
+  }
+
+  if (targetKeys.size === 0) return [];
+
+  const formulaRows = await tx.formulaCell.findMany({
+    where: {
+      OR: [...targetKeys].map((key) => {
+        const separator = key.indexOf(":");
+        return { sheetId: Number(key.slice(0, separator)), address: key.slice(separator + 1) };
+      }),
+    },
+    select: { sheetId: true, address: true, formula: true, dependencies: true },
+  });
   const formulas: StoredFormula[] = formulaRows.map((row) => ({
     sheetId: row.sheetId,
     address: row.address,
     formula: row.formula,
     dependencies: decodeDependencies(row.dependencies),
   }));
-  const affected = new Map<string, StoredFormula>();
-  const pending = [...changedRanges];
-
-  for (let index = 0; index < pending.length; index += 1) {
-    const change = pending[index];
-    if (!change) continue;
-
-    for (const formula of formulas) {
-      const formulaKey = `${formula.sheetId}:${formula.address}`;
-      if (affected.has(formulaKey)) continue;
-
-      const ownRange = formulaCellRange(formula);
-      const changedFormulaCell =
-        ownRange && rangesIntersect(ownRange, change.range) && change.sheetId === formula.sheetId;
-      const dependencyChanged = formula.dependencies.some((dependency) => {
-        const dependencySheetId = dependency.sheetName
-          ? sheetIdsByName.get(dependency.sheetName)
-          : formula.sheetId;
-        return (
-          dependencySheetId === change.sheetId && rangesIntersect(dependency.range, change.range)
-        );
-      });
-
-      if (!changedFormulaCell && !dependencyChanged) continue;
-      affected.set(formulaKey, formula);
-      if (ownRange) pending.push({ sheetId: formula.sheetId, range: ownRange });
-    }
-  }
-
+  const affected = new Map(
+    formulas.map((formula) => [`${formula.sheetId}:${formula.address}`, formula]),
+  );
   if (affected.size === 0) return [];
 
   const requiredRanges = new Map<number, CellRange[]>();

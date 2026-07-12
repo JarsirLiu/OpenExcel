@@ -52,7 +52,13 @@ export async function createWorkbook(
         ? null
         : await tx.sheet.findUnique({
             where: { id: sourceSheetId },
-            include: { workbook: true, chunks: true, objects: true, formulaCells: true },
+            include: {
+              workbook: true,
+              chunks: true,
+              objects: true,
+              formulaCells: true,
+              formulaDependenciesTo: true,
+            },
           });
 
     if (
@@ -108,6 +114,8 @@ export async function createWorkbook(
         await tx.formulaCell.createMany({
           data: sourceSheet.formulaCells.map((formulaCell) => ({
             sheetId: initialSheet.id,
+            row: formulaCell.row,
+            col: formulaCell.col,
             address: formulaCell.address,
             formula: formulaCell.formula,
             ast: formulaCell.ast,
@@ -115,6 +123,20 @@ export async function createWorkbook(
             cachedValue: formulaCell.cachedValue,
           })),
         });
+      }
+      const formulaDependencies = sourceSheet.formulaDependenciesTo
+        .filter((dependency) => dependency.sourceSheetId === sourceSheet.id)
+        .map((dependency) => ({
+          sourceSheetId: initialSheet.id,
+          targetSheetId: initialSheet.id,
+          targetAddress: dependency.targetAddress,
+          startRow: dependency.startRow,
+          startCol: dependency.startCol,
+          endRow: dependency.endRow,
+          endCol: dependency.endCol,
+        }));
+      if (formulaDependencies.length > 0) {
+        await tx.formulaDependency.createMany({ data: formulaDependencies });
       }
     }
 

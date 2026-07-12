@@ -74,6 +74,8 @@ model Sheet {
   operations   SheetOperation[]
   objects      SheetObject[]
   formulaCells FormulaCell[]
+  formulaDependenciesFrom FormulaDependency[] @relation("FormulaDependencySource")
+  formulaDependenciesTo   FormulaDependency[] @relation("FormulaDependencyTarget")
   pivotTables  PivotTable[]
   createdAt    DateTime                @default(now())
   updatedAt    DateTime                @updatedAt
@@ -225,6 +227,8 @@ model SheetObject {
 model FormulaCell {
   id           Int      @id @default(autoincrement())
   sheetId      Int
+  row          Int
+  col          Int
   address      String
   formula      String
   ast          Bytes?
@@ -234,8 +238,26 @@ model FormulaCell {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  @@unique([sheetId, row, col])
   @@unique([sheetId, address])
-  @@index([sheetId])
+  @@index([sheetId, row, col])
+}
+
+model FormulaDependency {
+  id             Int   @id @default(autoincrement())
+  sourceSheetId  Int
+  targetSheetId  Int
+  targetAddress  String
+  startRow       Int
+  startCol       Int
+  endRow         Int
+  endCol         Int
+  sourceSheet    Sheet @relation("FormulaDependencySource", fields: [sourceSheetId], references: [id], onDelete: Cascade)
+  targetSheet    Sheet @relation("FormulaDependencyTarget", fields: [targetSheetId], references: [id], onDelete: Cascade)
+
+  @@unique([targetSheetId, targetAddress, sourceSheetId, startRow, startCol, endRow, endCol])
+  @@index([sourceSheetId, startRow, endRow, startCol, endCol])
+  @@index([targetSheetId, targetAddress])
 }
 
 model PivotTable {

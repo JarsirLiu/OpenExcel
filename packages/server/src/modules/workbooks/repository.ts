@@ -77,9 +77,10 @@ export async function createSheet(data: {
 }
 
 export async function copySheetDocument(sourceSheetId: number, targetSheetId: number) {
-  const [chunks, objects] = await Promise.all([
+  const [chunks, objects, formulaDependencies] = await Promise.all([
     prisma.sheetChunk.findMany({ where: { sheetId: sourceSheetId } }),
     prisma.sheetObject.findMany({ where: { sheetId: sourceSheetId } }),
+    prisma.formulaDependency.findMany({ where: { targetSheetId: sourceSheetId } }),
   ]);
   const formulaCells = await prisma.formulaCell.findMany({ where: { sheetId: sourceSheetId } });
   await prisma.$transaction(async (tx) => {
@@ -109,11 +110,27 @@ export async function copySheetDocument(sourceSheetId: number, targetSheetId: nu
       await tx.formulaCell.createMany({
         data: formulaCells.map((formulaCell) => ({
           sheetId: targetSheetId,
+          row: formulaCell.row,
+          col: formulaCell.col,
           address: formulaCell.address,
           formula: formulaCell.formula,
           ast: formulaCell.ast,
           dependencies: formulaCell.dependencies,
           cachedValue: formulaCell.cachedValue,
+        })),
+      });
+    }
+    if (formulaDependencies.length > 0) {
+      await tx.formulaDependency.createMany({
+        data: formulaDependencies.map((dependency) => ({
+          sourceSheetId:
+            dependency.sourceSheetId === sourceSheetId ? targetSheetId : dependency.sourceSheetId,
+          targetSheetId,
+          targetAddress: dependency.targetAddress,
+          startRow: dependency.startRow,
+          startCol: dependency.startCol,
+          endRow: dependency.endRow,
+          endCol: dependency.endCol,
         })),
       });
     }

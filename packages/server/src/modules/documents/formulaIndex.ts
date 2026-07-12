@@ -27,6 +27,8 @@ export function buildFormulaCellData(sheetId: number, celldata: FortuneCell[]) {
     return [
       {
         sheetId,
+        row: cell.r,
+        col: cell.c,
         address: formatA1Cell(cell.r, cell.c),
         formula,
         dependencies: encodeDocumentJson(extractFormulaReferences(formula)),
@@ -90,53 +92,92 @@ export function collectFormulaIndexUpdate(operations: DocumentOperation[]): Form
   return update;
 }
 
-function rangeContainsAddress(range: CellRange, address: string): boolean {
-  try {
-    const cell = parseA1Cell(address);
-    return (
-      cell.row >= range.startRow &&
-      cell.row <= range.endRow &&
-      cell.col >= range.startCol &&
-      cell.col <= range.endCol
-    );
-  } catch {
-    return false;
-  }
-}
-
 export async function syncFormulaIndex(
   tx: Prisma.TransactionClient,
+  workbookId: number,
   sheetId: number,
   operations: DocumentOperation[],
 ): Promise<void> {
   const update = collectFormulaIndexUpdate(operations);
   if (update.upserts.size === 0 && update.clearRanges.length === 0) return;
 
-  const existing = await tx.formulaCell.findMany({
-    where: { sheetId },
-    select: { id: true, address: true },
-  });
-  const idsToDelete = existing
-    .filter(
-      (row) =>
-        update.upserts.has(row.address) ||
-        update.clearRanges.some((range) => rangeContainsAddress(range, row.address)),
-    )
-    .map((row) => row.id);
-  if (idsToDelete.length > 0) {
-    await tx.formulaCell.deleteMany({ where: { id: { in: idsToDelete } } });
-  }
+  const [sheets, existing] = await Promise.all([
+    tx.sheet.findMany({ where: { workbookId }, select: { id: true, name: true } }),
+    update.clearRanges.length === 0
+      ? Promise.resolve([])
+      : tx.formulaCell.findMany({
+          where: {
+            OR: update.clearRanges.map((range) => ({
+              sheetId,
+              row: { gte: range.startRow, lte: range.endRow },
+              col: { gte: range.startCol, lte: range.endCol },
+            })),
+          },
+          select: { row: true, col: true, address: true },
+        }),
+  ]);
+  const addressesToClear = new Set(
+    existing
+      .filter((row) =>
+        update.clearRanges.some(
+          (range) =>
+            row.row >= range.startRow &&
+            row.row <= range.endRow &&
+            row.col >= range.startCol &&
+            row.col <= range.endCol,
+        ),
+      )
+      .map((row) => row.address),
+  );
+  const upserts = [...update.upserts].filter(([address]) => !addressesToClear.has(address));
+  const addresses = new Set([...addressesToClear, ...upserts.map(([address]) => address)]);
+  if (addresses.size === 0) return;
 
-  if (update.upserts.size > 0) {
-    await tx.formulaCell.createMany({
-      data: [...update.upserts].map(([address, formula]) => ({
-        sheetId,
-        address,
-        formula,
-        dependencies: encodeDocumentJson(extractFormulaReferences(formula)),
-        ast: null,
-        cachedValue: null,
-      })),
-    });
+  await tx.formulaDependency.deleteMany({
+    where: { targetSheetId: sheetId, targetAddress: { in: [...addresses] } },
+  });
+  await tx.formulaCell.deleteMany({
+    where: { sheetId, address: { in: [...addresses] } },
+  });
+
+  if (upserts.length === 0) return;
+
+  const sheetIdsByName = new Map(sheets.map((sheet) => [sheet.name, sheet.id]));
+  const formulaRows = upserts.map(([address, formula]) => {
+    const cell = parseA1Cell(address);
+    return {
+      sheetId,
+      row: cell.row,
+      col: cell.col,
+      address,
+      formula,
+      dependencies: encodeDocumentJson(extractFormulaReferences(formula)),
+      ast: null,
+      cachedValue: null,
+    };
+  });
+  await tx.formulaCell.createMany({ data: formulaRows });
+
+  const dependencyRows = formulaRows.flatMap((row) =>
+    extractFormulaReferences(row.formula).flatMap((dependency) => {
+      const sourceSheetId = dependency.sheetName
+        ? sheetIdsByName.get(dependency.sheetName)
+        : sheetId;
+      if (sourceSheetId === undefined) return [];
+      return [
+        {
+          sourceSheetId,
+          targetSheetId: sheetId,
+          targetAddress: row.address,
+          startRow: dependency.range.startRow,
+          startCol: dependency.range.startCol,
+          endRow: dependency.range.endRow,
+          endCol: dependency.range.endCol,
+        },
+      ];
+    }),
+  );
+  if (dependencyRows.length > 0) {
+    await tx.formulaDependency.createMany({ data: dependencyRows });
   }
 }

@@ -444,7 +444,7 @@ export async function applyStoredDocumentOperations(
     const nextState = applyDocumentOperations(state, operations, sheet.documentRevision);
     const revision = sheet.documentRevision + operations.length;
 
-    await syncFormulaIndex(tx, sheet.id, operations);
+    await syncFormulaIndex(tx, sheet.workbookId, sheet.id, operations);
 
     if (runId != null) {
       const [snapshotChunks, snapshotObjects] = await Promise.all([

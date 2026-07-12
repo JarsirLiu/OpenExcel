@@ -359,6 +359,12 @@ A1 changed
 
 当前 `dev` 分支已经加入项目自有的纯 TypeScript 公式计算内核，不依赖 GPL 或商业授权计算库，支持算术表达式、跨 Sheet 引用、范围、常用聚合/逻辑函数和循环检测。它仍是第一版语义内核：服务端重算会构建受影响公式的计算上下文，后续需要把反向依赖边和脏集合持久化，避免大型工作簿扫描全部公式。
 
+### Dependency index implementation
+
+The current `dev` branch includes a project-owned TypeScript formula kernel and does not depend on GPL or commercial calculation libraries. `FormulaCell` stores numeric coordinates for indexed lookup, while `FormulaDependency` stores reverse edges from source ranges to target formulas. A write queries only overlapping dependency ranges and propagates through the affected graph instead of scanning every formula in the workbook.
+
+Both tables are derived indexes over canonical chunks. Formula text and cached cell state remain in the canonical document model; the indexes can be rebuilt without making the renderer or a third-party spreadsheet component the source of truth.
+
 ## Pivot Table Model
 
 透视表不是普通单元格结果，需要独立模型。

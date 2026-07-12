@@ -24,21 +24,31 @@ describe("recalculateAffectedFormulas", () => {
         findMany: vi.fn().mockResolvedValue([{ id: 1, name: "Sheet1" }]),
       },
       formulaCell: {
-        findMany: vi.fn().mockResolvedValue([
-          {
-            sheetId: 1,
-            address: "B1",
-            formula: "A1*2",
-            dependencies: encodeDocumentJson(extractFormulaReferences("A1*2")),
-          },
-          {
-            sheetId: 1,
-            address: "C1",
-            formula: "B1*2",
-            dependencies: encodeDocumentJson(extractFormulaReferences("B1*2")),
-          },
-        ]),
+        findMany: vi
+          .fn()
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([
+            {
+              sheetId: 1,
+              address: "B1",
+              formula: "A1*2",
+              dependencies: encodeDocumentJson(extractFormulaReferences("A1*2")),
+            },
+            {
+              sheetId: 1,
+              address: "C1",
+              formula: "B1*2",
+              dependencies: encodeDocumentJson(extractFormulaReferences("B1*2")),
+            },
+          ]),
         update: formulaUpdate,
+      },
+      formulaDependency: {
+        findMany: vi
+          .fn()
+          .mockResolvedValueOnce([{ targetSheetId: 1, targetAddress: "B1" }])
+          .mockResolvedValueOnce([{ targetSheetId: 1, targetAddress: "C1" }])
+          .mockResolvedValue([]),
       },
       sheetChunk: {
         findMany: vi.fn().mockResolvedValue([chunk]),

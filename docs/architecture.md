@@ -542,6 +542,10 @@ canonical workbook export path so a partially hydrated viewport can never produc
 Legacy `uploadedData` is import/export transition state only. New reads and mutations must use the
 canonical document operations and range APIs.
 
+### 7.0.1 Formula dependency flow
+
+Formula text and calculated cell values belong to canonical document chunks. `FormulaCell` and `FormulaDependency` are database indexes used to locate formulas efficiently; they are rebuildable and are not renderer state. A cell write queries overlapping source ranges, walks dependent formulas level by level, recalculates only that set, and writes updated chunk values in the same transaction.
+
 ### 7.1 Workbook editing flow
 
 1. User edits sheet content in the workbook area.
