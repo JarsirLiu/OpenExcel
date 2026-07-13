@@ -22,7 +22,7 @@ export function ChatSidebar({
   initialMessages,
 }: {
   onWorkspaceRefresh?: () => Promise<void> | void;
-  onAttachExcel: (file: File) => Promise<void> | void;
+  onAttachExcel: (files: File[]) => Promise<void> | void;
   referenceCacheRevision: number;
   workspaceId: number | null;
   currentUser: CurrentUser;

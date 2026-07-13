@@ -276,23 +276,27 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
   );
 
   const handleNewWorkbookFileChange = useCallback(
-    async (file: File) => {
+    async (files: File[]) => {
       if (workspaceId == null) return;
+      if (files.length === 0) return;
       const { generation, controller } = beginRequest();
-      setStatus("上传中...");
+      setStatus(files.length === 1 ? "上传中..." : `正在上传 ${files.length} 个文件...`);
       try {
-        const result = await uploadNewWorkbook(workspaceId, file);
+        const results = await uploadNewWorkbook(workspaceId, files, {
+          signal: controller.signal,
+        });
         const list = await fetchWorkbooks(workspaceId, { signal: controller.signal });
         if (!isCurrentRequest(generation, controller.signal)) return;
         const safeList = Array.isArray(list) ? sortWorkbooks(list) : [];
         setWorkbooks(safeList);
         invalidateReferenceCache();
-        const idx = safeList.findIndex((wb) => wb.id === result.id);
+        const lastResult = results[results.length - 1];
+        const idx = lastResult ? safeList.findIndex((wb) => wb.id === lastResult.id) : -1;
         if (idx >= 0) {
           setWorkbookIdx(idx);
           setCurrentSheetIndex(0);
         }
-        setStatus("上传完成");
+        setStatus(files.length === 1 ? "上传完成" : `已上传 ${files.length} 个文件`);
       } catch (error) {
         if (controller.signal.aborted) return;
         const message = error instanceof Error ? error.message : "上传失败";

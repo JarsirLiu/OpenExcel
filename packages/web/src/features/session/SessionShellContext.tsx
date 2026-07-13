@@ -2,7 +2,7 @@ import { createContext, useContext } from "react";
 
 type SessionInfra = {
   workspaceId: number;
-  onAttachExcel: (file: File) => Promise<void> | void;
+  onAttachExcel: (files: File[]) => Promise<void> | void;
   referenceCacheRevision: number;
   onWorkspaceRefresh?: () => Promise<void> | void;
   onUndoComplete?: () => Promise<void> | void;

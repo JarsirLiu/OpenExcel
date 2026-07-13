@@ -32,6 +32,10 @@ export async function createWorkbook(
   const initialSheetName = normalizeSheetName(sheetName, 1);
 
   return prisma.$transaction(async (tx) => {
+    await tx.workspace.update({
+      where: { id: workspaceId },
+      data: { updatedAt: new Date() },
+    });
     const maxOrder = await tx.workbook.aggregate({
       where: { workspaceId },
       _max: { order: true },

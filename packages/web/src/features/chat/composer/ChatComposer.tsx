@@ -20,7 +20,7 @@ type ChatComposerProps = {
   isStreaming: boolean;
   onSend: (text: string) => void;
   onStop: () => void;
-  onAttachExcel: (file: File) => Promise<void> | void;
+  onAttachExcel: (files: File[]) => Promise<void> | void;
   referenceCacheRevision: number;
   workspaceId: number;
 };
@@ -104,9 +104,9 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
 
   const handleAttachmentChange = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      if (file) {
-        void onAttachExcel(file);
+      const files = Array.from(event.target.files ?? []);
+      if (files.length > 0) {
+        void onAttachExcel(files);
       }
       event.target.value = "";
     },
@@ -128,6 +128,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
             ref={attachmentInputRef}
             type="file"
             accept=".xlsx,.xls"
+            multiple
             style={{ display: "none" }}
             onChange={handleAttachmentChange}
           />

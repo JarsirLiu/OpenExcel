@@ -25,7 +25,7 @@ type Props = {
   handleSelectSession: (id: number) => void;
   handleDeleteSession: (id: number) => Promise<void>;
   handleUndoComplete: () => Promise<void>;
-  onAttachExcel: (file: File) => Promise<void> | void;
+  onAttachExcel: (files: File[]) => Promise<void> | void;
   onWorkspaceRefresh?: () => Promise<void> | void;
   referenceCacheRevision: number;
   currentUser: CurrentUser;

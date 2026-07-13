@@ -8,5 +8,6 @@ export {
   uploadAsNewWorkbook,
   WorkbookUploadError,
   type WorkbookUploadErrorCode,
+  type WorkbookUploadFile,
 } from "./import/uploadWorkbook.js";
 export { getReferenceCandidates, getWorkbook, getWorkbooks, renameWorkbook } from "./query.js";

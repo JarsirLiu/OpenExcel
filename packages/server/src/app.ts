@@ -10,6 +10,7 @@ import { resolveUserHook } from "./middleware/resolveUser.js";
 import { authRoutes } from "./modules/auth/routes.js";
 import { sessionRoutes } from "./modules/sessions/routes.js";
 import { sheetRoutes } from "./modules/sheets/routes.js";
+import { WORKBOOK_UPLOAD_LIMITS } from "./modules/workbooks/import/uploadLimits.js";
 import { workbookRoutes } from "./modules/workbooks/routes.js";
 import { workspaceRoutes } from "./modules/workspaces/routes.js";
 
@@ -24,7 +25,13 @@ export async function createApp() {
   app.addHook("onResponse", responseLoggerHook);
 
   await app.register(cors, { origin: true });
-  await app.register(multipart);
+  await app.register(multipart, {
+    limits: {
+      files: WORKBOOK_UPLOAD_LIMITS.maxFiles,
+      fileSize: WORKBOOK_UPLOAD_LIMITS.maxFileBytes,
+      parts: WORKBOOK_UPLOAD_LIMITS.maxParts,
+    },
+  });
   await app.register(authRoutes);
   await app.register(workspaceRoutes);
   await app.register(workbookRoutes);

@@ -3,6 +3,7 @@ import {
   resolveWorkbookIdForRequest,
   resolveWorkspaceIdForRequest,
 } from "../../shared/utils/resolvePublicId.js";
+import { WORKBOOK_UPLOAD_LIMITS } from "./import/uploadLimits.js";
 import * as service from "./service.js";
 
 export async function workbookRoutes(app: FastifyInstance) {
@@ -110,11 +111,38 @@ export async function workbookRoutes(app: FastifyInstance) {
           reply,
         );
         if (workspaceId == null) return;
-        const data = await req.file();
-        if (!data) return reply.status(400).send({ error: "No file uploaded" });
+        const files = [];
+        let totalBytes = 0;
+        for await (const data of req.files()) {
+          const chunks: Buffer[] = [];
+          let fileBytes = 0;
+          for await (const chunk of data.file) {
+            const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+            fileBytes += buffer.length;
+            totalBytes += buffer.length;
+            if (totalBytes > WORKBOOK_UPLOAD_LIMITS.maxTotalBytes) {
+              throw new service.WorkbookUploadError(
+                "本次上传文件总大小超过限制",
+                "UPLOAD_LIMIT_EXCEEDED",
+                413,
+                { fileName: data.filename, maxTotalBytes: WORKBOOK_UPLOAD_LIMITS.maxTotalBytes },
+              );
+            }
+            chunks.push(buffer);
+          }
+          if (data.file.truncated) {
+            throw new service.WorkbookUploadError(
+              "上传文件超过单文件大小限制",
+              "UPLOAD_LIMIT_EXCEEDED",
+              413,
+              { fileName: data.filename, maxFileBytes: WORKBOOK_UPLOAD_LIMITS.maxFileBytes },
+            );
+          }
+          files.push({ buffer: Buffer.concat(chunks, fileBytes), fileName: data.filename });
+        }
+        if (files.length === 0) return reply.status(400).send({ error: "No file uploaded" });
 
-        const buf = await data.toBuffer();
-        const result = await service.uploadAsNewWorkbook(workspaceId, buf, data.filename);
+        const result = await service.uploadAsNewWorkbook(workspaceId, files);
         return reply.status(201).send(result);
       } catch (error) {
         if (error instanceof service.WorkbookUploadError) {
@@ -122,6 +150,17 @@ export async function workbookRoutes(app: FastifyInstance) {
             error: error.message,
             code: error.code,
             details: error.details,
+          });
+        }
+        if (
+          typeof error === "object" &&
+          error !== null &&
+          "statusCode" in error &&
+          error.statusCode === 413
+        ) {
+          return reply.status(413).send({
+            error: "上传文件数量或大小超过限制",
+            code: "UPLOAD_LIMIT_EXCEEDED",
           });
         }
         throw error;

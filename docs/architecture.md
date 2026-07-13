@@ -568,6 +568,11 @@ The API surface should stay explicit.
 - `GET /api/workspaces/:workspaceId/workbooks/:id`
 - `POST /api/workspaces/:workspaceId/workbooks`
 - `POST /api/workspaces/:workspaceId/workbooks/upload`
+
+  Accepts multiple multipart `file` parts. Each file creates one workbook and the response is
+  an array of created workbook summaries. The whole batch is transactional: if any file cannot
+  be parsed, no workbook from the batch is persisted. The server limits a request to 20 files,
+  50 MiB per file, and 200 MiB total.
 - `POST /api/workspaces/:workspaceId/workbooks/:id/upload`
 - `POST /api/workspaces/:workspaceId/workbooks/:workbookId/sheets`
 - `DELETE /api/workspaces/:workspaceId/workbooks/:workbookId/sheets/:sheetId`

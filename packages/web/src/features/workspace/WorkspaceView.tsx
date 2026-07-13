@@ -23,7 +23,7 @@ type Props = {
   currentSheetIndex: number;
   setCurrentSheetIndex: (index: number) => void;
   handleSwitchWorkbook: (index: number) => void;
-  handleNewWorkbookFileChange: (file: File) => void;
+  handleNewWorkbookFileChange: (files: File[]) => void;
   handleWorkbookDelete: (workbookId: number) => void;
   handleWorkbookRename: (workbookId: number, newName: string) => Promise<void>;
   handleWorkbookStructureChanged: (update: WorkbookStructureUpdate) => void;
@@ -68,10 +68,11 @@ export function WorkspaceView({
         ref={newWbInputRef}
         type="file"
         accept=".xlsx,.xls"
+        multiple
         style={{ display: "none" }}
         onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) void handleNewWorkbookFileChange(file);
+          const files = Array.from(e.target.files ?? []);
+          if (files.length > 0) void handleNewWorkbookFileChange(files);
           e.target.value = "";
         }}
       />

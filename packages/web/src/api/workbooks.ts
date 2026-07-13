@@ -88,13 +88,15 @@ export async function fetchWorkbook(
 
 export async function uploadNewWorkbook(
   workspaceId: number,
-  file: File,
-): Promise<{ id: number; publicId: string; name: string; sheets: number }> {
+  files: readonly File[],
+  options?: { signal?: AbortSignal },
+): Promise<{ id: number; publicId: string; name: string; sheets: number }[]> {
   const form = new FormData();
-  form.append("file", file);
+  for (const file of files) form.append("file", file);
   const res = await apiFetch(`/workspaces/${workspaceId}/workbooks/upload`, {
     method: "POST",
     body: form,
+    signal: options?.signal,
   });
   if (!res.ok) throw new Error(await readErrorMessage(res, "上传工作簿失败"));
   return res.json();

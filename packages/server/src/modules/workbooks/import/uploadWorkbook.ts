@@ -6,7 +6,7 @@ function bufferToArrayBuffer(buffer: Buffer): ArrayBuffer | SharedArrayBuffer {
   return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
 }
 
-export type WorkbookUploadErrorCode = "INVALID_EXCEL_FILE";
+export type WorkbookUploadErrorCode = "INVALID_EXCEL_FILE" | "UPLOAD_LIMIT_EXCEEDED";
 
 export class WorkbookUploadError extends Error {
   statusCode: number;
@@ -27,52 +27,114 @@ export class WorkbookUploadError extends Error {
   }
 }
 
-function readWorkbookOrThrow(buffer: Buffer) {
+function readWorkbookOrThrow(buffer: Buffer, fileName: string) {
   try {
-    return XLSX.read(buffer, { type: "buffer", cellStyles: true, cellFormula: true, cellNF: true });
+    const extension = fileName.toLowerCase().match(/\.(xlsx|xls)$/)?.[1];
+    const isXlsx = buffer.subarray(0, 4).equals(Buffer.from([0x50, 0x4b, 0x03, 0x04]));
+    const isXls = buffer
+      .subarray(0, 8)
+      .equals(Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]));
+    if ((extension !== "xlsx" || !isXlsx) && (extension !== "xls" || !isXls)) {
+      throw new Error("文件内容与 Excel 文件扩展名不匹配");
+    }
+
+    const workbook = XLSX.read(buffer, {
+      type: "buffer",
+      cellStyles: true,
+      cellFormula: true,
+      cellNF: true,
+    });
+    if (workbook.SheetNames.length === 0) {
+      throw new Error("工作簿不包含任何工作表");
+    }
+    return workbook;
   } catch (error) {
     throw new WorkbookUploadError(
       "无法解析上传的 Excel 文件，请确认文件格式有效",
       "INVALID_EXCEL_FILE",
       400,
-      { cause: error instanceof Error ? error.message : String(error) },
+      { fileName, cause: error instanceof Error ? error.message : String(error) },
     );
   }
 }
 
-export async function uploadAsNewWorkbook(workspaceId: number, buffer: Buffer, fileName: string) {
-  const wbFile = readWorkbookOrThrow(buffer);
+export type WorkbookUploadFile = {
+  buffer: Buffer;
+  fileName: string;
+};
+
+async function parseUpload(file: WorkbookUploadFile) {
+  const wbFile = readWorkbookOrThrow(file.buffer, file.fileName);
   const sheetNames = wbFile.SheetNames;
   const { excelToGrid } = await import("@openexcel/core");
-  const results = excelToGrid(bufferToArrayBuffer(buffer), sheetNames);
-  const wbName = fileName.replace(/\.[^.]+$/, "");
+  const results = excelToGrid(bufferToArrayBuffer(file.buffer), sheetNames);
+
+  return {
+    workbookName: file.fileName.replace(/\.[^.]+$/, ""),
+    sheetNames,
+    results,
+  };
+}
+
+type ParsedWorkbook = Awaited<ReturnType<typeof parseUpload>>;
+
+export async function uploadAsNewWorkbook(
+  workspaceId: number,
+  files: readonly WorkbookUploadFile[],
+) {
+  if (files.length === 0) return [];
+
+  const parsedWorkbooks: ParsedWorkbook[] = [];
+  for (const file of files) {
+    parsedWorkbooks.push(await parseUpload(file));
+  }
 
   return prisma.$transaction(async (tx) => {
+    await tx.workspace.update({
+      where: { id: workspaceId },
+      data: { updatedAt: new Date() },
+    });
     const maxOrder = await tx.workbook.aggregate({
       where: { workspaceId },
       _max: { order: true },
     });
-    const nextOrder = (maxOrder._max.order ?? -1) + 1;
-    const wb = await tx.workbook.create({
-      data: { publicId: generateWorkbookPublicId(), workspaceId, name: wbName, order: nextOrder },
-    });
+    let nextOrder = (maxOrder._max.order ?? -1) + 1;
+    const uploaded = [];
 
-    for (let i = 0; i < sheetNames.length; i++) {
-      const parsed = results[i] ?? { celldata: [], merges: [], config: {} };
-      await tx.sheet.create({
+    for (const parsedWorkbook of parsedWorkbooks) {
+      const wb = await tx.workbook.create({
         data: {
-          workbookId: wb.id,
-          sheetNo: i + 1,
-          name: sheetNames[i],
-          order: i,
-          columns: JSON.stringify([]),
-          merges: JSON.stringify(parsed.merges),
-          uploadedData: JSON.stringify(parsed.celldata),
-          config: JSON.stringify(parsed.config ?? {}),
+          publicId: generateWorkbookPublicId(),
+          workspaceId,
+          name: parsedWorkbook.workbookName,
+          order: nextOrder++,
         },
+      });
+
+      for (let i = 0; i < parsedWorkbook.sheetNames.length; i++) {
+        const parsed = parsedWorkbook.results[i] ?? { celldata: [], merges: [], config: {} };
+        await tx.sheet.create({
+          data: {
+            workbookId: wb.id,
+            sheetNo: i + 1,
+            name: parsedWorkbook.sheetNames[i],
+            order: i,
+            columns: JSON.stringify([]),
+            merges: JSON.stringify(parsed.merges),
+            uploadedData: JSON.stringify(parsed.celldata),
+            config: JSON.stringify(parsed.config ?? {}),
+          },
+        });
+      }
+
+      uploaded.push({
+        id: wb.id,
+        publicId: wb.publicId,
+        name: parsedWorkbook.workbookName,
+        sheets: parsedWorkbook.sheetNames.length,
       });
     }
 
-    return { id: wb.id, publicId: wb.publicId, name: wbName, sheets: sheetNames.length };
+    return uploaded;
   });
 }
