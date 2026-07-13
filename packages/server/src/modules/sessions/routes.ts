@@ -19,6 +19,13 @@ function isDatabaseError(error: unknown): boolean {
   );
 }
 
+function isUndoConflict(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return /没有可撤销|无法撤销|会话记录与运行输入不一致|运行记录中的 .* 输出损坏|会话消息记录损坏/.test(
+    message,
+  );
+}
+
 export async function sessionRoutes(app: FastifyInstance) {
   app.get<{ Params: { workspacePublicId: string } }>(
     "/api/workspaces/:workspacePublicId/sessions",
@@ -128,7 +135,15 @@ export async function sessionRoutes(app: FastifyInstance) {
       if (ids == null) return;
       const session = await service.getSession(ids.workspaceId, ids.sessionId);
       if (!session) return reply.status(404).send({ error: "Session not found" });
-      return service.undoLatestRun(ids.workspaceId, ids.sessionId);
+      try {
+        return await service.undoLatestRun(ids.workspaceId, ids.sessionId);
+      } catch (error) {
+        if (isUndoConflict(error)) {
+          const message = error instanceof Error ? error.message : "当前运行无法撤销";
+          return reply.status(409).send({ error: message });
+        }
+        throw error;
+      }
     },
   );
 

@@ -78,6 +78,8 @@ export function useChatConversation({
   const pendingWorkspaceRefreshRef = useRef(false);
   const wasStreamingRef = useRef(false);
   const loadedOffsetRef = useRef(initialMessages?.length ?? 0);
+  const requestGenerationRef = useRef(0);
+  const mountedRef = useRef(true);
 
   const transport = useMemo(
     () =>
@@ -88,7 +90,7 @@ export function useChatConversation({
   );
 
   const { messages, setMessages, sendMessage, status, stop, error } = useChat({
-    id: String(sessionId),
+    id: `${workspaceId}:${sessionId}`,
     messages: initialMessages ?? [],
     transport,
     onFinish: ({ isAbort, isError, messages: finishedMessages }) => {
@@ -101,43 +103,58 @@ export function useChatConversation({
 
   // Load initial messages when switching to a session (not from route loader)
   useEffect(() => {
-    if (initialMessages != null) return;
+    mountedRef.current = true;
+    requestGenerationRef.current += 1;
+    const generation = requestGenerationRef.current;
+    const controller = new AbortController();
 
-    let cancelled = false;
     setInitialLoaded(false);
     setHasOlder(false);
     loadedOffsetRef.current = 0;
 
     const loadInitialMessages = async () => {
-      try {
-        const { messages: msgs, total } = await fetchChatMessages(
-          workspaceId,
-          sessionId,
-          PAGE_SIZE,
-          0,
-        );
-        if (!cancelled) {
-          // A newly created session can start streaming before its first history
-          // request completes. Do not let the stale empty response erase the
-          // optimistic user message already held by useChat.
-          setMessages((currentMessages) => applyInitialMessages(currentMessages, msgs));
-          loadedOffsetRef.current = msgs.length;
-          setHasOlder(msgs.length < total);
-          setInitialLoaded(true);
+      if (initialMessages == null) {
+        try {
+          const { messages: msgs, total } = await fetchChatMessages(
+            workspaceId,
+            sessionId,
+            PAGE_SIZE,
+            0,
+            { signal: controller.signal },
+          );
+          if (mountedRef.current && generation === requestGenerationRef.current) {
+            // A newly created session can start streaming before its first history
+            // request completes. Do not let the stale empty response erase the
+            // optimistic user message already held by useChat.
+            setMessages((currentMessages) => applyInitialMessages(currentMessages, msgs));
+            loadedOffsetRef.current = msgs.length;
+            setHasOlder(msgs.length < total);
+            setInitialLoaded(true);
+          }
+        } catch {
+          // Expected: session invalidated by workspace switch
+          if (!controller.signal.aborted && mountedRef.current) {
+            setInitialLoaded(true);
+          }
         }
-      } catch {
-        // Expected: session invalidated by workspace switch
-        if (!cancelled) {
-          setInitialLoaded(true);
-        }
+      } else if (mountedRef.current && generation === requestGenerationRef.current) {
+        setInitialLoaded(true);
       }
     };
 
     void loadInitialMessages();
     return () => {
-      cancelled = true;
+      mountedRef.current = false;
+      requestGenerationRef.current += 1;
+      controller.abort();
     };
   }, [sessionId, workspaceId, initialMessages, setMessages]);
+
+  useEffect(() => {
+    return () => {
+      stop();
+    };
+  }, [stop]);
 
   const isStreaming = status === "submitted" || status === "streaming";
 
@@ -179,6 +196,7 @@ export function useChatConversation({
   const flushPendingWorkspaceRefresh = useCallback(async () => {
     if (!pendingWorkspaceRefreshRef.current) return;
     pendingWorkspaceRefreshRef.current = false;
+    if (!mountedRef.current) return;
     await onWorkspaceRefresh?.();
   }, [onWorkspaceRefresh]);
 
@@ -215,6 +233,7 @@ export function useChatConversation({
         PAGE_SIZE,
         offset,
       );
+      if (!mountedRef.current || requestGenerationRef.current === 0) return;
       if (olderMsgs.length === 0) {
         setHasOlder(false);
         return;
@@ -233,6 +252,7 @@ export function useChatConversation({
     }
 
     const result = await undoLatestRun(workspaceId, sessionId);
+    if (!mountedRef.current) throw new Error("当前会话已切换");
     const nextMessages = trimMessagesAfterUserTurn(messagesRef.current, result.undoneUserText);
     setMessages(nextMessages);
 

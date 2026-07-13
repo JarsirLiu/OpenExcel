@@ -51,6 +51,17 @@ function serializeJson(value: unknown): string | null {
   }
 }
 
+function removeEmptyAssistantMessages(messages: any[]): any[] {
+  return messages.filter(
+    (message) =>
+      !(
+        message?.role === "assistant" &&
+        Array.isArray(message.parts) &&
+        message.parts.length === 0
+      ),
+  );
+}
+
 export async function streamChat(
   workspaceId: number,
   sessionId: number,
@@ -99,6 +110,11 @@ export async function streamChat(
   const toolNames = Object.keys(tools);
 
   let finalized = false;
+  let terminalOutcome: {
+    status: string;
+    outputText?: string | null;
+    errorMessage?: string;
+  } | null = null;
   let stepOrder = 0;
 
   const finalizeRunOnce = async (data: Record<string, unknown>) => {
@@ -146,6 +162,14 @@ export async function streamChat(
     }
   };
 
+  const recordTerminalOutcome = (outcome: {
+    status: string;
+    outputText?: string | null;
+    errorMessage?: string;
+  }) => {
+    terminalOutcome ??= outcome;
+  };
+
   try {
     return await streamAgentChat({
       modelConfig: config,
@@ -168,30 +192,41 @@ export async function streamChat(
       abortSignal,
       onStepFinish: persistStepOnce,
       onFinish: async ({ text }: any) => {
-        await finalizeRunOnce({
+        recordTerminalOutcome({
           status: "completed",
           outputText: typeof text === "string" && text.length > 0 ? text : null,
         });
       },
       onAbort: async () => {
-        await finalizeRunOnce({ status: "aborted" });
+        recordTerminalOutcome({ status: "aborted" });
       },
       onError: async (error: any) => {
         const errorMessage = formatAIError(error);
         console.error(`[session] AI stream error for run ${run.id}: ${errorMessage}`);
-        await finalizeRunOnce({
+        recordTerminalOutcome({
           status: "error",
           errorMessage,
         });
       },
       onEnd: async ({ messages: newMessages }) => {
+        const outcome =
+          terminalOutcome ??
+          ({ status: "error", errorMessage: "对话流未正常结束" } satisfies {
+            status: string;
+            errorMessage: string;
+          });
+        const transcript =
+          outcome.status === "completed" ? newMessages : removeEmptyAssistantMessages(messages);
+
         try {
           await withSessionLock(sessionId, () =>
-            persistSessionMessages(workspaceId, sessionId, newMessages),
+            persistSessionMessages(workspaceId, sessionId, transcript),
           );
         } catch (error) {
           console.error(`[session] Failed to persist transcript for session ${sessionId}:`, error);
         }
+
+        await finalizeRunOnce(outcome);
 
         try {
           await withSessionLock(sessionId, () =>

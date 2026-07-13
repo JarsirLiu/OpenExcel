@@ -51,6 +51,31 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
   const [currentSheetIndex, setCurrentSheetIndex] = useState(loadStoredSheetIdx);
   const [referenceCacheRevision, setReferenceCacheRevision] = useState(0);
   const currentWorkbookRef = useRef(currentWorkbook);
+  const requestGenerationRef = useRef(0);
+  const refreshControllerRef = useRef<AbortController | null>(null);
+
+  const beginRequest = useCallback(() => {
+    requestGenerationRef.current += 1;
+    refreshControllerRef.current?.abort();
+    const controller = new AbortController();
+    refreshControllerRef.current = controller;
+    return { generation: requestGenerationRef.current, controller };
+  }, []);
+
+  const isCurrentRequest = useCallback((generation: number, signal: AbortSignal) => {
+    return generation === requestGenerationRef.current && !signal.aborted;
+  }, []);
+
+  useEffect(() => {
+    requestGenerationRef.current += 1;
+    refreshControllerRef.current?.abort();
+    refreshControllerRef.current = null;
+    currentWorkbookRef.current = null;
+    return () => {
+      requestGenerationRef.current += 1;
+      refreshControllerRef.current?.abort();
+    };
+  }, [workspaceId]);
 
   useEffect(() => {
     currentWorkbookRef.current = currentWorkbook;
@@ -70,19 +95,34 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
 
   const refreshCurrentWorkbook = useCallback(async () => {
     if (!currentWorkbook || workspaceId == null) return;
+    const { generation, controller } = beginRequest();
     try {
-      const full = await fetchWorkbook(workspaceId, currentWorkbook.id);
+      const full = await fetchWorkbook(workspaceId, currentWorkbook.id, {
+        signal: controller.signal,
+      });
+      if (!isCurrentRequest(generation, controller.signal)) return;
+      currentWorkbookRef.current = full;
       replaceCurrentWorkbook(full);
-    } catch {
-      // ignore
+    } catch (error) {
+      if (!controller.signal.aborted) {
+        console.error("[workbook] Failed to refresh current workbook:", error);
+      }
     }
-  }, [currentWorkbook, replaceCurrentWorkbook, workspaceId]);
+  }, [beginRequest, currentWorkbook, isCurrentRequest, replaceCurrentWorkbook, workspaceId]);
 
   const refreshWorkspace = useCallback(async () => {
     if (workspaceId == null) return;
+    const { generation, controller } = beginRequest();
 
     try {
-      const list = await fetchWorkbooks(workspaceId);
+      let list: WorkbookMeta[];
+      try {
+        list = await fetchWorkbooks(workspaceId, { signal: controller.signal });
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        throw error;
+      }
+      if (!isCurrentRequest(generation, controller.signal)) return;
       const safeList = Array.isArray(list) ? sortWorkbooks(list) : [];
       setWorkbooks(safeList);
       invalidateReferenceCache();
@@ -99,7 +139,11 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
         return;
       }
 
-      const nextWorkbook = await fetchWorkbook(workspaceId, nextWorkbookId);
+      const nextWorkbook = await fetchWorkbook(workspaceId, nextWorkbookId, {
+        signal: controller.signal,
+      });
+      if (!isCurrentRequest(generation, controller.signal)) return;
+      currentWorkbookRef.current = nextWorkbook;
       replaceCurrentWorkbook(nextWorkbook);
       const nextIndex = safeList.findIndex((workbook) => workbook.id === nextWorkbookId);
       setWorkbookIdx(nextIndex >= 0 ? nextIndex : 0);
@@ -109,13 +153,17 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
           ? Math.min(currentSheetIndex, Math.max(0, nextWorkbook.sheets.length - 1))
           : 0;
       setCurrentSheetIndex(nextSheetIndex);
-    } catch {
-      // ignore
+    } catch (error) {
+      if (!controller.signal.aborted) {
+        console.error("[workbook] Failed to refresh workspace:", error);
+      }
     }
   }, [
+    beginRequest,
     currentSheetIndex,
     currentWorkbook,
     invalidateReferenceCache,
+    isCurrentRequest,
     replaceCurrentWorkbook,
     setCurrentSheetIndex,
     setWorkbookIdx,
@@ -141,58 +189,76 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
       }
 
       try {
-        const full = await fetchWorkbook(workspaceId, workbook.id);
+        const { generation, controller } = beginRequest();
+        const full = await fetchWorkbook(workspaceId, workbook.id, {
+          signal: controller.signal,
+        });
+        if (!isCurrentRequest(generation, controller.signal)) return;
         currentWorkbookRef.current = full;
         replaceCurrentWorkbook(full);
-      } catch {
-        // ignore
+      } catch (error) {
+        console.error("[workbook] Failed to refresh after sheet change:", error);
       }
     },
-    [replaceCurrentWorkbook, workspaceId],
+    [beginRequest, isCurrentRequest, replaceCurrentWorkbook, workspaceId],
   );
 
   const handleWorkbookStructureChanged = useCallback(
     async (update: WorkbookStructureUpdate) => {
       if (workspaceId == null) return;
+      const { generation, controller } = beginRequest();
       invalidateReferenceCache();
 
-      if (update.kind === "workbook-created") {
-        const list = await fetchWorkbooks(workspaceId);
-        const safeList = Array.isArray(list) ? sortWorkbooks(list) : [];
-        setWorkbooks(safeList);
-        const nextIndex = safeList.findIndex((wb) => wb.id === update.workbookId);
-        setWorkbookIdx(nextIndex >= 0 ? nextIndex : 0);
-        setCurrentSheetIndex(0);
-        return;
-      }
+      try {
+        if (update.kind === "workbook-created") {
+          const list = await fetchWorkbooks(workspaceId, { signal: controller.signal });
+          if (!isCurrentRequest(generation, controller.signal)) return;
+          const safeList = Array.isArray(list) ? sortWorkbooks(list) : [];
+          setWorkbooks(safeList);
+          const nextIndex = safeList.findIndex((wb) => wb.id === update.workbookId);
+          setWorkbookIdx(nextIndex >= 0 ? nextIndex : 0);
+          setCurrentSheetIndex(0);
+          return;
+        }
 
-      if (update.kind === "sheet-deleted") {
+        if (update.kind === "sheet-deleted") {
+          if (currentWorkbook?.id !== update.workbookId) {
+            return;
+          }
+
+          const nextWorkbook = await fetchWorkbook(workspaceId, update.workbookId, {
+            signal: controller.signal,
+          });
+          if (!isCurrentRequest(generation, controller.signal)) return;
+          replaceCurrentWorkbook(nextWorkbook);
+          const nextIndex = nextWorkbook.sheets.findIndex((sheet) => sheet.id === update.sheetId);
+          const fallbackIndex = Math.min(update.order, nextWorkbook.sheets.length - 1);
+          setCurrentSheetIndex(nextIndex >= 0 ? nextIndex : fallbackIndex);
+          return;
+        }
+
         if (currentWorkbook?.id !== update.workbookId) {
           return;
         }
 
-        const nextWorkbook = await fetchWorkbook(workspaceId, update.workbookId);
+        const nextWorkbook = await fetchWorkbook(workspaceId, update.workbookId, {
+          signal: controller.signal,
+        });
+        if (!isCurrentRequest(generation, controller.signal)) return;
         replaceCurrentWorkbook(nextWorkbook);
         const nextIndex = nextWorkbook.sheets.findIndex((sheet) => sheet.id === update.sheetId);
-        const fallbackIndex = Math.min(update.order, nextWorkbook.sheets.length - 1);
-        setCurrentSheetIndex(nextIndex >= 0 ? nextIndex : fallbackIndex);
-        return;
+        setCurrentSheetIndex(
+          nextIndex >= 0 ? nextIndex : Math.min(update.order, nextWorkbook.sheets.length - 1),
+        );
+      } catch (error) {
+        if (!controller.signal.aborted) throw error;
       }
-
-      if (currentWorkbook?.id !== update.workbookId) {
-        return;
-      }
-
-      const nextWorkbook = await fetchWorkbook(workspaceId, update.workbookId);
-      replaceCurrentWorkbook(nextWorkbook);
-      const nextIndex = nextWorkbook.sheets.findIndex((sheet) => sheet.id === update.sheetId);
-      setCurrentSheetIndex(
-        nextIndex >= 0 ? nextIndex : Math.min(update.order, nextWorkbook.sheets.length - 1),
-      );
     },
     [
       currentWorkbook?.id,
+      beginRequest,
       invalidateReferenceCache,
+      isCurrentRequest,
       replaceCurrentWorkbook,
       setCurrentSheetIndex,
       setWorkbookIdx,
@@ -212,10 +278,12 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
   const handleNewWorkbookFileChange = useCallback(
     async (file: File) => {
       if (workspaceId == null) return;
+      const { generation, controller } = beginRequest();
       setStatus("上传中...");
       try {
         const result = await uploadNewWorkbook(workspaceId, file);
-        const list = await fetchWorkbooks(workspaceId);
+        const list = await fetchWorkbooks(workspaceId, { signal: controller.signal });
+        if (!isCurrentRequest(generation, controller.signal)) return;
         const safeList = Array.isArray(list) ? sortWorkbooks(list) : [];
         setWorkbooks(safeList);
         invalidateReferenceCache();
@@ -226,18 +294,40 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
         }
         setStatus("上传完成");
       } catch (error) {
+        if (controller.signal.aborted) return;
         const message = error instanceof Error ? error.message : "上传失败";
         setStatus(`上传失败：${message}`);
       }
     },
-    [invalidateReferenceCache, setStatus, setWorkbooks, setWorkbookIdx, workspaceId],
+    [
+      beginRequest,
+      invalidateReferenceCache,
+      isCurrentRequest,
+      setStatus,
+      setWorkbooks,
+      setWorkbookIdx,
+      workspaceId,
+    ],
   );
 
   const handleWorkbookDelete = useCallback(
     async (workbookId: number) => {
       if (workspaceId == null) return;
-      await deleteWorkbook(workspaceId, workbookId);
-      const list = await fetchWorkbooks(workspaceId);
+      const { generation, controller } = beginRequest();
+      try {
+        await deleteWorkbook(workspaceId, workbookId);
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        throw error;
+      }
+      let list: WorkbookMeta[];
+      try {
+        list = await fetchWorkbooks(workspaceId, { signal: controller.signal });
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        throw error;
+      }
+      if (!isCurrentRequest(generation, controller.signal)) return;
       const safeList = Array.isArray(list) ? sortWorkbooks(list) : [];
       setWorkbooks(safeList);
       invalidateReferenceCache();
@@ -251,16 +341,26 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
       }
       setStatus("已删除");
     },
-    [invalidateReferenceCache, replaceCurrentWorkbook, setWorkbookIdx, setWorkbooks, workspaceId],
+    [
+      beginRequest,
+      invalidateReferenceCache,
+      isCurrentRequest,
+      replaceCurrentWorkbook,
+      setWorkbookIdx,
+      setWorkbooks,
+      workspaceId,
+    ],
   );
 
   const handleCreateWorkbook = useCallback(
     async (workspaceId: number) => {
       if (workspaceId == null) return;
+      const { generation, controller } = beginRequest();
       setStatus("创建中...");
       try {
         const result = await createWorkbook(workspaceId);
-        const list = await fetchWorkbooks(workspaceId);
+        const list = await fetchWorkbooks(workspaceId, { signal: controller.signal });
+        if (!isCurrentRequest(generation, controller.signal)) return;
         const safeList = Array.isArray(list) ? sortWorkbooks(list) : [];
         setWorkbooks(safeList);
         invalidateReferenceCache();
@@ -271,20 +371,31 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
         }
         setStatus("已创建");
       } catch (error) {
+        if (controller.signal.aborted) return;
         const message = error instanceof Error ? error.message : "创建失败";
         setStatus(`创建失败：${message}`);
       }
     },
-    [invalidateReferenceCache, setStatus, setWorkbookIdx, setWorkbooks, workspaceId],
+    [
+      beginRequest,
+      invalidateReferenceCache,
+      isCurrentRequest,
+      setStatus,
+      setWorkbookIdx,
+      setWorkbooks,
+      workspaceId,
+    ],
   );
 
   const handleWorkbookRename = useCallback(
     async (workbookId: number, newName: string) => {
       if (workspaceId == null) return;
+      const { generation, controller } = beginRequest();
       setStatus("重命名中...");
       try {
         await updateWorkbookName(workspaceId, workbookId, newName);
-        const list = await fetchWorkbooks(workspaceId);
+        const list = await fetchWorkbooks(workspaceId, { signal: controller.signal });
+        if (!isCurrentRequest(generation, controller.signal)) return;
         const safeList = Array.isArray(list) ? sortWorkbooks(list) : [];
         setWorkbooks(safeList);
         if (currentWorkbook?.id === workbookId) {
@@ -293,13 +404,16 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
         invalidateReferenceCache();
         setStatus("已重命名");
       } catch (error) {
+        if (controller.signal.aborted) return;
         const message = error instanceof Error ? error.message : "重命名失败";
         setStatus(`重命名失败：${message}`);
       }
     },
     [
       currentWorkbook,
+      beginRequest,
       invalidateReferenceCache,
+      isCurrentRequest,
       replaceCurrentWorkbook,
       setStatus,
       setWorkbooks,

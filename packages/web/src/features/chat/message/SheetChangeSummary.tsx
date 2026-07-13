@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { SheetPreview } from "./SheetPreview";
 
+function isRecord(value: unknown): value is Record<string, any> {
+  return typeof value === "object" && value !== null;
+}
+
 type SheetChangeEntry = {
   sheetId: number;
   sheetName: string;
@@ -14,16 +18,23 @@ function collectSheetChanges(parts: any[]): SheetChangeEntry[] {
   const map = new Map<number, SheetChangeEntry>();
 
   for (const part of parts) {
-    if (!part.type?.startsWith("tool-")) continue;
+    if (!isRecord(part) || typeof part.type !== "string" || !part.type.startsWith("tool-"))
+      continue;
     if (part.state !== "output-available") continue;
     const output = part.output;
-    if (!output?.sheetInfo?.sheetId) continue;
+    if (
+      !isRecord(output) ||
+      !isRecord(output.sheetInfo) ||
+      typeof output.sheetInfo.sheetId !== "number"
+    )
+      continue;
 
     const sheetId = output.sheetInfo.sheetId;
     if (!map.has(sheetId)) {
       map.set(sheetId, {
         sheetId,
-        sheetName: output.sheetInfo.sheetName,
+        sheetName:
+          typeof output.sheetInfo.sheetName === "string" ? output.sheetInfo.sheetName : "Sheet",
         sheetNo: output.sheetInfo.sheetNo,
         lastPreview: null,
         changedCells: new Set(),

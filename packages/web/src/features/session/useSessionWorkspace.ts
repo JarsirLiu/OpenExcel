@@ -21,12 +21,14 @@ export function useSessionWorkspace(
     handleSelectSession: listSelectSession,
     handleDeleteSession: listDeleteSession,
   } = useSessionsList(workspaceId, initial?.sessions);
+  const initialSeededRef = useRef(false);
 
   // Seed initial sessions from route loader
   useEffect(() => {
-    if (!initial) return;
+    if (!initial || initialSeededRef.current) return;
+    initialSeededRef.current = true;
     setSessions(initial.sessions);
-  }, [initial, setSessions]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [initial, setSessions]);
 
   // Reset on workspace switch
   const prevWorkspaceIdRef = useRef(workspaceId);

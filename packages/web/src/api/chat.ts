@@ -5,9 +5,11 @@ export async function fetchMessages(
   sessionId: number,
   limit = 40,
   offset = 0,
+  options?: { signal?: AbortSignal },
 ): Promise<{ messages: any[]; total: number }> {
   const res = await apiFetch(
     `/workspaces/${workspaceId}/sessions/${sessionId}/messages?limit=${limit}&offset=${offset}`,
+    { signal: options?.signal },
   );
   if (!res.ok) throw new Error("加载消息失败");
   return res.json();

@@ -8,8 +8,13 @@ export interface Session {
   createdAt: string;
 }
 
-export async function fetchSessions(workspaceId: number): Promise<Session[]> {
-  const res = await apiFetch(`/workspaces/${workspaceId}/sessions`);
+export async function fetchSessions(
+  workspaceId: number,
+  options?: { signal?: AbortSignal },
+): Promise<Session[]> {
+  const res = await apiFetch(`/workspaces/${workspaceId}/sessions`, {
+    signal: options?.signal,
+  });
   if (!res.ok) throw new Error("加载会话失败");
   return res.json();
 }

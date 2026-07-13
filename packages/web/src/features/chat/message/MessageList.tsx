@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { MessageItem } from "./MessageItem";
 import styles from "./MessageList.module.css";
+import { MessageRenderBoundary } from "./MessageRenderBoundary";
 
 export function MessageList({
   messages,
@@ -117,19 +118,20 @@ export function MessageList({
         </div>
       )}
       {messages.map((msg: any, idx: number) => (
-        <MessageItem
-          key={msg.id || idx}
-          msg={msg}
-          isStreaming={isStreaming}
-          isLastAssistantMessage={
-            !isStreaming && msg.role === "assistant" && msg.id === lastAssistantMsg?.id
-          }
-          isLastUserMessage={!isStreaming && msg.role === "user" && msg.id === lastUserMsg?.id}
-          onRegenerate={onRegenerate}
-          onUndo={onUndo}
-          isUndoing={isUndoing}
-          onNavigateSheet={onNavigateSheet}
-        />
+        <MessageRenderBoundary key={`${msg?.id || idx}:${msg?.parts?.length ?? 0}`}>
+          <MessageItem
+            msg={msg}
+            isStreaming={isStreaming}
+            isLastAssistantMessage={
+              !isStreaming && msg.role === "assistant" && msg.id === lastAssistantMsg?.id
+            }
+            isLastUserMessage={!isStreaming && msg.role === "user" && msg.id === lastUserMsg?.id}
+            onRegenerate={onRegenerate}
+            onUndo={onUndo}
+            isUndoing={isUndoing}
+            onNavigateSheet={onNavigateSheet}
+          />
+        </MessageRenderBoundary>
       ))}
       <div ref={messagesEndRef} />
 
@@ -139,7 +141,10 @@ export function MessageList({
           const showDots =
             last?.role !== "assistant" ||
             !last.parts?.some(
-              (p: any) => p.type === "text" || p.type.startsWith("tool-") || p.type === "reasoning",
+              (p: any) =>
+                p?.type === "text" ||
+                (typeof p?.type === "string" && p.type.startsWith("tool-")) ||
+                p?.type === "reasoning",
             );
           if (!showDots) return null;
           return (

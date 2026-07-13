@@ -17,6 +17,12 @@ vi.mock("@/api/sessions", () => ({
 }));
 
 describe("useSessionWorkspace", () => {
+  const emptyInitial = {
+    sessions: [],
+    messages: [],
+    messageTotal: 0,
+  };
+
   beforeEach(() => {
     sessionStorage.clear();
     mocks.createSession.mockReset();
@@ -34,13 +40,7 @@ describe("useSessionWorkspace", () => {
       createdAt: "2026-07-07T00:00:00.000Z",
     });
 
-    const { result } = renderHook(() =>
-      useSessionWorkspace(1, undefined, {
-        sessions: [],
-        messages: [],
-        messageTotal: 0,
-      }),
-    );
+    const { result } = renderHook(() => useSessionWorkspace(1, undefined, emptyInitial));
 
     await act(async () => {
       await result.current.handleSendInDraft("帮我汇总这份表格");
@@ -51,5 +51,37 @@ describe("useSessionWorkspace", () => {
     });
 
     expect(result.current.sessions.map((session) => session.id)).toEqual([5]);
+  });
+
+  it("does not reuse a session from the previous workspace", async () => {
+    mocks.fetchSessions.mockImplementation(async (workspaceId: number) =>
+      workspaceId === 2
+        ? [
+            {
+              id: 8,
+              publicId: "session-8",
+              sheetId: null,
+              name: "工作区 2",
+              createdAt: "2026-07-07T00:00:00.000Z",
+            },
+          ]
+        : [],
+    );
+
+    const { result, rerender } = renderHook(({ workspaceId }) => useSessionWorkspace(workspaceId), {
+      initialProps: { workspaceId: 1 },
+    });
+
+    await act(async () => {
+      rerender({ workspaceId: 2 });
+    });
+
+    await waitFor(() => {
+      expect(result.current.currentSessionId).toBe(8);
+    });
+    expect(mocks.fetchSessions).toHaveBeenCalledWith(
+      2,
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
   });
 });

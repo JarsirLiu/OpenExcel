@@ -191,6 +191,7 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
       />
       <div className={styles.main}>
         <WorkspaceView
+          key={activeWorkspaceId ?? "no-workspace"}
           workspaceId={activeWorkspaceId}
           workbooks={workbook.workbooks}
           workbookIdx={workbook.workbookIdx}
@@ -210,6 +211,7 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
         <div className={styles.resizeHandle} onMouseDown={handleResizeMouseDown} />
       </div>
       <ChatSidebar
+        key={activeWorkspaceId ?? "no-workspace"}
         workspaceId={activeWorkspaceId}
         onWorkspaceRefresh={workbook.handleWorkspaceRefresh}
         onAttachExcel={workbook.handleNewWorkbookFileChange}

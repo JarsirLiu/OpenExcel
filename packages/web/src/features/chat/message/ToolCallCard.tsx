@@ -1,4 +1,4 @@
-import { SheetPreview } from "./SheetPreview";
+import { normalizePreviewData, SheetPreview } from "./SheetPreview";
 
 function isStaticToolPart(part: any): boolean {
   return part.args === undefined && part.input !== undefined;
@@ -149,7 +149,7 @@ export function ToolCallCard({ part }: { part: any }) {
   const input = isStaticToolPart(part) ? part.input : part.args;
   const output = isStaticToolPart(part) ? (part as any).output : undefined;
   const summary = getToolSummary(toolName, output, input);
-  const preview = output?.preview ?? null;
+  const preview = normalizePreviewData(output?.preview);
   const sheetInfo = output?.sheetInfo ?? null;
   const changedCells = computeChangedCells(output?.delta);
 
@@ -213,7 +213,7 @@ export function ToolCallCard({ part }: { part: any }) {
           {isComplete ? (isError ? "失败" : "已完成") : "运行中..."}
         </span>
       </div>
-      {isComplete && !isError && preview?.rows?.length > 0 && (
+      {isComplete && !isError && preview && preview.rows.length > 0 && (
         <div style={{ paddingLeft: 22, marginTop: 4 }}>
           <SheetPreview preview={preview} changedCells={changedCells} />
         </div>

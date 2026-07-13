@@ -30,8 +30,8 @@ export const prisma = await createPrismaClient(databaseConfig);
 
 if (databaseConfig.provider === "sqlite") {
   try {
-    await prisma.$executeRawUnsafe("PRAGMA busy_timeout = 10000");
-    await prisma.$executeRawUnsafe("PRAGMA synchronous = NORMAL");
+    await prisma.$queryRawUnsafe("PRAGMA busy_timeout = 10000");
+    await prisma.$queryRawUnsafe("PRAGMA synchronous = NORMAL");
     await prisma.$queryRawUnsafe("PRAGMA journal_mode = WAL");
   } catch (error) {
     console.warn("[database] Failed to initialize SQLite concurrency pragmas:", error);

@@ -51,8 +51,13 @@ export interface WorkbookCreateResult {
   };
 }
 
-export async function fetchWorkbooks(workspaceId: number): Promise<WorkbookMeta[]> {
-  const res = await apiFetch(`/workspaces/${workspaceId}/workbooks`);
+export async function fetchWorkbooks(
+  workspaceId: number,
+  options?: { signal?: AbortSignal },
+): Promise<WorkbookMeta[]> {
+  const res = await apiFetch(`/workspaces/${workspaceId}/workbooks`, {
+    signal: options?.signal,
+  });
   if (!res.ok) throw new Error("加载工作簿失败");
   return res.json();
 }
@@ -69,8 +74,14 @@ export async function fetchWorkbookReferenceCandidates(
   return res.json();
 }
 
-export async function fetchWorkbook(workspaceId: number, id: number): Promise<WorkbookFull> {
-  const res = await apiFetch(`/workspaces/${workspaceId}/workbooks/${id}`);
+export async function fetchWorkbook(
+  workspaceId: number,
+  id: number,
+  options?: { signal?: AbortSignal },
+): Promise<WorkbookFull> {
+  const res = await apiFetch(`/workspaces/${workspaceId}/workbooks/${id}`, {
+    signal: options?.signal,
+  });
   if (!res.ok) throw new Error("加载工作簿详情失败");
   return res.json();
 }

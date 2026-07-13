@@ -5,12 +5,86 @@ interface PreviewMerge {
   endCol: number;
 }
 
-interface PreviewData {
+export interface PreviewData {
   sheetId: number;
   sheetName: string;
   range: { startRow: number; endRow: number; startCol: number; endCol: number };
   rows: string[][];
   merges: PreviewMerge[];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function formatPreviewValue(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  if (Array.isArray(value)) return value.map(formatPreviewValue).join(", ");
+  if (isRecord(value)) {
+    if ("value" in value) return formatPreviewValue(value.value);
+    if ("v" in value) return formatPreviewValue(value.v);
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return "";
+    }
+  }
+  return String(value);
+}
+
+function normalizePreviewRows(value: unknown): string[][] {
+  if (!Array.isArray(value)) return [];
+
+  return value.map((row) => {
+    if (Array.isArray(row)) return row.map(formatPreviewValue);
+
+    if (isRecord(row) && Array.isArray(row.values)) {
+      return row.values.map(formatPreviewValue);
+    }
+
+    if (isRecord(row)) {
+      const numericKeys = Object.keys(row)
+        .filter((key) => /^\d+$/.test(key))
+        .sort((a, b) => Number(a) - Number(b));
+      if (numericKeys.length > 0) {
+        return numericKeys.map((key) => formatPreviewValue(row[key]));
+      }
+    }
+
+    return [formatPreviewValue(row)];
+  });
+}
+
+export function normalizePreviewData(value: unknown): PreviewData | null {
+  if (!isRecord(value)) return null;
+
+  const range = isRecord(value.range) ? value.range : {};
+  const merges = Array.isArray(value.merges)
+    ? value.merges.filter(
+        (merge): merge is PreviewMerge =>
+          isRecord(merge) &&
+          typeof merge.startRow === "number" &&
+          typeof merge.startCol === "number" &&
+          typeof merge.endRow === "number" &&
+          typeof merge.endCol === "number",
+      )
+    : [];
+
+  return {
+    sheetId: typeof value.sheetId === "number" ? value.sheetId : 0,
+    sheetName: typeof value.sheetName === "string" ? value.sheetName : "Sheet",
+    range: {
+      startRow: typeof range.startRow === "number" ? range.startRow : 1,
+      endRow: typeof range.endRow === "number" ? range.endRow : 1,
+      startCol: typeof range.startCol === "number" ? range.startCol : 1,
+      endCol: typeof range.endCol === "number" ? range.endCol : 1,
+    },
+    rows: normalizePreviewRows(value.rows),
+    merges,
+  };
 }
 
 function buildMergeMap(merges: PreviewMerge[]): Map<string, { rs: number; cs: number }> {
@@ -25,12 +99,15 @@ function buildMergeMap(merges: PreviewMerge[]): Map<string, { rs: number; cs: nu
 }
 
 export function SheetPreview({
-  preview,
+  preview: rawPreview,
   changedCells,
 }: {
-  preview: PreviewData;
+  preview: unknown;
   changedCells?: ReadonlySet<string>;
 }) {
+  const preview = normalizePreviewData(rawPreview);
+  if (!preview) return null;
+
   const mergeMap = buildMergeMap(preview.merges);
   const skipped = new Set<string>();
   const rowBase = preview.range.startRow;

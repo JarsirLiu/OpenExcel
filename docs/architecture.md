@@ -667,6 +667,31 @@ These rules are non-negotiable for future work:
 6. Model integrations stay on chat/completions unless a deliberate migration is approved.
 7. Any new feature must declare its owner package before implementation.
 
+### 11.1 Resource context and request lifecycle
+
+The web workbench treats `workspaceId` as the resource context boundary. Session
+state and workbook state are scoped to that context and are remounted with a
+`workspaceId` key when the active workspace changes. A child component must not
+reuse a session or workbook response from another workspace.
+
+All asynchronous reads that can cross a workspace or workbook switch must use
+both protections:
+
+- an `AbortController` to cancel work that is no longer relevant;
+- a monotonically increasing request generation to discard a response that was
+  already returned after the context changed.
+
+The server run lifecycle has the opposite ordering requirement: transcript
+persistence must complete before a run becomes terminal. Failed and aborted
+streams may persist only the cleaned client transcript; they must not persist an
+empty assistant placeholder or an incomplete assistant turn. This prevents a
+new run from observing a run that is marked finished while the previous stream
+is still writing its history.
+
+Undo is available only through persisted run effects and must be treated as a
+workbook mutation operation. A failed run without snapshots or structural
+effects is not an undo candidate.
+
 ## 12. Migration Plan
 
 The architecture should evolve in steps.
