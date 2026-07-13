@@ -18,14 +18,20 @@ import {
 import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatchSync";
 import { confirm } from "@/shared/lib";
 import { buildDocumentOperations, valueKey } from "./documentSync";
-import { toFortuneSheetData } from "./fortuneSheet";
+import {
+  buildFortuneSheetViewportUpdates,
+  type FortuneSheetRuntime,
+  toFortuneSheetData,
+} from "./fortuneSheet";
 import { useSheetActivation } from "./SheetActivationContext";
+import { rendererRowToDocumentRow } from "./sheetCoordinates";
 import { useWorkbookEditorSession } from "./useWorkbookEditorSession";
 import {
   createViewportCache,
   mergeDocumentRange,
   missingChunksForRange,
   rangeToA1,
+  syncViewportCacheFromMatrix,
   viewportCelldata,
   viewportRangeFromScroll,
 } from "./viewportCache";
@@ -67,10 +73,13 @@ export function useExcelGridWorkspace({
   const gridRootRef = useRef<HTMLDivElement>(null);
   const viewportCacheRef = useRef<Record<number, ReturnType<typeof createViewportCache>>>({});
   const pendingViewportChunksRef = useRef<Record<number, Set<string>>>({});
+  const viewportGenerationRef = useRef(0);
+  const renderedViewportKeyRef = useRef<Record<number, string>>({});
+  const pendingProgrammaticChangesRef = useRef<Record<number, string[]>>({});
   const { sheetData, sessionKey } = useWorkbookEditorSession(workbook, workbookRevision);
   const { registerActivateSheet } = useSheetActivation();
 
-  const getSnapshot = useCallback((celldata: any[], config: any) => {
+  const getSnapshot = useCallback((celldata: unknown[], config: unknown) => {
     return JSON.stringify({ celldata, config });
   }, []);
 
@@ -82,23 +91,29 @@ export function useExcelGridWorkspace({
       if (!instance || !sourceSheet || !cache) return;
 
       const renderedCells = viewportCelldata(cache);
-      const allSheets = instance.getAllSheets() as any[];
-      instance.updateSheet(
-        allSheets.map((sheet) =>
-          String(sheet.id) === String(sheetId)
-            ? {
-                ...sheet,
-                celldata: renderedCells,
-                row: Math.max(sourceSheet.maxRow ?? 0, cache.maxRow, 128) + 1,
-                column: Math.max(sourceSheet.maxColumn ?? 0, cache.maxColumn, 64),
-              }
-            : sheet,
-        ),
+      const row = Math.max(sourceSheet.maxRow ?? 0, cache.maxRow, 128) + 1;
+      const column = Math.max(sourceSheet.maxColumn ?? 0, cache.maxColumn, 64);
+      const renderedKey = getSnapshot(renderedCells, { row, column });
+      if (renderedViewportKeyRef.current[sheetId] === renderedKey) return;
+      const updates = buildFortuneSheetViewportUpdates(
+        instance.getAllSheets(),
+        sheetId,
+        renderedCells,
+        row,
+        column,
       );
+      if (updates.length === 0) return;
+
+      const expectedSnapshot = getSnapshot(renderedCells, extractSheetConfig(updates[0]));
+      const pending = pendingProgrammaticChangesRef.current[sheetId] ?? [];
+      pending.push(expectedSnapshot);
+      pendingProgrammaticChangesRef.current[sheetId] = pending;
+      instance.updateSheet(updates);
+      renderedViewportKeyRef.current[sheetId] = renderedKey;
       lastSavedCelldataRef.current[sheetId] = renderedCells;
       lastSavedRevisionRef.current[sheetId] = cache.revision;
     },
-    [workbook],
+    [getSnapshot, workbook],
   );
 
   const loadViewport = useCallback(
@@ -109,6 +124,7 @@ export function useExcelGridWorkspace({
       if (workspaceId == null) return;
       const sheet = workbook?.sheets.find((item) => item.id === sheetId);
       if (!sheet) return;
+      const generation = viewportGenerationRef.current;
 
       let cache = viewportCacheRef.current[sheetId];
       if (!cache) {
@@ -122,13 +138,18 @@ export function useExcelGridWorkspace({
       }
       const missing = missingChunksForRange(cache, range).filter((key) => !pending.has(key));
       if (missing.length === 0) {
-        updateRenderedSheet(sheetId);
         return;
       }
       for (const key of missing) pending.add(key);
 
       try {
         const result = await fetchDocumentRange(workspaceId, sheetId, rangeToA1(range));
+        if (
+          generation !== viewportGenerationRef.current ||
+          viewportCacheRef.current[sheetId] !== cache
+        ) {
+          return;
+        }
         mergeDocumentRange(cache, result, sheet.columns);
         updateRenderedSheet(sheetId);
       } catch (error) {
@@ -145,6 +166,9 @@ export function useExcelGridWorkspace({
 
     viewportCacheRef.current = {};
     pendingViewportChunksRef.current = {};
+    viewportGenerationRef.current += 1;
+    renderedViewportKeyRef.current = {};
+    pendingProgrammaticChangesRef.current = {};
 
     const nextSnapshots: Record<number, string> = {};
     workbook.sheets.forEach((sheet) => {
@@ -156,7 +180,7 @@ export function useExcelGridWorkspace({
     });
 
     lastSavedSnapshotRef.current = nextSnapshots;
-  }, [workbook, getSnapshot]);
+  }, [getSnapshot, workbook, workbookRevision]);
 
   useEffect(() => {
     const sheet = workbook?.sheets[currentSheetIndex];
@@ -223,7 +247,7 @@ export function useExcelGridWorkspace({
   }, []);
 
   const syncSheetToServer = useCallback(
-    async (celldata: any[], config: any) => {
+    async (celldata: FortuneCell[], config: unknown) => {
       if (!workbook?.sheets[currentSheetIndex] || workspaceId == null) return;
 
       setSaveStatus("saving");
@@ -232,7 +256,7 @@ export function useExcelGridWorkspace({
         const previousCelldata = lastSavedCelldataRef.current[sheet.id] ?? [];
         const operations = buildDocumentOperations(
           previousCelldata,
-          celldata as FortuneCell[],
+          celldata,
           sheet.columns.length > 0 ? 1 : 0,
         );
         let revision = lastSavedRevisionRef.current[sheet.id] ?? sheet.documentRevision ?? 0;
@@ -242,7 +266,7 @@ export function useExcelGridWorkspace({
             sheet.id,
             operations,
             revision,
-            [...collectDocumentStyles(celldata as FortuneCell[])].map(([id, style]) => ({
+            [...collectDocumentStyles(celldata)].map(([id, style]) => ({
               id,
               style,
             })),
@@ -279,7 +303,7 @@ export function useExcelGridWorkspace({
   );
 
   const scheduleSave = useCallback(
-    (celldata: any[], config: any) => {
+    (celldata: FortuneCell[], config: unknown) => {
       if (!workbook?.sheets[currentSheetIndex]) return;
       const sheet = workbook.sheets[currentSheetIndex];
       if (!Array.isArray(celldata)) return;
@@ -296,11 +320,11 @@ export function useExcelGridWorkspace({
   );
 
   const handleChange = useCallback(
-    (data: any[]) => {
+    (data: FortuneSheetRuntime[]) => {
       if (!workbook || !Array.isArray(data)) return;
       const sheet = workbook.sheets[currentSheetIndex];
       if (!sheet) return;
-      const fortuneSheet = data.find((s: any) => String(s.id) === String(sheet.id));
+      const fortuneSheet = data.find((item) => String(item.id) === String(sheet.id));
       if (!fortuneSheet) return;
 
       const cellMatrix = fortuneSheet.data;
@@ -313,13 +337,24 @@ export function useExcelGridWorkspace({
       }
       const headerRows = sheet.columns.length > 0 ? 1 : 0;
       for (const cell of celldata) {
-        cache.maxRow = Math.max(cache.maxRow, Math.max(0, cell.r - headerRows + 1));
+        cache.maxRow = Math.max(
+          cache.maxRow,
+          Math.max(0, rendererRowToDocumentRow(cell.r, headerRows) + 1),
+        );
         cache.maxColumn = Math.max(cache.maxColumn, cell.c + 1);
       }
+      syncViewportCacheFromMatrix(cache, cellMatrix, headerRows);
       const config = extractSheetConfig(fortuneSheet);
+      const snapshot = getSnapshot(celldata, config);
+      const pending = pendingProgrammaticChangesRef.current[sheet.id];
+      if (pending?.includes(snapshot)) {
+        delete pendingProgrammaticChangesRef.current[sheet.id];
+        return;
+      }
+      if (pending) delete pendingProgrammaticChangesRef.current[sheet.id];
       scheduleSave(celldata, config);
     },
-    [currentSheetIndex, scheduleSave, workbook],
+    [currentSheetIndex, getSnapshot, scheduleSave, workbook],
   );
 
   const handleActivateSheet = useCallback(

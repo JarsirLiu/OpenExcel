@@ -1,7 +1,9 @@
+import type { WorkbookInstance } from "@fortune-sheet/react";
 import type { FortuneCell, FortuneSheetData, SheetConfig } from "@openexcel/core";
 import { restoreSheetConfig } from "@openexcel/core";
 
 export type { FortuneCell, FortuneSheetData, SheetConfig };
+export type FortuneSheetRuntime = ReturnType<WorkbookInstance["getAllSheets"]>[number];
 
 export function extractMergesFromCelldata(
   celldata: FortuneCell[],
@@ -46,4 +48,34 @@ export function toFortuneSheetData(sheet: {
   }
 
   return result;
+}
+
+/**
+ * FortuneSheet's updateSheet mutates the input sheet's top-level `data` field.
+ * Omitting that renderer matrix makes it consume canonical `celldata` instead.
+ */
+export function buildFortuneSheetViewportUpdate(
+  sheet: FortuneSheetRuntime,
+  celldata: FortuneCell[],
+  row: number,
+  column: number,
+): FortuneSheetRuntime {
+  const { data: _legacyData, ...sheetWithoutLegacyData } = sheet;
+  return {
+    ...sheetWithoutLegacyData,
+    celldata,
+    row,
+    column,
+  };
+}
+
+export function buildFortuneSheetViewportUpdates(
+  sheets: FortuneSheetRuntime[],
+  sheetId: number,
+  celldata: FortuneCell[],
+  row: number,
+  column: number,
+): FortuneSheetRuntime[] {
+  const targetSheet = sheets.find((sheet) => String(sheet.id) === String(sheetId));
+  return targetSheet ? [buildFortuneSheetViewportUpdate(targetSheet, celldata, row, column)] : [];
 }

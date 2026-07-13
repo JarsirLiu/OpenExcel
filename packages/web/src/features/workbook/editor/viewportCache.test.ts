@@ -5,6 +5,7 @@ import {
   expandRangeToChunks,
   mergeDocumentRange,
   missingChunksForRange,
+  syncViewportCacheFromMatrix,
   viewportCelldata,
   viewportRangeFromScroll,
 } from "./viewportCache";
@@ -65,5 +66,35 @@ describe("viewportCache", () => {
     expect(range.startCol).toBe(0);
     expect(range.endRow).toBe(639);
     expect(range.endCol).toBe(127);
+  });
+
+  it("keeps local matrix edits in the canonical cache coordinate space", () => {
+    const cache = createViewportCache();
+    mergeDocumentRange(
+      cache,
+      {
+        sheetId: 1,
+        format: "openexcel-document-v1",
+        version: 1,
+        revision: 1,
+        maxRow: 2,
+        maxColumn: 1,
+        range: { startRow: 0, startCol: 0, endRow: 127, endCol: 63 },
+        cells: [{ row: 0, col: 0, value: { value: "server" } }],
+        objects: [],
+      },
+      [{ label: "Header" }],
+    );
+
+    syncViewportCacheFromMatrix(cache, [[{ v: "Header" }], [{ v: "local" }], [null]], 1);
+
+    expect(viewportCelldata(cache)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ r: 1, c: 0, v: expect.objectContaining({ v: "local" }) }),
+      ]),
+    );
+    expect(viewportCelldata(cache)).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ r: 1, c: 0, v: { v: "server" } })]),
+    );
   });
 });

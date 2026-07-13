@@ -7,8 +7,10 @@ import {
   formatA1Range,
   getChunkKey,
   getChunkPosition,
+  matrixToCelldata,
 } from "@openexcel/core";
 import type { DocumentRangeResult } from "@/api/documents";
+import { documentRowToRendererRow } from "./sheetCoordinates";
 
 const DEFAULT_ROW_HEIGHT = 19;
 const DEFAULT_COLUMN_WIDTH = 100;
@@ -126,9 +128,10 @@ export function mergeDocumentRange(
   result: DocumentRangeResult,
   columns: Array<{ label: string }>,
 ): void {
+  const headerRows = columns.length > 0 ? 1 : 0;
   for (const cell of result.cells) {
     cache.cells.set(`${cell.row},${cell.col}`, {
-      r: cell.row + 1,
+      r: documentRowToRendererRow(cell.row, headerRows),
       c: cell.col,
       v: documentValueToFortuneValue(cell.value, result.styles ?? {}),
     });
@@ -154,6 +157,7 @@ export function mergeDocumentRange(
 
 export function viewportCelldata(cache: ViewportCacheState): FortuneCell[] {
   const cells = new Map<string, FortuneCell>();
+  const headerRows = cache.headers.size > 0 ? 1 : 0;
   for (const [col, cell] of cache.headers) {
     cells.set(`0,${col}`, { ...cell, v: { ...cell.v } });
   }
@@ -168,11 +172,17 @@ export function viewportCelldata(cache: ViewportCacheState): FortuneCell[] {
     const colSpan = range.endCol - range.startCol + 1;
     for (let row = range.startRow; row <= range.endRow; row += 1) {
       for (let col = range.startCol; col <= range.endCol; col += 1) {
-        const key = `${row + 1},${col}`;
-        const current = cells.get(key) ?? { r: row + 1, c: col, v: { v: "", m: "" } };
+        const renderRow = documentRowToRendererRow(row, headerRows);
+        const key = `${renderRow},${col}`;
+        const current = cells.get(key) ?? { r: renderRow, c: col, v: { v: "", m: "" } };
         current.v = {
           ...current.v,
-          mc: { r: range.startRow + 1, c: range.startCol, rs: rowSpan, cs: colSpan },
+          mc: {
+            r: documentRowToRendererRow(range.startRow, headerRows),
+            c: range.startCol,
+            rs: rowSpan,
+            cs: colSpan,
+          },
         };
         cells.set(key, current);
       }
@@ -180,4 +190,28 @@ export function viewportCelldata(cache: ViewportCacheState): FortuneCell[] {
   }
 
   return [...cells.values()].sort((left, right) => left.r - right.r || left.c - right.c);
+}
+
+export function syncViewportCacheFromMatrix(
+  cache: ViewportCacheState,
+  matrix: Parameters<typeof matrixToCelldata>[0],
+  headerRows: number,
+): void {
+  const cellsByAddress = new Map(
+    matrixToCelldata(matrix).map((cell) => [`${cell.r},${cell.c}`, cell] as const),
+  );
+
+  for (let renderRow = headerRows; renderRow < matrix.length; renderRow += 1) {
+    const row = matrix[renderRow];
+    if (!Array.isArray(row)) continue;
+    for (let col = 0; col < row.length; col += 1) {
+      const cacheKey = `${renderRow - headerRows},${col}`;
+      const cell = cellsByAddress.get(`${renderRow},${col}`);
+      if (cell) {
+        cache.cells.set(cacheKey, { ...cell });
+      } else {
+        cache.cells.delete(cacheKey);
+      }
+    }
+  }
 }

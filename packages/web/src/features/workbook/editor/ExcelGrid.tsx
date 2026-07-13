@@ -1,9 +1,52 @@
 import { Workbook } from "@fortune-sheet/react";
 import "@fortune-sheet/react/dist/index.css";
+import { useMemo } from "react";
 import type { WorkbookFull } from "@/api/workbooks";
 import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatchSync";
 import styles from "./ExcelGrid.module.css";
 import { useExcelGridWorkspace } from "./useExcelGridWorkspace";
+
+const TOOLBAR_ITEMS = [
+  "merge-cell",
+  "|",
+  "bold",
+  "italic",
+  "strike-through",
+  "underline",
+  "|",
+  "font-color",
+  "background",
+  "border",
+  "|",
+  "horizontal-align",
+  "vertical-align",
+  "text-wrap",
+  "|",
+  "clear",
+  "filter",
+  "link",
+  "comment",
+];
+
+const CELL_CONTEXT_MENU_ITEMS = [
+  "copy",
+  "paste",
+  "|",
+  "insert-row",
+  "insert-column",
+  "delete-row",
+  "delete-column",
+  "delete-cell",
+  "|",
+  "clear",
+  "sort",
+  "orderAZ",
+  "orderZA",
+  "filter",
+  "|",
+  "data",
+  "cell-format",
+];
 
 interface Props {
   workspaceId: number | null;
@@ -49,6 +92,20 @@ export function ExcelGrid({
     onWorkbookStructureChanged,
     onWorkbookRefresh,
   });
+  const hooks = useMemo(
+    () => ({
+      afterActivateSheet: handleActivateSheet,
+      beforeAddSheet: handleBeforeAddSheet,
+      beforeDeleteSheet: handleBeforeDeleteSheet,
+      beforeUpdateSheetName: handleBeforeUpdateSheetName,
+    }),
+    [
+      handleActivateSheet,
+      handleBeforeAddSheet,
+      handleBeforeDeleteSheet,
+      handleBeforeUpdateSheetName,
+    ],
+  );
 
   if (!workbook) return null;
 
@@ -63,54 +120,11 @@ export function ExcelGrid({
           showSheetTabs={true}
           showToolbar={true}
           showFormulaBar={true}
-          toolbarItems={[
-            "merge-cell",
-            "|",
-            "bold",
-            "italic",
-            "strike-through",
-            "underline",
-            "|",
-            "font-color",
-            "background",
-            "border",
-            "|",
-            "horizontal-align",
-            "vertical-align",
-            "text-wrap",
-            "|",
-            "clear",
-            "filter",
-            "link",
-            "comment",
-          ]}
-          cellContextMenu={[
-            "copy",
-            "paste",
-            "|",
-            "insert-row",
-            "insert-column",
-            "delete-row",
-            "delete-column",
-            "delete-cell",
-            "|",
-            "clear",
-            "sort",
-            "orderAZ",
-            "orderZA",
-            "filter",
-            "|",
-            "data",
-            "cell-format",
-          ]}
+          toolbarItems={TOOLBAR_ITEMS}
+          cellContextMenu={CELL_CONTEXT_MENU_ITEMS}
           // @ts-expect-error allowUpdate is a valid prop but missing from types
           allowUpdate={true}
-          hooks={{
-            afterActivateSheet: handleActivateSheet,
-            beforeAddSheet: handleBeforeAddSheet,
-            beforeDeleteSheet: handleBeforeDeleteSheet,
-            beforeUpdateSheetName: handleBeforeUpdateSheetName,
-          }}
+          hooks={hooks}
         />
       </div>
     </div>
