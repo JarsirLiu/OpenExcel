@@ -3,6 +3,7 @@ import type { Session } from "@/api/sessions";
 import type { WorkbookFull, WorkbookMeta } from "@/api/workbooks";
 import type { Workspace } from "@/api/workspaces";
 import { ChatSidebar } from "@/features/chat/ChatSidebar";
+import type { SheetPatchUpdate } from "@/features/chat/hooks/useSheetPatchSync";
 import { useSessionWorkspace } from "@/features/session/useSessionWorkspace";
 import { useSheetActivation } from "@/features/workbook/editor/SheetActivationContext";
 import { useWorkspaceState } from "@/features/workspace/useWorkspaceState";
@@ -67,6 +68,18 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
   );
 
   const workbook = useWorkspaceView(activeWorkspaceId, domainInitial.workbook);
+  const sheetMutationHandlerRef = useRef<
+    ((update: SheetPatchUpdate) => Promise<void> | void) | null
+  >(null);
+  const registerSheetMutationHandler = useCallback(
+    (handler: ((update: SheetPatchUpdate) => Promise<void> | void) | null) => {
+      sheetMutationHandlerRef.current = handler;
+    },
+    [],
+  );
+  const handleSheetMutation = useCallback((update: SheetPatchUpdate) => {
+    return sheetMutationHandlerRef.current?.(update);
+  }, []);
   const session = useSessionWorkspace(
     activeWorkspaceId,
     workbook.handleWorkspaceRefresh,
@@ -206,12 +219,14 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
           handleWorkbookRename={workbook.handleWorkbookRename}
           handleWorkbookStructureChanged={workbook.handleWorkbookStructureChanged}
           handleWorkbookRefresh={workbook.handleWorkbookRefresh}
+          onRegisterSheetMutationHandler={registerSheetMutationHandler}
         />
         <div className={styles.resizeHandle} onMouseDown={handleResizeMouseDown} />
       </div>
       <ChatSidebar
         workspaceId={activeWorkspaceId}
         onWorkspaceRefresh={workbook.handleWorkspaceRefresh}
+        onSheetMutation={handleSheetMutation}
         onAttachExcel={workbook.handleNewWorkbookFileChange}
         referenceCacheRevision={workbook.referenceCacheRevision}
         currentUser={currentUser}

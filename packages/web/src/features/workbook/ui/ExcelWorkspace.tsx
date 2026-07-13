@@ -1,5 +1,8 @@
 import type { WorkbookFull } from "@/api/workbooks";
-import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatchSync";
+import type {
+  SheetPatchUpdate,
+  WorkbookStructureUpdate,
+} from "@/features/chat/hooks/useSheetPatchSync";
 import { ExcelGrid } from "@/features/workbook/editor/ExcelGrid";
 import styles from "./ExcelWorkspace.module.css";
 
@@ -12,6 +15,9 @@ interface Props {
   onWorkbookDelete?: (workbookId: number) => void;
   onWorkbookStructureChanged?: (update: WorkbookStructureUpdate) => void;
   onWorkbookRefresh?: () => Promise<void>;
+  onRegisterSheetMutationHandler?: (
+    handler: ((update: SheetPatchUpdate) => Promise<void> | void) | null,
+  ) => void;
 }
 
 export function ExcelWorkspace({
@@ -23,6 +29,7 @@ export function ExcelWorkspace({
   onWorkbookDelete,
   onWorkbookStructureChanged,
   onWorkbookRefresh,
+  onRegisterSheetMutationHandler,
 }: Props) {
   return (
     <div className={styles.container}>
@@ -35,6 +42,7 @@ export function ExcelWorkspace({
         onWorkbookDelete={onWorkbookDelete}
         onWorkbookStructureChanged={onWorkbookStructureChanged}
         onWorkbookRefresh={onWorkbookRefresh}
+        onRegisterSheetMutationHandler={onRegisterSheetMutationHandler}
       />
     </div>
   );

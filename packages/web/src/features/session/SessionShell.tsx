@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 import type { Session } from "@/api/sessions";
 import { DraftComposer } from "@/features/chat/composer/DraftComposer";
 import { ChatPanel } from "@/features/chat/conversation/ChatPanel";
+import type { SheetPatchUpdate } from "@/features/chat/hooks/useSheetPatchSync";
 import { t } from "@/lib/i18n";
 import { SessionHeader } from "./components/SessionHeader";
 import { SessionHistoryPopover } from "./components/SessionHistoryPopover";
@@ -27,6 +28,7 @@ type Props = {
   handleUndoComplete: () => Promise<void>;
   onAttachExcel: (file: File) => Promise<void> | void;
   onWorkspaceRefresh?: () => Promise<void> | void;
+  onSheetMutation?: (update: SheetPatchUpdate) => Promise<void> | void;
   referenceCacheRevision: number;
   currentUser: CurrentUser;
   onLogout: () => void;
@@ -48,6 +50,7 @@ export function SessionShell({
   handleUndoComplete,
   onAttachExcel,
   onWorkspaceRefresh,
+  onSheetMutation,
   referenceCacheRevision,
   currentUser,
   onLogout,
@@ -95,6 +98,7 @@ export function SessionShell({
         onAttachExcel,
         referenceCacheRevision,
         onWorkspaceRefresh,
+        onSheetMutation,
         onUndoComplete: handleUndoComplete,
         onNavigateSheet,
         initialMessages,

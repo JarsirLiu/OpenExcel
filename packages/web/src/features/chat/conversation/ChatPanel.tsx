@@ -23,6 +23,7 @@ export function ChatPanel({
     workspaceId,
     initialMessages,
     onWorkspaceRefresh,
+    onSheetMutation,
     onUndoComplete,
     onAttachExcel,
     referenceCacheRevision,
@@ -47,6 +48,7 @@ export function ChatPanel({
       return onRunComplete?.(sessionId, finishedMessages);
     },
     onWorkspaceRefresh,
+    onSheetMutation,
   });
 
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);

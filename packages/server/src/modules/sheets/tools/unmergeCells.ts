@@ -41,7 +41,7 @@ export const unmergeCells = {
         );
       })
       .map((object) => ({ type: "deleteObject" as const, id: object.id }));
-    const { sheet } = await applyToolOperations(
+    const { sheet, mutation } = await applyToolOperations(
       context.workspaceId,
       sheetId,
       deleteOperations,
@@ -51,6 +51,7 @@ export const unmergeCells = {
     const delta: SheetChangeDelta = { type: "unmerge", operations };
     const output = {
       success: true,
+      mutation,
       unmergedRanges: operations.map((operation) =>
         formatA1Range(sheetChangeRangeToZeroBased(operation)),
       ),

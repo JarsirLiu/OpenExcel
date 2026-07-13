@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { documentMutationSchema } from "../document/mutation.js";
 
 const sheetChangeValueSchema = z.union([z.string(), z.number(), z.boolean()]);
 
@@ -81,6 +82,7 @@ export const sheetChangePatchOutputSchema = z
       sheetNo: z.number().int().optional(),
       sheetName: z.string().min(1),
     }),
+    mutation: documentMutationSchema.optional(),
     delta: sheetChangeDeltaSchema.nullish(),
   })
   .passthrough();

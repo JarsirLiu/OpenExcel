@@ -3,6 +3,7 @@ import type { DocumentRangeResult } from "@/api/documents";
 import {
   createViewportCache,
   expandRangeToChunks,
+  invalidateDocumentRanges,
   mergeDocumentRange,
   missingChunksForRange,
   syncViewportCacheFromMatrix,
@@ -11,6 +12,23 @@ import {
 } from "./viewportCache";
 
 describe("viewportCache", () => {
+  it("invalidates loaded chunks and intersecting merge objects", () => {
+    const cache = createViewportCache();
+    cache.loadedChunks.add("0:0");
+    cache.cells.set("1,1", { r: 1, c: 1, v: { v: "stale", m: "stale" } });
+    cache.mergeObjects.set("merge-1", {
+      id: "merge-1",
+      type: "custom",
+      position: { startRow: 0, startCol: 0, endRow: 1, endCol: 1 },
+      data: { kind: "merge" },
+    });
+
+    invalidateDocumentRanges(cache, [{ startRow: 0, startCol: 0, endRow: 1, endCol: 1 }]);
+
+    expect(cache.loadedChunks.has("0:0")).toBe(false);
+    expect(cache.cells.has("1,1")).toBe(false);
+    expect(cache.mergeObjects.has("merge-1")).toBe(false);
+  });
   it("aligns requests to canonical chunk boundaries", () => {
     expect(expandRangeToChunks({ startRow: 130, startCol: 65, endRow: 140, endCol: 70 })).toEqual({
       startRow: 128,

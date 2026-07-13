@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fetchMessages, fetchRuns, undoLatestRun } from "./chat";
-import { fetchDocumentRange } from "./documents";
+import {
+  applyDocumentOperations,
+  DocumentRevisionConflictError,
+  fetchDocumentRange,
+} from "./documents";
 import { generateSessionTitle } from "./sessions";
 import {
   createSheet,
@@ -67,6 +71,27 @@ describe("fetchDocumentRange", () => {
       "/api/workspaces/9/sheets/7/document/range?range=A1%3ABL128",
       {},
     );
+  });
+});
+
+describe("applyDocumentOperations", () => {
+  it("exposes typed revision conflicts without requiring a model API", async () => {
+    mockFetch.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          error: "Revision conflict",
+          currentRevision: 8,
+          changedRanges: [{ startRow: 4, startCol: 1, endRow: 4, endCol: 2 }],
+        }),
+        { status: 409 },
+      ),
+    );
+
+    await expect(applyDocumentOperations(9, 7, [], 7)).rejects.toMatchObject({
+      constructor: DocumentRevisionConflictError,
+      currentRevision: 8,
+      changedRanges: [{ startRow: 4, startCol: 1, endRow: 4, endCol: 2 }],
+    });
   });
 });
 

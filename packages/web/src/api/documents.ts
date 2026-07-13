@@ -1,4 +1,8 @@
-import type { CanonicalCellStyle, DocumentStyleDefinition } from "@openexcel/core";
+import type {
+  CanonicalCellStyle,
+  DocumentMutation,
+  DocumentStyleDefinition,
+} from "@openexcel/core";
 import { apiFetch, readErrorMessage } from "./http";
 
 export interface DocumentRangeCell {
@@ -48,6 +52,50 @@ export interface DocumentMutationResponse {
   calculatedCells: CalculatedCell[];
 }
 
+export class DocumentRevisionConflictError extends Error {
+  readonly currentRevision: number;
+  readonly changedRanges: DocumentMutation["changedRanges"];
+
+  constructor(currentRevision: number, changedRanges: DocumentMutation["changedRanges"] = []) {
+    super("Revision conflict");
+    this.name = "DocumentRevisionConflictError";
+    this.currentRevision = currentRevision;
+    this.changedRanges = changedRanges;
+  }
+}
+
+async function throwDocumentMutationError(res: Response, fallback: string): Promise<never> {
+  let data: unknown;
+  try {
+    data = await res.json();
+  } catch {
+    throw new Error(fallback);
+  }
+  if (
+    res.status === 409 &&
+    typeof data === "object" &&
+    data !== null &&
+    (data as Record<string, unknown>).error === "Revision conflict" &&
+    typeof (data as Record<string, unknown>).currentRevision === "number"
+  ) {
+    const body = data as Record<string, unknown>;
+    throw new DocumentRevisionConflictError(
+      body.currentRevision as number,
+      Array.isArray(body.changedRanges)
+        ? (body.changedRanges as DocumentMutation["changedRanges"])
+        : [],
+    );
+  }
+  if (
+    typeof data === "object" &&
+    data !== null &&
+    typeof (data as Record<string, unknown>).error === "string"
+  ) {
+    throw new Error((data as Record<string, unknown>).error as string);
+  }
+  throw new Error(fallback);
+}
+
 export async function fetchDocumentRange(
   workspaceId: number,
   sheetId: number,
@@ -74,7 +122,7 @@ export async function applyDocumentOperation(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ operation, expectedRevision, styles, batchId, idempotencyKey }),
   });
-  if (!res.ok) throw new Error(await readErrorMessage(res, "保存文档操作失败"));
+  if (!res.ok) await throwDocumentMutationError(res, "保存文档操作失败");
   return res.json();
 }
 
@@ -95,7 +143,7 @@ export async function applyDocumentOperations(
       body: JSON.stringify({ operations, expectedRevision, styles, batchId, idempotencyKey }),
     },
   );
-  if (!res.ok) throw new Error(await readErrorMessage(res, "保存文档操作失败"));
+  if (!res.ok) await throwDocumentMutationError(res, "保存文档操作失败");
   return res.json();
 }
 
@@ -112,6 +160,6 @@ export async function applyDocumentLayout(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ config, expectedRevision, batchId, idempotencyKey }),
   });
-  if (!res.ok) throw new Error(await readErrorMessage(res, "保存文档布局失败"));
+  if (!res.ok) await throwDocumentMutationError(res, "保存文档布局失败");
   return res.json();
 }

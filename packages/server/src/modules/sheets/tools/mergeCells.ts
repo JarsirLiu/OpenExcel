@@ -31,7 +31,7 @@ export const mergeCells = {
       ),
     );
     const documentOperations = operations.map(mergeOperationToDocument);
-    const { sheet } = await applyToolOperations(
+    const { sheet, mutation } = await applyToolOperations(
       context.workspaceId,
       sheetId,
       documentOperations,
@@ -41,6 +41,7 @@ export const mergeCells = {
     const delta: SheetChangeDelta = { type: "merge", operations };
     const output = {
       success: true,
+      mutation,
       mergedRanges: operations.map((operation) =>
         formatA1Range(sheetChangeRangeToZeroBased(operation)),
       ),

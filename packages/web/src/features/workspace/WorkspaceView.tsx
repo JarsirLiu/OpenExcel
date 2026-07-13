@@ -1,6 +1,9 @@
 import { useRef } from "react";
 import type { WorkbookFull } from "@/api/workbooks";
-import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatchSync";
+import type {
+  SheetPatchUpdate,
+  WorkbookStructureUpdate,
+} from "@/features/chat/hooks/useSheetPatchSync";
 import { t } from "@/lib/i18n";
 import { ExcelWorkspace } from "../workbook/ui/ExcelWorkspace";
 import { WorkbookHeader } from "../workbook/ui/WorkbookHeader";
@@ -28,6 +31,9 @@ type Props = {
   handleWorkbookRename: (workbookId: number, newName: string) => Promise<void>;
   handleWorkbookStructureChanged: (update: WorkbookStructureUpdate) => void;
   handleWorkbookRefresh: () => Promise<void>;
+  onRegisterSheetMutationHandler?: (
+    handler: ((update: SheetPatchUpdate) => Promise<void> | void) | null,
+  ) => void;
 };
 
 export function WorkspaceView({
@@ -46,6 +52,7 @@ export function WorkspaceView({
   handleWorkbookRename,
   handleWorkbookStructureChanged,
   handleWorkbookRefresh,
+  onRegisterSheetMutationHandler,
 }: Props) {
   const newWbInputRef = useRef<HTMLInputElement>(null);
 
@@ -86,6 +93,7 @@ export function WorkspaceView({
           onWorkbookDelete={handleWorkbookDelete}
           onWorkbookStructureChanged={handleWorkbookStructureChanged}
           onWorkbookRefresh={handleWorkbookRefresh}
+          onRegisterSheetMutationHandler={onRegisterSheetMutationHandler}
         />
       </div>
     </div>

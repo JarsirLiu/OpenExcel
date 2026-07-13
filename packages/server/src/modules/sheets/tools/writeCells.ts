@@ -60,7 +60,7 @@ export const writeCells = {
     const { sheetId, operations } = normalizeWriteOperations(input);
     const documentOperations = operations.map(writeOperationToDocument);
     const ranges = operations.map(rangeForWriteOperation);
-    const { sheet } = await applyToolOperations(
+    const { sheet, mutation } = await applyToolOperations(
       context.workspaceId,
       sheetId,
       documentOperations,
@@ -73,6 +73,7 @@ export const writeCells = {
     const output = {
       success: true,
       updatedCells: touched.length,
+      mutation,
       delta,
       preview: buildToolPreview(sheet, previewRange, previewData.cells),
       sheetInfo: { sheetId: sheet.sheetId, sheetNo: sheet.sheetNo, sheetName: sheet.name },

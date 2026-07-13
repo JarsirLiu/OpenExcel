@@ -17,6 +17,21 @@ describe("sheetChangePatchOutputSchema", () => {
     expect(result.success).toBe(true);
   });
 
+  it("accepts canonical mutation metadata", () => {
+    const result = sheetChangePatchOutputSchema.safeParse({
+      success: true,
+      sheetInfo: { sheetId: 1, sheetName: "Sheet1" },
+      mutation: {
+        sheetId: 1,
+        revision: 7,
+        changedRanges: [{ startRow: 0, startCol: 0, endRow: 2, endCol: 3 }],
+        objectIds: [],
+      },
+    });
+
+    expect(result.success).toBe(true);
+  });
+
   it("accepts a write patch output with formulas", () => {
     const result = sheetChangePatchOutputSchema.safeParse({
       success: true,

@@ -217,6 +217,7 @@ export interface DocumentMutationResult {
 export interface DocumentRevisionConflict {
   conflict: true;
   currentRevision: number;
+  changedRanges: CellRange[];
 }
 
 export interface DocumentIdempotencyConflict {
@@ -228,6 +229,25 @@ export interface DocumentCompactionResult {
   revision: number;
   snapshotId: number | null;
   deletedOperations: number;
+}
+
+async function changedRangesSince(
+  tx: Prisma.TransactionClient,
+  sheetId: number,
+  revision: number,
+): Promise<CellRange[]> {
+  const operations = await tx.sheetOperation.findMany({
+    where: { sheetId, revision: { gt: revision } },
+    select: { payload: true },
+    orderBy: { revision: "asc" },
+  });
+  return operations.flatMap(({ payload }) => {
+    try {
+      return operationRanges(decodeDocumentJson<DocumentOperation>(payload));
+    } catch {
+      return [];
+    }
+  });
 }
 
 function decodeMutationResult(data: Uint8Array<ArrayBufferLike>): DocumentMutationResult {
@@ -454,7 +474,11 @@ export async function applyStoredDocumentOperations(
       }
     }
     if (expectedRevision !== undefined && expectedRevision !== sheet.documentRevision) {
-      return { conflict: true, currentRevision: sheet.documentRevision };
+      return {
+        conflict: true,
+        currentRevision: sheet.documentRevision,
+        changedRanges: await changedRangesSince(tx, sheet.id, expectedRevision),
+      };
     }
     const resolvedBatchId = batchId ?? randomUUID();
     await registerCellStyles(tx, sheet.workbookId, styleDefinitions);
@@ -540,6 +564,11 @@ export async function applyStoredDocumentOperations(
       return {
         conflict: true,
         currentRevision: current?.documentRevision ?? sheet.documentRevision,
+        changedRanges: await changedRangesSince(
+          tx,
+          sheet.id,
+          expectedRevision ?? sheet.documentRevision,
+        ),
       };
     }
 
@@ -667,7 +696,11 @@ export async function compactStoredDocumentOperations(
     });
     if (!sheet) return null;
     if (expectedRevision !== undefined && expectedRevision !== sheet.documentRevision) {
-      return { conflict: true, currentRevision: sheet.documentRevision };
+      return {
+        conflict: true,
+        currentRevision: sheet.documentRevision,
+        changedRanges: await changedRangesSince(tx, sheet.id, expectedRevision),
+      };
     }
     if (sheet.compactedRevision >= sheet.documentRevision) {
       return { revision: sheet.documentRevision, snapshotId: null, deletedOperations: 0 };
@@ -691,6 +724,11 @@ export async function compactStoredDocumentOperations(
       return {
         conflict: true,
         currentRevision: current?.documentRevision ?? sheet.documentRevision,
+        changedRanges: await changedRangesSince(
+          tx,
+          sheet.id,
+          expectedRevision ?? sheet.documentRevision,
+        ),
       };
     }
 
@@ -775,7 +813,11 @@ export async function updateDocumentLayout(
       }
     }
     if (expectedRevision !== undefined && expectedRevision !== sheet.documentRevision) {
-      return { conflict: true, currentRevision: sheet.documentRevision };
+      return {
+        conflict: true,
+        currentRevision: sheet.documentRevision,
+        changedRanges: await changedRangesSince(tx, sheet.id, expectedRevision),
+      };
     }
 
     const resolvedBatchId = batchId ?? randomUUID();
@@ -797,6 +839,11 @@ export async function updateDocumentLayout(
       return {
         conflict: true,
         currentRevision: current?.documentRevision ?? sheet.documentRevision,
+        changedRanges: await changedRangesSince(
+          tx,
+          sheet.id,
+          expectedRevision ?? sheet.documentRevision,
+        ),
       };
     }
 

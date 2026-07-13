@@ -600,6 +600,22 @@ The document engine API surface includes range reads, operation writes, layout u
 3. Server persists the change.
 4. Web refreshes only the affected workbook or sheet.
 
+Document mutation tool results carry a canonical refresh contract in addition to the legacy
+display `delta` and `preview` fields:
+
+```text
+mutation.sheetId
+mutation.revision
+mutation.changedRanges   # zero-based canonical ranges
+mutation.objectIds
+```
+
+The web editor invalidates only the affected viewport chunks and refetches them. Historical tool
+messages without this field use the full-workbook refresh fallback until the migration is complete.
+Document writes use optimistic revisions. The editor retries once only when the server reports that
+remote cell ranges do not overlap the local operations; overlapping changes are reloaded and are
+reported as a conflict instead of being silently overwritten.
+
 ### 7.2 Chat flow
 
 1. User sends a chat message.

@@ -11,3 +11,12 @@
   flex: 1;
   min-height: 0;
 }
+
+.conflictNotice {
+  flex: 0 0 auto;
+  padding: 6px 12px;
+  border-bottom: 1px solid #f0c36d;
+  background: #fff8e6;
+  color: #7a4d00;
+  font-size: 12px;
+}

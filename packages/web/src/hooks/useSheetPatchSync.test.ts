@@ -47,6 +47,7 @@ describe("collectSheetPatchUpdates", () => {
         sheetId: 12,
         sheetNo: 3,
         delta: null,
+        mutation: null,
       },
     ]);
   });
@@ -113,8 +114,42 @@ describe("collectSheetPatchUpdates", () => {
             { type: "range", startRow: 2, startCol: 2, endRow: 3, endCol: 3 },
           ],
         },
+        mutation: null,
       },
     ]);
+  });
+
+  it("collects canonical mutation metadata for incremental refresh", () => {
+    const updates = collectSheetPatchUpdates(
+      [
+        {
+          role: "assistant",
+          parts: [
+            {
+              toolCallId: "tool-5",
+              state: "output-available",
+              output: {
+                sheetInfo: { sheetId: 15, sheetName: "Data" },
+                mutation: {
+                  sheetId: 15,
+                  revision: 9,
+                  changedRanges: [{ startRow: 2, startCol: 1, endRow: 3, endCol: 4 }],
+                  objectIds: ["merge:2:1:3:4"],
+                },
+              },
+            },
+          ],
+        },
+      ],
+      new Set(),
+    );
+
+    expect(updates[0]?.mutation).toEqual({
+      sheetId: 15,
+      revision: 9,
+      changedRanges: [{ startRow: 2, startCol: 1, endRow: 3, endCol: 4 }],
+      objectIds: ["merge:2:1:3:4"],
+    });
   });
 });
 

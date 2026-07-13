@@ -79,6 +79,7 @@ export {
   type DocumentOperation,
   type DocumentScalar,
 } from "./document/model.js";
+export { type DocumentMutation, documentMutationSchema } from "./document/mutation.js";
 export {
   applyDocumentOperation,
   applyDocumentOperations,

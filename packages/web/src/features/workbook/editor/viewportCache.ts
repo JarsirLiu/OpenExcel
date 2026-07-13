@@ -75,6 +75,40 @@ export function missingChunksForRange(cache: ViewportCacheState, range: CellRang
   return chunkKeysForRange(range).filter((key) => !cache.loadedChunks.has(key));
 }
 
+function rangesIntersect(left: CellRange, right: CellRange): boolean {
+  return !(
+    left.endRow < right.startRow ||
+    right.endRow < left.startRow ||
+    left.endCol < right.startCol ||
+    right.endCol < left.startCol
+  );
+}
+
+export function invalidateDocumentRanges(cache: ViewportCacheState, ranges: CellRange[]): void {
+  const chunkKeys = new Set(ranges.flatMap(chunkKeysForRange));
+  for (const key of chunkKeys) {
+    cache.loadedChunks.delete(key);
+  }
+
+  for (const key of cache.cells.keys()) {
+    const [row, col] = key.split(",").map(Number);
+    if (
+      chunkKeys.has(
+        getChunkKey(getChunkPosition(row, col).rowBlock, getChunkPosition(row, col).colBlock),
+      )
+    ) {
+      cache.cells.delete(key);
+    }
+  }
+
+  for (const [id, object] of cache.mergeObjects) {
+    const position = mergeRange(object);
+    if (position && ranges.some((range) => rangesIntersect(position, range))) {
+      cache.mergeObjects.delete(id);
+    }
+  }
+}
+
 export function viewportRangeFromScroll(
   scrollTop: number,
   scrollLeft: number,

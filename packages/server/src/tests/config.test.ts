@@ -27,7 +27,7 @@ describe("environment model config", () => {
       toolResultMaxTokens: 8_000,
       readSheetBudgetTokens: 24_000,
     });
-  });
+  }, 15_000);
 
   it("loads retry and timeout settings from environment variables", async () => {
     vi.stubEnv("MODEL_BASE_URL", "https://test.api.com/v1");

@@ -2,6 +2,7 @@ import type { SheetChangeClearOperation, SheetChangeRangeOperation } from "@open
 import {
   type CellRange,
   cellRangeSize,
+  type DocumentMutation,
   type DocumentOperation,
   sheetChangeCellToZeroBased,
   sheetChangeRangeToZeroBased,
@@ -139,7 +140,13 @@ export async function applyToolOperations(
     runId,
   );
   if ("error" in result) throw new Error(result.error);
-  return { sheet, revision: result.revision, result };
+  const mutation: DocumentMutation = {
+    sheetId,
+    revision: result.revision,
+    changedRanges: result.changedRanges,
+    objectIds: result.objectIds,
+  };
+  return { sheet, revision: result.revision, mutation, result };
 }
 
 export async function readToolRange(workspaceId: number, sheetId: number, range: CellRange) {

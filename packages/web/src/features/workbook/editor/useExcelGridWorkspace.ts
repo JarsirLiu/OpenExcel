@@ -1,12 +1,19 @@
 import type { WorkbookInstance } from "@fortune-sheet/react";
 import {
+  type CellRange,
   collectDocumentStyles,
+  type DocumentOperation,
   extractSheetConfig,
   type FortuneCell,
   matrixToCelldata,
 } from "@openexcel/core";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { applyDocumentLayout, applyDocumentOperations, fetchDocumentRange } from "@/api/documents";
+import {
+  applyDocumentLayout,
+  applyDocumentOperations,
+  DocumentRevisionConflictError,
+  fetchDocumentRange,
+} from "@/api/documents";
 import type { WorkbookFull } from "@/api/workbooks";
 import {
   createSheet,
@@ -15,7 +22,10 @@ import {
   downloadWorkbook,
   updateSheetName,
 } from "@/api/workbooks";
-import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatchSync";
+import type {
+  SheetPatchUpdate,
+  WorkbookStructureUpdate,
+} from "@/features/chat/hooks/useSheetPatchSync";
 import { confirm } from "@/shared/lib";
 import { buildDocumentOperations, valueKey } from "./documentSync";
 import {
@@ -28,6 +38,8 @@ import { rendererRowToDocumentRow } from "./sheetCoordinates";
 import { useWorkbookEditorSession } from "./useWorkbookEditorSession";
 import {
   createViewportCache,
+  expandRangeToChunks,
+  invalidateDocumentRanges,
   mergeDocumentRange,
   missingChunksForRange,
   rangeToA1,
@@ -45,7 +57,39 @@ type UseExcelGridWorkspaceProps = {
   onWorkbookDelete?: (workbookId: number) => void;
   onWorkbookStructureChanged?: (update: WorkbookStructureUpdate) => void;
   onWorkbookRefresh?: () => Promise<void> | void;
+  onRegisterSheetMutationHandler?: (
+    handler: ((update: SheetPatchUpdate) => Promise<void> | void) | null,
+  ) => void;
 };
+
+function operationRanges(operation: DocumentOperation): CellRange[] {
+  switch (operation.type) {
+    case "setCell":
+      return [
+        {
+          startRow: operation.row,
+          startCol: operation.col,
+          endRow: operation.row,
+          endCol: operation.col,
+        },
+      ];
+    case "setRangeValues":
+    case "setRangeStyle":
+    case "clearRange":
+      return [operation.range];
+    default:
+      return [];
+  }
+}
+
+function rangesOverlap(left: CellRange, right: CellRange): boolean {
+  return !(
+    left.endRow < right.startRow ||
+    right.endRow < left.startRow ||
+    left.endCol < right.startCol ||
+    right.endCol < left.startCol
+  );
+}
 
 function createRequestKey(): string {
   return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
@@ -60,8 +104,9 @@ export function useExcelGridWorkspace({
   onWorkbookDelete,
   onWorkbookStructureChanged,
   onWorkbookRefresh,
+  onRegisterSheetMutationHandler,
 }: UseExcelGridWorkspaceProps) {
-  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "conflict">("idle");
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveStatusResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveChainRef = useRef(Promise.resolve());
@@ -74,6 +119,9 @@ export function useExcelGridWorkspace({
   const viewportCacheRef = useRef<Record<number, ReturnType<typeof createViewportCache>>>({});
   const pendingViewportChunksRef = useRef<Record<number, Set<string>>>({});
   const viewportGenerationRef = useRef(0);
+  const viewportRequestSequenceRef = useRef(0);
+  const viewportChunkRequestRef = useRef<Record<number, Record<string, number>>>({});
+  const lastViewportRangeRef = useRef<Record<number, CellRange>>({});
   const renderedViewportKeyRef = useRef<Record<number, string>>({});
   const pendingProgrammaticChangesRef = useRef<Record<number, string[]>>({});
   const { sheetData, sessionKey } = useWorkbookEditorSession(workbook, workbookRevision);
@@ -125,6 +173,7 @@ export function useExcelGridWorkspace({
       const sheet = workbook?.sheets.find((item) => item.id === sheetId);
       if (!sheet) return;
       const generation = viewportGenerationRef.current;
+      lastViewportRangeRef.current[sheetId] = range;
 
       let cache = viewportCacheRef.current[sheetId];
       if (!cache) {
@@ -140,13 +189,19 @@ export function useExcelGridWorkspace({
       if (missing.length === 0) {
         return;
       }
+      const requestId = viewportRequestSequenceRef.current + 1;
+      viewportRequestSequenceRef.current = requestId;
+      const latestRequests = viewportChunkRequestRef.current[sheetId] ?? {};
+      viewportChunkRequestRef.current[sheetId] = latestRequests;
+      for (const key of missing) latestRequests[key] = requestId;
       for (const key of missing) pending.add(key);
 
       try {
         const result = await fetchDocumentRange(workspaceId, sheetId, rangeToA1(range));
         if (
           generation !== viewportGenerationRef.current ||
-          viewportCacheRef.current[sheetId] !== cache
+          viewportCacheRef.current[sheetId] !== cache ||
+          missing.some((key) => latestRequests[key] !== requestId)
         ) {
           return;
         }
@@ -161,12 +216,79 @@ export function useExcelGridWorkspace({
     [updateRenderedSheet, workbook, workspaceId],
   );
 
+  const handleSheetMutation = useCallback(
+    async (update: SheetPatchUpdate) => {
+      const mutation = update.mutation;
+      if (!mutation) {
+        await onWorkbookRefresh?.();
+        return;
+      }
+
+      const sheet = workbook?.sheets.find((item) => item.id === mutation.sheetId);
+      if (!sheet) {
+        await onWorkbookRefresh?.();
+        return;
+      }
+
+      let cache = viewportCacheRef.current[mutation.sheetId];
+      if (!cache) {
+        cache = createViewportCache();
+        viewportCacheRef.current[mutation.sheetId] = cache;
+      }
+      const requestedRanges = mutation.changedRanges.map(expandRangeToChunks);
+      const ranges =
+        requestedRanges.length > 0
+          ? requestedRanges
+          : [
+              lastViewportRangeRef.current[sheet.id] ??
+                viewportRangeFromScroll(0, 0, sheet.maxRow ?? 0, sheet.maxColumn ?? 0),
+            ];
+      invalidateDocumentRanges(cache, ranges);
+      renderedViewportKeyRef.current[mutation.sheetId] = "";
+
+      if (sheet.id !== workbook?.sheets[currentSheetIndex]?.id) return;
+      for (const range of ranges) {
+        await loadViewport(sheet.id, range);
+      }
+    },
+    [currentSheetIndex, loadViewport, onWorkbookRefresh, workbook],
+  );
+
+  const refreshDocumentRanges = useCallback(
+    async (sheetId: number, ranges: CellRange[]) => {
+      const sheet = workbook?.sheets.find((item) => item.id === sheetId);
+      if (!sheet) return;
+      let cache = viewportCacheRef.current[sheetId];
+      if (!cache) {
+        cache = createViewportCache();
+        viewportCacheRef.current[sheetId] = cache;
+      }
+      const requestedRanges = (
+        ranges.length > 0
+          ? ranges
+          : [
+              lastViewportRangeRef.current[sheetId] ??
+                viewportRangeFromScroll(0, 0, sheet.maxRow ?? 0, sheet.maxColumn ?? 0),
+            ]
+      ).map(expandRangeToChunks);
+      invalidateDocumentRanges(cache, requestedRanges);
+      renderedViewportKeyRef.current[sheetId] = "";
+      for (const range of requestedRanges) {
+        await loadViewport(sheetId, range);
+      }
+    },
+    [loadViewport, workbook],
+  );
+
   useEffect(() => {
     if (!workbook) return;
 
     viewportCacheRef.current = {};
     pendingViewportChunksRef.current = {};
     viewportGenerationRef.current += 1;
+    viewportRequestSequenceRef.current = 0;
+    viewportChunkRequestRef.current = {};
+    lastViewportRangeRef.current = {};
     renderedViewportKeyRef.current = {};
     pendingProgrammaticChangesRef.current = {};
 
@@ -181,6 +303,11 @@ export function useExcelGridWorkspace({
 
     lastSavedSnapshotRef.current = nextSnapshots;
   }, [getSnapshot, workbook, workbookRevision]);
+
+  useEffect(() => {
+    onRegisterSheetMutationHandler?.(handleSheetMutation);
+    return () => onRegisterSheetMutationHandler?.(null);
+  }, [handleSheetMutation, onRegisterSheetMutationHandler]);
 
   useEffect(() => {
     const sheet = workbook?.sheets[currentSheetIndex];
@@ -260,23 +387,45 @@ export function useExcelGridWorkspace({
           sheet.columns.length > 0 ? 1 : 0,
         );
         let revision = lastSavedRevisionRef.current[sheet.id] ?? sheet.documentRevision ?? 0;
+        const previousConfig = lastSavedConfigRef.current[sheet.id];
+        const configChanged = valueKey(previousConfig) !== valueKey(config);
         if (operations.length > 0) {
-          const result = await applyDocumentOperations(
-            workspaceId,
-            sheet.id,
-            operations,
-            revision,
-            [...collectDocumentStyles(celldata)].map(([id, style]) => ({
-              id,
-              style,
-            })),
-            undefined,
-            createRequestKey(),
-          );
+          const idempotencyKey = createRequestKey();
+          const styles = [...collectDocumentStyles(celldata)].map(([id, style]) => ({ id, style }));
+          let result: Awaited<ReturnType<typeof applyDocumentOperations>>;
+          try {
+            result = await applyDocumentOperations(
+              workspaceId,
+              sheet.id,
+              operations,
+              revision,
+              styles,
+              undefined,
+              idempotencyKey,
+            );
+          } catch (error) {
+            if (!(error instanceof DocumentRevisionConflictError)) throw error;
+            const localRanges = operations.flatMap(operationRanges);
+            const overlapsRemoteChange = error.changedRanges.some((remoteRange) =>
+              localRanges.some((localRange) => rangesOverlap(localRange, remoteRange)),
+            );
+            if (overlapsRemoteChange || (error.changedRanges.length === 0 && configChanged)) {
+              await refreshDocumentRanges(sheet.id, localRanges);
+              throw error;
+            }
+            result = await applyDocumentOperations(
+              workspaceId,
+              sheet.id,
+              operations,
+              error.currentRevision,
+              styles,
+              undefined,
+              idempotencyKey,
+            );
+          }
           revision = result.revision;
         }
-        const previousConfig = lastSavedConfigRef.current[sheet.id];
-        if (valueKey(previousConfig) !== valueKey(config)) {
+        if (configChanged) {
           const result = await applyDocumentLayout(
             workspaceId,
             sheet.id,
@@ -295,11 +444,25 @@ export function useExcelGridWorkspace({
         if (saveStatusResetRef.current) clearTimeout(saveStatusResetRef.current);
         saveStatusResetRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
       } catch (error) {
+        if (error instanceof DocumentRevisionConflictError) {
+          await onWorkbookRefresh?.();
+          if (saveStatusResetRef.current) clearTimeout(saveStatusResetRef.current);
+          setSaveStatus("conflict");
+          saveStatusResetRef.current = setTimeout(() => setSaveStatus("idle"), 5000);
+          console.warn("保存时检测到工作表版本冲突，已重新加载最新数据。", error);
+        }
         setSaveStatus("idle");
         console.error("保存失败:", error);
       }
     },
-    [currentSheetIndex, getSnapshot, workbook, workspaceId],
+    [
+      currentSheetIndex,
+      getSnapshot,
+      onWorkbookRefresh,
+      refreshDocumentRanges,
+      workbook,
+      workspaceId,
+    ],
   );
 
   const scheduleSave = useCallback(

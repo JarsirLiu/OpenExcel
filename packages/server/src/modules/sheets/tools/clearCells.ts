@@ -25,7 +25,7 @@ export const clearCells = {
     const before = await readToolRange(context.workspaceId, sheetId, previewRange);
     const beforeKeys = new Set(before.cells.map((cell) => `${cell.row},${cell.col}`));
     const documentOperations = operations.map(clearOperationToDocument);
-    const { sheet } = await applyToolOperations(
+    const { sheet, mutation } = await applyToolOperations(
       context.workspaceId,
       sheetId,
       documentOperations,
@@ -35,6 +35,7 @@ export const clearCells = {
     const delta: SheetChangeDelta = { type: "clear", operations };
     const output = {
       success: true,
+      mutation,
       clearedCells:
         beforeKeys.size - new Set(after.cells.map((cell) => `${cell.row},${cell.col}`)).size,
       delta,

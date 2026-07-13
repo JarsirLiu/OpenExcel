@@ -2,7 +2,11 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchMessages as fetchChatMessages, undoLatestRun } from "@/api/chat";
-import { collectWorkbookMutationToolCallIds } from "./useSheetPatchSync";
+import {
+  collectSheetPatchUpdates,
+  collectWorkbookStructureUpdates,
+  type SheetPatchUpdate,
+} from "./useSheetPatchSync";
 
 const PAGE_SIZE = 40;
 
@@ -60,6 +64,7 @@ export function useChatConversation({
   initialMessages,
   onRunComplete,
   onWorkspaceRefresh,
+  onSheetMutation,
   onStreamingChange,
 }: {
   sessionId: number;
@@ -67,6 +72,7 @@ export function useChatConversation({
   initialMessages?: any[];
   onRunComplete?: (messages: any[]) => Promise<void> | void;
   onWorkspaceRefresh?: () => Promise<void> | void;
+  onSheetMutation?: (update: SheetPatchUpdate) => Promise<void> | void;
   onStreamingChange?: (isStreaming: boolean) => void;
 }) {
   const messagesRef = useRef<any[]>(initialMessages ?? []);
@@ -151,10 +157,19 @@ export function useChatConversation({
   }, [error, setMessages]);
 
   useEffect(() => {
-    const toolCallIds = collectWorkbookMutationToolCallIds(
+    const patchUpdates = collectSheetPatchUpdates(
       messages,
       seenWorkbookMutationToolCallIdsRef.current,
     );
+    const seenAfterPatchUpdates = new Set(seenWorkbookMutationToolCallIdsRef.current);
+    for (const update of patchUpdates) {
+      seenAfterPatchUpdates.add(update.toolCallId);
+    }
+    const structureUpdates = collectWorkbookStructureUpdates(messages, seenAfterPatchUpdates);
+    const toolCallIds = [
+      ...patchUpdates.map((update) => update.toolCallId),
+      ...structureUpdates.map((update) => update.toolCallId),
+    ];
     if (toolCallIds.length === 0) {
       hasPrimedWorkbookMutationHistoryRef.current = true;
       return;
@@ -173,8 +188,14 @@ export function useChatConversation({
       return;
     }
 
-    pendingWorkspaceRefreshRef.current = true;
-  }, [isStreaming, messages]);
+    for (const update of patchUpdates) {
+      void onSheetMutation?.(update);
+      if (!onSheetMutation) pendingWorkspaceRefreshRef.current = true;
+    }
+    if (structureUpdates.length > 0) {
+      pendingWorkspaceRefreshRef.current = true;
+    }
+  }, [isStreaming, messages, onSheetMutation]);
 
   const flushPendingWorkspaceRefresh = useCallback(async () => {
     if (!pendingWorkspaceRefreshRef.current) return;

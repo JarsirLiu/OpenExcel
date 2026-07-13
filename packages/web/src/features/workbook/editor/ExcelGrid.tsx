@@ -2,7 +2,10 @@ import { Workbook } from "@fortune-sheet/react";
 import "@fortune-sheet/react/dist/index.css";
 import { useMemo } from "react";
 import type { WorkbookFull } from "@/api/workbooks";
-import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatchSync";
+import type {
+  SheetPatchUpdate,
+  WorkbookStructureUpdate,
+} from "@/features/chat/hooks/useSheetPatchSync";
 import styles from "./ExcelGrid.module.css";
 import { useExcelGridWorkspace } from "./useExcelGridWorkspace";
 
@@ -57,6 +60,9 @@ interface Props {
   onWorkbookDelete?: (workbookId: number) => void;
   onWorkbookStructureChanged?: (update: WorkbookStructureUpdate) => void;
   onWorkbookRefresh?: () => Promise<void> | void;
+  onRegisterSheetMutationHandler?: (
+    handler: ((update: SheetPatchUpdate) => Promise<void> | void) | null,
+  ) => void;
 }
 
 export function ExcelGrid({
@@ -68,6 +74,7 @@ export function ExcelGrid({
   onWorkbookDelete,
   onWorkbookStructureChanged,
   onWorkbookRefresh,
+  onRegisterSheetMutationHandler,
 }: Props) {
   const {
     saveStatus,
@@ -91,6 +98,7 @@ export function ExcelGrid({
     onWorkbookDelete,
     onWorkbookStructureChanged,
     onWorkbookRefresh,
+    onRegisterSheetMutationHandler,
   });
   const hooks = useMemo(
     () => ({
@@ -111,6 +119,11 @@ export function ExcelGrid({
 
   return (
     <div ref={gridRootRef} className={styles.container}>
+      {saveStatus === "conflict" && (
+        <div className={styles.conflictNotice} role="alert">
+          工作表已被其他操作更新，本次本地修改未覆盖远程数据。
+        </div>
+      )}
       <div className={styles.inner}>
         <Workbook
           key={`${workbook.id}:${sessionKey}`}

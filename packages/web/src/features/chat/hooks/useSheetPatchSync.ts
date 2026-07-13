@@ -1,4 +1,8 @@
-import { type SheetChangeDelta, sheetChangePatchOutputSchema } from "@openexcel/core";
+import {
+  type DocumentMutation,
+  type SheetChangeDelta,
+  sheetChangePatchOutputSchema,
+} from "@openexcel/core";
 import { useEffect, useRef } from "react";
 
 export type SheetPatchMessageLike = {
@@ -11,6 +15,7 @@ export type SheetPatchUpdate = {
   sheetId: number;
   sheetNo?: number;
   delta: SheetChangeDelta | null;
+  mutation: DocumentMutation | null;
 };
 
 export type WorkbookCreatedUpdate = {
@@ -107,6 +112,7 @@ export function collectSheetPatchUpdates(
         sheetId: parsed.data.sheetInfo.sheetId,
         sheetNo: parsed.data.sheetInfo.sheetNo,
         delta: parsed.data.delta ?? null,
+        mutation: parsed.data.mutation ?? null,
       });
     }
   }
@@ -230,7 +236,7 @@ export function collectWorkbookMutationToolCallIds(
 
 export function useSheetPatchSync(
   messages: ReadonlyArray<SheetPatchMessageLike>,
-  onSheetChanged?: (sheetId: number, delta: SheetChangeDelta | null) => void,
+  onSheetChanged?: (update: SheetPatchUpdate) => void,
   onWorkbookStructureChanged?: (update: WorkbookStructureUpdate) => void,
 ) {
   const appliedToolCallIdsRef = useRef<Set<string>>(new Set());
@@ -241,7 +247,7 @@ export function useSheetPatchSync(
       : [];
     for (const update of patchUpdates) {
       appliedToolCallIdsRef.current.add(update.toolCallId);
-      onSheetChanged?.(update.sheetId, update.delta);
+      onSheetChanged?.(update);
     }
 
     const structureUpdates = onWorkbookStructureChanged
