@@ -1,3 +1,12 @@
+import type { CreateObjectOperation, DocumentObjectPatch } from "./objects/model.js";
+
+export type {
+  CreateObjectOperation,
+  DocumentObject,
+  DocumentObjectPatch,
+  DocumentObjectType,
+} from "./objects/model.js";
+
 export const DEFAULT_CHUNK_ROW_SIZE = 128;
 export const DEFAULT_CHUNK_COLUMN_SIZE = 64;
 
@@ -34,21 +43,6 @@ export interface DocumentChunk {
   cells: Record<string, DocumentCellValue>;
 }
 
-export interface CreateChartOperation {
-  type: "createObject";
-  object: {
-    id: string;
-    type: "chart" | "image" | "comment" | "custom";
-    position: Record<string, unknown>;
-    data: Record<string, unknown>;
-  };
-}
-
-export interface DocumentObjectPatch {
-  position?: Record<string, unknown>;
-  data?: Record<string, unknown>;
-}
-
 export type DocumentOperation =
   | {
       type: "setCell";
@@ -71,7 +65,7 @@ export type DocumentOperation =
       type: "clearRange";
       range: CellRange;
     }
-  | CreateChartOperation
+  | CreateObjectOperation
   | {
       type: "updateObject";
       id: string;
@@ -85,10 +79,3 @@ export type DocumentOperation =
       type: "replaceSnapshot";
       sourceFormat: string;
     };
-
-export interface DocumentObject {
-  id: string;
-  type: "chart" | "image" | "comment" | "custom";
-  position: Record<string, unknown>;
-  data: Record<string, unknown>;
-}

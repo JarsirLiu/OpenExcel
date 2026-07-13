@@ -549,7 +549,7 @@ document ranges, chunks, objects, and operations.
 
 ### 7.0.1 Formula dependency flow
 
-Formula text and calculated cell values belong to canonical document chunks. The pure calculation kernel is owned by `packages/core/src/document/calculation.ts`; the server only supplies canonical cells, queries dependency indexes, and persists results. `FormulaCell` and `FormulaDependency` are database indexes used to locate formulas efficiently; they are rebuildable and are not renderer state. A cell write queries overlapping source ranges, walks dependent formulas level by level, recalculates only that set, and writes updated chunk values in the same transaction.
+Formula text and calculated cell values belong to canonical document chunks. The pure calculation kernel is owned by `packages/core/src/document/formula/`. The formula package separates serializable types, parsing, runtime coercion and criteria semantics, function families, one function registry, AST evaluation, result mapping, and the stateful calculation engine. The server only supplies canonical cells, queries dependency indexes, and persists results. `FormulaCell` and `FormulaDependency` are database indexes used to locate formulas efficiently; they are rebuildable and are not renderer state. A cell write queries overlapping source ranges, walks dependent formulas level by level, recalculates only that set, and writes updated chunk values in the same transaction.
 
 ### 7.0.2 Canonical style flow
 
@@ -564,9 +564,15 @@ renderer style fields
     -> renderer adapter fields
 ```
 
-`CellStyle` is workbook-scoped and deduplicated by content hash. A cell must not persist a repeated
-FortuneSheet style object. Style definitions are registered with imports and document mutations;
-the web layer only submits definitions observed in the current renderer payload.
+`CellStyle` is workbook-scoped and deduplicated by content hash. Its canonical type and normalization
+logic are renderer-independent; FortuneSheet conversion stays in the adapter layer. A cell must not
+persist a repeated FortuneSheet style object. Style definitions are registered with imports and
+document mutations; the web layer only submits definitions observed in the current renderer payload.
+
+Document objects are kept behind a generic object boundary in `packages/core/src/document/objects/`.
+Charts, images, comments, and custom objects may share persistence and mutation mechanics, but each
+capability must add its own validated model and renderer/import/export adapter instead of expanding
+the generic document model with capability-specific fields.
 
 ### 7.0.3 Canonical operation compaction
 

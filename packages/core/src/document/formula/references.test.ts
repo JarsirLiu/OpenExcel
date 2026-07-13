@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractFormulaReferences } from "./formula.js";
+import { extractFormulaReferences } from "./references.js";
 
 describe("extractFormulaReferences", () => {
   it("extracts local cell and range references", () => {

@@ -41,14 +41,6 @@ export type {
   DocumentRangeData,
 } from "./document/adapter.js";
 export {
-  type CalculationCellInput,
-  type CalculationCellResult,
-  type CalculationSheetInput,
-  type FormulaAst,
-  FormulaCalculationEngine,
-  parseFormula,
-} from "./document/calculation.js";
-export {
   createEmptyChunk,
   getChunkCellKey,
   getChunkKey,
@@ -57,8 +49,16 @@ export {
   readChunkCell,
   writeChunkCell,
 } from "./document/chunk.js";
-export type { FormulaReference } from "./document/formula.js";
-export { extractFormulaReferences } from "./document/formula.js";
+export type { FormulaReference } from "./document/formula/index.js";
+export {
+  type CalculationCellInput,
+  type CalculationCellResult,
+  type CalculationSheetInput,
+  extractFormulaReferences,
+  type FormulaAst,
+  FormulaCalculationEngine,
+  parseFormula,
+} from "./document/formula/index.js";
 export {
   chunksToFortuneCelldata,
   documentValueToFortuneValue,
@@ -67,7 +67,7 @@ export {
 } from "./document/fortuneAdapter.js";
 export {
   type CellRange,
-  type CreateChartOperation,
+  type CreateObjectOperation,
   DEFAULT_CHUNK_COLUMN_SIZE,
   DEFAULT_CHUNK_ROW_SIZE,
   type DocumentCell,

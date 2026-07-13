@@ -1,4 +1,28 @@
-import type { FortuneCell, FortuneCellValue } from "../excel/celldataUtils.js";
+export interface CanonicalBorderSide {
+  s: number;
+  c?: string;
+}
+
+export interface CanonicalCellStyle {
+  bg?: string;
+  fc?: string;
+  fs?: number;
+  ff?: string;
+  bl?: number;
+  it?: number;
+  cl?: number;
+  un?: number;
+  ht?: number;
+  vt?: number;
+  tb?: string;
+  ct?: { fa?: string; t?: string };
+  bd?: {
+    t?: CanonicalBorderSide;
+    b?: CanonicalBorderSide;
+    l?: CanonicalBorderSide;
+    r?: CanonicalBorderSide;
+  };
+}
 
 const STYLE_KEYS = [
   "bg",
@@ -14,9 +38,7 @@ const STYLE_KEYS = [
   "tb",
   "ct",
   "bd",
-] as const satisfies ReadonlyArray<keyof FortuneCellValue>;
-
-export type CanonicalCellStyle = Partial<Pick<FortuneCellValue, (typeof STYLE_KEYS)[number]>>;
+] as const satisfies ReadonlyArray<keyof CanonicalCellStyle>;
 
 export interface DocumentStyleDefinition {
   id: string;
@@ -25,7 +47,7 @@ export interface DocumentStyleDefinition {
 
 export function mergeCellStyles(
   base: CanonicalCellStyle | undefined,
-  patch: Partial<FortuneCellValue>,
+  patch: Partial<CanonicalCellStyle>,
 ): CanonicalCellStyle | null {
   const merged = {
     ...(base ?? {}),
@@ -44,7 +66,7 @@ export function mergeCellStyles(
         }
       : {}),
   };
-  return normalizeCellStyle(merged as Partial<FortuneCellValue>);
+  return normalizeCellStyle(merged);
 }
 
 export function createStyleDefinition(style: CanonicalCellStyle): DocumentStyleDefinition | null {
@@ -83,14 +105,17 @@ function hashString(value: string): string {
   return hash.toString(16).padStart(16, "0");
 }
 
-export function normalizeCellStyle(value: Partial<FortuneCellValue>): CanonicalCellStyle | null {
+export function normalizeCellStyle(value: object): CanonicalCellStyle | null {
+  const candidate = value as Partial<CanonicalCellStyle>;
   const style = Object.fromEntries(
-    STYLE_KEYS.flatMap((key) => (value[key] === undefined ? [] : ([[key, value[key]]] as const))),
+    STYLE_KEYS.flatMap((key) =>
+      candidate[key] === undefined ? [] : ([[key, candidate[key]]] as const),
+    ),
   ) as CanonicalCellStyle;
   return Object.keys(style).length > 0 ? (normalizeValue(style) as CanonicalCellStyle) : null;
 }
 
-export function extractCellStyle(value: FortuneCellValue): CanonicalCellStyle | null {
+export function extractCellStyle(value: object): CanonicalCellStyle | null {
   return normalizeCellStyle(value);
 }
 
@@ -98,7 +123,9 @@ export function cellStyleId(style: CanonicalCellStyle): string {
   return `style_${hashString(stableStringify(normalizeValue(style)))}`;
 }
 
-export function collectDocumentStyles(celldata: FortuneCell[]): Map<string, CanonicalCellStyle> {
+export function collectDocumentStyles<T extends { v: object }>(
+  celldata: T[],
+): Map<string, CanonicalCellStyle> {
   const styles = new Map<string, CanonicalCellStyle>();
   for (const cell of celldata) {
     const style = extractCellStyle(cell.v);
@@ -107,7 +134,7 @@ export function collectDocumentStyles(celldata: FortuneCell[]): Map<string, Cano
   return styles;
 }
 
-export function stripCellStyle(value: FortuneCellValue): Record<string, unknown> {
+export function stripCellStyle(value: object): Record<string, unknown> {
   const metadata = { ...value } as Record<string, unknown>;
   for (const key of ["v", "m", "f", ...STYLE_KEYS]) delete metadata[key];
   return metadata;
@@ -124,11 +151,11 @@ export function resolveCellStyle(
   return (resolver as Readonly<Record<string, CanonicalCellStyle>>)[styleId];
 }
 
-export function applyCellStyle(
-  value: FortuneCellValue,
+export function applyCellStyle<T extends object>(
+  value: T,
   styleId: string | undefined,
   resolver: DocumentStyleResolver | undefined,
-): FortuneCellValue {
+): T {
   const style = resolveCellStyle(styleId, resolver);
-  return style ? { ...value, ...style } : value;
+  return style ? ({ ...value, ...style } as T) : value;
 }

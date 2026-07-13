@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FormulaCalculationEngine, parseFormula } from "./calculation.js";
+import { FormulaCalculationEngine, parseFormula } from "./index.js";
 
 describe("FormulaCalculationEngine", () => {
   it("parses formulas into serializable AST nodes", () => {
@@ -217,6 +217,29 @@ describe("FormulaCalculationEngine", () => {
     expect(engine.calculateFormula("Summary", 0, 6).value).toBe("a-b");
     expect(engine.calculateFormula("Summary", 0, 7).value).toBe("missing");
     expect(engine.calculateFormula("Summary", 0, 8).value).toBe(true);
+    engine.destroy();
+  });
+
+  it("evaluates lazy branches without touching the unused branch", () => {
+    const engine = new FormulaCalculationEngine([
+      {
+        name: "Sheet1",
+        cells: [
+          { row: 0, col: 0, value: { value: null, formula: "=IF(TRUE,1,1/0)" } },
+          { row: 0, col: 1, value: { value: null, formula: "=IFERROR(1/0,2)" } },
+          { row: 0, col: 2, value: { value: null, formula: "=IFNA(MATCH(9,A1:A1,0),3)" } },
+          { row: 0, col: 3, value: { value: 1 } },
+          { row: 0, col: 4, value: { value: null, formula: "=XLOOKUP(2,A1:A1,A1:A1,1/0)" } },
+          { row: 0, col: 5, value: { value: null, formula: "=XLOOKUP(1,A1:A1,A1:A1,1/0)" } },
+        ],
+      },
+    ]);
+
+    expect(engine.calculateFormula("Sheet1", 0, 0).value).toBe(1);
+    expect(engine.calculateFormula("Sheet1", 0, 1).value).toBe(2);
+    expect(engine.calculateFormula("Sheet1", 0, 2).value).toBe(3);
+    expect(engine.calculateFormula("Sheet1", 0, 4).error).toBe("DIV_BY_ZERO");
+    expect(engine.calculateFormula("Sheet1", 0, 5).value).toBe(1);
     engine.destroy();
   });
 });

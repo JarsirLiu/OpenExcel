@@ -1,5 +1,5 @@
-import type { CellRange } from "./model.js";
-import { parseA1Range } from "./range.js";
+import type { CellRange } from "../model.js";
+import { parseA1Range } from "../range.js";
 
 export interface FormulaReference {
   sheetName?: string;
