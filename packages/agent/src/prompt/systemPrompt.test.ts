@@ -8,6 +8,11 @@ describe("system prompt", () => {
     expect(DEFAULT_PROMPT).toContain("意图不明先确认");
   });
 
+  it("guides the model to inspect an overview before reading ranges", () => {
+    expect(DEFAULT_PROMPT).toContain("overview 模式");
+    expect(DEFAULT_PROMPT).toContain("mode=range");
+  });
+
   it("includes the prompt, catalog, and context in the final system prompt", () => {
     const systemPrompt = buildSystemPrompt("workspace context", "- **readSheet**: read data");
 
