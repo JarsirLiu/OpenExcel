@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 import type { Session } from "@/api/sessions";
 import { DraftComposer } from "@/features/chat/composer/DraftComposer";
 import { ChatPanel } from "@/features/chat/conversation/ChatPanel";
-import type { SheetPatchUpdate } from "@/features/chat/hooks/useSheetPatchSync";
+import type { SheetMutationUpdate } from "@/features/chat/hooks/sheetMutationMessages";
 import { t } from "@/lib/i18n";
 import { SessionHeader } from "./components/SessionHeader";
 import { SessionHistoryPopover } from "./components/SessionHistoryPopover";
@@ -28,7 +28,7 @@ type Props = {
   handleUndoComplete: () => Promise<void>;
   onAttachExcel: (file: File) => Promise<void> | void;
   onWorkspaceRefresh?: () => Promise<void> | void;
-  onSheetMutation?: (update: SheetPatchUpdate) => Promise<void> | void;
+  onSheetMutation?: (update: SheetMutationUpdate) => Promise<void> | void;
   referenceCacheRevision: number;
   currentUser: CurrentUser;
   onLogout: () => void;

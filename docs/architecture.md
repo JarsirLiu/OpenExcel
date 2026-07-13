@@ -601,7 +601,8 @@ The document engine API surface includes range reads, operation writes, layout u
 4. Web refreshes only the affected workbook or sheet.
 
 Document mutation tool results carry a canonical refresh contract in addition to the legacy
-display `delta` and `preview` fields:
+display `delta` and `preview` fields. The web message boundary parses these results in a pure
+message module; it is not a React synchronization hook:
 
 ```text
 mutation.sheetId
@@ -615,6 +616,11 @@ messages without this field use the full-workbook refresh fallback until the mig
 Document writes use optimistic revisions. The editor retries once only when the server reports that
 remote cell ranges do not overlap the local operations; overlapping changes are reloaded and are
 reported as a conflict instead of being silently overwritten.
+
+Server-side spreadsheet tools are split at the document boundary: `toolDocumentOperations` owns
+one-based tool coordinates and canonical operations, `toolMutationBridge` owns service execution
+and mutation metadata, and `toolPreview` owns legacy display previews. New document tools should
+depend on the smallest of these modules rather than a shared adapter facade.
 
 ### 7.2 Chat flow
 

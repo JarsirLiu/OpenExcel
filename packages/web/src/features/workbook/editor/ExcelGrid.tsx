@@ -3,9 +3,9 @@ import "@fortune-sheet/react/dist/index.css";
 import { useMemo } from "react";
 import type { WorkbookFull } from "@/api/workbooks";
 import type {
-  SheetPatchUpdate,
+  SheetMutationUpdate,
   WorkbookStructureUpdate,
-} from "@/features/chat/hooks/useSheetPatchSync";
+} from "@/features/chat/hooks/sheetMutationMessages";
 import styles from "./ExcelGrid.module.css";
 import { useExcelGridWorkspace } from "./useExcelGridWorkspace";
 
@@ -61,7 +61,7 @@ interface Props {
   onWorkbookStructureChanged?: (update: WorkbookStructureUpdate) => void;
   onWorkbookRefresh?: () => Promise<void> | void;
   onRegisterSheetMutationHandler?: (
-    handler: ((update: SheetPatchUpdate) => Promise<void> | void) | null,
+    handler: ((update: SheetMutationUpdate) => Promise<void> | void) | null,
   ) => void;
 }
 

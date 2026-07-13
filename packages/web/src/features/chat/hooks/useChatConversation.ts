@@ -3,10 +3,10 @@ import { DefaultChatTransport } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchMessages as fetchChatMessages, undoLatestRun } from "@/api/chat";
 import {
-  collectSheetPatchUpdates,
+  collectSheetMutationUpdates,
   collectWorkbookStructureUpdates,
-  type SheetPatchUpdate,
-} from "./useSheetPatchSync";
+  type SheetMutationUpdate,
+} from "./sheetMutationMessages";
 
 const PAGE_SIZE = 40;
 
@@ -72,7 +72,7 @@ export function useChatConversation({
   initialMessages?: any[];
   onRunComplete?: (messages: any[]) => Promise<void> | void;
   onWorkspaceRefresh?: () => Promise<void> | void;
-  onSheetMutation?: (update: SheetPatchUpdate) => Promise<void> | void;
+  onSheetMutation?: (update: SheetMutationUpdate) => Promise<void> | void;
   onStreamingChange?: (isStreaming: boolean) => void;
 }) {
   const messagesRef = useRef<any[]>(initialMessages ?? []);
@@ -157,17 +157,17 @@ export function useChatConversation({
   }, [error, setMessages]);
 
   useEffect(() => {
-    const patchUpdates = collectSheetPatchUpdates(
+    const mutationUpdates = collectSheetMutationUpdates(
       messages,
       seenWorkbookMutationToolCallIdsRef.current,
     );
-    const seenAfterPatchUpdates = new Set(seenWorkbookMutationToolCallIdsRef.current);
-    for (const update of patchUpdates) {
-      seenAfterPatchUpdates.add(update.toolCallId);
+    const seenAfterMutationUpdates = new Set(seenWorkbookMutationToolCallIdsRef.current);
+    for (const update of mutationUpdates) {
+      seenAfterMutationUpdates.add(update.toolCallId);
     }
-    const structureUpdates = collectWorkbookStructureUpdates(messages, seenAfterPatchUpdates);
+    const structureUpdates = collectWorkbookStructureUpdates(messages, seenAfterMutationUpdates);
     const toolCallIds = [
-      ...patchUpdates.map((update) => update.toolCallId),
+      ...mutationUpdates.map((update) => update.toolCallId),
       ...structureUpdates.map((update) => update.toolCallId),
     ];
     if (toolCallIds.length === 0) {
@@ -188,7 +188,7 @@ export function useChatConversation({
       return;
     }
 
-    for (const update of patchUpdates) {
+    for (const update of mutationUpdates) {
       void onSheetMutation?.(update);
       if (!onSheetMutation) pendingWorkspaceRefreshRef.current = true;
     }

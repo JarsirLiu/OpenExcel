@@ -1,7 +1,7 @@
 import { SessionShell } from "@/features/session/SessionShell";
 import type { useSessionWorkspace } from "@/features/session/useSessionWorkspace";
 import styles from "./ChatSidebar.module.css";
-import type { SheetPatchUpdate } from "./hooks/useSheetPatchSync";
+import type { SheetMutationUpdate } from "./hooks/sheetMutationMessages";
 
 type CurrentUser = {
   email: string;
@@ -24,7 +24,7 @@ export function ChatSidebar({
   initialMessages,
 }: {
   onWorkspaceRefresh?: () => Promise<void> | void;
-  onSheetMutation?: (update: SheetPatchUpdate) => Promise<void> | void;
+  onSheetMutation?: (update: SheetMutationUpdate) => Promise<void> | void;
   onAttachExcel: (file: File) => Promise<void> | void;
   referenceCacheRevision: number;
   workspaceId: number | null;

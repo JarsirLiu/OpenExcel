@@ -3,14 +3,13 @@ import {
   type SheetChangeDelta,
   sheetChangePatchOutputSchema,
 } from "@openexcel/core";
-import { useEffect, useRef } from "react";
 
-export type SheetPatchMessageLike = {
+export type SheetMutationMessageLike = {
   role?: unknown;
   parts?: ReadonlyArray<unknown> | null;
 };
 
-export type SheetPatchUpdate = {
+export type SheetMutationUpdate = {
   toolCallId: string;
   sheetId: number;
   sheetNo?: number;
@@ -80,22 +79,20 @@ function isCompletedToolPart(part: unknown): part is CompletedToolPart {
 }
 
 function getToolName(part: CompletedToolPart): string {
-  // ai-sdk v7 static tool: type is "tool-${name}" (e.g. "tool-createSheet")
   if (typeof part.type === "string" && part.type.startsWith("tool-")) {
     return part.type.slice("tool-".length);
   }
-  // ai-sdk v7 dynamic tool or legacy v4 format
   if (typeof part.toolName === "string") {
     return part.toolName;
   }
   return "";
 }
 
-export function collectSheetPatchUpdates(
-  messages: ReadonlyArray<SheetPatchMessageLike>,
+export function collectSheetMutationUpdates(
+  messages: ReadonlyArray<SheetMutationMessageLike>,
   seenToolCallIds: ReadonlySet<string>,
-): SheetPatchUpdate[] {
-  const updates: SheetPatchUpdate[] = [];
+): SheetMutationUpdate[] {
+  const updates: SheetMutationUpdate[] = [];
 
   for (const message of messages) {
     if (message.role !== "assistant" || !Array.isArray(message.parts)) continue;
@@ -165,7 +162,7 @@ function isSheetCreatedOutput(output: unknown): output is {
 }
 
 export function collectWorkbookStructureUpdates(
-  messages: ReadonlyArray<SheetPatchMessageLike>,
+  messages: ReadonlyArray<SheetMutationMessageLike>,
   seenToolCallIds: ReadonlySet<string>,
 ): WorkbookStructureUpdate[] {
   const updates: WorkbookStructureUpdate[] = [];
@@ -212,50 +209,18 @@ export function collectWorkbookStructureUpdates(
 }
 
 export function collectWorkbookMutationToolCallIds(
-  messages: ReadonlyArray<SheetPatchMessageLike>,
+  messages: ReadonlyArray<SheetMutationMessageLike>,
   seenToolCallIds: ReadonlySet<string>,
 ): string[] {
   const toolCallIds = new Set<string>();
-  const patchUpdates = collectSheetPatchUpdates(messages, seenToolCallIds);
-  for (const update of patchUpdates) {
-    toolCallIds.add(update.toolCallId);
-  }
+  const mutationUpdates = collectSheetMutationUpdates(messages, seenToolCallIds);
+  for (const update of mutationUpdates) toolCallIds.add(update.toolCallId);
 
-  const seenAfterPatchUpdates = new Set(seenToolCallIds);
-  for (const toolCallId of toolCallIds) {
-    seenAfterPatchUpdates.add(toolCallId);
-  }
+  const seenAfterMutationUpdates = new Set(seenToolCallIds);
+  for (const toolCallId of toolCallIds) seenAfterMutationUpdates.add(toolCallId);
 
-  const structureUpdates = collectWorkbookStructureUpdates(messages, seenAfterPatchUpdates);
-  for (const update of structureUpdates) {
-    toolCallIds.add(update.toolCallId);
-  }
+  const structureUpdates = collectWorkbookStructureUpdates(messages, seenAfterMutationUpdates);
+  for (const update of structureUpdates) toolCallIds.add(update.toolCallId);
 
   return Array.from(toolCallIds);
-}
-
-export function useSheetPatchSync(
-  messages: ReadonlyArray<SheetPatchMessageLike>,
-  onSheetChanged?: (update: SheetPatchUpdate) => void,
-  onWorkbookStructureChanged?: (update: WorkbookStructureUpdate) => void,
-) {
-  const appliedToolCallIdsRef = useRef<Set<string>>(new Set());
-
-  useEffect(() => {
-    const patchUpdates = onSheetChanged
-      ? collectSheetPatchUpdates(messages, appliedToolCallIdsRef.current)
-      : [];
-    for (const update of patchUpdates) {
-      appliedToolCallIdsRef.current.add(update.toolCallId);
-      onSheetChanged?.(update);
-    }
-
-    const structureUpdates = onWorkbookStructureChanged
-      ? collectWorkbookStructureUpdates(messages, appliedToolCallIdsRef.current)
-      : [];
-    for (const update of structureUpdates) {
-      appliedToolCallIdsRef.current.add(update.toolCallId);
-      onWorkbookStructureChanged?.(update);
-    }
-  }, [messages, onSheetChanged, onWorkbookStructureChanged]);
 }

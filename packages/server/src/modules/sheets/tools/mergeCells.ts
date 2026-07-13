@@ -7,13 +7,12 @@ import {
   sheetChangeRangeToZeroBased,
 } from "@openexcel/core";
 import {
-  applyToolOperations,
-  buildToolPreview,
   mergeOperationToDocument,
   mergeRanges,
   rangeForWriteOperation,
-  readToolRange,
-} from "../../documents/toolAdapter.js";
+} from "../../documents/toolDocumentOperations.js";
+import { applyToolOperations, readToolRange } from "../../documents/toolMutationBridge.js";
+import { buildToolPreview } from "../../documents/toolPreview.js";
 
 export const mergeCells = {
   ...excelToolSpecs.mergeCells,

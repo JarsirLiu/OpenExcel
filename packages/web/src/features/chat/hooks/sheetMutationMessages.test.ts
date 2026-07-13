@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
-  collectSheetPatchUpdates,
+  collectSheetMutationUpdates,
   collectWorkbookMutationToolCallIds,
   collectWorkbookStructureUpdates,
-} from "../features/chat/hooks/useSheetPatchSync";
+} from "./sheetMutationMessages";
 
-describe("collectSheetPatchUpdates", () => {
+describe("collectSheetMutationUpdates", () => {
   it("collects valid completed patch outputs once", () => {
     const messages = [
       {
@@ -39,7 +39,7 @@ describe("collectSheetPatchUpdates", () => {
       },
     ];
 
-    const updates = collectSheetPatchUpdates(messages, new Set(["tool-1"]));
+    const updates = collectSheetMutationUpdates(messages, new Set(["tool-1"]));
 
     expect(updates).toEqual([
       {
@@ -72,7 +72,7 @@ describe("collectSheetPatchUpdates", () => {
       },
     ];
 
-    const updates = collectSheetPatchUpdates(messages, new Set());
+    const updates = collectSheetMutationUpdates(messages, new Set());
 
     expect(updates).toEqual([]);
   });
@@ -100,7 +100,7 @@ describe("collectSheetPatchUpdates", () => {
       },
     ];
 
-    const updates = collectSheetPatchUpdates(messages, new Set());
+    const updates = collectSheetMutationUpdates(messages, new Set());
 
     expect(updates).toEqual([
       {
@@ -120,7 +120,7 @@ describe("collectSheetPatchUpdates", () => {
   });
 
   it("collects canonical mutation metadata for incremental refresh", () => {
-    const updates = collectSheetPatchUpdates(
+    const updates = collectSheetMutationUpdates(
       [
         {
           role: "assistant",

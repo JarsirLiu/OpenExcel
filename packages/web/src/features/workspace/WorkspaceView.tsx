@@ -1,9 +1,9 @@
 import { useRef } from "react";
 import type { WorkbookFull } from "@/api/workbooks";
 import type {
-  SheetPatchUpdate,
+  SheetMutationUpdate,
   WorkbookStructureUpdate,
-} from "@/features/chat/hooks/useSheetPatchSync";
+} from "@/features/chat/hooks/sheetMutationMessages";
 import { t } from "@/lib/i18n";
 import { ExcelWorkspace } from "../workbook/ui/ExcelWorkspace";
 import { WorkbookHeader } from "../workbook/ui/WorkbookHeader";
@@ -32,7 +32,7 @@ type Props = {
   handleWorkbookStructureChanged: (update: WorkbookStructureUpdate) => void;
   handleWorkbookRefresh: () => Promise<void>;
   onRegisterSheetMutationHandler?: (
-    handler: ((update: SheetPatchUpdate) => Promise<void> | void) | null,
+    handler: ((update: SheetMutationUpdate) => Promise<void> | void) | null,
   ) => void;
 };
 

@@ -9,7 +9,7 @@ import {
   updateWorkbookName,
   uploadNewWorkbook,
 } from "@/api/workbooks";
-import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatchSync";
+import type { WorkbookStructureUpdate } from "@/features/chat/hooks/sheetMutationMessages";
 import { useWorkbookCatalog } from "./useWorkbookCatalog";
 
 function sortWorkbooks(list: WorkbookMeta[]): WorkbookMeta[] {

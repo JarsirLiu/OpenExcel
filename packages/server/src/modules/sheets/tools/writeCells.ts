@@ -1,22 +1,15 @@
 import { excelToolSpecs, runToolContextSchema } from "@openexcel/agent";
 import { type SheetChangeDelta, sheetChangePatchOutputSchema } from "@openexcel/core";
 import {
-  applyToolOperations,
-  buildToolPreview,
   mergeRanges,
+  normalizeToolFormula,
   rangeForWriteOperation,
-  readToolRange,
   type ToolWriteOperation,
   writeOperationToDocument,
-} from "../../documents/toolAdapter.js";
-import { normalizeWriteOperations, type WriteCellsInput } from "../domain.js";
-
-function normalizeFormula(formula?: string): string | undefined {
-  if (!formula) return undefined;
-  const value = formula.trim();
-  if (!value) return undefined;
-  return value.startsWith("=") ? value.slice(1) : value;
-}
+} from "../../documents/toolDocumentOperations.js";
+import { applyToolOperations, readToolRange } from "../../documents/toolMutationBridge.js";
+import { buildToolPreview } from "../../documents/toolPreview.js";
+import { normalizeWriteOperations, type WriteCellsInput } from "./writeCellsInput.js";
 
 function touchedCells(operations: ToolWriteOperation[]) {
   const cells: Array<{
@@ -26,7 +19,7 @@ function touchedCells(operations: ToolWriteOperation[]) {
     formula?: string;
   }> = [];
   for (const operation of operations) {
-    const formula = normalizeFormula(operation.formula);
+    const formula = normalizeToolFormula(operation.formula);
     if (operation.type === "cell") {
       cells.push({
         row: operation.row,

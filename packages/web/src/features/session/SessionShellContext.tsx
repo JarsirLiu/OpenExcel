@@ -1,12 +1,12 @@
 import { createContext, useContext } from "react";
-import type { SheetPatchUpdate } from "@/features/chat/hooks/useSheetPatchSync";
+import type { SheetMutationUpdate } from "@/features/chat/hooks/sheetMutationMessages";
 
 type SessionInfra = {
   workspaceId: number;
   onAttachExcel: (file: File) => Promise<void> | void;
   referenceCacheRevision: number;
   onWorkspaceRefresh?: () => Promise<void> | void;
-  onSheetMutation?: (update: SheetPatchUpdate) => Promise<void> | void;
+  onSheetMutation?: (update: SheetMutationUpdate) => Promise<void> | void;
   onUndoComplete?: () => Promise<void> | void;
   onNavigateSheet?: (sheetId: number) => void;
   initialMessages?: unknown[];

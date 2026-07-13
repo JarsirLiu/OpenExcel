@@ -3,7 +3,7 @@ import type { Session } from "@/api/sessions";
 import type { WorkbookFull, WorkbookMeta } from "@/api/workbooks";
 import type { Workspace } from "@/api/workspaces";
 import { ChatSidebar } from "@/features/chat/ChatSidebar";
-import type { SheetPatchUpdate } from "@/features/chat/hooks/useSheetPatchSync";
+import type { SheetMutationUpdate } from "@/features/chat/hooks/sheetMutationMessages";
 import { useSessionWorkspace } from "@/features/session/useSessionWorkspace";
 import { useSheetActivation } from "@/features/workbook/editor/SheetActivationContext";
 import { useWorkspaceState } from "@/features/workspace/useWorkspaceState";
@@ -69,15 +69,15 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
 
   const workbook = useWorkspaceView(activeWorkspaceId, domainInitial.workbook);
   const sheetMutationHandlerRef = useRef<
-    ((update: SheetPatchUpdate) => Promise<void> | void) | null
+    ((update: SheetMutationUpdate) => Promise<void> | void) | null
   >(null);
   const registerSheetMutationHandler = useCallback(
-    (handler: ((update: SheetPatchUpdate) => Promise<void> | void) | null) => {
+    (handler: ((update: SheetMutationUpdate) => Promise<void> | void) | null) => {
       sheetMutationHandlerRef.current = handler;
     },
     [],
   );
-  const handleSheetMutation = useCallback((update: SheetPatchUpdate) => {
+  const handleSheetMutation = useCallback((update: SheetMutationUpdate) => {
     return sheetMutationHandlerRef.current?.(update);
   }, []);
   const session = useSessionWorkspace(

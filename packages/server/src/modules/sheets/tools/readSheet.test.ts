@@ -7,8 +7,11 @@ vi.mock("../../documents/service.js", () => ({
   getSheetInfo: mockGetSheetInfo,
 }));
 
-vi.mock("../../documents/toolAdapter.js", () => ({
+vi.mock("../../documents/toolMutationBridge.js", () => ({
   readToolRange: mockReadToolRange,
+}));
+
+vi.mock("../../documents/toolDocumentOperations.js", () => ({
   isMergeObject: (object: { type: string; data: Record<string, unknown> }) =>
     object.type === "custom" && object.data.kind === "merge",
 }));

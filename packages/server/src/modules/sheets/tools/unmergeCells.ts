@@ -6,13 +6,9 @@ import {
   sheetChangePatchOutputSchema,
   sheetChangeRangeToZeroBased,
 } from "@openexcel/core";
-import {
-  applyToolOperations,
-  buildToolPreview,
-  isMergeObject,
-  mergeRanges,
-  readToolRange,
-} from "../../documents/toolAdapter.js";
+import { isMergeObject, mergeRanges } from "../../documents/toolDocumentOperations.js";
+import { applyToolOperations, readToolRange } from "../../documents/toolMutationBridge.js";
+import { buildToolPreview } from "../../documents/toolPreview.js";
 
 export const unmergeCells = {
   ...excelToolSpecs.unmergeCells,

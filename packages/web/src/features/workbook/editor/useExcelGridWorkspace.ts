@@ -23,9 +23,9 @@ import {
   updateSheetName,
 } from "@/api/workbooks";
 import type {
-  SheetPatchUpdate,
+  SheetMutationUpdate,
   WorkbookStructureUpdate,
-} from "@/features/chat/hooks/useSheetPatchSync";
+} from "@/features/chat/hooks/sheetMutationMessages";
 import { confirm } from "@/shared/lib";
 import { buildDocumentOperations, valueKey } from "./documentSync";
 import {
@@ -58,7 +58,7 @@ type UseExcelGridWorkspaceProps = {
   onWorkbookStructureChanged?: (update: WorkbookStructureUpdate) => void;
   onWorkbookRefresh?: () => Promise<void> | void;
   onRegisterSheetMutationHandler?: (
-    handler: ((update: SheetPatchUpdate) => Promise<void> | void) | null,
+    handler: ((update: SheetMutationUpdate) => Promise<void> | void) | null,
   ) => void;
 };
 
@@ -217,7 +217,7 @@ export function useExcelGridWorkspace({
   );
 
   const handleSheetMutation = useCallback(
-    async (update: SheetPatchUpdate) => {
+    async (update: SheetMutationUpdate) => {
       const mutation = update.mutation;
       if (!mutation) {
         await onWorkbookRefresh?.();

@@ -5,13 +5,12 @@ import {
   sheetChangePatchOutputSchema,
 } from "@openexcel/core";
 import {
-  applyToolOperations,
-  buildToolPreview,
   clearOperationToDocument,
   mergeRanges,
   rangeForClearOperation,
-  readToolRange,
-} from "../../documents/toolAdapter.js";
+} from "../../documents/toolDocumentOperations.js";
+import { applyToolOperations, readToolRange } from "../../documents/toolMutationBridge.js";
+import { buildToolPreview } from "../../documents/toolPreview.js";
 
 export const clearCells = {
   ...excelToolSpecs.clearCells,

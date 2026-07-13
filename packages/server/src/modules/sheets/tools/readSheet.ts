@@ -1,7 +1,8 @@
 import { excelToolSpecs, workspaceToolContextSchema } from "@openexcel/agent";
 import type { DocumentCell } from "@openexcel/core";
 import * as documentService from "../../documents/service.js";
-import { isMergeObject, readToolRange } from "../../documents/toolAdapter.js";
+import { isMergeObject } from "../../documents/toolDocumentOperations.js";
+import { readToolRange } from "../../documents/toolMutationBridge.js";
 
 const DEFAULT_PAGE_SIZE = 30;
 const MAX_CELLS_PER_READ = 4_000;
