@@ -1,5 +1,5 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
-import type { CurrentUserContext } from "../modules/auth/service.js";
+import type { CurrentUserContext } from "../modules/auth/domain/authTypes.js";
 
 declare module "fastify" {
   interface FastifyRequest {

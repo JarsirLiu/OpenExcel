@@ -1,5 +1,5 @@
 import { excelToolSpecs, workspaceToolContextSchema } from "@openexcel/agent";
-import * as service from "../service.js";
+import { createWorkbook as createWorkbookUseCase } from "../application/createWorkbook.js";
 
 export const createWorkbook = {
   ...excelToolSpecs.createWorkbook,
@@ -8,7 +8,7 @@ export const createWorkbook = {
     input: { name?: string; sheetName?: string; sourceSheetId?: number },
     { context }: { context: { workspaceId: number } },
   ) => {
-    return service.createWorkbook(
+    return createWorkbookUseCase(
       context.workspaceId,
       input.name,
       input.sheetName,

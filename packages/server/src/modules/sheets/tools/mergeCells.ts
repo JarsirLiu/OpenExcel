@@ -5,10 +5,15 @@ import {
   sheetChangePatchOutputSchema,
   sheetChangeRangeToZeroBased,
 } from "@openexcel/core";
-import { prisma } from "../../../infra/database/db.js";
 import { sheetRecordToCelldata } from "../../../shared/utils/sheetData.js";
 import * as repo from "../../sessions/runs/repository.js";
-import { applyMergeOperation, buildSheetChangePreview, toA1CellRef, toA1Range } from "../domain.js";
+import {
+  applyMergeOperation,
+  buildSheetChangePreview,
+  toA1CellRef,
+  toA1Range,
+} from "../domain/sheet.js";
+import * as sheetRepo from "../infrastructure/sheetRepository.js";
 
 export const mergeCells = {
   ...excelToolSpecs.mergeCells,
@@ -17,10 +22,7 @@ export const mergeCells = {
     { sheetId, operations }: { sheetId: number; operations: SheetChangeRangeOperation[] },
     { context }: { context: { runId: number; workspaceId: number } },
   ) => {
-    const sheet = await prisma.sheet.findFirst({
-      where: { id: sheetId },
-      include: { workbook: true },
-    });
+    const sheet = await sheetRepo.findSheetForWorkspace(sheetId, context.workspaceId);
     if (!sheet) throw new Error(`Sheet ${sheetId} 不存在`);
     if (sheet.workbook.workspaceId !== context.workspaceId)
       throw new Error(`Sheet ${sheetId} 不存在`);
@@ -68,13 +70,14 @@ export const mergeCells = {
       };
     }
 
-    await prisma.sheet.update({
-      where: { id: sheetId },
-      data: {
+    await sheetRepo.updateSheetState(
+      sheetId,
+      {
         uploadedData: JSON.stringify(updatedCelldata),
         config: JSON.stringify(config),
       },
-    });
+      context.workspaceId,
+    );
 
     const delta: SheetChangeDelta = {
       type: "merge",

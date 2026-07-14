@@ -5,7 +5,6 @@ import {
   sheetChangePatchOutputSchema,
   sheetChangeRangeToZeroBased,
 } from "@openexcel/core";
-import { prisma } from "../../../infra/database/db.js";
 import { sheetRecordToCelldata } from "../../../shared/utils/sheetData.js";
 import * as repo from "../../sessions/runs/repository.js";
 import {
@@ -13,7 +12,8 @@ import {
   buildSheetChangePreview,
   normalizeWriteOperations,
   type WriteCellsInput,
-} from "../domain.js";
+} from "../domain/sheet.js";
+import * as sheetRepo from "../infrastructure/sheetRepository.js";
 
 export const writeCells = {
   ...excelToolSpecs.writeCells,
@@ -23,10 +23,7 @@ export const writeCells = {
     { context }: { context: { runId: number; workspaceId: number } },
   ) => {
     const { sheetId, operations } = normalizeWriteOperations(input);
-    const sheet = await prisma.sheet.findFirst({
-      where: { id: sheetId },
-      include: { workbook: true },
-    });
+    const sheet = await sheetRepo.findSheetForWorkspace(sheetId, context.workspaceId);
     if (!sheet) throw new Error(`Sheet ${sheetId} 不存在`);
     if (sheet.workbook.workspaceId !== context.workspaceId)
       throw new Error(`Sheet ${sheetId} 不存在`);
@@ -80,10 +77,11 @@ export const writeCells = {
 
     const updatedCelldata = Array.from(cellMap.values());
 
-    await prisma.sheet.update({
-      where: { id: sheetId },
-      data: { uploadedData: JSON.stringify(updatedCelldata) },
-    });
+    await sheetRepo.updateSheetContent(
+      sheetId,
+      JSON.stringify(updatedCelldata),
+      context.workspaceId,
+    );
 
     const touchedValues = Array.from(touchedCells.values());
     const minRow = Math.min(...touchedValues.map((cell) => cell.row - 1));

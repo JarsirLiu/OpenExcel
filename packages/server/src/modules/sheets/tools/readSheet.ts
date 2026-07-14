@@ -1,8 +1,8 @@
 import { excelToolSpecs, workspaceToolContextSchema } from "@openexcel/agent";
 import type { FortuneCell } from "@openexcel/core";
-import { prisma } from "../../../infra/database/db.js";
 import { sheetRecordToCelldata } from "../../../shared/utils/sheetData.js";
-import { parseMergesFromCelldata } from "../domain.js";
+import { parseMergesFromCelldata } from "../domain/sheet.js";
+import { findSheetForWorkspace } from "../infrastructure/sheetRepository.js";
 
 const DEFAULT_PAGE_SIZE = 30;
 const MAX_CELLS_PER_READ = 4_000;
@@ -268,10 +268,7 @@ export const readSheet = {
     },
     { context }: { context: { workspaceId: number } },
   ) => {
-    const sheet = await prisma.sheet.findFirst({
-      where: { id: sheetId },
-      include: { workbook: true },
-    });
+    const sheet = await findSheetForWorkspace(sheetId, context.workspaceId);
     if (!sheet) throw new Error(`Sheet ${sheetId} 不存在`);
     if (sheet.workbook.workspaceId !== context.workspaceId) {
       throw new Error(`Sheet ${sheetId} 不存在`);

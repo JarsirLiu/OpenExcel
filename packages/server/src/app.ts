@@ -7,12 +7,12 @@ import Fastify from "fastify";
 import { pinoStream } from "./infra/observability/logger.js";
 import { responseLoggerHook, startTimerHook } from "./middleware/requestLogger.js";
 import { resolveUserHook } from "./middleware/resolveUser.js";
-import { authRoutes } from "./modules/auth/routes.js";
+import { authRoutes } from "./modules/auth/api/routes.js";
 import { sessionRoutes } from "./modules/sessions/routes.js";
-import { sheetRoutes } from "./modules/sheets/routes.js";
-import { WORKBOOK_UPLOAD_LIMITS } from "./modules/workbooks/import/uploadLimits.js";
-import { workbookRoutes } from "./modules/workbooks/routes.js";
-import { workspaceRoutes } from "./modules/workspaces/routes.js";
+import { sheetRoutes } from "./modules/sheets/api/routes.js";
+import { workbookRoutes } from "./modules/workbooks/api/routes.js";
+import { WORKBOOK_UPLOAD_LIMITS } from "./modules/workbooks/api/uploadLimits.js";
+import { workspaceRoutes } from "./modules/workspaces/api/routes.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 

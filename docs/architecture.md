@@ -168,22 +168,20 @@ packages/server/src/
 │   └── requestContext.ts # request id, actor id, tenant id attachment
 ├── modules/              # business modules, split by domain
 │   ├── auth/
-│   │   ├── routes.ts     # login/logout/session refresh endpoints
-│   │   ├── service.ts    # auth flows and session issuance
-│   │   ├── repository.ts # user/session/token persistence
-│   │   ├── policy.ts     # password, MFA, lockout, invitation rules
-│   │   ├── dto.ts        # request/response shapes
-│   │   └── types.ts      # auth module types
+│   │   ├── api/          # HTTP routes and response mapping
+│   │   ├── application/  # login, register, logout, current-user use cases
+│   │   ├── domain/       # auth errors and module contracts
+│   │   └── infrastructure/ # Prisma, password, token, cookie adapters
 │   ├── users/
 │   │   ├── routes.ts     # user profile and admin user endpoints
 │   │   ├── service.ts    # profile, status, account lifecycle
 │   │   ├── repository.ts # user persistence
 │   │   └── types.ts
 │   ├── workspaces/
-│   │   ├── routes.ts     # future org/workspace boundaries
-│   │   ├── service.ts    # workspace creation, membership, tenant scoping
-│   │   ├── repository.ts # workspace and membership persistence
-│   │   └── types.ts
+│   │   ├── api/          # workspace HTTP routes
+│   │   ├── application/  # workspace use cases
+│   │   ├── domain/       # workspace errors and contracts
+│   │   └── infrastructure/ # Prisma and initial-resource provisioners
 │   ├── sessions/
 │   │   ├── routes.ts     # session CRUD, chat, title, undo endpoints
 │   │   ├── service.ts    # session orchestration and use-case composition
@@ -197,15 +195,17 @@ packages/server/src/
 │   │   ├── repository.ts # run and step persistence helpers
 │   │   └── types.ts
 │   ├── workbooks/
-│   │   ├── routes.ts     # workbook upload, export, create, sheet structure endpoints
-│   │   ├── service.ts    # workbook import/export and workbook-level use cases
-│   │   ├── repository.ts # workbook persistence
-│   │   └── types.ts
+│   │   ├── api/          # workbook and sheet-structure HTTP routes
+│   │   ├── application/  # workbook and sheet-structure use cases
+│   │   ├── domain/       # workbook creation rules and errors
+│   │   ├── infrastructure/ # Prisma and workbook transactions
+│   │   └── tools/        # Agent workbook tool adapters
 │   └── sheets/
-│       ├── routes.ts     # sheet read and patch endpoints
-│       ├── service.ts    # sheet patch orchestration
-│       ├── repository.ts # sheet persistence
-│       └── types.ts
+│       ├── api/          # sheet read and patch HTTP routes
+│       ├── application/  # sheet query and content/name update use cases
+│       ├── domain/       # sheet change and tool-domain helpers
+│       ├── infrastructure/ # Sheet persistence
+│       └── tools/        # Agent sheet tool adapters
 └── tests/                # cross-module integration tests and HTTP tests
 ```
 
@@ -350,6 +350,27 @@ should remain framework-free and continue to act as shared primitives.
 
 ### 5.2 `packages/server`
 
+Authentication and workspace boundaries have completed the first application-layer extraction:
+
+- `src/modules/auth/api/routes.ts` owns HTTP validation, Cookie handling, and response mapping.
+- `src/modules/auth/application/*` owns authentication use cases without Fastify dependencies.
+- `src/modules/auth/domain/*` owns auth contracts and predictable errors.
+- `src/modules/auth/infrastructure/*` owns Prisma persistence, password hashing, and session-cookie primitives.
+- `src/modules/workspaces/api/routes.ts` owns workspace HTTP adapters.
+- `src/modules/workspaces/application/*` owns workspace use cases and bootstrap orchestration.
+- `src/modules/workspaces/domain/*` owns workspace errors and contracts.
+- `src/modules/workspaces/infrastructure/*` owns Prisma queries, resource-group transactions, and example provisioning.
+- `src/modules/workbooks/api/*` owns workbook HTTP adapters, including nested sheet-structure endpoints.
+- `src/modules/workbooks/application/*` owns workbook import/export, creation/deletion, and sheet creation/deletion use cases.
+- `src/modules/workbooks/domain/*` owns workbook creation rules and predictable errors.
+- `src/modules/workbooks/infrastructure/*` owns workbook persistence and cross-workbook/sheet transactions.
+- `src/modules/sheets/api/*` owns Sheet content and name HTTP adapters.
+- `src/modules/sheets/application/*` owns Sheet query and content/name update use cases.
+- `src/modules/sheets/infrastructure/*` owns Sheet persistence and workspace-scoped access.
+
+The sessions domain remains intentionally transitional. Its `routes.ts`, `service.ts`, and
+`repository.ts` files will be extracted later using the same dependency direction.
+
 Current session-related files:
 
 - `src/modules/sessions/service.ts`
@@ -358,10 +379,6 @@ Current session-related files:
 - `src/modules/sessions/transcript.ts`
 - `src/modules/sessions/chat/*`
 - `src/modules/sessions/runs/*`
-- `src/modules/workbooks/import/*`
-- `src/modules/workbooks/export/*`
-- `src/modules/workbooks/create/*`
-- `src/modules/workbooks/delete/*`
 - `src/modules/sheets/tools/*`
 
 represent the agent/server boundary today.
@@ -373,6 +390,11 @@ Long term, these should move toward a cleaner split:
 
 Session title generation remains in `server`, because it is a session API capability rather than an agent primitive.
 Sheet mutation tools now live under `src/modules/sheets/tools/*`, which is a better fit for the domain than the old session-tools location.
+
+Workbook structure operations remain in `workbooks`, even when their URLs are nested under a workbook:
+workbook creation, import/export, deletion, and sheet creation/deletion belong to the workbook boundary.
+The `sheets` module owns Sheet content reads, cell updates, and name updates. This keeps structural
+changes separate from incremental cell mutations.
 
 ### 5.3 `packages/web`
 

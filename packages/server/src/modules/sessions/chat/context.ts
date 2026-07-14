@@ -1,5 +1,5 @@
 import { buildWorkspaceContext as buildAgentWorkspaceContext } from "@openexcel/agent";
-import * as workbookRepo from "../../workbooks/repository.js";
+import * as workbookRepo from "../../workbooks/infrastructure/workbookRepository.js";
 import type { findRunsBySession } from "../runs/repository.js";
 
 export function historyFromRuns(runs: Awaited<ReturnType<typeof findRunsBySession>>) {

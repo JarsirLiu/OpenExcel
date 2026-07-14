@@ -6,10 +6,10 @@ import {
   sheetChangeRangeToZeroBased,
   toZeroBasedIndex,
 } from "@openexcel/core";
-import { prisma } from "../../../infra/database/db.js";
 import { sheetRecordToCelldata } from "../../../shared/utils/sheetData.js";
 import * as repo from "../../sessions/runs/repository.js";
-import { applyClearOperation, buildSheetChangePreview } from "../domain.js";
+import { applyClearOperation, buildSheetChangePreview } from "../domain/sheet.js";
+import * as sheetRepo from "../infrastructure/sheetRepository.js";
 
 export const clearCells = {
   ...excelToolSpecs.clearCells,
@@ -18,10 +18,7 @@ export const clearCells = {
     { sheetId, operations }: { sheetId: number; operations: SheetChangeClearOperation[] },
     { context }: { context: { runId: number; workspaceId: number } },
   ) => {
-    const sheet = await prisma.sheet.findFirst({
-      where: { id: sheetId },
-      include: { workbook: true },
-    });
+    const sheet = await sheetRepo.findSheetForWorkspace(sheetId, context.workspaceId);
     if (!sheet) throw new Error(`Sheet ${sheetId} 不存在`);
     if (sheet.workbook.workspaceId !== context.workspaceId)
       throw new Error(`Sheet ${sheetId} 不存在`);
@@ -62,10 +59,11 @@ export const clearCells = {
 
     const updatedCelldata = Array.from(cellMap.values());
 
-    await prisma.sheet.update({
-      where: { id: sheetId },
-      data: { uploadedData: JSON.stringify(updatedCelldata) },
-    });
+    await sheetRepo.updateSheetContent(
+      sheetId,
+      JSON.stringify(updatedCelldata),
+      context.workspaceId,
+    );
 
     const touchedRows = Array.from(touchedRowIndices.values());
     const minRow = touchedRows.length > 0 ? Math.min(...touchedRows) : 0;
