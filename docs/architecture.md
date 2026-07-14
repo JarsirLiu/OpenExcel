@@ -233,7 +233,8 @@ The current implementation follows that direction with a cookie-backed email/pas
 
 - each browser gets an opaque session token stored in an HttpOnly cookie
 - the server resolves it to a current user at request time
-- registration or login provisions a private workspace for that user
+- registration or login only provisions the authentication session
+- the first authenticated workspace query lazily provisions the user's private workspace
 - workspace, workbook, sheet, and session reads are filtered by the current user
 
 This keeps the SQLite development path usable for multi-user demos without changing the workbook model or exposing internal sheet identifiers as a permission boundary, while leaving room for password reset, logout-all, and future SSO-style auth later.
@@ -524,6 +525,17 @@ If a bug affects two panes at once, treat it as a boundary bug and add a regress
 2. Web emits a workbook delta or full-sheet update.
 3. Server persists the change.
 4. Web refreshes only the affected workbook or sheet.
+
+### 7.1.1 Authentication and workspace bootstrap flow
+
+1. Registration or login validates credentials and creates an `AuthSession`.
+2. The server sets the opaque `openexcel_session` cookie and returns the current user.
+3. The web app navigates to the protected workbench route.
+4. The protected route loads `GET /api/workspaces`.
+5. If the user has no workspace, the workspace application layer provisions the initial workspace, workbook, sheets, and first conversation `Session` in one transaction.
+6. The workspace list is read again and returned to the route loader.
+
+`AuthSession` is the login identity. `Session` is the persisted conversation resource under a workspace. Login must never create a conversation session.
 
 ### 7.2 Chat flow
 

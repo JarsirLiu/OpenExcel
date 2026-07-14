@@ -1,28 +1,18 @@
-import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import { gridToCelldata, type InitConfig } from "@openexcel/core";
-import { prisma } from "../../infra/database/db.js";
+import { gridToCelldata } from "@openexcel/core";
+import { prisma } from "../../../infra/database/db.js";
 import {
   generateSessionPublicId,
   generateWorkbookPublicId,
   generateWorkspacePublicId,
-} from "../../shared/utils/publicId.js";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const exampleTemplatePath = resolve(__dirname, "../../../../../templates/init.json");
-
-function loadExampleTemplate(): InitConfig {
-  const raw = readFileSync(exampleTemplatePath, "utf-8");
-  return JSON.parse(raw) as InitConfig;
-}
+} from "../../../shared/utils/publicId.js";
+import { loadExampleTemplate } from "./exampleTemplateReader.js";
 
 function normalizeName(name: string | undefined, fallback: string) {
   const trimmed = name?.trim();
   return trimmed && trimmed.length > 0 ? trimmed : fallback;
 }
 
-export async function seedExampleWorkspaceForUser(
+export async function provisionExampleWorkspaceForUser(
   ownerUserId: number,
   template = loadExampleTemplate(),
 ) {
@@ -55,6 +45,18 @@ export async function seedExampleWorkspaceForUser(
         data: { exampleWorkspaceSeededAt: now },
       });
 
+      return { seeded: false as const };
+    }
+
+    const claim = await tx.user.updateMany({
+      where: {
+        id: ownerUserId,
+        exampleWorkspaceSeededAt: null,
+      },
+      data: { exampleWorkspaceSeededAt: now },
+    });
+
+    if (claim.count !== 1) {
       return { seeded: false as const };
     }
 
@@ -106,11 +108,6 @@ export async function seedExampleWorkspaceForUser(
         sheetId: null,
         publicId: generateSessionPublicId(),
       },
-    });
-
-    await tx.user.update({
-      where: { id: ownerUserId },
-      data: { exampleWorkspaceSeededAt: now },
     });
 
     return { seeded: true as const, workspaceId: workspace.id };

@@ -1,5 +1,4 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
-import { seedExampleWorkspaceForUser } from "../workspaces/exampleSeed.js";
 import { hashPassword, PASSWORD_MIN_LENGTH, verifyPassword } from "./password.js";
 import * as authRepo from "./repository.js";
 import {
@@ -137,7 +136,6 @@ export async function registerWithPassword(
     passwordHash,
   });
 
-  await seedExampleWorkspaceForUser(user.id);
   await issueSessionForUser(user.id, req, reply);
   return toCurrentUser(user);
 }
@@ -158,7 +156,6 @@ export async function loginWithPassword(
     throw new AuthError("邮箱或密码错误", "INVALID_CREDENTIALS", 401);
   }
 
-  await seedExampleWorkspaceForUser(user.id);
   await issueSessionForUser(user.id, req, reply);
   return toCurrentUser(user);
 }

@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   transaction: vi.fn(),
   userFindUnique: vi.fn(),
   userUpdate: vi.fn(),
+  userUpdateMany: vi.fn(),
   workspaceAggregate: vi.fn(),
   workspaceCreate: vi.fn(),
   workbookCreate: vi.fn(),
@@ -17,13 +18,14 @@ vi.mock("../../infra/database/db.js", () => ({
   },
 }));
 
-import { seedExampleWorkspaceForUser } from "./exampleSeed.js";
+import { provisionExampleWorkspaceForUser } from "./infrastructure/exampleWorkspaceProvisioner.js";
 
-describe("seedExampleWorkspaceForUser", () => {
+describe("provisionExampleWorkspaceForUser", () => {
   beforeEach(() => {
     mocks.transaction.mockReset();
     mocks.userFindUnique.mockReset();
     mocks.userUpdate.mockReset();
+    mocks.userUpdateMany.mockReset();
     mocks.workspaceAggregate.mockReset();
     mocks.workspaceCreate.mockReset();
     mocks.workbookCreate.mockReset();
@@ -34,7 +36,11 @@ describe("seedExampleWorkspaceForUser", () => {
   it("creates an example workspace bundle from the template when the user has none", async () => {
     mocks.transaction.mockImplementationOnce(async (callback: (tx: any) => Promise<any>) =>
       callback({
-        user: { findUnique: mocks.userFindUnique, update: mocks.userUpdate },
+        user: {
+          findUnique: mocks.userFindUnique,
+          update: mocks.userUpdate,
+          updateMany: mocks.userUpdateMany,
+        },
         workspace: { aggregate: mocks.workspaceAggregate, create: mocks.workspaceCreate },
         workbook: { create: mocks.workbookCreate },
         sheet: { create: mocks.sheetCreate },
@@ -46,6 +52,7 @@ describe("seedExampleWorkspaceForUser", () => {
       exampleWorkspaceSeededAt: null,
       workspaces: [],
     });
+    mocks.userUpdateMany.mockResolvedValueOnce({ count: 1 });
     mocks.workspaceAggregate.mockResolvedValueOnce({ _max: { order: -1 } });
     mocks.workspaceCreate.mockResolvedValueOnce({ id: 100 });
     mocks.workbookCreate
@@ -55,9 +62,8 @@ describe("seedExampleWorkspaceForUser", () => {
       .mockResolvedValueOnce({ id: 300, sheetNo: 1, name: "概述", order: 0 })
       .mockResolvedValueOnce({ id: 301, sheetNo: 1, name: "季度销售", order: 0 });
     mocks.sessionCreate.mockResolvedValueOnce({ id: 400 });
-    mocks.userUpdate.mockResolvedValueOnce({ id: 8 });
 
-    const result = await seedExampleWorkspaceForUser(8, {
+    const result = await provisionExampleWorkspaceForUser(8, {
       workbooks: [
         {
           name: "经营概览",
@@ -105,8 +111,8 @@ describe("seedExampleWorkspaceForUser", () => {
         publicId: expect.stringMatching(/^ss_[0-9a-f]{12}$/),
       },
     });
-    expect(mocks.userUpdate).toHaveBeenCalledWith({
-      where: { id: 8 },
+    expect(mocks.userUpdateMany).toHaveBeenCalledWith({
+      where: { id: 8, exampleWorkspaceSeededAt: null },
       data: { exampleWorkspaceSeededAt: expect.any(Date) },
     });
 
@@ -121,7 +127,11 @@ describe("seedExampleWorkspaceForUser", () => {
   it("marks an existing user as seeded without creating an example workspace", async () => {
     mocks.transaction.mockImplementationOnce(async (callback: (tx: any) => Promise<any>) =>
       callback({
-        user: { findUnique: mocks.userFindUnique, update: mocks.userUpdate },
+        user: {
+          findUnique: mocks.userFindUnique,
+          update: mocks.userUpdate,
+          updateMany: mocks.userUpdateMany,
+        },
         workspace: { aggregate: mocks.workspaceAggregate, create: mocks.workspaceCreate },
         workbook: { create: mocks.workbookCreate },
         sheet: { create: mocks.sheetCreate },
@@ -135,7 +145,7 @@ describe("seedExampleWorkspaceForUser", () => {
     });
     mocks.userUpdate.mockResolvedValueOnce({ id: 9 });
 
-    const result = await seedExampleWorkspaceForUser(9, { workbooks: [] });
+    const result = await provisionExampleWorkspaceForUser(9, { workbooks: [] });
 
     expect(result).toEqual({ seeded: false });
     expect(mocks.workspaceCreate).not.toHaveBeenCalled();
@@ -144,6 +154,37 @@ describe("seedExampleWorkspaceForUser", () => {
     expect(mocks.sessionCreate).not.toHaveBeenCalled();
     expect(mocks.userUpdate).toHaveBeenCalledWith({
       where: { id: 9 },
+      data: { exampleWorkspaceSeededAt: expect.any(Date) },
+    });
+  });
+
+  it("skips creation when another request already claimed initialization", async () => {
+    mocks.transaction.mockImplementationOnce(async (callback: (tx: any) => Promise<any>) =>
+      callback({
+        user: {
+          findUnique: mocks.userFindUnique,
+          update: mocks.userUpdate,
+          updateMany: mocks.userUpdateMany,
+        },
+        workspace: { aggregate: mocks.workspaceAggregate, create: mocks.workspaceCreate },
+        workbook: { create: mocks.workbookCreate },
+        sheet: { create: mocks.sheetCreate },
+        session: { create: mocks.sessionCreate },
+      }),
+    );
+    mocks.userFindUnique.mockResolvedValueOnce({
+      id: 10,
+      exampleWorkspaceSeededAt: null,
+      workspaces: [],
+    });
+    mocks.userUpdateMany.mockResolvedValueOnce({ count: 0 });
+
+    const result = await provisionExampleWorkspaceForUser(10, { workbooks: [] });
+
+    expect(result).toEqual({ seeded: false });
+    expect(mocks.workspaceCreate).not.toHaveBeenCalled();
+    expect(mocks.userUpdateMany).toHaveBeenCalledWith({
+      where: { id: 10, exampleWorkspaceSeededAt: null },
       data: { exampleWorkspaceSeededAt: expect.any(Date) },
     });
   });

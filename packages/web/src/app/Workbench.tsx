@@ -1,7 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Session } from "@/api/sessions";
-import type { WorkbookFull, WorkbookMeta } from "@/api/workbooks";
-import type { Workspace } from "@/api/workspaces";
 import { ChatSidebar } from "@/features/chat/ChatSidebar";
 import { useSessionWorkspace } from "@/features/session/useSessionWorkspace";
 import { useSheetActivation } from "@/features/workbook/editor/SheetActivationContext";
@@ -9,25 +6,16 @@ import { useWorkspaceState } from "@/features/workspace/useWorkspaceState";
 import { useWorkspaceView } from "@/features/workspace/useWorkspaceView";
 import { WorkspaceSidebar } from "@/features/workspace/WorkspaceSidebar";
 import { WorkspaceView } from "@/features/workspace/WorkspaceView";
+import type { WorkbenchRouteData } from "./routeData";
 import { useUrlSync } from "./useUrlSync";
 import styles from "./Workbench.module.css";
 
 type CurrentUser = { email: string; displayName: string };
 
-export type RouteData = {
-  workspaces: Workspace[];
-  workspace: Workspace;
-  workbooks: WorkbookMeta[];
-  sessions: Session[];
-  currentWorkbook?: WorkbookFull;
-  messages?: unknown[];
-  messageTotal?: number;
-};
-
 type Props = {
   currentUser: CurrentUser;
   onLogout: () => void;
-  routeData?: RouteData;
+  routeData?: WorkbenchRouteData;
 };
 
 const MIN_SIDEBAR_WIDTH = 300;

@@ -8,6 +8,7 @@ import {
   buildBlankSheetInitialization,
   normalizeWorkbookName,
 } from "../workbooks/create/creation.js";
+import { ensureInitialWorkspace } from "./application/ensureInitialWorkspace.js";
 import * as repo from "./repository.js";
 
 export class WorkspaceNotFoundError extends Error {
@@ -21,6 +22,12 @@ export class WorkspaceNotFoundError extends Error {
 }
 
 export async function getWorkspaces(ownerUserId: number) {
+  const workspaces = await repo.findWorkspaces(ownerUserId);
+  if (workspaces.length > 0) {
+    return workspaces;
+  }
+
+  await ensureInitialWorkspace(ownerUserId);
   return repo.findWorkspaces(ownerUserId);
 }
 

@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect } from "react";
 import { useLocation, useNavigate, useRouteLoaderData } from "react-router-dom";
 import { type CurrentUser, logout } from "@/api/auth";
-import type { RouteData } from "@/app/Workbench";
+import type { WorkbenchRouteData } from "@/app/routeData";
 import { AuthScreen } from "@/features/auth/AuthScreen";
 import { useAuthState } from "@/features/auth/useAuthState";
 import { SheetActivationProvider } from "@/features/workbook/editor/SheetActivationContext";
@@ -89,7 +89,7 @@ function AuthPage() {
 }
 
 function useWorkbenchRouteData() {
-  return useRouteLoaderData("workspace-route") as RouteData | undefined;
+  return useRouteLoaderData("workspace-route") as WorkbenchRouteData | undefined;
 }
 
 function WorkbenchPage() {

@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   workbookCreate: vi.fn(),
   sheetCreate: vi.fn(),
   sessionCreate: vi.fn(),
+  ensureInitialWorkspace: vi.fn(),
 }));
 
 vi.mock("./repository.js", () => ({
@@ -20,6 +21,10 @@ vi.mock("../../infra/database/db.js", () => ({
   prisma: {
     $transaction: mocks.transaction,
   },
+}));
+
+vi.mock("./application/ensureInitialWorkspace.js", () => ({
+  ensureInitialWorkspace: mocks.ensureInitialWorkspace,
 }));
 
 import {
@@ -39,6 +44,7 @@ describe("workspace service scoping", () => {
     mocks.workbookCreate.mockReset();
     mocks.sheetCreate.mockReset();
     mocks.sessionCreate.mockReset();
+    mocks.ensureInitialWorkspace.mockReset();
   });
 
   it("loads workspaces only for the current user", async () => {
@@ -47,6 +53,25 @@ describe("workspace service scoping", () => {
     await getWorkspaces(42);
 
     expect(mocks.findWorkspaces).toHaveBeenCalledWith(42);
+  });
+
+  it("initializes a workspace before returning an empty user's workspaces", async () => {
+    mocks.findWorkspaces.mockResolvedValueOnce([]).mockResolvedValueOnce([{ id: 8 }]);
+    mocks.ensureInitialWorkspace.mockResolvedValueOnce({ seeded: true, workspaceId: 8 });
+
+    const workspaces = await getWorkspaces(42);
+
+    expect(mocks.ensureInitialWorkspace).toHaveBeenCalledWith(42);
+    expect(workspaces).toEqual([{ id: 8 }]);
+    expect(mocks.findWorkspaces).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not initialize an existing user's workspaces", async () => {
+    mocks.findWorkspaces.mockResolvedValueOnce([{ id: 1 }]);
+
+    await getWorkspaces(42);
+
+    expect(mocks.ensureInitialWorkspace).not.toHaveBeenCalled();
   });
 
   it("throws when a workspace does not belong to the current user", async () => {
