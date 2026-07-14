@@ -1,6 +1,6 @@
 import { prisma } from "../../../infra/database/db.js";
 import type { Prisma } from "../../../infra/database/prismaTypes.js";
-import { withSessionLock } from "../concurrency.js";
+import { withSessionLock } from "../infrastructure/sessionLock.js";
 import * as repo from "./repository.js";
 
 type ChatMessageLike = {

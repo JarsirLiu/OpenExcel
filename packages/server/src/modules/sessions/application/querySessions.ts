@@ -1,7 +1,6 @@
-import { historyFromRuns } from "./chat/index.js";
-import * as repo from "./repository.js";
-import * as runRepo from "./runs/repository.js";
-import { getSessionMessagesPaginated } from "./transcript.js";
+import * as repo from "../infrastructure/sessionRepository.js";
+import * as runRepo from "../runs/repository.js";
+import { getSessionMessagesPaginated, historyFromRuns } from "./transcript.js";
 
 export async function getSessions(workspaceId: number) {
   return repo.findSessionsByWorkspace(workspaceId);

@@ -1,8 +1,8 @@
 import { createTitleModel, type ModelConfig } from "@openexcel/agent";
 import { generateText, type LanguageModel } from "ai";
-import { loadModelConfig } from "../../config.js";
-import { withSessionLock } from "./concurrency.js";
-import * as repo from "./repository.js";
+import { loadModelConfig } from "../../../config.js";
+import { withSessionLock } from "../infrastructure/sessionLock.js";
+import * as repo from "../infrastructure/sessionRepository.js";
 
 export async function generateTitle(model: LanguageModel, prompt: string): Promise<string> {
   try {

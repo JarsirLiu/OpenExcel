@@ -183,14 +183,12 @@ packages/server/src/
 │   │   ├── domain/       # workspace errors and contracts
 │   │   └── infrastructure/ # Prisma and initial-resource provisioners
 │   ├── sessions/
-│   │   ├── routes.ts     # session CRUD, chat, title, undo endpoints
-│   │   ├── service.ts    # session orchestration and use-case composition
-│   │   ├── query.ts      # session read models and list/detail queries
-│   │   ├── transcript.ts # stored message history read/write
-│   │   ├── title.ts      # title generation and fallback handling
-│   │   ├── undo.ts       # undo-latest logic
-│   │   ├── repository.ts # session/run/step persistence
-│   │   └── types.ts      # session domain DTOs and contracts
+│   │   ├── api/          # session CRUD, chat, title, undo HTTP routes
+│   │   ├── application/  # session queries, transcript, title, and use cases
+│   │   ├── domain/       # session errors and contracts
+│   │   ├── infrastructure/ # session persistence and per-session locking
+│   │   ├── chat/         # SSE and Agent orchestration boundary
+│   │   └── runs/         # run, step, snapshot, and undo persistence
 │   ├── runs/
 │   │   ├── repository.ts # run and step persistence helpers
 │   │   └── types.ts
@@ -367,16 +365,21 @@ Authentication and workspace boundaries have completed the first application-lay
 - `src/modules/sheets/api/*` owns Sheet content and name HTTP adapters.
 - `src/modules/sheets/application/*` owns Sheet query and content/name update use cases.
 - `src/modules/sheets/infrastructure/*` owns Sheet persistence and workspace-scoped access.
+- `src/modules/sessions/api/*` owns session HTTP adapters and SSE response handling.
+- `src/modules/sessions/application/*` owns session directory queries, message history, title, and use cases.
+- `src/modules/sessions/domain/*` owns predictable session errors.
+- `src/modules/sessions/infrastructure/*` owns session persistence and per-session locking.
+- `src/modules/sessions/chat/*` owns the Agent/SSE orchestration boundary.
+- `src/modules/sessions/runs/*` owns run, step, snapshot, and undo behavior.
 
 The sessions domain remains intentionally transitional. Its `routes.ts`, `service.ts`, and
 `repository.ts` files will be extracted later using the same dependency direction.
 
 Current session-related files:
 
-- `src/modules/sessions/service.ts`
-- `src/modules/sessions/routes.ts`
-- `src/modules/sessions/title.ts`
-- `src/modules/sessions/transcript.ts`
+- `src/modules/sessions/api/routes.ts`
+- `src/modules/sessions/application/*`
+- `src/modules/sessions/infrastructure/*`
 - `src/modules/sessions/chat/*`
 - `src/modules/sessions/runs/*`
 - `src/modules/sheets/tools/*`
@@ -395,6 +398,10 @@ Workbook structure operations remain in `workbooks`, even when their URLs are ne
 workbook creation, import/export, deletion, and sheet creation/deletion belong to the workbook boundary.
 The `sheets` module owns Sheet content reads, cell updates, and name updates. This keeps structural
 changes separate from incremental cell mutations.
+
+Workspace entry loads directory data first. Workbook list and session list endpoints return metadata;
+full workbook content is loaded when a workbook is opened, and session messages are loaded when a
+conversation is selected, paginated from the newest messages backward.
 
 ### 5.3 `packages/web`
 

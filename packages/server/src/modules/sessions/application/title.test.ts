@@ -14,12 +14,12 @@ vi.mock("@openexcel/agent", () => ({
   createTitleModel: mockCreateTitleModel,
 }));
 
-vi.mock("./repository.js", () => ({
+vi.mock("../infrastructure/sessionRepository.js", () => ({
   findSession: mockFindSession,
   updateSession: mockUpdateSession,
 }));
 
-vi.mock("../../config.js", () => ({
+vi.mock("../../../config.js", () => ({
   loadModelConfig: mockLoadModelConfig,
 }));
 

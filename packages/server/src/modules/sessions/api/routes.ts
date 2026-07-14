@@ -4,9 +4,9 @@ import type { FastifyInstance } from "fastify";
 import {
   resolveSessionIdForRequest,
   resolveWorkspaceIdForRequest,
-} from "../../shared/utils/resolvePublicId.js";
-import { SessionBusyError } from "./concurrency.js";
-import * as service from "./service.js";
+} from "../../../shared/utils/resolvePublicId.js";
+import * as application from "../application/index.js";
+import { SessionBusyError } from "../domain/sessionErrors.js";
 
 function isDatabaseError(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false;
@@ -36,7 +36,7 @@ export async function sessionRoutes(app: FastifyInstance) {
         reply,
       );
       if (workspaceId == null) return;
-      return service.getSessions(workspaceId);
+      return application.getSessions(workspaceId);
     },
   );
 
@@ -49,7 +49,7 @@ export async function sessionRoutes(app: FastifyInstance) {
         reply,
       );
       if (workspaceId == null) return;
-      const session = await service.createSession(workspaceId);
+      const session = await application.createSession(workspaceId);
       return reply.status(201).send(session);
     },
   );
@@ -64,7 +64,7 @@ export async function sessionRoutes(app: FastifyInstance) {
         reply,
       );
       if (ids == null) return;
-      const deleted = await service.deleteSession(ids.workspaceId, ids.sessionId);
+      const deleted = await application.deleteSession(ids.workspaceId, ids.sessionId);
       if (!deleted) return reply.status(404).send({ error: "Session not found" });
       return { success: true };
     },
@@ -81,7 +81,7 @@ export async function sessionRoutes(app: FastifyInstance) {
       reply,
     );
     if (ids == null) return;
-    const session = await service.renameSession(ids.workspaceId, ids.sessionId, req.body.name);
+    const session = await application.renameSession(ids.workspaceId, ids.sessionId, req.body.name);
     if (!session) return reply.status(404).send({ error: "Session not found" });
     return session;
   });
@@ -99,11 +99,11 @@ export async function sessionRoutes(app: FastifyInstance) {
         reply,
       );
       if (ids == null) return;
-      const session = await service.getSession(ids.workspaceId, ids.sessionId);
+      const session = await application.getSession(ids.workspaceId, ids.sessionId);
       if (!session) return reply.status(404).send({ error: "Session not found" });
       const limit = Math.min(Number(req.query.limit) || 40, 200);
       const offset = Number(req.query.offset) || 0;
-      return service.getMessages(ids.workspaceId, ids.sessionId, limit, offset);
+      return application.getMessages(ids.workspaceId, ids.sessionId, limit, offset);
     },
   );
 
@@ -117,9 +117,9 @@ export async function sessionRoutes(app: FastifyInstance) {
         reply,
       );
       if (ids == null) return;
-      const session = await service.getSession(ids.workspaceId, ids.sessionId);
+      const session = await application.getSession(ids.workspaceId, ids.sessionId);
       if (!session) return reply.status(404).send({ error: "Session not found" });
-      return service.getRuns(ids.workspaceId, ids.sessionId);
+      return application.getRuns(ids.workspaceId, ids.sessionId);
     },
   );
 
@@ -133,10 +133,10 @@ export async function sessionRoutes(app: FastifyInstance) {
         reply,
       );
       if (ids == null) return;
-      const session = await service.getSession(ids.workspaceId, ids.sessionId);
+      const session = await application.getSession(ids.workspaceId, ids.sessionId);
       if (!session) return reply.status(404).send({ error: "Session not found" });
       try {
-        return await service.undoLatestRun(ids.workspaceId, ids.sessionId);
+        return await application.undoLatestRun(ids.workspaceId, ids.sessionId);
       } catch (error) {
         if (isUndoConflict(error)) {
           const message = error instanceof Error ? error.message : "当前运行无法撤销";
@@ -166,12 +166,12 @@ export async function sessionRoutes(app: FastifyInstance) {
       return reply.status(400).send({ error: "标题生成需要用户消息" });
     }
 
-    const session = await service.getSession(ids.workspaceId, sessionId);
+    const session = await application.getSession(ids.workspaceId, sessionId);
     if (!session) {
       return reply.status(404).send({ error: "会话不存在" });
     }
 
-    const title = await service.generateSessionTitleForSession(
+    const title = await application.generateSessionTitleForSession(
       ids.workspaceId,
       sessionId,
       firstUserText,
@@ -191,7 +191,7 @@ export async function sessionRoutes(app: FastifyInstance) {
     );
     if (ids == null) return;
     const sessionId = ids.sessionId;
-    const session = await service.getSession(ids.workspaceId, sessionId);
+    const session = await application.getSession(ids.workspaceId, sessionId);
     if (!session) return reply.status(404).send({ error: "Session not found" });
     const { messages } = req.body;
     const controller = new AbortController();
@@ -208,7 +208,7 @@ export async function sessionRoutes(app: FastifyInstance) {
     });
 
     try {
-      const stream = await service.streamChat(
+      const stream = await application.streamChat(
         ids.workspaceId,
         sessionId,
         messages,

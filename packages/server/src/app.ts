@@ -8,7 +8,7 @@ import { pinoStream } from "./infra/observability/logger.js";
 import { responseLoggerHook, startTimerHook } from "./middleware/requestLogger.js";
 import { resolveUserHook } from "./middleware/resolveUser.js";
 import { authRoutes } from "./modules/auth/api/routes.js";
-import { sessionRoutes } from "./modules/sessions/routes.js";
+import { sessionRoutes } from "./modules/sessions/api/routes.js";
 import { sheetRoutes } from "./modules/sheets/api/routes.js";
 import { workbookRoutes } from "./modules/workbooks/api/routes.js";
 import { WORKBOOK_UPLOAD_LIMITS } from "./modules/workbooks/api/uploadLimits.js";

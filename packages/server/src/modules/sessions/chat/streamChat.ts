@@ -11,10 +11,11 @@ import {
 import { loadModelConfig } from "../../../config.js";
 import { excelTools } from "../../sheets/tools/index.js";
 import { workbookTools } from "../../workbooks/tools/index.js";
-import { SessionBusyError, withSessionLock } from "../concurrency.js";
-import * as repo from "../repository.js";
+import { persistSessionMessages } from "../application/transcript.js";
+import { SessionBusyError } from "../domain/sessionErrors.js";
+import { withSessionLock } from "../infrastructure/sessionLock.js";
+import * as repo from "../infrastructure/sessionRepository.js";
 import * as runRepo from "../runs/repository.js";
-import { persistSessionMessages } from "../transcript.js";
 import { buildWorkspaceContext } from "./context.js";
 
 function extractMessageText(message: any): string {

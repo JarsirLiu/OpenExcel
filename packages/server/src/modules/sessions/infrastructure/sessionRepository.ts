@@ -1,5 +1,5 @@
-import { prisma } from "../../infra/database/db.js";
-import { generateSessionPublicId } from "../../shared/utils/publicId.js";
+import { prisma } from "../../../infra/database/db.js";
+import { generateSessionPublicId } from "../../../shared/utils/publicId.js";
 
 export async function findSessionsByWorkspace(workspaceId: number) {
   return prisma.session.findMany({

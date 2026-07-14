@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { withSessionLock } from "./concurrency.js";
+import { withSessionLock } from "./sessionLock.js";
 
 describe("withSessionLock", () => {
   it("serializes operations for the same session", async () => {
