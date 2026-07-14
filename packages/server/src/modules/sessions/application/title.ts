@@ -30,26 +30,61 @@ export async function generateSessionTitleForSession(
   workspaceId: number,
   sessionId: number,
   firstUserText: string,
+  options: { initialTitle?: string } = {},
 ) {
   const session = await repo.findSession(sessionId, workspaceId);
   if (!session) throw new Error("会话不存在");
-  if (session.name !== "新对话") {
+  const initialTitle = options.initialTitle ?? "新对话";
+  if (session.titleStatus && session.titleStatus !== "pending") {
+    return session.name;
+  }
+  if (session.name !== "新对话" && session.name !== initialTitle) {
     return session.name;
   }
 
   const config: ModelConfig = loadModelConfig();
   const title = await generateTitle(createTitleModel(config), firstUserText);
-  await withSessionLock(sessionId, () =>
-    repo.updateSession(sessionId, { name: title }, workspaceId),
-  );
-  return title;
+  return withSessionLock(sessionId, async () => {
+    const latestSession = await repo.findSession(sessionId, workspaceId);
+    if (!latestSession) throw new Error("会话不存在");
+    if (latestSession.titleStatus && latestSession.titleStatus !== "pending") {
+      return latestSession.name;
+    }
+    if (latestSession.name !== "新对话" && latestSession.name !== initialTitle) {
+      return latestSession.name;
+    }
+    const updated = await repo.updateSessionNameIfUnchanged(
+      sessionId,
+      workspaceId,
+      [...new Set(["新对话", initialTitle])],
+      title,
+    );
+    if (updated) return title;
+
+    const renamedSession = await repo.findSession(sessionId, workspaceId);
+    return renamedSession?.name ?? title;
+  });
+}
+
+export function scheduleSessionTitleGeneration(
+  workspaceId: number,
+  sessionId: number,
+  firstUserText: string,
+) {
+  if (!firstUserText.trim()) return;
+
+  void generateSessionTitleForSession(workspaceId, sessionId, firstUserText, {
+    initialTitle: fallbackTitleFromPrompt(firstUserText),
+  }).catch((error) => {
+    console.error(`[session] Failed to update title for session ${sessionId}:`, error);
+  });
 }
 
 function stripThinkingTags(text: string): string {
   return text.replace(/<think>[\s\S]*?<\/think>/gi, "").replace(/<\/?think>/gi, "");
 }
 
-function fallbackTitleFromPrompt(prompt: string): string {
+export function fallbackTitleFromPrompt(prompt: string): string {
   const fallback = prompt.replace(/\s+/g, " ").trim().slice(0, 10);
   return fallback || "新对话";
 }

@@ -3,20 +3,23 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   findWorkspaces: vi.fn(),
   findWorkspace: vi.fn(),
-  createWorkspaceBundle: vi.fn(),
   countWorkspaces: vi.fn(),
   renameWorkspace: vi.fn(),
   deleteWorkspace: vi.fn(),
   ensureInitialWorkspace: vi.fn(),
+  provisionWorkspaceResources: vi.fn(),
 }));
 
 vi.mock("../infrastructure/workspaceRepository.js", () => ({
   findWorkspaces: mocks.findWorkspaces,
   findWorkspace: mocks.findWorkspace,
-  createWorkspaceBundle: mocks.createWorkspaceBundle,
   countWorkspaces: mocks.countWorkspaces,
   renameWorkspace: mocks.renameWorkspace,
   deleteWorkspace: mocks.deleteWorkspace,
+}));
+
+vi.mock("../infrastructure/workspaceProvisioner.js", () => ({
+  provisionWorkspaceResources: mocks.provisionWorkspaceResources,
 }));
 
 vi.mock("./ensureInitialWorkspace.js", () => ({
@@ -42,11 +45,11 @@ describe("workspace application", () => {
   beforeEach(() => {
     mocks.findWorkspaces.mockReset();
     mocks.findWorkspace.mockReset();
-    mocks.createWorkspaceBundle.mockReset();
     mocks.countWorkspaces.mockReset();
     mocks.renameWorkspace.mockReset();
     mocks.deleteWorkspace.mockReset();
     mocks.ensureInitialWorkspace.mockReset();
+    mocks.provisionWorkspaceResources.mockReset();
   });
 
   it("loads workspaces only for the current user", async () => {
@@ -96,10 +99,9 @@ describe("workspace application", () => {
 
   it("creates a workspace bundle when none exists", async () => {
     mocks.findWorkspaces.mockResolvedValueOnce([]);
-    mocks.createWorkspaceBundle.mockResolvedValueOnce({
+    mocks.provisionWorkspaceResources.mockResolvedValueOnce({
       workspace: { id: 9, name: "新工作区", order: 9 },
       workbook: { id: 10, initialSheet: { id: 11 } },
-      session: { id: 12 },
     });
 
     const created = await createWorkspace(77);
@@ -107,8 +109,7 @@ describe("workspace application", () => {
     expect(created.workspace).toEqual({ id: 9, name: "新工作区", order: 9 });
     expect(created.workbook.id).toBe(10);
     expect(created.workbook.initialSheet.id).toBe(11);
-    expect(created.session.id).toBe(12);
-    expect(mocks.createWorkspaceBundle).toHaveBeenCalledWith(77, "新项目");
+    expect(mocks.provisionWorkspaceResources).toHaveBeenCalledWith(77, "新项目");
   });
 
   it("trims a workspace name before updating an owned workspace", async () => {

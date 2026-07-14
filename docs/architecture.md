@@ -402,6 +402,9 @@ changes separate from incremental cell mutations.
 Workspace entry loads directory data first. Workbook list and session list endpoints return metadata;
 full workbook content is loaded when a workbook is opened, and session messages are loaded when a
 conversation is selected, paginated from the newest messages backward.
+The workspace always starts with an in-memory draft conversation. A conversation Session is created
+only after the user sends the first message; opening a workspace, creating a workspace, and clicking
+"new conversation" do not write an empty Session row.
 
 ### 5.3 `packages/web`
 
@@ -560,18 +563,18 @@ If a bug affects two panes at once, treat it as a boundary bug and add a regress
 1. Registration or login validates credentials and atomically creates the user and `AuthSession`.
 2. The server sets the opaque `openexcel_session` cookie and returns the current user.
 3. The web app calls `POST /api/workspaces/bootstrap`.
-4. The bootstrap use case provisions the initial workspace, workbook, sheets, and first conversation `Session` in one idempotent transaction.
+4. The bootstrap use case provisions the initial workspace, workbook, and sheets in one idempotent transaction. It does not create a conversation `Session`.
 5. The web app navigates to the protected workbench route.
-6. The route loader reads `GET /api/workspaces`, then loads workbooks and conversation sessions.
+6. The route loader reads `GET /api/workspaces`, then loads workbook metadata and conversation-session metadata for the selected workspace.
 
-`AuthSession` is the login identity. `Session` is the persisted conversation resource under a workspace. Login must never create a conversation session.
+`AuthSession` is the login identity. `Session` is the persisted conversation resource under a workspace. Login and workspace bootstrap must never create a conversation session.
 
 `GET /api/workspaces` is a read-only query. Initialization is never hidden inside a list request.
 
 ### 7.2 Chat flow
 
-1. User sends a chat message.
-2. Web posts the current transcript to the server.
+1. Entering a workspace opens a new in-memory draft conversation. The persisted session list is history and is not automatically selected.
+2. User sends a chat message from the draft. Web posts the transcript to `sessions/draft/chat` with an idempotency key; the server creates the persisted `Session`, stores the initial user transcript and starts the stream in one application use case. The initial session name is a deterministic fallback derived from the first user message.
 3. The agent removes empty placeholders and compacts the recent contiguous transcript to the configured context budget. The default model input budget is 180,000 tokens, with 16,000 tokens reserved for the response.
    It also keeps only the latest 20 complete user turns by default (`MODEL_MAX_CONVERSATION_TURNS`); turn trimming happens before token trimming, so an assistant tool call and its result are not split across the window.
    Each user message sent to the model is independently capped at 16,000 tokens (`MODEL_MAX_USER_INPUT_TOKENS`). Only the model-facing copy is truncated; the complete user message remains in the persisted transcript.
@@ -585,13 +588,13 @@ Spreadsheet reads are bounded at the tool boundary. A default `readSheet` call r
 
 ### 7.3 Title flow
 
-1. Chat finishes successfully.
-2. Web calls the title endpoint separately.
-3. Server generates a title.
-4. Server persists the title update.
-5. Web refreshes session state or updates cache.
+1. The session service observes that the first transcript has been persisted.
+2. The server schedules title generation independently of the chat response.
+3. Server generates a title and persists it only while the session still has its initial title.
+4. Web refreshes session metadata or updates its session cache.
 
 Title generation must never block chat completion.
+The title endpoint remains available for explicit retry or manual client actions, but the initial chat flow does not depend on a mounted chat component to request a title.
 
 ### 7.4 Undo flow
 
@@ -639,7 +642,7 @@ The bootstrap command is authenticated and idempotent. The workspace list endpoi
 ### 8.3 Session APIs
 
 - `GET /api/workspaces/:workspaceId/sessions`
-- `POST /api/workspaces/:workspaceId/sessions`
+- `POST /api/workspaces/:workspaceId/sessions/draft/chat`
 - `DELETE /api/workspaces/:workspaceId/sessions/:id`
 - `PATCH /api/workspaces/:workspaceId/sessions/:id`
 

@@ -92,6 +92,7 @@ model Session {
   workspaceId  Int
   sheetId      Int?
   name         String
+  titleStatus  String   @default("pending")
   chatMessages String?    @default("[]")
   workspace    Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   sheet        Sheet?     @relation(fields: [sheetId], references: [id], onDelete: SetNull)
@@ -104,6 +105,7 @@ model Session {
 model AgentRun {
   id           Int                     @id @default(autoincrement())
   sessionId    Int
+  clientRequestId String?              @unique
   status       String
   model        String?
   systemPrompt String?

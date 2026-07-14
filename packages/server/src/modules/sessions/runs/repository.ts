@@ -6,11 +6,22 @@ const STALE_RUN_AFTER_MS = 5 * 60 * 1000;
 export async function createRun(data: {
   sessionId: number;
   status: string;
+  clientRequestId?: string;
   model?: string;
   systemPrompt?: string;
   inputText?: string;
 }) {
   return prisma.agentRun.create({ data });
+}
+
+export async function findRunByClientRequestId(workspaceId: number, clientRequestId: string) {
+  return prisma.agentRun.findFirst({
+    where: {
+      clientRequestId,
+      session: { workspaceId },
+    },
+    select: { id: true, sessionId: true, status: true },
+  });
 }
 
 export async function findActiveRun(sessionId: number) {

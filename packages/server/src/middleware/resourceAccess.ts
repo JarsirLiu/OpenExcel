@@ -1,8 +1,8 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
-import { prisma } from "../../infra/database/db.js";
-import { requireCurrentUser } from "../../middleware/requestContext.js";
-import { requireWorkspace } from "../../modules/workspaces/application/getWorkspace.js";
-import { WorkspaceNotFoundError } from "../../modules/workspaces/domain/workspaceErrors.js";
+import { prisma } from "../infra/database/db.js";
+import { requireWorkspace } from "../modules/workspaces/application/getWorkspace.js";
+import { WorkspaceNotFoundError } from "../modules/workspaces/domain/workspaceErrors.js";
+import { requireCurrentUser } from "./requestContext.js";
 
 function isNumeric(value: string): boolean {
   return /^\d+$/.test(value);
@@ -49,22 +49,16 @@ export async function resolveWorkbookIdForRequest(
   const workspaceId = await resolveWorkspaceIdForRequest(req, workspaceIdOrPublicId, reply);
   if (workspaceId == null) return null;
 
-  if (isNumeric(workbookIdOrPublicId)) {
-    const workbook = await prisma.workbook.findFirst({
-      where: { id: Number(workbookIdOrPublicId), workspaceId },
-      select: { id: true },
-    });
-    if (!workbook) {
-      reply.status(404).send({ error: "Workbook not found" });
-      return null;
-    }
-    return { workspaceId, workbookId: workbook.id };
-  }
+  const workbook = isNumeric(workbookIdOrPublicId)
+    ? await prisma.workbook.findFirst({
+        where: { id: Number(workbookIdOrPublicId), workspaceId },
+        select: { id: true },
+      })
+    : await prisma.workbook.findFirst({
+        where: { publicId: workbookIdOrPublicId, workspaceId },
+        select: { id: true },
+      });
 
-  const workbook = await prisma.workbook.findFirst({
-    where: { publicId: workbookIdOrPublicId, workspaceId },
-    select: { id: true },
-  });
   if (!workbook) {
     reply.status(404).send({ error: "Workbook not found" });
     return null;
@@ -81,22 +75,16 @@ export async function resolveSessionIdForRequest(
   const workspaceId = await resolveWorkspaceIdForRequest(req, workspaceIdOrPublicId, reply);
   if (workspaceId == null) return null;
 
-  if (isNumeric(sessionIdOrPublicId)) {
-    const session = await prisma.session.findFirst({
-      where: { id: Number(sessionIdOrPublicId), workspaceId },
-      select: { id: true },
-    });
-    if (!session) {
-      reply.status(404).send({ error: "Session not found" });
-      return null;
-    }
-    return { workspaceId, sessionId: session.id };
-  }
+  const session = isNumeric(sessionIdOrPublicId)
+    ? await prisma.session.findFirst({
+        where: { id: Number(sessionIdOrPublicId), workspaceId },
+        select: { id: true },
+      })
+    : await prisma.session.findFirst({
+        where: { publicId: sessionIdOrPublicId, workspaceId },
+        select: { id: true },
+      });
 
-  const session = await prisma.session.findFirst({
-    where: { publicId: sessionIdOrPublicId, workspaceId },
-    select: { id: true },
-  });
   if (!session) {
     reply.status(404).send({ error: "Session not found" });
     return null;

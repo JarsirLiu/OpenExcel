@@ -1,7 +1,6 @@
 import { gridToCelldata } from "@openexcel/core";
 import { prisma } from "../../../infra/database/db.js";
 import {
-  generateSessionPublicId,
   generateWorkbookPublicId,
   generateWorkspacePublicId,
 } from "../../../shared/utils/publicId.js";
@@ -100,15 +99,6 @@ export async function provisionExampleWorkspaceForUser(
         });
       }
     }
-
-    await tx.session.create({
-      data: {
-        workspaceId: workspace.id,
-        name: "新对话",
-        sheetId: null,
-        publicId: generateSessionPublicId(),
-      },
-    });
 
     return { seeded: true as const, workspaceId: workspace.id };
   });

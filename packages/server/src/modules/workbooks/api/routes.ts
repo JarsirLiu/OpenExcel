@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import {
   resolveWorkbookIdForRequest,
   resolveWorkspaceIdForRequest,
-} from "../../../shared/utils/resolvePublicId.js";
+} from "../../../middleware/resourceAccess.js";
 import * as application from "../application/index.js";
 import { WORKBOOK_UPLOAD_LIMITS } from "./uploadLimits.js";
 

@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { requireCurrentUser } from "../../../middleware/requestContext.js";
-import { resolveWorkspaceIdForRequest } from "../../../shared/utils/resolvePublicId.js";
+import { resolveWorkspaceIdForRequest } from "../../../middleware/resourceAccess.js";
 import * as application from "../application/index.js";
 import { WorkspaceNotFoundError } from "../domain/workspaceErrors.js";
 

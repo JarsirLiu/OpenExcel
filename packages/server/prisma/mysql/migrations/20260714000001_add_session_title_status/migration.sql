@@ -1,0 +1,1 @@
+ALTER TABLE `Session` ADD COLUMN `titleStatus` VARCHAR(32) NOT NULL DEFAULT 'pending';

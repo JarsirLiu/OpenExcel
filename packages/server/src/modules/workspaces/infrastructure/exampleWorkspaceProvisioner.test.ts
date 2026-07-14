@@ -9,7 +9,6 @@ const mocks = vi.hoisted(() => ({
   workspaceCreate: vi.fn(),
   workbookCreate: vi.fn(),
   sheetCreate: vi.fn(),
-  sessionCreate: vi.fn(),
 }));
 
 vi.mock("../../../infra/database/db.js", () => ({
@@ -30,7 +29,6 @@ describe("provisionExampleWorkspaceForUser", () => {
     mocks.workspaceCreate.mockReset();
     mocks.workbookCreate.mockReset();
     mocks.sheetCreate.mockReset();
-    mocks.sessionCreate.mockReset();
   });
 
   it("creates an example workspace bundle from the template when the user has none", async () => {
@@ -44,7 +42,6 @@ describe("provisionExampleWorkspaceForUser", () => {
         workspace: { aggregate: mocks.workspaceAggregate, create: mocks.workspaceCreate },
         workbook: { create: mocks.workbookCreate },
         sheet: { create: mocks.sheetCreate },
-        session: { create: mocks.sessionCreate },
       }),
     );
     mocks.userFindUnique.mockResolvedValueOnce({
@@ -61,7 +58,6 @@ describe("provisionExampleWorkspaceForUser", () => {
     mocks.sheetCreate
       .mockResolvedValueOnce({ id: 300, sheetNo: 1, name: "概述", order: 0 })
       .mockResolvedValueOnce({ id: 301, sheetNo: 1, name: "季度销售", order: 0 });
-    mocks.sessionCreate.mockResolvedValueOnce({ id: 400 });
 
     const result = await provisionExampleWorkspaceForUser(8, {
       workbooks: [
@@ -103,14 +99,6 @@ describe("provisionExampleWorkspaceForUser", () => {
     });
     expect(mocks.workbookCreate).toHaveBeenCalledTimes(2);
     expect(mocks.sheetCreate).toHaveBeenCalledTimes(2);
-    expect(mocks.sessionCreate).toHaveBeenCalledWith({
-      data: {
-        workspaceId: 100,
-        name: "新对话",
-        sheetId: null,
-        publicId: expect.stringMatching(/^ss_[0-9a-f]{12}$/),
-      },
-    });
     expect(mocks.userUpdateMany).toHaveBeenCalledWith({
       where: { id: 8, exampleWorkspaceSeededAt: null },
       data: { exampleWorkspaceSeededAt: expect.any(Date) },
@@ -135,7 +123,6 @@ describe("provisionExampleWorkspaceForUser", () => {
         workspace: { aggregate: mocks.workspaceAggregate, create: mocks.workspaceCreate },
         workbook: { create: mocks.workbookCreate },
         sheet: { create: mocks.sheetCreate },
-        session: { create: mocks.sessionCreate },
       }),
     );
     mocks.userFindUnique.mockResolvedValueOnce({
@@ -151,7 +138,6 @@ describe("provisionExampleWorkspaceForUser", () => {
     expect(mocks.workspaceCreate).not.toHaveBeenCalled();
     expect(mocks.workbookCreate).not.toHaveBeenCalled();
     expect(mocks.sheetCreate).not.toHaveBeenCalled();
-    expect(mocks.sessionCreate).not.toHaveBeenCalled();
     expect(mocks.userUpdate).toHaveBeenCalledWith({
       where: { id: 9 },
       data: { exampleWorkspaceSeededAt: expect.any(Date) },
@@ -169,7 +155,6 @@ describe("provisionExampleWorkspaceForUser", () => {
         workspace: { aggregate: mocks.workspaceAggregate, create: mocks.workspaceCreate },
         workbook: { create: mocks.workbookCreate },
         sheet: { create: mocks.sheetCreate },
-        session: { create: mocks.sessionCreate },
       }),
     );
     mocks.userFindUnique.mockResolvedValueOnce({

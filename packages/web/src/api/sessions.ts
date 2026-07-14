@@ -5,6 +5,7 @@ export interface Session {
   publicId: string;
   sheetId: number | null;
   name: string;
+  titleStatus?: "pending" | "generated" | "manual";
   createdAt: string;
 }
 
@@ -16,12 +17,6 @@ export async function fetchSessions(
     signal: options?.signal,
   });
   if (!res.ok) throw new Error("加载会话失败");
-  return res.json();
-}
-
-export async function createSession(workspaceId: number): Promise<Session> {
-  const res = await apiFetch(`/workspaces/${workspaceId}/sessions`, { method: "POST" });
-  if (!res.ok) throw new Error("创建会话失败");
   return res.json();
 }
 

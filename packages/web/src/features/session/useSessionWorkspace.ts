@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
-import { createSession, generateSessionTitle, type Session } from "@/api/sessions";
-import { getFirstUserText } from "@/features/shared/messageUtils";
+import type { Session } from "@/api/sessions";
 import { useSessionsList } from "./useSessionsList";
 
 export function useSessionWorkspace(
@@ -16,12 +15,16 @@ export function useSessionWorkspace(
     historyOpen,
     setHistoryOpen,
     refreshSessions,
-    ensureSession,
     handleNewSession: listNewSession,
     handleSelectSession: listSelectSession,
     handleDeleteSession: listDeleteSession,
   } = useSessionsList(workspaceId, initial?.sessions);
   const initialSeededRef = useRef(false);
+  const currentSessionIdRef = useRef(currentSessionId);
+
+  useEffect(() => {
+    currentSessionIdRef.current = currentSessionId;
+  }, [currentSessionId]);
 
   // Seed initial sessions from route loader
   useEffect(() => {
@@ -37,20 +40,20 @@ export function useSessionWorkspace(
     if (workspaceId == null) {
       // Workspace unmounted — no-op, sessions will reset on next mount
     } else if (prevWorkspaceIdRef.current != null && prevWorkspaceIdRef.current !== workspaceId) {
-      refreshSessions();
+      refreshSessions({ resetCurrent: true });
     }
     prevWorkspaceIdRef.current = workspaceId;
   }, [workspaceId, refreshSessions]);
 
-  const handleSendInDraft = useCallback(
-    async (_text: string) => {
-      if (workspaceId == null) throw new Error("No workspace");
-      const session = await createSession(workspaceId);
-      setCurrentSessionId(session.id);
-      setSessions((prev) => [session, ...prev]);
-      return session.id;
+  const handleDraftSessionCreated = useCallback(
+    async (sessionId: number) => {
+      const shouldActivate = currentSessionIdRef.current == null;
+      const list = await refreshSessions({ resetCurrent: shouldActivate });
+      if (shouldActivate && list.some((session) => session.id === sessionId)) {
+        setCurrentSessionId(sessionId);
+      }
     },
-    [workspaceId, setCurrentSessionId, setSessions],
+    [refreshSessions, setCurrentSessionId],
   );
 
   const handleNewSession = useCallback(() => {
@@ -72,23 +75,14 @@ export function useSessionWorkspace(
   );
 
   const handleRunComplete = useCallback(
-    async (sessionId: number, finishedMessages: any[]) => {
-      const firstUserText = getFirstUserText(finishedMessages).trim();
-      try {
-        if (firstUserText && workspaceId != null) {
-          await generateSessionTitle(workspaceId, sessionId, firstUserText);
-        }
-      } catch (error) {
-        console.error("[session] Failed to generate session title:", error);
-      }
-
+    async (_sessionId: number, _finishedMessages: any[]) => {
       try {
         await refreshSessions();
       } catch (error) {
-        console.error("[session] Failed to refresh sessions after title update:", error);
+        console.error("[session] Failed to refresh sessions after chat completion:", error);
       }
     },
-    [refreshSessions, workspaceId],
+    [refreshSessions],
   );
 
   const handleUndoComplete = useCallback(async () => {
@@ -101,8 +95,7 @@ export function useSessionWorkspace(
     historyOpen,
     setHistoryOpen,
     refreshSessions,
-    ensureSession,
-    handleSendInDraft,
+    handleDraftSessionCreated,
     handleRunComplete,
     handleNewSession,
     handleSelectSession,

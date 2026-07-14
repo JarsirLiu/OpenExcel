@@ -10,12 +10,14 @@ import styles from "./ChatPanel.module.css";
 
 export function ChatPanel({
   sessionId,
-  pendingDraftTextRef,
+  isDraft = false,
+  onDraftSessionCreated,
   onRunComplete,
   onRegenerate,
 }: {
-  sessionId: number;
-  pendingDraftTextRef: React.MutableRefObject<{ [sessionId: number]: string }>;
+  sessionId: number | null;
+  isDraft?: boolean;
+  onDraftSessionCreated?: (sessionId: number) => Promise<void> | void;
   onRunComplete?: (sessionId: number, messages: any[]) => Promise<void> | void;
   onRegenerate?: () => void;
 }) {
@@ -42,8 +44,10 @@ export function ChatPanel({
   } = useChatConversation({
     sessionId,
     workspaceId,
+    onDraftSessionCreated,
     initialMessages,
     onRunComplete: (finishedMessages) => {
+      if (sessionId == null) return;
       return onRunComplete?.(sessionId, finishedMessages);
     },
     onWorkspaceRefresh,
@@ -81,14 +85,6 @@ export function ChatPanel({
     }
   }, [onUndo, isUndoing, onUndoComplete]);
 
-  useEffect(() => {
-    const text = pendingDraftTextRef.current[sessionId];
-    if (text) {
-      delete pendingDraftTextRef.current[sessionId];
-      sendMessage(text);
-    }
-  }, [pendingDraftTextRef, sendMessage, sessionId]);
-
   const handleScroll = useCallback(() => {
     const el = document.querySelector(`.${msgStyles.messageList}`) as HTMLElement | null;
     if (!el) return;
@@ -114,7 +110,7 @@ export function ChatPanel({
         messages={messages}
         isStreaming={isStreaming}
         onRegenerate={onRegenerate}
-        onUndo={canUndo ? handleUndo : undefined}
+        onUndo={!isDraft && canUndo ? handleUndo : undefined}
         isUndoing={isUndoing}
         loadingOlder={loadingOlder}
         hasOlder={hasOlder}

@@ -1,58 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { createSession, deleteSession, fetchSessions, type Session } from "@/api/sessions";
-
-const SESSION_STORAGE_KEY = "openexcel:sessionId";
-
-function getSessionStorageKey(workspaceId: number | null): string | null {
-  return workspaceId == null ? null : `${SESSION_STORAGE_KEY}:${workspaceId}`;
-}
-
-function loadStoredSessionId(workspaceId: number | null): number | null {
-  const key = getSessionStorageKey(workspaceId);
-  if (!key) return null;
-  try {
-    const stored = sessionStorage.getItem(key);
-    return stored !== null ? Number(stored) : null;
-  } catch {
-    return null;
-  }
-}
-
-function saveSessionId(workspaceId: number | null, id: number | null) {
-  const key = getSessionStorageKey(workspaceId);
-  if (!key) return;
-  try {
-    if (id != null) {
-      sessionStorage.setItem(key, String(id));
-    } else {
-      sessionStorage.removeItem(key);
-    }
-  } catch {
-    // ignore
-  }
-}
+import { deleteSession, fetchSessions, type Session } from "@/api/sessions";
 
 export function useSessionsList(workspaceId: number | null, initialSessions?: Session[]) {
   const [sessions, setSessions] = useState<Session[]>(initialSessions ?? []);
-  const [currentSessionId, setCurrentSessionId] = useState<number | null>(() => {
-    const stored = loadStoredSessionId(workspaceId);
-    if (initialSessions && stored !== null && initialSessions.some((s) => s.id === stored)) {
-      return stored;
-    }
-    if (initialSessions && initialSessions.length > 0) return initialSessions[0].id;
-    return stored;
-  });
+  // A project opens on a new in-memory conversation. Persisted sessions are
+  // history entries and become active only after an explicit user selection.
+  const [currentSessionId, setCurrentSessionId] = useState<number | null>(null);
   const previousWorkspaceIdRef = useRef<number | null>(workspaceId);
   const requestGenerationRef = useRef(0);
   const requestControllerRef = useRef<AbortController | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const workspaceReady = previousWorkspaceIdRef.current === workspaceId;
-
-  useEffect(() => {
-    if (workspaceReady) {
-      saveSessionId(workspaceId, currentSessionId);
-    }
-  }, [currentSessionId, workspaceId, workspaceReady]);
 
   useEffect(() => {
     if (previousWorkspaceIdRef.current === workspaceId) return;
@@ -72,55 +30,67 @@ export function useSessionsList(workspaceId: number | null, initialSessions?: Se
     };
   }, []);
 
-  const refreshSessions = useCallback(async () => {
-    if (workspaceId == null) {
-      setSessions([]);
-      setCurrentSessionId(null);
-      return [];
-    }
+  const refreshSessions = useCallback(
+    async (options?: { resetCurrent?: boolean; preserveCurrent?: boolean }) => {
+      if (workspaceId == null) {
+        setSessions([]);
+        setCurrentSessionId(null);
+        return [];
+      }
 
-    requestGenerationRef.current += 1;
-    const generation = requestGenerationRef.current;
-    requestControllerRef.current?.abort();
-    const controller = new AbortController();
-    requestControllerRef.current = controller;
+      requestGenerationRef.current += 1;
+      const generation = requestGenerationRef.current;
+      requestControllerRef.current?.abort();
+      const controller = new AbortController();
+      requestControllerRef.current = controller;
 
-    try {
-      const list = await fetchSessions(workspaceId, { signal: controller.signal });
-      if (generation !== requestGenerationRef.current || controller.signal.aborted) return [];
+      try {
+        const list = await fetchSessions(workspaceId, { signal: controller.signal });
+        if (generation !== requestGenerationRef.current || controller.signal.aborted) return [];
 
-      setSessions(list);
-      setCurrentSessionId((prev) => {
-        if (prev !== null && list.some((session) => session.id === prev)) {
-          return prev;
+        setSessions(list);
+        if (options?.resetCurrent) {
+          setCurrentSessionId(null);
+        } else if (!options?.preserveCurrent) {
+          setCurrentSessionId((prev) => {
+            if (prev !== null && list.some((session) => session.id === prev)) {
+              return prev;
+            }
+            return list[0]?.id ?? null;
+          });
         }
-        return list[0]?.id ?? null;
-      });
-      return list;
-    } catch (error) {
-      if (!controller.signal.aborted) throw error;
-      return [];
-    }
-  }, [workspaceId]);
+        return list;
+      } catch (error) {
+        if (!controller.signal.aborted) throw error;
+        return [];
+      }
+    },
+    [workspaceId],
+  );
 
-  const ensureSession = useCallback(async () => {
-    if (currentSessionId != null) return currentSessionId;
-    if (workspaceId == null) throw new Error("No workspace");
-    const session = await createSession(workspaceId);
-    setCurrentSessionId(session.id);
-    setSessions((prev) => [session, ...prev]);
-    return session.id;
-  }, [currentSessionId, workspaceId]);
+  useEffect(() => {
+    if (!sessions.some((session) => session.titleStatus === "pending")) return;
+
+    const timer = window.setInterval(() => {
+      void refreshSessions({ preserveCurrent: true });
+    }, 1500);
+    return () => window.clearInterval(timer);
+  }, [refreshSessions, sessions]);
 
   const handleNewSession = useCallback(() => {
     setCurrentSessionId(null);
     setHistoryOpen(false);
-  }, []);
+    void refreshSessions({ resetCurrent: true });
+  }, [refreshSessions]);
 
-  const handleSelectSession = useCallback((id: number) => {
-    setCurrentSessionId(id);
-    setHistoryOpen(false);
-  }, []);
+  const handleSelectSession = useCallback(
+    (id: number) => {
+      setCurrentSessionId(id);
+      setHistoryOpen(false);
+      void refreshSessions();
+    },
+    [refreshSessions],
+  );
 
   const handleDeleteSession = useCallback(
     async (id: number) => {
@@ -151,7 +121,6 @@ export function useSessionsList(workspaceId: number | null, initialSessions?: Se
     historyOpen,
     setHistoryOpen,
     refreshSessions,
-    ensureSession,
     handleNewSession,
     handleSelectSession,
     handleDeleteSession,

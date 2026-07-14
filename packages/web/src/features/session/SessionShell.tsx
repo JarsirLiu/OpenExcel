@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import type { Session } from "@/api/sessions";
-import { DraftComposer } from "@/features/chat/composer/DraftComposer";
 import { ChatPanel } from "@/features/chat/conversation/ChatPanel";
 import { t } from "@/lib/i18n";
 import { SessionHeader } from "./components/SessionHeader";
@@ -19,7 +18,7 @@ type Props = {
   currentSessionId: number | null;
   historyOpen: boolean;
   setHistoryOpen: (next: boolean) => void;
-  handleSendInDraft: (text: string) => Promise<number>;
+  handleDraftSessionCreated: (sessionId: number) => Promise<void> | void;
   handleRunComplete: (sessionId: number, messages: any[]) => Promise<void>;
   handleNewSession: () => void;
   handleSelectSession: (id: number) => void;
@@ -40,7 +39,7 @@ export function SessionShell({
   currentSessionId,
   historyOpen,
   setHistoryOpen,
-  handleSendInDraft,
+  handleDraftSessionCreated,
   handleRunComplete,
   handleNewSession,
   handleSelectSession,
@@ -55,7 +54,6 @@ export function SessionShell({
   initialMessages,
 }: Props) {
   const historyRef = useRef<HTMLDivElement>(null);
-  const pendingDraftTextRef = useRef<{ [sessionId: number]: string }>({});
 
   useEffect(() => {
     if (!historyOpen) return;
@@ -67,15 +65,6 @@ export function SessionShell({
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [historyOpen, setHistoryOpen]);
-
-  const handleDraftSend = useCallback(
-    async (text: string) => {
-      const newId = await handleSendInDraft(text);
-      pendingDraftTextRef.current[newId] = text;
-      return newId;
-    },
-    [handleSendInDraft],
-  );
 
   const currentSession =
     currentSessionId != null ? sessions.find((session) => session.id === currentSessionId) : null;
@@ -125,11 +114,16 @@ export function SessionShell({
           <ChatPanel
             key={currentSessionId}
             sessionId={currentSessionId}
-            pendingDraftTextRef={pendingDraftTextRef}
             onRunComplete={handleRunComplete}
           />
         ) : (
-          <DraftComposer onSend={handleDraftSend} />
+          <ChatPanel
+            key="draft"
+            sessionId={null}
+            isDraft
+            onDraftSessionCreated={handleDraftSessionCreated}
+            onRunComplete={handleRunComplete}
+          />
         )}
       </div>
     </SessionShellProvider>

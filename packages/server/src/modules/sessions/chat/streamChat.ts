@@ -11,33 +11,14 @@ import {
 import { loadModelConfig } from "../../../config.js";
 import { excelTools } from "../../sheets/tools/index.js";
 import { workbookTools } from "../../workbooks/tools/index.js";
+import { extractFirstUserText, extractLatestUserText } from "../application/messageText.js";
+import { scheduleSessionTitleGeneration } from "../application/title.js";
 import { persistSessionMessages } from "../application/transcript.js";
 import { SessionBusyError } from "../domain/sessionErrors.js";
 import { withSessionLock } from "../infrastructure/sessionLock.js";
 import * as repo from "../infrastructure/sessionRepository.js";
 import * as runRepo from "../runs/repository.js";
 import { buildWorkspaceContext } from "./context.js";
-
-function extractMessageText(message: any): string {
-  if (typeof message?.content === "string") return message.content;
-  if (Array.isArray(message?.parts)) {
-    return message.parts
-      .filter((part: any) => part.type === "text")
-      .map((part: any) => part.text)
-      .join("");
-  }
-  return "";
-}
-
-function extractLatestUserText(messages: any[]): string {
-  for (let i = messages.length - 1; i >= 0; i -= 1) {
-    const message = messages[i];
-    if (message?.role === "user") {
-      return extractMessageText(message);
-    }
-  }
-  return "";
-}
 
 function serializeJson(value: unknown): string | null {
   if (value === undefined) return null;
@@ -68,6 +49,7 @@ export async function streamChat(
   sessionId: number,
   messages: any[],
   abortSignal?: AbortSignal,
+  options: { clientRequestId?: string } = {},
 ) {
   const session = await repo.findSession(sessionId, workspaceId);
   if (!session) throw new Error("Session not found");
@@ -90,6 +72,7 @@ export async function streamChat(
     return runRepo.createRun({
       sessionId,
       status: "running",
+      clientRequestId: options.clientRequestId,
       model: config.modelName,
       systemPrompt,
       inputText,
@@ -226,6 +209,12 @@ export async function streamChat(
         } catch (error) {
           console.error(`[session] Failed to persist transcript for session ${sessionId}:`, error);
         }
+
+        scheduleSessionTitleGeneration(
+          workspaceId,
+          sessionId,
+          extractFirstUserText(transcript) || extractLatestUserText(messages),
+        );
 
         await finalizeRunOnce(outcome);
 

@@ -50,6 +50,13 @@ function removeEmptyAssistantMessages(messages: any[]): any[] {
   );
 }
 
+function createClientRequestId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 export function applyInitialMessages(currentMessages: any[], loadedMessages: any[]): any[] {
   return currentMessages.length > 0 ? currentMessages : loadedMessages;
 }
@@ -57,18 +64,21 @@ export function applyInitialMessages(currentMessages: any[], loadedMessages: any
 export function useChatConversation({
   sessionId,
   workspaceId,
+  onDraftSessionCreated,
   initialMessages,
   onRunComplete,
   onWorkspaceRefresh,
   onStreamingChange,
 }: {
-  sessionId: number;
+  sessionId: number | null;
   workspaceId: number;
+  onDraftSessionCreated?: (sessionId: number) => Promise<void> | void;
   initialMessages?: any[];
   onRunComplete?: (messages: any[]) => Promise<void> | void;
   onWorkspaceRefresh?: () => Promise<void> | void;
   onStreamingChange?: (isStreaming: boolean) => void;
 }) {
+  const draftSessionIdRef = useRef<number | null>(null);
   const messagesRef = useRef<any[]>(initialMessages ?? []);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [hasOlder, setHasOlder] = useState(false);
@@ -80,21 +90,45 @@ export function useChatConversation({
   const loadedOffsetRef = useRef(initialMessages?.length ?? 0);
   const requestGenerationRef = useRef(0);
   const mountedRef = useRef(true);
-
-  const transport = useMemo(
-    () =>
-      new DefaultChatTransport({
-        api: `/api/workspaces/${workspaceId}/sessions/${sessionId}/chat`,
-      }),
-    [sessionId, workspaceId],
+  const draftRequestIdRef = useRef<string | null>(
+    sessionId == null ? createClientRequestId() : null,
   );
+
+  const transport = useMemo(() => {
+    const isDraft = sessionId == null;
+    return new DefaultChatTransport({
+      api: isDraft
+        ? `/api/workspaces/${workspaceId}/sessions/draft/chat`
+        : `/api/workspaces/${workspaceId}/sessions/${sessionId}/chat`,
+      headers: isDraft
+        ? { "Idempotency-Key": draftRequestIdRef.current ?? createClientRequestId() }
+        : undefined,
+      fetch: async (input, init) => {
+        const response = await fetch(input, init);
+        if (isDraft) {
+          const createdSessionId = Number(response.headers.get("X-OpenExcel-Session-Id"));
+          if (Number.isInteger(createdSessionId) && createdSessionId > 0) {
+            draftSessionIdRef.current = createdSessionId;
+            if (response.status === 409) {
+              void onDraftSessionCreated?.(createdSessionId);
+            }
+          }
+        }
+        return response;
+      },
+    });
+  }, [onDraftSessionCreated, sessionId, workspaceId]);
 
   const { messages, setMessages, sendMessage, status, stop, error } = useChat({
     id: `${workspaceId}:${sessionId}`,
     messages: initialMessages ?? [],
     transport,
     onFinish: ({ isAbort, isError, messages: finishedMessages }) => {
-      if (isAbort || isError) return;
+      const createdSessionId = draftSessionIdRef.current;
+      if (createdSessionId != null) {
+        void onDraftSessionCreated?.(createdSessionId);
+      }
+      if (isAbort || isError || !mountedRef.current) return;
       void onRunComplete?.(finishedMessages);
     },
   });
@@ -113,6 +147,13 @@ export function useChatConversation({
     loadedOffsetRef.current = 0;
 
     const loadInitialMessages = async () => {
+      if (sessionId == null) {
+        if (mountedRef.current && generation === requestGenerationRef.current) {
+          setInitialLoaded(true);
+        }
+        return;
+      }
+
       if (initialMessages == null) {
         try {
           const { messages: msgs, total } = await fetchChatMessages(
@@ -223,7 +264,7 @@ export function useChatConversation({
   );
 
   const loadOlderMessages = useCallback(async () => {
-    if (loadingOlder || !hasOlder) return;
+    if (sessionId == null || loadingOlder || !hasOlder) return;
     setLoadingOlder(true);
     try {
       const offset = loadedOffsetRef.current;
@@ -251,6 +292,10 @@ export function useChatConversation({
       throw new Error("对话进行中，无法撤销");
     }
 
+    if (sessionId == null) {
+      throw new Error("草稿会话尚未持久化");
+    }
+
     const result = await undoLatestRun(workspaceId, sessionId);
     if (!mountedRef.current) throw new Error("当前会话已切换");
     const nextMessages = trimMessagesAfterUserTurn(messagesRef.current, result.undoneUserText);
@@ -269,6 +314,6 @@ export function useChatConversation({
     sendMessage: handleSend,
     stop,
     loadOlderMessages,
-    onUndo: handleUndo,
+    onUndo: sessionId == null ? undefined : handleUndo,
   };
 }

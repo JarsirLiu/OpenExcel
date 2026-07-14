@@ -1,7 +1,6 @@
 export { streamChat } from "../chat/index.js";
 export { undoLatestRun } from "../runs/undo.js";
 export {
-  createSession,
   deleteSession,
   getMessages,
   getRuns,
@@ -9,5 +8,6 @@ export {
   getSessions,
   renameSession,
 } from "./querySessions.js";
+export { startDraftChat } from "./startDraftChat.js";
 export { generateSessionTitleForSession } from "./title.js";
 export { persistSessionMessages } from "./transcript.js";

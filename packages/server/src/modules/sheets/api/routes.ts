@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { resolveWorkspaceIdForRequest } from "../../../shared/utils/resolvePublicId.js";
+import { resolveWorkspaceIdForRequest } from "../../../middleware/resourceAccess.js";
 import * as application from "../application/index.js";
 
 export async function sheetRoutes(app: FastifyInstance) {

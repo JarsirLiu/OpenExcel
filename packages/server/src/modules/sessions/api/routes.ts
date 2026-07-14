@@ -4,9 +4,9 @@ import type { FastifyInstance } from "fastify";
 import {
   resolveSessionIdForRequest,
   resolveWorkspaceIdForRequest,
-} from "../../../shared/utils/resolvePublicId.js";
+} from "../../../middleware/resourceAccess.js";
 import * as application from "../application/index.js";
-import { SessionBusyError } from "../domain/sessionErrors.js";
+import { DraftRequestConflictError, SessionBusyError } from "../domain/sessionErrors.js";
 
 function isDatabaseError(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false;
@@ -40,19 +40,66 @@ export async function sessionRoutes(app: FastifyInstance) {
     },
   );
 
-  app.post<{ Params: { workspacePublicId: string } }>(
-    "/api/workspaces/:workspacePublicId/sessions",
-    async (req, reply) => {
-      const workspaceId = await resolveWorkspaceIdForRequest(
-        req,
-        req.params.workspacePublicId,
-        reply,
-      );
-      if (workspaceId == null) return;
-      const session = await application.createSession(workspaceId);
-      return reply.status(201).send(session);
-    },
-  );
+  app.post<{
+    Params: { workspacePublicId: string };
+    Body: { messages: any[] };
+  }>("/api/workspaces/:workspacePublicId/sessions/draft/chat", async (req, reply) => {
+    const workspaceId = await resolveWorkspaceIdForRequest(
+      req,
+      req.params.workspacePublicId,
+      reply,
+    );
+    if (workspaceId == null) return;
+
+    const { messages } = req.body;
+    const clientRequestId = req.headers["idempotency-key"];
+    const normalizedClientRequestId = Array.isArray(clientRequestId)
+      ? clientRequestId[0]
+      : clientRequestId;
+    const controller = new AbortController();
+    const abort = () => {
+      if (!controller.signal.aborted) controller.abort();
+    };
+
+    req.raw.on("aborted", abort);
+    reply.raw.on("close", () => {
+      if (!reply.raw.writableEnded) abort();
+    });
+
+    let sessionId: number | null = null;
+    try {
+      const result = await application.startDraftChat(workspaceId, messages, {
+        abortSignal: controller.signal,
+        clientRequestId: normalizedClientRequestId,
+      });
+      sessionId = result.session.id;
+
+      if (controller.signal.aborted) {
+        await application.deleteSession(workspaceId, sessionId);
+        return;
+      }
+
+      reply.header("X-OpenExcel-Session-Id", String(sessionId));
+      reply.header("X-OpenExcel-Session-Name", encodeURIComponent(result.session.name));
+      reply.hijack();
+      pipeUIMessageStreamToResponse({ response: reply.raw, stream: result.stream });
+    } catch (error) {
+      if (controller.signal.aborted) {
+        if (sessionId != null) await application.deleteSession(workspaceId, sessionId);
+        return;
+      }
+      if (error instanceof SessionBusyError) {
+        return reply.status(error.statusCode).send({ error: error.message });
+      }
+      if (error instanceof DraftRequestConflictError) {
+        reply.header("X-OpenExcel-Session-Id", String(error.sessionId));
+        return reply.status(error.statusCode).send({ error: error.message });
+      }
+      const errorMessage = isDatabaseError(error) ? "数据库繁忙，请稍后重试" : formatAIError(error);
+      console.error(`[session] Failed to start draft chat: ${errorMessage}`);
+      if (!reply.sent) return reply.status(502).send({ error: errorMessage });
+    }
+  });
 
   app.delete<{ Params: { workspacePublicId: string; sessionPublicId: string } }>(
     "/api/workspaces/:workspacePublicId/sessions/:sessionPublicId",

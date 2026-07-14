@@ -6,16 +6,12 @@ export async function getSessions(workspaceId: number) {
   return repo.findSessionsByWorkspace(workspaceId);
 }
 
-export async function createSession(workspaceId: number) {
-  return repo.createSession(workspaceId, "新对话");
-}
-
 export async function deleteSession(workspaceId: number, sessionId: number) {
   return repo.deleteSession(sessionId, workspaceId);
 }
 
 export async function renameSession(workspaceId: number, sessionId: number, name: string) {
-  return repo.updateSession(sessionId, { name }, workspaceId);
+  return repo.updateSession(sessionId, { name, titleStatus: "manual" }, workspaceId);
 }
 
 export async function getSession(workspaceId: number, sessionId: number) {

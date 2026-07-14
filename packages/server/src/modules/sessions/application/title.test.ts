@@ -4,6 +4,7 @@ const mockGenerateText = vi.fn();
 const mockCreateTitleModel = vi.fn();
 const mockFindSession = vi.fn();
 const mockUpdateSession = vi.fn();
+const mockUpdateSessionNameIfUnchanged = vi.fn();
 const mockLoadModelConfig = vi.fn();
 
 vi.mock("ai", () => ({
@@ -17,6 +18,7 @@ vi.mock("@openexcel/agent", () => ({
 vi.mock("../infrastructure/sessionRepository.js", () => ({
   findSession: mockFindSession,
   updateSession: mockUpdateSession,
+  updateSessionNameIfUnchanged: mockUpdateSessionNameIfUnchanged,
 }));
 
 vi.mock("../../../config.js", () => ({
@@ -28,6 +30,7 @@ const { generateSessionTitleForSession, generateTitle } = await import("./title.
 beforeEach(() => {
   vi.clearAllMocks();
   mockCreateTitleModel.mockReturnValue("title-model");
+  mockUpdateSessionNameIfUnchanged.mockResolvedValue(true);
   mockLoadModelConfig.mockReturnValue({
     baseUrl: "http://test.local",
     apiKey: "test-key",
@@ -100,7 +103,7 @@ describe("generateSessionTitleForSession", () => {
       apiKey: "test-key",
       modelName: "test-model",
     });
-    expect(mockUpdateSession).toHaveBeenCalledWith(1, { name: "数据分析" }, 1);
+    expect(mockUpdateSessionNameIfUnchanged).toHaveBeenCalledWith(1, 1, ["新对话"], "数据分析");
     expect(title).toBe("数据分析");
   });
 
