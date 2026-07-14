@@ -1,6 +1,5 @@
 import { prisma } from "../../../infra/database/db.js";
 
-const DEFAULT_UNDO_SNAPSHOT_RETENTION = 1;
 const STALE_RUN_AFTER_MS = 5 * 60 * 1000;
 
 export async function createRun(data: {
@@ -54,15 +53,16 @@ export async function findRun(id: number) {
   return prisma.agentRun.findUnique({ where: { id } });
 }
 
-export async function findLatestUndoableRun(workspaceId: number, sessionId: number) {
+export async function findUndoCheckpointRun(workspaceId: number, sessionId: number) {
   const session = await prisma.session.findFirst({
     where: { id: sessionId, workspaceId },
-    select: { id: true },
+    select: { id: true, undoRunId: true },
   });
-  if (!session) return null;
+  if (!session?.undoRunId) return null;
 
   return prisma.agentRun.findFirst({
     where: {
+      id: session.undoRunId,
       sessionId: session.id,
       status: { in: ["completed", "aborted", "error"] },
       OR: [
@@ -89,6 +89,26 @@ export async function findLatestUndoableRun(workspaceId: number, sessionId: numb
     },
     orderBy: [{ startedAt: "desc" }, { id: "desc" }],
   });
+}
+
+export async function findRunUndoState(runId: number) {
+  const run = await prisma.agentRun.findUnique({
+    where: { id: runId },
+    select: {
+      id: true,
+      undoInvalidated: true,
+      _count: {
+        select: { snapshots: true },
+      },
+    },
+  });
+  if (!run) return null;
+
+  return {
+    id: run.id,
+    undoInvalidated: run.undoInvalidated,
+    hasUndoEffects: run._count.snapshots > 0,
+  };
 }
 
 export async function findRunsBySession(workspaceId: number, sessionId: number) {
@@ -153,46 +173,33 @@ export async function findRunSheetSnapshots(runId: number) {
   });
 }
 
+export async function findRunsWithSheetSnapshots(
+  workspaceId: number,
+  sheetIds: number[],
+  originRunId?: number,
+) {
+  if (sheetIds.length === 0) return [];
+
+  const snapshots = await prisma.agentRunSheetSnapshot.findMany({
+    where: {
+      sheetId: { in: sheetIds },
+      run: {
+        undoInvalidated: false,
+        status: { in: ["running", "completed", "aborted", "error"] },
+        session: { workspaceId },
+        ...(originRunId == null ? {} : { id: { not: originRunId } }),
+      },
+    },
+    select: { runId: true },
+  });
+
+  return [...new Set(snapshots.map((snapshot) => snapshot.runId))];
+}
+
 export async function deleteRunSheetSnapshots(runId: number) {
   await prisma.agentRunSheetSnapshot.deleteMany({
     where: { runId },
   });
-}
-
-export async function pruneUndoSnapshots(
-  workspaceId: number,
-  sessionId: number,
-  keepRuns = DEFAULT_UNDO_SNAPSHOT_RETENTION,
-) {
-  const session = await prisma.session.findFirst({
-    where: { id: sessionId, workspaceId },
-    select: { id: true },
-  });
-  if (!session) return 0;
-
-  const runsWithSnapshots = await prisma.agentRun.findMany({
-    where: {
-      sessionId: session.id,
-      snapshots: { some: {} },
-    },
-    orderBy: [{ startedAt: "desc" }, { id: "desc" }],
-    select: { id: true },
-  });
-
-  const staleRunIds = runsWithSnapshots
-    .slice(keepRuns)
-    .map((run: (typeof runsWithSnapshots)[number]) => run.id);
-  if (staleRunIds.length === 0) {
-    return 0;
-  }
-
-  const result = await prisma.agentRunSheetSnapshot.deleteMany({
-    where: {
-      runId: { in: staleRunIds },
-    },
-  });
-
-  return result.count;
 }
 
 export async function restoreRunSheetSnapshots(runId: number) {

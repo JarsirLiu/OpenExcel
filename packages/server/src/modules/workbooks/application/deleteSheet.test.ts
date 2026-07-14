@@ -7,6 +7,14 @@ vi.mock("../infrastructure/workbookRepository.js", () => ({
   deleteSheetAndReindex: vi.fn(),
 }));
 
+vi.mock("../../sessions/runs/undoCheckpoint.js", () => ({
+  withUndoTrackedSheetMutation: (
+    _workspaceId: number,
+    _sheetIds: number[],
+    mutation: () => Promise<unknown>,
+  ) => mutation(),
+}));
+
 const mockedRepo = vi.mocked(repo);
 
 describe("deleteSheet", () => {

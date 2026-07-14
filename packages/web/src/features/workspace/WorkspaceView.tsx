@@ -28,6 +28,7 @@ type Props = {
   handleWorkbookRename: (workbookId: number, newName: string) => Promise<void>;
   handleWorkbookStructureChanged: (update: WorkbookStructureUpdate) => void;
   handleWorkbookRefresh: () => Promise<void>;
+  onWorkbookMutation?: () => Promise<void> | void;
 };
 
 export function WorkspaceView({
@@ -46,6 +47,7 @@ export function WorkspaceView({
   handleWorkbookRename,
   handleWorkbookStructureChanged,
   handleWorkbookRefresh,
+  onWorkbookMutation,
 }: Props) {
   const newWbInputRef = useRef<HTMLInputElement>(null);
 
@@ -87,6 +89,7 @@ export function WorkspaceView({
           onWorkbookDelete={handleWorkbookDelete}
           onWorkbookStructureChanged={handleWorkbookStructureChanged}
           onWorkbookRefresh={handleWorkbookRefresh}
+          onWorkbookMutation={onWorkbookMutation}
         />
       </div>
     </div>

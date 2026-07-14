@@ -77,20 +77,21 @@ export function useSessionWorkspace(
     [listDeleteSession],
   );
 
-  const handleRunComplete = useCallback(
+  const handleRunSettled = useCallback(
     async (_sessionId: number, _finishedMessages: any[]) => {
       try {
         await refreshSessions();
       } catch (error) {
-        console.error("[session] Failed to refresh sessions after chat completion:", error);
+        console.error("[session] Failed to refresh sessions after chat settlement:", error);
       }
     },
     [refreshSessions],
   );
 
   const handleUndoComplete = useCallback(async () => {
+    await refreshSessions({ mode: "authoritative", preserveCurrent: true });
     await onUndoComplete?.();
-  }, [onUndoComplete]);
+  }, [onUndoComplete, refreshSessions]);
 
   return {
     sessions,
@@ -99,7 +100,7 @@ export function useSessionWorkspace(
     setHistoryOpen,
     refreshSessions,
     handleDraftSessionCreated,
-    handleRunComplete,
+    handleRunSettled,
     handleNewSession,
     handleSelectSession,
     handleDeleteSession,

@@ -28,6 +28,7 @@ export const excelToolSpecs = {
   createWorkbook: {
     description:
       "新建一个工作簿，并同时创建第一个 Sheet。仅在用户明确要求创建新工作簿时使用。可选地传入初始工作簿名称、初始 Sheet 名称，或者从已有 Sheet 复制初始结构。",
+    needsRunContext: true,
     inputSchema: z.object({
       name: z.string().trim().min(1).optional().describe("工作簿名称"),
       sheetName: z.string().trim().min(1).optional().describe("初始 Sheet 名称"),
@@ -42,6 +43,7 @@ export const excelToolSpecs = {
   createSheet: {
     description:
       "在指定工作簿中创建一个新的 Sheet。仅在用户明确要求新增 Sheet 时使用。可选地传入名称，或者从已有 Sheet 复制初始结构。",
+    needsRunContext: true,
     inputSchema: z.object({
       workbookId: z.coerce.number().int().positive().describe("工作簿 ID"),
       name: z.string().trim().min(1).optional().describe("Sheet 名称"),

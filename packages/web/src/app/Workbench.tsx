@@ -68,21 +68,47 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
     [workbook.currentWorkbook?.id, workbook.workbooks, workbook.workbookIdx],
   );
 
+  const refreshUndoAvailability = useCallback(async () => {
+    try {
+      await session.refreshSessions();
+    } catch (error) {
+      console.error("[session] Failed to refresh undo availability:", error);
+    }
+  }, [session]);
+
   // Wrappers that refresh sidebar workbooksMap after workbook mutations
   const wrappedWorkbookCreate = useCallback(
     async (workspaceId: number) => {
       await workbook.handleCreateWorkbook(workspaceId);
       await refreshWorkbooks(workspaces);
+      await refreshUndoAvailability();
     },
-    [workbook.handleCreateWorkbook, refreshWorkbooks, workspaces],
+    [workbook.handleCreateWorkbook, refreshUndoAvailability, refreshWorkbooks, workspaces],
   );
 
   const wrappedWorkbookDelete = useCallback(
     async (workbookId: number) => {
       await workbook.handleWorkbookDelete(workbookId);
       await refreshWorkbooks(workspaces);
+      await refreshUndoAvailability();
     },
-    [workbook.handleWorkbookDelete, refreshWorkbooks, workspaces],
+    [workbook.handleWorkbookDelete, refreshUndoAvailability, refreshWorkbooks, workspaces],
+  );
+
+  const handleAttachExcel = useCallback(
+    async (files: File[]) => {
+      await workbook.handleNewWorkbookFileChange(files);
+      await refreshUndoAvailability();
+    },
+    [workbook.handleNewWorkbookFileChange, refreshUndoAvailability],
+  );
+
+  const handleWorkbookRename = useCallback(
+    async (workbookId: number, name: string) => {
+      await workbook.handleWorkbookRename(workbookId, name);
+      await refreshUndoAvailability();
+    },
+    [workbook.handleWorkbookRename, refreshUndoAvailability],
   );
 
   const pendingWorkbookSwitch = useRef<number | null>(null);
@@ -192,9 +218,10 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
           handleSwitchWorkbook={workbook.handleSwitchWorkbook}
           handleNewWorkbookFileChange={workbook.handleNewWorkbookFileChange}
           handleWorkbookDelete={workbook.handleWorkbookDelete}
-          handleWorkbookRename={workbook.handleWorkbookRename}
+          handleWorkbookRename={handleWorkbookRename}
           handleWorkbookStructureChanged={workbook.handleWorkbookStructureChanged}
           handleWorkbookRefresh={workbook.handleWorkbookRefresh}
+          onWorkbookMutation={refreshUndoAvailability}
         />
         <div className={styles.resizeHandle} onMouseDown={handleResizeMouseDown} />
       </div>
@@ -202,7 +229,7 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
         key={activeWorkspaceId ?? "no-workspace"}
         workspaceId={activeWorkspaceId}
         onWorkspaceRefresh={workbook.handleWorkspaceRefresh}
-        onAttachExcel={workbook.handleNewWorkbookFileChange}
+        onAttachExcel={handleAttachExcel}
         referenceCacheRevision={workbook.referenceCacheRevision}
         currentUser={currentUser}
         onLogout={onLogout}

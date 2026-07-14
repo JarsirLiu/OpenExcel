@@ -94,12 +94,14 @@ model Session {
   name         String
   titleStatus  String   @default("pending")
   chatMessages String?    @default("[]")
+  undoRunId    Int?
   workspace    Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   sheet        Sheet?     @relation(fields: [sheetId], references: [id], onDelete: SetNull)
   runs         AgentRun[]
   createdAt    DateTime   @default(now())
 
   @@index([workspaceId])
+  @@index([workspaceId, undoRunId])
 }
 
 model AgentRun {
@@ -112,6 +114,7 @@ model AgentRun {
   inputText    String?
   outputText   String?
   errorMessage String?
+  undoInvalidated Boolean                @default(false)
   revertedAt   DateTime?
   session      Session                 @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   steps        AgentStep[]
@@ -146,4 +149,5 @@ model AgentRunSheetSnapshot {
 
   @@unique([runId, sheetId])
   @@index([runId])
+  @@index([sheetId])
 }

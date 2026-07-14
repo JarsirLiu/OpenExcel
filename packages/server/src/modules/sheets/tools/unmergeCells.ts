@@ -6,9 +6,9 @@ import {
   sheetChangeRangeToZeroBased,
 } from "@openexcel/core";
 import { sheetRecordToCelldata } from "../../../shared/utils/sheetData.js";
-import * as repo from "../../sessions/runs/repository.js";
 import { buildSheetChangePreview, toA1Range } from "../domain/sheet.js";
 import * as sheetRepo from "../infrastructure/sheetRepository.js";
+import { runSheetMutation } from "./runSheetMutation.js";
 
 export const unmergeCells = {
   ...excelToolSpecs.unmergeCells,
@@ -17,84 +17,74 @@ export const unmergeCells = {
     { sheetId, operations }: { sheetId: number; operations: SheetChangeRangeOperation[] },
     { context }: { context: { runId: number; workspaceId: number } },
   ) => {
-    const sheet = await sheetRepo.findSheetForWorkspace(sheetId, context.workspaceId);
-    if (!sheet) throw new Error(`Sheet ${sheetId} 不存在`);
-    if (sheet.workbook.workspaceId !== context.workspaceId)
-      throw new Error(`Sheet ${sheetId} 不存在`);
+    return runSheetMutation(context, sheetId, async (sheet) => {
+      const celldata: any[] = sheetRecordToCelldata(sheet);
+      if (!Array.isArray(celldata)) throw new Error("celldata 格式错误");
 
-    await repo.upsertRunSheetSnapshot({
-      runId: context.runId,
-      sheetId,
-      uploadedData: sheet.uploadedData ?? null,
-      config: sheet.config ?? null,
-    });
+      const storageRanges = operations.map(sheetChangeRangeToZeroBased);
 
-    const celldata: any[] = sheetRecordToCelldata(sheet);
-    if (!Array.isArray(celldata)) throw new Error("celldata 格式错误");
-
-    const storageRanges = operations.map(sheetChangeRangeToZeroBased);
-
-    for (const range of storageRanges) {
-      for (const cell of celldata) {
-        if (
-          cell.r >= range.startRow &&
-          cell.r <= range.endRow &&
-          cell.c >= range.startCol &&
-          cell.c <= range.endCol
-        ) {
-          if (cell.v?.mc) {
-            const { mc, ...rest } = cell.v;
-            cell.v = rest;
-          }
-        }
-      }
-    }
-
-    const config = sheet.config ? JSON.parse(sheet.config) : {};
-    if (config.merge) {
       for (const range of storageRanges) {
-        for (const key of Object.keys(config.merge)) {
-          const m = config.merge[key];
+        for (const cell of celldata) {
           if (
-            m.r >= range.startRow &&
-            m.r <= range.endRow &&
-            m.c >= range.startCol &&
-            m.c <= range.endCol
+            cell.r >= range.startRow &&
+            cell.r <= range.endRow &&
+            cell.c >= range.startCol &&
+            cell.c <= range.endCol
           ) {
-            delete config.merge[key];
+            if (cell.v?.mc) {
+              const { mc, ...rest } = cell.v;
+              cell.v = rest;
+            }
           }
         }
       }
-    }
 
-    await sheetRepo.updateSheetState(
-      sheetId,
-      {
-        uploadedData: JSON.stringify(celldata),
-        config: JSON.stringify(config),
-      },
-      context.workspaceId,
-    );
+      const config = sheet.config ? JSON.parse(sheet.config) : {};
+      if (config.merge) {
+        for (const range of storageRanges) {
+          for (const key of Object.keys(config.merge)) {
+            const m = config.merge[key];
+            if (
+              m.r >= range.startRow &&
+              m.r <= range.endRow &&
+              m.c >= range.startCol &&
+              m.c <= range.endCol
+            ) {
+              delete config.merge[key];
+            }
+          }
+        }
+      }
 
-    const minRow = Math.min(...storageRanges.map((range) => range.startRow));
-    const maxRow = Math.max(...storageRanges.map((range) => range.endRow));
+      await sheetRepo.updateSheetState(
+        sheetId,
+        {
+          uploadedData: JSON.stringify(celldata),
+          config: JSON.stringify(config),
+        },
+        context.workspaceId,
+      );
 
-    const delta: SheetChangeDelta = {
-      type: "unmerge",
-      operations,
-    };
+      const minRow = Math.min(...storageRanges.map((range) => range.startRow));
+      const maxRow = Math.max(...storageRanges.map((range) => range.endRow));
 
-    const output = {
-      success: true,
-      unmergedRanges: operations.map((operation) =>
-        toA1Range(operation.startRow, operation.startCol, operation.endRow, operation.endCol),
-      ),
-      delta,
-      preview: buildSheetChangePreview(celldata, sheet.name, sheetId, minRow, maxRow),
-      sheetInfo: { sheetId: sheet.id, sheetNo: sheet.sheetNo, sheetName: sheet.name },
-    };
+      const delta: SheetChangeDelta = {
+        type: "unmerge",
+        operations,
+      };
 
-    sheetChangePatchOutputSchema.parse(output);
-    return output;
+      const output = {
+        success: true,
+        unmergedRanges: operations.map((operation) =>
+          toA1Range(operation.startRow, operation.startCol, operation.endRow, operation.endCol),
+        ),
+        delta,
+        preview: buildSheetChangePreview(celldata, sheet.name, sheetId, minRow, maxRow),
+        sheetInfo: { sheetId: sheet.id, sheetNo: sheet.sheetNo, sheetName: sheet.name },
+      };
+
+      sheetChangePatchOutputSchema.parse(output);
+      return output;
+    });
   },
 };

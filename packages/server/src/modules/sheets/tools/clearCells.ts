@@ -7,9 +7,9 @@ import {
   toZeroBasedIndex,
 } from "@openexcel/core";
 import { sheetRecordToCelldata } from "../../../shared/utils/sheetData.js";
-import * as repo from "../../sessions/runs/repository.js";
 import { applyClearOperation, buildSheetChangePreview } from "../domain/sheet.js";
 import * as sheetRepo from "../infrastructure/sheetRepository.js";
+import { runSheetMutation } from "./runSheetMutation.js";
 
 export const clearCells = {
   ...excelToolSpecs.clearCells,
@@ -18,71 +18,61 @@ export const clearCells = {
     { sheetId, operations }: { sheetId: number; operations: SheetChangeClearOperation[] },
     { context }: { context: { runId: number; workspaceId: number } },
   ) => {
-    const sheet = await sheetRepo.findSheetForWorkspace(sheetId, context.workspaceId);
-    if (!sheet) throw new Error(`Sheet ${sheetId} 不存在`);
-    if (sheet.workbook.workspaceId !== context.workspaceId)
-      throw new Error(`Sheet ${sheetId} 不存在`);
+    return runSheetMutation(context, sheetId, async (sheet) => {
+      const celldata: any[] = sheetRecordToCelldata(sheet);
+      if (!Array.isArray(celldata)) throw new Error("celldata 格式错误");
 
-    await repo.upsertRunSheetSnapshot({
-      runId: context.runId,
-      sheetId,
-      uploadedData: sheet.uploadedData ?? null,
-      config: sheet.config ?? null,
-    });
-
-    const celldata: any[] = sheetRecordToCelldata(sheet);
-    if (!Array.isArray(celldata)) throw new Error("celldata 格式错误");
-
-    const cellMap = new Map<string, any>();
-    for (const cell of celldata) {
-      cellMap.set(`${cell.r},${cell.c}`, cell);
-    }
-
-    const touchedCellKeys = new Set<string>();
-    const touchedRowIndices = new Set<number>();
-    for (const operation of operations) {
-      const zeroBased =
-        operation.type === "cell"
-          ? {
-              type: "cell" as const,
-              row: toZeroBasedIndex(operation.row),
-              col: toZeroBasedIndex(operation.col),
-            }
-          : { type: "range" as const, ...sheetChangeRangeToZeroBased(operation) };
-      const touchedKeys = applyClearOperation(cellMap, zeroBased);
-      for (const key of touchedKeys) {
-        touchedCellKeys.add(key);
-        const [row] = key.split(",");
-        touchedRowIndices.add(Number(row));
+      const cellMap = new Map<string, any>();
+      for (const cell of celldata) {
+        cellMap.set(`${cell.r},${cell.c}`, cell);
       }
-    }
 
-    const updatedCelldata = Array.from(cellMap.values());
+      const touchedCellKeys = new Set<string>();
+      const touchedRowIndices = new Set<number>();
+      for (const operation of operations) {
+        const zeroBased =
+          operation.type === "cell"
+            ? {
+                type: "cell" as const,
+                row: toZeroBasedIndex(operation.row),
+                col: toZeroBasedIndex(operation.col),
+              }
+            : { type: "range" as const, ...sheetChangeRangeToZeroBased(operation) };
+        const touchedKeys = applyClearOperation(cellMap, zeroBased);
+        for (const key of touchedKeys) {
+          touchedCellKeys.add(key);
+          const [row] = key.split(",");
+          touchedRowIndices.add(Number(row));
+        }
+      }
 
-    await sheetRepo.updateSheetContent(
-      sheetId,
-      JSON.stringify(updatedCelldata),
-      context.workspaceId,
-    );
+      const updatedCelldata = Array.from(cellMap.values());
 
-    const touchedRows = Array.from(touchedRowIndices.values());
-    const minRow = touchedRows.length > 0 ? Math.min(...touchedRows) : 0;
-    const maxRow = touchedRows.length > 0 ? Math.max(...touchedRows) : 0;
+      await sheetRepo.updateSheetContent(
+        sheetId,
+        JSON.stringify(updatedCelldata),
+        context.workspaceId,
+      );
 
-    const delta: SheetChangeDelta = {
-      type: "clear",
-      operations,
-    };
+      const touchedRows = Array.from(touchedRowIndices.values());
+      const minRow = touchedRows.length > 0 ? Math.min(...touchedRows) : 0;
+      const maxRow = touchedRows.length > 0 ? Math.max(...touchedRows) : 0;
 
-    const output = {
-      success: true,
-      clearedCells: touchedCellKeys.size,
-      delta,
-      preview: buildSheetChangePreview(updatedCelldata, sheet.name, sheetId, minRow, maxRow),
-      sheetInfo: { sheetId: sheet.id, sheetNo: sheet.sheetNo, sheetName: sheet.name },
-    };
+      const delta: SheetChangeDelta = {
+        type: "clear",
+        operations,
+      };
 
-    sheetChangePatchOutputSchema.parse(output);
-    return output;
+      const output = {
+        success: true,
+        clearedCells: touchedCellKeys.size,
+        delta,
+        preview: buildSheetChangePreview(updatedCelldata, sheet.name, sheetId, minRow, maxRow),
+        sheetInfo: { sheetId: sheet.id, sheetNo: sheet.sheetNo, sheetName: sheet.name },
+      };
+
+      sheetChangePatchOutputSchema.parse(output);
+      return output;
+    });
   },
 };

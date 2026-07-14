@@ -60,7 +60,7 @@ export function useChatConversation({
   workspaceId,
   onDraftSessionCreated,
   initialMessages,
-  onRunComplete,
+  onRunSettled,
   onWorkspaceRefresh,
   onStreamingChange,
 }: {
@@ -68,7 +68,7 @@ export function useChatConversation({
   workspaceId: number;
   onDraftSessionCreated?: (sessionId: number) => Promise<void> | void;
   initialMessages?: any[];
-  onRunComplete?: (messages: any[]) => Promise<void> | void;
+  onRunSettled?: (messages: any[]) => Promise<void> | void;
   onWorkspaceRefresh?: () => Promise<void> | void;
   onStreamingChange?: (isStreaming: boolean) => void;
 }) {
@@ -113,12 +113,12 @@ export function useChatConversation({
     id: `${workspaceId}:${sessionId}`,
     messages: initialMessages ?? [],
     transport,
-    onFinish: ({ isAbort, isError, messages: finishedMessages }) => {
+    onFinish: ({ isAbort, messages: finishedMessages }) => {
       if (!isAbort) {
         beginDraftSessionTransition();
       }
-      if (isAbort || isError || !mountedRef.current) return;
-      void onRunComplete?.(finishedMessages);
+      if (!mountedRef.current) return;
+      void onRunSettled?.(finishedMessages);
     },
   });
 

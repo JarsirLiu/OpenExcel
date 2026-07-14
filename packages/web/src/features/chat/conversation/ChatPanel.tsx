@@ -12,14 +12,16 @@ export function ChatPanel({
   sessionId,
   isDraft = false,
   onDraftSessionCreated,
-  onRunComplete,
+  onRunSettled,
   onRegenerate,
+  hasUndoCheckpoint = false,
 }: {
   sessionId: number | null;
   isDraft?: boolean;
   onDraftSessionCreated?: (sessionId: number) => Promise<void> | void;
-  onRunComplete?: (sessionId: number, messages: any[]) => Promise<void> | void;
+  onRunSettled?: (sessionId: number, messages: any[]) => Promise<void> | void;
   onRegenerate?: () => void;
+  hasUndoCheckpoint?: boolean;
 }) {
   const {
     workspaceId,
@@ -47,29 +49,16 @@ export function ChatPanel({
     workspaceId,
     onDraftSessionCreated,
     initialMessages,
-    onRunComplete: (finishedMessages) => {
+    onRunSettled: (finishedMessages) => {
       if (sessionId == null) return;
-      return onRunComplete?.(sessionId, finishedMessages);
+      return onRunSettled?.(sessionId, finishedMessages);
     },
     onWorkspaceRefresh,
   });
 
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [isUndoing, setIsUndoing] = useState(false);
-  const [canUndo, setCanUndo] = useState(true);
   const composerRef = useRef<ChatComposerHandle>(null);
-  const prevStreaming = useRef(isStreaming);
-
-  useEffect(() => {
-    if (prevStreaming.current && !isStreaming) {
-      setCanUndo(true);
-    }
-    prevStreaming.current = isStreaming;
-  }, [isStreaming]);
-
-  useEffect(() => {
-    setCanUndo(true);
-  }, [sessionId]);
 
   const handleUndo = useCallback(async () => {
     if (!onUndo || isUndoing) return;
@@ -78,7 +67,6 @@ export function ChatPanel({
       const result = await onUndo();
       composerRef.current?.restoreDraft(result.undoneUserText);
       await onUndoComplete?.();
-      setCanUndo(false);
     } catch (error) {
       console.error("[chat] Failed to undo latest run:", error);
     } finally {
@@ -111,7 +99,7 @@ export function ChatPanel({
         messages={messages}
         isStreaming={isStreaming}
         onRegenerate={onRegenerate}
-        onUndo={!isDraft && canUndo ? handleUndo : undefined}
+        onUndo={!isDraft && hasUndoCheckpoint ? handleUndo : undefined}
         isUndoing={isUndoing}
         loadingOlder={loadingOlder}
         hasOlder={hasOlder}

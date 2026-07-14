@@ -1,3 +1,4 @@
+import { withUndoTrackedSheetMutation } from "../../sessions/runs/undoCheckpoint.js";
 import * as repo from "../infrastructure/workbookRepository.js";
 
 export async function deleteSheet(workspaceId: number, workbookId: number, sheetId: number) {
@@ -13,7 +14,9 @@ export async function deleteSheet(workspaceId: number, workbookId: number, sheet
     return { error: "Workbook must keep at least one sheet", statusCode: 409 as const };
   }
 
-  await repo.deleteSheetAndReindex(workbookId, sheetId, workspaceId);
+  await withUndoTrackedSheetMutation(workspaceId, [sheetId], () =>
+    repo.deleteSheetAndReindex(workbookId, sheetId, workspaceId),
+  );
 
   return {
     success: true as const,

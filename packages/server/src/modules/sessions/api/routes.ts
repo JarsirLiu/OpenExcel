@@ -21,7 +21,7 @@ function isDatabaseError(error: unknown): boolean {
 
 function isUndoConflict(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error ?? "");
-  return /没有可撤销|无法撤销|会话记录与运行输入不一致|运行记录中的 .* 输出损坏|会话消息记录损坏/.test(
+  return /没有可撤销|无法撤销|当前运行已失效|会话记录与运行输入不一致|运行记录中的 .* 输出损坏|会话消息记录损坏/.test(
     message,
   );
 }

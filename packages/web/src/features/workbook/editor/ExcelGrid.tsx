@@ -14,6 +14,7 @@ interface Props {
   onWorkbookDelete?: (workbookId: number) => void;
   onWorkbookStructureChanged?: (update: WorkbookStructureUpdate) => void;
   onWorkbookRefresh?: () => Promise<void> | void;
+  onWorkbookMutation?: () => Promise<void> | void;
 }
 
 export function ExcelGrid({
@@ -25,6 +26,7 @@ export function ExcelGrid({
   onWorkbookDelete,
   onWorkbookStructureChanged,
   onWorkbookRefresh,
+  onWorkbookMutation,
 }: Props) {
   const {
     saveStatus,
@@ -47,6 +49,7 @@ export function ExcelGrid({
     onWorkbookDelete,
     onWorkbookStructureChanged,
     onWorkbookRefresh,
+    onWorkbookMutation,
   });
 
   if (!workbook) return null;

@@ -598,11 +598,13 @@ The title endpoint remains available for explicit retry or manual client actions
 
 ### 7.4 Undo flow
 
-1. User requests undo for the latest run.
-2. Server restores the stored sheet snapshots.
-3. Web refreshes workbook state.
+1. A run that modifies a workbook saves pre-mutation Sheet snapshots and becomes the session's single undo checkpoint only after it finishes.
+2. Starting another chat turn clears that Session's prior checkpoint. A later mutation invalidates only Runs that captured the touched Sheet, including Runs still in progress; unrelated Sheets and newly uploaded workbooks do not affect it.
+3. User requests undo only while the session still points to that checkpoint.
+4. Server restores the stored Sheet snapshots, removes workbook structures created by that run, clears the checkpoint, and trims the corresponding chat turn.
+5. Web refreshes workbook and session metadata.
 
-Undo is a workbook-side capability, not a chat rendering concern.
+Undo is a workbook-side capability, not a chat rendering concern. It is intentionally a one-shot operation: it never searches older runs after a checkpoint has been invalidated.
 
 ## 8. API Boundaries
 
@@ -752,7 +754,10 @@ is still writing its history.
 
 Undo is available only through persisted run effects and must be treated as a
 workbook mutation operation. A failed run without snapshots or structural
-effects is not an undo candidate.
+effects is not an undo candidate. A session may expose at most one current
+undo checkpoint. Starting a new turn clears that Session's checkpoint; a
+mutation from elsewhere invalidates a checkpoint candidate only when it
+touches one of its captured Sheets, even if that Run has not finished yet.
 
 ## 12. Migration Plan
 

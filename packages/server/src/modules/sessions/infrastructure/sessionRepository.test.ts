@@ -32,6 +32,7 @@ describe("sessionRepository", () => {
         sheetId: true,
         name: true,
         titleStatus: true,
+        undoRunId: true,
         createdAt: true,
       },
       orderBy: { createdAt: "desc" },

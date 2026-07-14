@@ -13,6 +13,7 @@ export async function findSessionsByWorkspace(workspaceId: number) {
       sheetId: true,
       name: true,
       titleStatus: true,
+      undoRunId: true,
       createdAt: true,
     },
     orderBy: { createdAt: "desc" },
@@ -73,4 +74,19 @@ export async function findSession(id: number, workspaceId: number) {
   return prisma.session.findFirst({
     where: { id, workspaceId },
   });
+}
+
+export async function findSessionUndoCheckpoint(id: number, workspaceId: number) {
+  return prisma.session.findFirst({
+    where: { id, workspaceId },
+    select: { id: true, undoRunId: true },
+  });
+}
+
+export async function setSessionUndoRun(sessionId: number, workspaceId: number, undoRunId: number) {
+  const result = await prisma.session.updateMany({
+    where: { id: sessionId, workspaceId },
+    data: { undoRunId },
+  });
+  return result.count === 1;
 }

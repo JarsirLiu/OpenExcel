@@ -1,3 +1,4 @@
+import { withUndoTrackedSheetMutation } from "../../sessions/runs/undoCheckpoint.js";
 import * as repo from "../infrastructure/sheetRepository.js";
 
 export async function updateSheetData(
@@ -17,7 +18,9 @@ export async function updateSheetData(
     data.config = JSON.stringify(config);
   }
 
-  const updated = await repo.updateSheetData(sheetId, data, workspaceId);
+  const updated = await withUndoTrackedSheetMutation(workspaceId, [sheetId], () =>
+    repo.updateSheetData(sheetId, data, workspaceId),
+  );
   if (!updated) {
     return { error: "Sheet not found" };
   }

@@ -19,7 +19,7 @@ type Props = {
   historyOpen: boolean;
   setHistoryOpen: (next: boolean) => void;
   handleDraftSessionCreated: (sessionId: number) => Promise<void> | void;
-  handleRunComplete: (sessionId: number, messages: any[]) => Promise<void>;
+  handleRunSettled: (sessionId: number, messages: any[]) => Promise<void>;
   handleNewSession: () => void;
   handleSelectSession: (id: number) => void;
   handleDeleteSession: (id: number) => Promise<void>;
@@ -40,7 +40,7 @@ export function SessionShell({
   historyOpen,
   setHistoryOpen,
   handleDraftSessionCreated,
-  handleRunComplete,
+  handleRunSettled,
   handleNewSession,
   handleSelectSession,
   handleDeleteSession,
@@ -114,7 +114,8 @@ export function SessionShell({
           <ChatPanel
             key={currentSessionId}
             sessionId={currentSessionId}
-            onRunComplete={handleRunComplete}
+            hasUndoCheckpoint={currentSession?.undoRunId != null}
+            onRunSettled={handleRunSettled}
           />
         ) : (
           <ChatPanel
@@ -122,7 +123,7 @@ export function SessionShell({
             sessionId={null}
             isDraft
             onDraftSessionCreated={handleDraftSessionCreated}
-            onRunComplete={handleRunComplete}
+            onRunSettled={handleRunSettled}
           />
         )}
       </div>

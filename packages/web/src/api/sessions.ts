@@ -6,6 +6,7 @@ export interface Session {
   sheetId: number | null;
   name: string;
   titleStatus?: "pending" | "generated" | "manual";
+  undoRunId?: number | null;
   createdAt: string;
 }
 

@@ -24,6 +24,7 @@ type UseExcelGridWorkspaceProps = {
   onWorkbookDelete?: (workbookId: number) => void;
   onWorkbookStructureChanged?: (update: WorkbookStructureUpdate) => void;
   onWorkbookRefresh?: () => Promise<void> | void;
+  onWorkbookMutation?: () => Promise<void> | void;
 };
 
 export function useExcelGridWorkspace({
@@ -35,6 +36,7 @@ export function useExcelGridWorkspace({
   onWorkbookDelete,
   onWorkbookStructureChanged,
   onWorkbookRefresh,
+  onWorkbookMutation,
 }: UseExcelGridWorkspaceProps) {
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -87,6 +89,7 @@ export function useExcelGridWorkspace({
       try {
         const sheet = workbook.sheets[currentSheetIndex];
         await updateSheetData(workspaceId, sheet.id, celldata, config);
+        await onWorkbookMutation?.();
         setSaveStatus("saved");
         lastSavedSnapshotRef.current[sheet.id] = getSnapshot(celldata, config);
         if (saveStatusResetRef.current) clearTimeout(saveStatusResetRef.current);
@@ -96,7 +99,7 @@ export function useExcelGridWorkspace({
         console.error("保存失败:", error);
       }
     },
-    [currentSheetIndex, getSnapshot, workbook, workspaceId],
+    [currentSheetIndex, getSnapshot, onWorkbookMutation, workbook, workspaceId],
   );
 
   const scheduleSave = useCallback(
@@ -152,6 +155,7 @@ export function useExcelGridWorkspace({
         try {
           if (workspaceId == null) return;
           const result = await createSheet(workspaceId, workbook.id, { name });
+          await onWorkbookMutation?.();
           await onWorkbookStructureChanged?.({
             toolCallId: `ui-create-sheet:${workbook.id}:${result.id}`,
             kind: "sheet-created",
@@ -169,7 +173,7 @@ export function useExcelGridWorkspace({
       })();
       return false;
     },
-    [onWorkbookRefresh, onWorkbookStructureChanged, workbook, workspaceId],
+    [onWorkbookMutation, onWorkbookRefresh, onWorkbookStructureChanged, workbook, workspaceId],
   );
 
   const handleBeforeDeleteSheet = useCallback(
@@ -183,6 +187,7 @@ export function useExcelGridWorkspace({
         try {
           if (workspaceId == null) return;
           await deleteSheet(workspaceId, workbook.id, numericSheetId);
+          await onWorkbookMutation?.();
           await onWorkbookStructureChanged?.({
             toolCallId: `ui-delete-sheet:${workbook.id}:${numericSheetId}`,
             kind: "sheet-deleted",
@@ -198,7 +203,7 @@ export function useExcelGridWorkspace({
       })();
       return false;
     },
-    [onWorkbookRefresh, onWorkbookStructureChanged, workbook, workspaceId],
+    [onWorkbookMutation, onWorkbookRefresh, onWorkbookStructureChanged, workbook, workspaceId],
   );
 
   const handleBeforeUpdateSheetName = useCallback(
@@ -207,13 +212,14 @@ export function useExcelGridWorkspace({
         try {
           if (workspaceId == null) return;
           await updateSheetName(workspaceId, Number(sheetId), newName);
+          await onWorkbookMutation?.();
         } catch (error) {
           console.error("重命名 Sheet 失败:", error);
         }
       })();
       return true;
     },
-    [workspaceId],
+    [onWorkbookMutation, workspaceId],
   );
 
   const handleDownload = useCallback(() => {
@@ -250,8 +256,9 @@ export function useExcelGridWorkspace({
     if (!ok) return;
     if (workspaceId == null) return;
     await deleteWorkbook(workspaceId, workbook.id);
+    await onWorkbookMutation?.();
     onWorkbookDelete?.(workbook.id);
-  }, [onWorkbookDelete, workbook, workspaceId]);
+  }, [onWorkbookDelete, onWorkbookMutation, workbook, workspaceId]);
 
   return {
     saveStatus,

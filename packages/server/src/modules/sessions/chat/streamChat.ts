@@ -18,6 +18,10 @@ import { SessionBusyError } from "../domain/sessionErrors.js";
 import { withSessionLock } from "../infrastructure/sessionLock.js";
 import * as repo from "../infrastructure/sessionRepository.js";
 import * as runRepo from "../runs/repository.js";
+import {
+  clearSessionUndoCheckpoint,
+  completeRunAndUpdateUndoCheckpoint,
+} from "../runs/undoCheckpoint.js";
 import { buildWorkspaceContext } from "./context.js";
 
 function serializeJson(value: unknown): string | null {
@@ -69,6 +73,8 @@ export async function streamChat(
       }
     }
 
+    await clearSessionUndoCheckpoint(workspaceId, sessionId);
+
     return runRepo.createRun({
       sessionId,
       status: "running",
@@ -105,12 +111,7 @@ export async function streamChat(
     if (finalized) return;
     finalized = true;
     try {
-      await withSessionLock(sessionId, () =>
-        runRepo.updateRun(run.id, {
-          ...data,
-          endedAt: new Date(),
-        }),
-      );
+      await completeRunAndUpdateUndoCheckpoint(workspaceId, sessionId, run.id, data);
     } catch (error) {
       console.error(`[session] Failed to finalize run ${run.id}:`, error);
     }
@@ -217,17 +218,6 @@ export async function streamChat(
         );
 
         await finalizeRunOnce(outcome);
-
-        try {
-          await withSessionLock(sessionId, () =>
-            runRepo.pruneUndoSnapshots(workspaceId, sessionId),
-          );
-        } catch (error) {
-          console.error(
-            `[session] Failed to prune undo snapshots for session ${sessionId}:`,
-            error,
-          );
-        }
       },
     });
   } catch (error) {

@@ -12,6 +12,7 @@ interface Props {
   onWorkbookDelete?: (workbookId: number) => void;
   onWorkbookStructureChanged?: (update: WorkbookStructureUpdate) => void;
   onWorkbookRefresh?: () => Promise<void>;
+  onWorkbookMutation?: () => Promise<void> | void;
 }
 
 export function ExcelWorkspace({
@@ -23,6 +24,7 @@ export function ExcelWorkspace({
   onWorkbookDelete,
   onWorkbookStructureChanged,
   onWorkbookRefresh,
+  onWorkbookMutation,
 }: Props) {
   return (
     <div className={styles.container}>
@@ -35,6 +37,7 @@ export function ExcelWorkspace({
         onWorkbookDelete={onWorkbookDelete}
         onWorkbookStructureChanged={onWorkbookStructureChanged}
         onWorkbookRefresh={onWorkbookRefresh}
+        onWorkbookMutation={onWorkbookMutation}
       />
     </div>
   );

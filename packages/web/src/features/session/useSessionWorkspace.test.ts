@@ -142,6 +142,41 @@ describe("useSessionWorkspace", () => {
     expect(result.current.currentSessionId).toBeNull();
   });
 
+  it("refreshes session metadata after undo succeeds", async () => {
+    const onWorkspaceRefresh = vi.fn().mockResolvedValue(undefined);
+    mocks.fetchSessions.mockResolvedValue([
+      {
+        id: 10,
+        publicId: "session-10",
+        sheetId: null,
+        name: "已撤销",
+        undoRunId: null,
+        createdAt: "2026-07-14T00:00:00.000Z",
+      },
+    ]);
+    const { result } = renderHook(() =>
+      useSessionWorkspace(1, onWorkspaceRefresh, {
+        sessions: [
+          {
+            id: 10,
+            publicId: "session-10",
+            sheetId: null,
+            name: "待撤销",
+            undoRunId: 31,
+            createdAt: "2026-07-14T00:00:00.000Z",
+          },
+        ],
+      }),
+    );
+
+    await act(async () => {
+      await result.current.handleUndoComplete();
+    });
+
+    expect(onWorkspaceRefresh).toHaveBeenCalledOnce();
+    expect(result.current.sessions[0]?.undoRunId).toBeNull();
+  });
+
   it("does not reuse a session from the previous workspace", async () => {
     mocks.fetchSessions.mockImplementation(async (workspaceId: number) =>
       workspaceId === 2

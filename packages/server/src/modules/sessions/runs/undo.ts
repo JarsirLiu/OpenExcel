@@ -1,6 +1,6 @@
 import { prisma } from "../../../infra/database/db.js";
 import type { Prisma } from "../../../infra/database/prismaTypes.js";
-import { withSessionLock } from "../infrastructure/sessionLock.js";
+import { withWorkspaceUndoLock } from "../infrastructure/workspaceUndoLock.js";
 import * as repo from "./repository.js";
 
 type ChatMessageLike = {
@@ -40,6 +40,33 @@ function parseJson<T>(value: string | null | undefined, errorMessage: string): T
   } catch {
     throw new Error(errorMessage);
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function parseToolOutput(
+  step: UndoableRunStep,
+  toolName: string,
+  errorMessage: string,
+): Record<string, unknown> {
+  const storedOutput = parseJson<unknown>(step.output, errorMessage);
+  const results = Array.isArray(storedOutput) ? storedOutput : [storedOutput];
+
+  for (const result of results) {
+    if (!isRecord(result)) continue;
+    if (results.length > 1 && result.toolName !== toolName) continue;
+
+    const output = result.output ?? result.result ?? result;
+    if (isRecord(output)) return output;
+    if (typeof output === "string") {
+      const parsed = parseJson<unknown>(output, errorMessage);
+      if (isRecord(parsed)) return parsed;
+    }
+  }
+
+  throw new Error(errorMessage);
 }
 
 function extractMessageText(message: ChatMessageLike): string {
@@ -94,10 +121,18 @@ function parseStructuralUndoEffects(steps: UndoableRunStep[]): StructuralUndoEff
         : [];
 
     if (toolNames.includes("createWorkbook")) {
-      const output = parseJson<{
-        id: number;
-        initialSheet: { id: number };
-      }>(step.output, "运行记录中的 createWorkbook 输出损坏，无法撤销");
+      const output = parseToolOutput(
+        step,
+        "createWorkbook",
+        "运行记录中的 createWorkbook 输出损坏，无法撤销",
+      );
+      if (
+        typeof output.id !== "number" ||
+        !isRecord(output.initialSheet) ||
+        typeof output.initialSheet.id !== "number"
+      ) {
+        throw new Error("运行记录中的 createWorkbook 输出损坏，无法撤销");
+      }
 
       effects.push({
         kind: "createWorkbook",
@@ -105,14 +140,17 @@ function parseStructuralUndoEffects(steps: UndoableRunStep[]): StructuralUndoEff
         initialSheetId: output.initialSheet.id,
         order: step.order,
       });
-      continue;
     }
 
     if (toolNames.includes("createSheet")) {
-      const output = parseJson<{
-        workbookId: number;
-        id: number;
-      }>(step.output, "运行记录中的 createSheet 输出损坏，无法撤销");
+      const output = parseToolOutput(
+        step,
+        "createSheet",
+        "运行记录中的 createSheet 输出损坏，无法撤销",
+      );
+      if (typeof output.workbookId !== "number" || typeof output.id !== "number") {
+        throw new Error("运行记录中的 createSheet 输出损坏，无法撤销");
+      }
 
       effects.push({
         kind: "createSheet",
@@ -193,7 +231,7 @@ async function deleteSheetAndReindex(
 }
 
 async function undoLatestRunInternal(workspaceId: number, sessionId: number) {
-  const run = await repo.findLatestUndoableRun(workspaceId, sessionId);
+  const run = await repo.findUndoCheckpointRun(workspaceId, sessionId);
   if (!run) {
     throw new Error("没有可撤销的本轮修改");
   }
@@ -227,10 +265,13 @@ async function undoLatestRunInternal(workspaceId: number, sessionId: number) {
   const restoredSheetIds = await prisma.$transaction(async (tx) => {
     const session = await tx.session.findFirst({
       where: { id: sessionId, workspaceId },
-      select: { id: true, chatMessages: true },
+      select: { id: true, chatMessages: true, undoRunId: true },
     });
     if (!session) {
       throw new Error("Session not found");
+    }
+    if (session.undoRunId !== run.id) {
+      throw new Error("当前运行已失效，无法撤销");
     }
 
     const messages = parseJson<ChatMessageLike[]>(
@@ -257,6 +298,7 @@ async function undoLatestRunInternal(workspaceId: number, sessionId: number) {
       where: { id: session.id },
       data: {
         chatMessages: JSON.stringify(restoredMessages),
+        undoRunId: null,
       },
     });
 
@@ -279,5 +321,5 @@ async function undoLatestRunInternal(workspaceId: number, sessionId: number) {
 }
 
 export async function undoLatestRun(workspaceId: number, sessionId: number) {
-  return withSessionLock(sessionId, () => undoLatestRunInternal(workspaceId, sessionId));
+  return withWorkspaceUndoLock(workspaceId, () => undoLatestRunInternal(workspaceId, sessionId));
 }

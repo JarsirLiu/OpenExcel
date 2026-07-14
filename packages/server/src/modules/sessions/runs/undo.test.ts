@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  findLatestUndoableRun: vi.fn(),
+  findUndoCheckpointRun: vi.fn(),
   transaction: vi.fn(),
   sessionFindFirst: vi.fn(),
   agentRunSheetSnapshotFindMany: vi.fn(),
@@ -16,7 +16,11 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("./repository.js", () => ({
-  findLatestUndoableRun: mocks.findLatestUndoableRun,
+  findUndoCheckpointRun: mocks.findUndoCheckpointRun,
+}));
+
+vi.mock("../infrastructure/workspaceUndoLock.js", () => ({
+  withWorkspaceUndoLock: (_workspaceId: number, operation: () => Promise<unknown>) => operation(),
 }));
 
 vi.mock("../../../infra/database/db.js", () => ({
@@ -54,7 +58,7 @@ function buildTx() {
 
 describe("undoLatestRun", () => {
   beforeEach(() => {
-    mocks.findLatestUndoableRun.mockReset();
+    mocks.findUndoCheckpointRun.mockReset();
     mocks.transaction.mockReset();
     mocks.sessionFindFirst.mockReset();
     mocks.agentRunSheetSnapshotFindMany.mockReset();
@@ -69,17 +73,19 @@ describe("undoLatestRun", () => {
   });
 
   it("should undo a created workbook and restore the prompt", async () => {
-    mocks.findLatestUndoableRun.mockResolvedValueOnce({
+    mocks.findUndoCheckpointRun.mockResolvedValueOnce({
       id: 11,
       inputText: "创建一个工作簿",
       steps: [
         {
           order: 0,
           toolName: "createWorkbook",
-          output: JSON.stringify({
-            id: 21,
-            initialSheet: { id: 31 },
-          }),
+          output: JSON.stringify([
+            {
+              toolName: "createWorkbook",
+              output: { id: 21, initialSheet: { id: 31 } },
+            },
+          ]),
         },
       ],
       snapshots: [],
@@ -89,6 +95,7 @@ describe("undoLatestRun", () => {
     );
     mocks.sessionFindFirst.mockResolvedValueOnce({
       id: 5,
+      undoRunId: 11,
       chatMessages: JSON.stringify([
         { role: "user", content: "创建一个工作簿" },
         { role: "assistant", content: "好的" },
@@ -109,7 +116,7 @@ describe("undoLatestRun", () => {
     expect(mocks.workbookDelete).toHaveBeenCalledWith({ where: { id: 21 } });
     expect(mocks.sessionUpdate).toHaveBeenCalledWith({
       where: { id: 5 },
-      data: { chatMessages: "[]" },
+      data: { chatMessages: "[]", undoRunId: null },
     });
     expect(mocks.agentRunUpdate).toHaveBeenCalledWith({
       where: { id: 11 },
@@ -121,17 +128,19 @@ describe("undoLatestRun", () => {
   });
 
   it("should undo a created sheet without restoring the created sheet snapshot", async () => {
-    mocks.findLatestUndoableRun.mockResolvedValueOnce({
+    mocks.findUndoCheckpointRun.mockResolvedValueOnce({
       id: 12,
       inputText: "新建一个 sheet",
       steps: [
         {
           order: 0,
           toolName: "createSheet",
-          output: JSON.stringify({
-            workbookId: 9,
-            id: 77,
-          }),
+          output: JSON.stringify([
+            {
+              toolName: "createSheet",
+              output: { workbookId: 9, id: 77 },
+            },
+          ]),
         },
       ],
       snapshots: [],
@@ -141,6 +150,7 @@ describe("undoLatestRun", () => {
     );
     mocks.sessionFindFirst.mockResolvedValueOnce({
       id: 6,
+      undoRunId: 12,
       chatMessages: JSON.stringify([
         { role: "user", content: "新建一个 sheet" },
         { role: "assistant", content: "已创建" },
@@ -178,7 +188,7 @@ describe("undoLatestRun", () => {
     expect(mocks.sheetDelete).toHaveBeenCalledWith({ where: { id: 77 } });
     expect(mocks.sessionUpdate).toHaveBeenCalledWith({
       where: { id: 6 },
-      data: { chatMessages: "[]" },
+      data: { chatMessages: "[]", undoRunId: null },
     });
   });
 });

@@ -26,12 +26,12 @@ describe("buildExcelToolContext", () => {
     const mergedContext = buildExcelToolContext(7, 3);
 
     expect(workspaceContext).toEqual({
-      createWorkbook: { workspaceId: 3 },
-      createSheet: { workspaceId: 3 },
       readSheet: { workspaceId: 3 },
     });
 
     expect(runContext).toEqual({
+      createWorkbook: { runId: 7, workspaceId: 3 },
+      createSheet: { runId: 7, workspaceId: 3 },
       writeCells: { runId: 7, workspaceId: 3 },
       clearCells: { runId: 7, workspaceId: 3 },
       mergeCells: { runId: 7, workspaceId: 3 },
@@ -39,9 +39,9 @@ describe("buildExcelToolContext", () => {
     });
 
     expect(mergedContext).toEqual({
-      createWorkbook: { workspaceId: 3 },
-      createSheet: { workspaceId: 3 },
       readSheet: { workspaceId: 3 },
+      createWorkbook: { runId: 7, workspaceId: 3 },
+      createSheet: { runId: 7, workspaceId: 3 },
       writeCells: { runId: 7, workspaceId: 3 },
       clearCells: { runId: 7, workspaceId: 3 },
       mergeCells: { runId: 7, workspaceId: 3 },
