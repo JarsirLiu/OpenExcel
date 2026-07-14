@@ -6,7 +6,7 @@ import { AuthScreen } from "@/features/auth/AuthScreen";
 import { useAuthState } from "@/features/auth/useAuthState";
 import { SheetActivationProvider } from "@/features/workbook/editor/SheetActivationContext";
 import { t } from "@/lib/i18n";
-import { ConfirmDialog } from "@/shared/ui";
+import { ConfirmDialog, Toast } from "@/shared/ui";
 import { clearSessionStorage } from "@/shared/utils/storage";
 
 const Workbench = lazy(() =>
@@ -121,6 +121,7 @@ function WorkbenchPage() {
         </SheetActivationProvider>
       </Suspense>
       <ConfirmDialog />
+      <Toast />
     </>
   );
 }

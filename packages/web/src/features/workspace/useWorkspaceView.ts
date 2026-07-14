@@ -10,6 +10,7 @@ import {
   uploadNewWorkbook,
 } from "@/api/workbooks";
 import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatchSync";
+import { toast } from "@/shared/lib";
 import { patchWorkbookWithDelta } from "../workbook/utils/patchWorkbook";
 import { useWorkbookCatalog } from "./useWorkbookCatalog";
 
@@ -296,11 +297,16 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
           setWorkbookIdx(idx);
           setCurrentSheetIndex(0);
         }
-        setStatus(files.length === 1 ? "上传完成" : `已上传 ${files.length} 个文件`);
+        setStatus("");
+        toast({
+          message: files.length === 1 ? "上传完成" : `已上传 ${files.length} 个文件`,
+          variant: "success",
+        });
       } catch (error) {
         if (controller.signal.aborted) return;
         const message = error instanceof Error ? error.message : "上传失败";
-        setStatus(`上传失败：${message}`);
+        setStatus("");
+        toast({ message: `上传失败：${message}`, variant: "error" });
       }
     },
     [
