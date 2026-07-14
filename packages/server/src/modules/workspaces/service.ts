@@ -9,6 +9,7 @@ import {
   normalizeWorkbookName,
 } from "../workbooks/create/creation.js";
 import { ensureInitialWorkspace } from "./application/ensureInitialWorkspace.js";
+import { exampleWorkspaceProvisioner } from "./infrastructure/exampleWorkspaceProvisioner.js";
 import * as repo from "./repository.js";
 
 export class WorkspaceNotFoundError extends Error {
@@ -22,13 +23,13 @@ export class WorkspaceNotFoundError extends Error {
 }
 
 export async function getWorkspaces(ownerUserId: number) {
-  const workspaces = await repo.findWorkspaces(ownerUserId);
-  if (workspaces.length > 0) {
-    return workspaces;
-  }
-
-  await ensureInitialWorkspace(ownerUserId);
   return repo.findWorkspaces(ownerUserId);
+}
+
+export async function bootstrapWorkspace(ownerUserId: number) {
+  await ensureInitialWorkspace(ownerUserId, exampleWorkspaceProvisioner);
+  const workspaces = await repo.findWorkspaces(ownerUserId);
+  return workspaces[0] ?? null;
 }
 
 export async function getWorkspaceById(id: number) {

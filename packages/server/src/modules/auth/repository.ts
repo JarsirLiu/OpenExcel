@@ -14,6 +14,11 @@ export interface CreateSessionData {
   ipAddress?: string | null;
 }
 
+export interface CreateUserWithSessionData {
+  user: CreateUserData;
+  session: Omit<CreateSessionData, "userId">;
+}
+
 export async function findUserByEmail(email: string) {
   return prisma.user.findUnique({
     where: { email },
@@ -26,9 +31,23 @@ export async function findUserById(id: number) {
   });
 }
 
-export async function createUser(data: CreateUserData) {
-  return prisma.user.create({
-    data,
+export async function createUserWithSession(data: CreateUserWithSessionData) {
+  return prisma.$transaction(async (tx) => {
+    const user = await tx.user.create({
+      data: data.user,
+    });
+
+    await tx.authSession.create({
+      data: {
+        userId: user.id,
+        tokenHash: data.session.tokenHash,
+        expiresAt: data.session.expiresAt,
+        userAgent: data.session.userAgent ?? null,
+        ipAddress: data.session.ipAddress ?? null,
+      },
+    });
+
+    return user;
   });
 }
 

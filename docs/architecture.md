@@ -234,7 +234,7 @@ The current implementation follows that direction with a cookie-backed email/pas
 - each browser gets an opaque session token stored in an HttpOnly cookie
 - the server resolves it to a current user at request time
 - registration or login only provisions the authentication session
-- the first authenticated workspace query lazily provisions the user's private workspace
+- an explicit authenticated bootstrap command provisions the user's private workspace
 - workspace, workbook, sheet, and session reads are filtered by the current user
 
 This keeps the SQLite development path usable for multi-user demos without changing the workbook model or exposing internal sheet identifiers as a permission boundary, while leaving room for password reset, logout-all, and future SSO-style auth later.
@@ -528,14 +528,16 @@ If a bug affects two panes at once, treat it as a boundary bug and add a regress
 
 ### 7.1.1 Authentication and workspace bootstrap flow
 
-1. Registration or login validates credentials and creates an `AuthSession`.
+1. Registration or login validates credentials and atomically creates the user and `AuthSession`.
 2. The server sets the opaque `openexcel_session` cookie and returns the current user.
-3. The web app navigates to the protected workbench route.
-4. The protected route loads `GET /api/workspaces`.
-5. If the user has no workspace, the workspace application layer provisions the initial workspace, workbook, sheets, and first conversation `Session` in one transaction.
-6. The workspace list is read again and returned to the route loader.
+3. The web app calls `POST /api/workspaces/bootstrap`.
+4. The bootstrap use case provisions the initial workspace, workbook, sheets, and first conversation `Session` in one idempotent transaction.
+5. The web app navigates to the protected workbench route.
+6. The route loader reads `GET /api/workspaces`, then loads workbooks and conversation sessions.
 
 `AuthSession` is the login identity. `Session` is the persisted conversation resource under a workspace. Login must never create a conversation session.
+
+`GET /api/workspaces` is a read-only query. Initialization is never hidden inside a list request.
 
 ### 7.2 Chat flow
 
@@ -573,6 +575,17 @@ Undo is a workbook-side capability, not a chat rendering concern.
 ## 8. API Boundaries
 
 The API surface should stay explicit.
+
+### 8.0 Authentication and bootstrap APIs
+
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+- `POST /api/auth/logout`
+- `GET /api/auth/me`
+- `POST /api/workspaces/bootstrap`
+- `GET /api/workspaces`
+
+The bootstrap command is authenticated and idempotent. The workspace list endpoint is read-only and must not create application data.
 
 ### 8.1 Workbook APIs
 

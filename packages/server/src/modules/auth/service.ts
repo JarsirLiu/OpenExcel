@@ -71,21 +71,37 @@ function getRequestMetadata(req: FastifyRequest) {
   };
 }
 
-async function issueSessionForUser(userId: number, req: FastifyRequest, reply: FastifyReply) {
+function buildSessionData(req: FastifyRequest) {
   const rawToken = createSessionToken();
   const tokenHash = hashSessionToken(rawToken);
   const expiresAt = new Date(Date.now() + AUTH_SESSION_MAX_AGE_SECONDS * 1000);
   const metadata = getRequestMetadata(req);
 
-  await authRepo.createSession({
-    userId,
-    tokenHash,
-    expiresAt,
-    userAgent: metadata.userAgent,
-    ipAddress: metadata.ipAddress,
+  return {
+    rawToken,
+    session: {
+      tokenHash,
+      expiresAt,
+      userAgent: metadata.userAgent,
+      ipAddress: metadata.ipAddress,
+    },
+  };
+}
+
+async function issueSessionForUser(userId: number, req: FastifyRequest, reply: FastifyReply) {
+  const { rawToken, session } = buildSessionData(req);
+  await authRepo.createSession({ userId, ...session });
+  reply.header("Set-Cookie", buildSessionCookie(rawToken));
+}
+
+async function registerUserWithSession(userData: authRepo.CreateUserData, req: FastifyRequest) {
+  const { rawToken, session } = buildSessionData(req);
+  const user = await authRepo.createUserWithSession({
+    user: userData,
+    session,
   });
 
-  reply.header("Set-Cookie", buildSessionCookie(rawToken));
+  return { rawToken, user };
 }
 
 export async function resolveCurrentUser(req: FastifyRequest): Promise<CurrentUserContext | null> {
@@ -130,13 +146,15 @@ export async function registerWithPassword(
   }
 
   const passwordHash = await hashPassword(validated.password);
-  const user = await authRepo.createUser({
-    email: validated.email,
-    displayName: validated.displayName,
-    passwordHash,
-  });
-
-  await issueSessionForUser(user.id, req, reply);
+  const { rawToken, user } = await registerUserWithSession(
+    {
+      email: validated.email,
+      displayName: validated.displayName,
+      passwordHash,
+    },
+    req,
+  );
+  reply.header("Set-Cookie", buildSessionCookie(rawToken));
   return toCurrentUser(user);
 }
 

@@ -28,6 +28,7 @@ vi.mock("./application/ensureInitialWorkspace.js", () => ({
 }));
 
 import {
+  bootstrapWorkspace,
   ensureWorkspaceForUser,
   getWorkspaces,
   requireWorkspace,
@@ -55,23 +56,25 @@ describe("workspace service scoping", () => {
     expect(mocks.findWorkspaces).toHaveBeenCalledWith(42);
   });
 
-  it("initializes a workspace before returning an empty user's workspaces", async () => {
-    mocks.findWorkspaces.mockResolvedValueOnce([]).mockResolvedValueOnce([{ id: 8 }]);
-    mocks.ensureInitialWorkspace.mockResolvedValueOnce({ seeded: true, workspaceId: 8 });
+  it("keeps workspace listing read-only", async () => {
+    mocks.findWorkspaces.mockResolvedValueOnce([]);
 
     const workspaces = await getWorkspaces(42);
 
-    expect(mocks.ensureInitialWorkspace).toHaveBeenCalledWith(42);
-    expect(workspaces).toEqual([{ id: 8 }]);
-    expect(mocks.findWorkspaces).toHaveBeenCalledTimes(2);
+    expect(workspaces).toEqual([]);
+    expect(mocks.ensureInitialWorkspace).not.toHaveBeenCalled();
+    expect(mocks.findWorkspaces).toHaveBeenCalledTimes(1);
   });
 
-  it("does not initialize an existing user's workspaces", async () => {
-    mocks.findWorkspaces.mockResolvedValueOnce([{ id: 1 }]);
+  it("bootstraps and returns the user's first workspace", async () => {
+    mocks.ensureInitialWorkspace.mockResolvedValueOnce({ seeded: true, workspaceId: 8 });
+    mocks.findWorkspaces.mockResolvedValueOnce([{ id: 8 }]);
 
-    await getWorkspaces(42);
+    const workspace = await bootstrapWorkspace(42);
 
-    expect(mocks.ensureInitialWorkspace).not.toHaveBeenCalled();
+    expect(workspace).toEqual({ id: 8 });
+    expect(mocks.ensureInitialWorkspace).toHaveBeenCalledWith(42, expect.anything());
+    expect(mocks.findWorkspaces).toHaveBeenCalledWith(42);
   });
 
   it("throws when a workspace does not belong to the current user", async () => {

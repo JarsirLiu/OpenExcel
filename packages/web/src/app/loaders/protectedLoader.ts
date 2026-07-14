@@ -1,14 +1,21 @@
-import { redirect } from "react-router-dom";
+import { type LoaderFunctionArgs, redirect } from "react-router-dom";
 import { fetchCurrentUser } from "@/api/auth";
-import { getCachedUser } from "@/api/authCache";
+import { bootstrapWorkspace } from "@/api/workspaces";
 
-export async function protectedLoader() {
-  const cached = getCachedUser();
-  if (cached) return { currentUser: cached };
+export async function protectedLoader({ params }: LoaderFunctionArgs) {
+  const currentUser = await resolveUser();
 
+  if (!params.workspacePublicId) {
+    const workspace = await bootstrapWorkspace(currentUser.id);
+    throw redirect(`/workspaces/${workspace.publicId}`);
+  }
+
+  return { currentUser };
+}
+
+async function resolveUser() {
   try {
-    const currentUser = await fetchCurrentUser();
-    return { currentUser };
+    return await fetchCurrentUser();
   } catch {
     throw redirect("/login");
   }

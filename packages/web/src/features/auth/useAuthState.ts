@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { type CurrentUser, fetchCurrentUser, login, logout, register } from "@/api/auth";
-import { clearCachedUser, setCachedUser } from "@/api/authCache";
 import { clearSessionStorage } from "@/shared/utils/storage";
 
 export function useAuthState() {
@@ -40,7 +39,6 @@ export function useAuthState() {
     try {
       const user = await login(input);
       setCurrentUser(user);
-      setCachedUser(user);
       return user;
     } catch (err) {
       const message = err instanceof Error ? err.message : "登录失败";
@@ -57,7 +55,6 @@ export function useAuthState() {
     try {
       const user = await register(input);
       setCurrentUser(user);
-      setCachedUser(user);
       return user;
     } catch (err) {
       const message = err instanceof Error ? err.message : "注册失败";
@@ -74,7 +71,6 @@ export function useAuthState() {
     try {
       await logout();
       setCurrentUser(null);
-      clearCachedUser();
       clearSessionStorage();
     } catch (err) {
       const message = err instanceof Error ? err.message : "退出失败";

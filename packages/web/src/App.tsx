@@ -66,14 +66,10 @@ function AuthPage() {
   const authMode = location.pathname === "/register" ? "register" : "login";
 
   useEffect(() => {
-    if (
-      !auth.loading &&
-      auth.currentUser &&
-      (location.pathname === "/login" || location.pathname === "/register")
-    ) {
+    if (!auth.loading && auth.currentUser) {
       navigate("/", { replace: true });
     }
-  }, [auth.currentUser, auth.loading, location.pathname, navigate]);
+  }, [auth.currentUser, auth.loading, navigate]);
 
   if (auth.loading) return <LoadingScreen />;
   return (

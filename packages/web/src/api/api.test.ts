@@ -10,12 +10,85 @@ import {
   fetchWorkbooks,
   updateSheetData,
 } from "./workbooks";
+import { bootstrapWorkspace } from "./workspaces";
 
 const mockFetch = vi.fn();
 globalThis.fetch = mockFetch;
 
 beforeEach(() => {
   mockFetch.mockReset();
+});
+
+describe("bootstrapWorkspace", () => {
+  it("uses the explicit bootstrap endpoint", async () => {
+    const workspace = { id: 1, publicId: "ws_test", name: "Test", order: 0 };
+    mockFetch.mockResolvedValue(new Response(JSON.stringify(workspace), { status: 200 }));
+
+    await expect(bootstrapWorkspace(1)).resolves.toEqual(workspace);
+    expect(mockFetch).toHaveBeenCalledWith("/api/workspaces/bootstrap", { method: "POST" });
+  });
+
+  it("does not cache a completed bootstrap result", async () => {
+    const firstWorkspace = { id: 1, publicId: "ws_first", name: "First", order: 0 };
+    const secondWorkspace = { id: 2, publicId: "ws_second", name: "Second", order: 0 };
+    mockFetch
+      .mockResolvedValueOnce(new Response(JSON.stringify(firstWorkspace), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(secondWorkspace), { status: 200 }));
+
+    await expect(bootstrapWorkspace(1)).resolves.toEqual(firstWorkspace);
+    await expect(bootstrapWorkspace(1)).resolves.toEqual(secondWorkspace);
+
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("deduplicates concurrent bootstrap requests per user", async () => {
+    const workspace = { id: 1, publicId: "ws_test", name: "Test", order: 0 };
+    let resolveRequest: (response: Response) => void = () => {};
+    mockFetch.mockReturnValue(
+      new Promise<Response>((resolve) => {
+        resolveRequest = resolve;
+      }),
+    );
+
+    const firstRequest = bootstrapWorkspace(1);
+    const secondRequest = bootstrapWorkspace(1);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+
+    resolveRequest(new Response(JSON.stringify(workspace), { status: 200 }));
+    await expect(Promise.all([firstRequest, secondRequest])).resolves.toEqual([
+      workspace,
+      workspace,
+    ]);
+  });
+
+  it("does not share in-flight requests between users", async () => {
+    const firstWorkspace = { id: 1, publicId: "ws_first", name: "First", order: 0 };
+    const secondWorkspace = { id: 2, publicId: "ws_second", name: "Second", order: 0 };
+    let resolveFirst: (response: Response) => void = () => {};
+    let resolveSecond: (response: Response) => void = () => {};
+    mockFetch
+      .mockReturnValueOnce(
+        new Promise<Response>((resolve) => {
+          resolveFirst = resolve;
+        }),
+      )
+      .mockReturnValueOnce(
+        new Promise<Response>((resolve) => {
+          resolveSecond = resolve;
+        }),
+      );
+
+    const firstRequest = bootstrapWorkspace(1);
+    const secondRequest = bootstrapWorkspace(2);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+
+    resolveFirst(new Response(JSON.stringify(firstWorkspace), { status: 200 }));
+    resolveSecond(new Response(JSON.stringify(secondWorkspace), { status: 200 }));
+    await expect(Promise.all([firstRequest, secondRequest])).resolves.toEqual([
+      firstWorkspace,
+      secondWorkspace,
+    ]);
+  });
 });
 
 describe("fetchWorkbooks", () => {

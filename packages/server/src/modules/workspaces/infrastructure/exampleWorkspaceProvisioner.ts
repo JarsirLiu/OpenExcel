@@ -113,3 +113,7 @@ export async function provisionExampleWorkspaceForUser(
     return { seeded: true as const, workspaceId: workspace.id };
   });
 }
+
+export const exampleWorkspaceProvisioner = {
+  provision: provisionExampleWorkspaceForUser,
+};

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   findSessionByTokenHash: vi.fn(),
   findUserByEmail: vi.fn(),
-  createUser: vi.fn(),
+  createUserWithSession: vi.fn(),
   createSession: vi.fn(),
   revokeSessionByTokenHash: vi.fn(),
   revokeAllSessionsByUser: vi.fn(),
@@ -19,7 +19,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("./repository.js", () => ({
   findSessionByTokenHash: mocks.findSessionByTokenHash,
   findUserByEmail: mocks.findUserByEmail,
-  createUser: mocks.createUser,
+  createUserWithSession: mocks.createUserWithSession,
   createSession: mocks.createSession,
   revokeSessionByTokenHash: mocks.revokeSessionByTokenHash,
   revokeAllSessionsByUser: mocks.revokeAllSessionsByUser,
@@ -52,7 +52,7 @@ describe("auth service", () => {
   beforeEach(() => {
     mocks.findSessionByTokenHash.mockReset();
     mocks.findUserByEmail.mockReset();
-    mocks.createUser.mockReset();
+    mocks.createUserWithSession.mockReset();
     mocks.createSession.mockReset();
     mocks.revokeSessionByTokenHash.mockReset();
     mocks.revokeAllSessionsByUser.mockReset();
@@ -82,7 +82,7 @@ describe("auth service", () => {
   it("registers a user and sets an auth cookie without provisioning workspace data", async () => {
     mocks.findUserByEmail.mockResolvedValue(null);
     mocks.hashPassword.mockResolvedValue("hashed-password");
-    mocks.createUser.mockResolvedValue({
+    mocks.createUserWithSession.mockResolvedValue({
       id: 12,
       email: "new@example.com",
       displayName: "New User",
@@ -99,18 +99,20 @@ describe("auth service", () => {
     );
 
     expect(user).toEqual({ id: 12, email: "new@example.com", displayName: "New User" });
-    expect(mocks.createUser).toHaveBeenCalledWith({
-      email: "new@example.com",
-      displayName: "New User",
-      passwordHash: "hashed-password",
+    expect(mocks.createUserWithSession).toHaveBeenCalledWith({
+      user: {
+        email: "new@example.com",
+        displayName: "New User",
+        passwordHash: "hashed-password",
+      },
+      session: {
+        tokenHash: "session-hash",
+        expiresAt: expect.any(Date),
+        userAgent: null,
+        ipAddress: "127.0.0.1",
+      },
     });
-    expect(mocks.createSession).toHaveBeenCalledWith({
-      userId: 12,
-      tokenHash: "session-hash",
-      expiresAt: expect.any(Date),
-      userAgent: null,
-      ipAddress: "127.0.0.1",
-    });
+    expect(mocks.createSession).not.toHaveBeenCalled();
     expect(reply.header).toHaveBeenCalledWith("Set-Cookie", "cookie-value");
   });
 

@@ -10,6 +10,16 @@ export async function workspaceRoutes(app: FastifyInstance) {
     return service.getWorkspaces(currentUser.id);
   });
 
+  app.post("/api/workspaces/bootstrap", async (req, reply) => {
+    const currentUser = requireCurrentUser(req, reply);
+    if (!currentUser) return;
+    const workspace = await service.bootstrapWorkspace(currentUser.id);
+    if (!workspace) {
+      return reply.status(503).send({ error: "Unable to initialize workspace" });
+    }
+    return workspace;
+  });
+
   app.post<{ Body: { name?: string } }>("/api/workspaces", async (req, reply) => {
     const currentUser = requireCurrentUser(req, reply);
     if (!currentUser) return;
