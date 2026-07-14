@@ -2,6 +2,7 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchMessages as fetchChatMessages, undoLatestRun } from "@/api/chat";
+import { useDraftSessionTransition } from "./useDraftSessionTransition";
 import { collectWorkbookMutationToolCallIds } from "./useSheetPatchSync";
 
 const PAGE_SIZE = 40;
@@ -50,13 +51,6 @@ function removeEmptyAssistantMessages(messages: any[]): any[] {
   );
 }
 
-function createClientRequestId(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
-  }
-  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
-
 export function applyInitialMessages(currentMessages: any[], loadedMessages: any[]): any[] {
   return currentMessages.length > 0 ? currentMessages : loadedMessages;
 }
@@ -78,7 +72,6 @@ export function useChatConversation({
   onWorkspaceRefresh?: () => Promise<void> | void;
   onStreamingChange?: (isStreaming: boolean) => void;
 }) {
-  const draftSessionIdRef = useRef<number | null>(null);
   const messagesRef = useRef<any[]>(initialMessages ?? []);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [hasOlder, setHasOlder] = useState(false);
@@ -90,9 +83,16 @@ export function useChatConversation({
   const loadedOffsetRef = useRef(initialMessages?.length ?? 0);
   const requestGenerationRef = useRef(0);
   const mountedRef = useRef(true);
-  const draftRequestIdRef = useRef<string | null>(
-    sessionId == null ? createClientRequestId() : null,
-  );
+  const {
+    draftRequestId,
+    isTransitioning: isDraftSessionTransitioning,
+    captureDraftResponse,
+    beginTransition: beginDraftSessionTransition,
+    isSendLocked,
+  } = useDraftSessionTransition({
+    isDraft: sessionId == null,
+    onDraftSessionCreated,
+  });
 
   const transport = useMemo(() => {
     const isDraft = sessionId == null;
@@ -100,33 +100,22 @@ export function useChatConversation({
       api: isDraft
         ? `/api/workspaces/${workspaceId}/sessions/draft/chat`
         : `/api/workspaces/${workspaceId}/sessions/${sessionId}/chat`,
-      headers: isDraft
-        ? { "Idempotency-Key": draftRequestIdRef.current ?? createClientRequestId() }
-        : undefined,
+      headers: isDraft && draftRequestId ? { "Idempotency-Key": draftRequestId } : undefined,
       fetch: async (input, init) => {
         const response = await fetch(input, init);
-        if (isDraft) {
-          const createdSessionId = Number(response.headers.get("X-OpenExcel-Session-Id"));
-          if (Number.isInteger(createdSessionId) && createdSessionId > 0) {
-            draftSessionIdRef.current = createdSessionId;
-            if (response.status === 409) {
-              void onDraftSessionCreated?.(createdSessionId);
-            }
-          }
-        }
+        captureDraftResponse(response);
         return response;
       },
     });
-  }, [onDraftSessionCreated, sessionId, workspaceId]);
+  }, [captureDraftResponse, draftRequestId, sessionId, workspaceId]);
 
   const { messages, setMessages, sendMessage, status, stop, error } = useChat({
     id: `${workspaceId}:${sessionId}`,
     messages: initialMessages ?? [],
     transport,
     onFinish: ({ isAbort, isError, messages: finishedMessages }) => {
-      const createdSessionId = draftSessionIdRef.current;
-      if (createdSessionId != null) {
-        void onDraftSessionCreated?.(createdSessionId);
+      if (!isAbort) {
+        beginDraftSessionTransition();
       }
       if (isAbort || isError || !mountedRef.current) return;
       void onRunComplete?.(finishedMessages);
@@ -257,10 +246,10 @@ export function useChatConversation({
 
   const handleSend = useCallback(
     (text: string) => {
-      if (!text || isStreaming) return;
+      if (!text || isStreaming || isSendLocked()) return;
       sendMessage({ text });
     },
-    [isStreaming, sendMessage],
+    [isSendLocked, isStreaming, sendMessage],
   );
 
   const loadOlderMessages = useCallback(async () => {
@@ -308,6 +297,7 @@ export function useChatConversation({
     messages,
     error,
     isStreaming,
+    isDraftSessionTransitioning,
     initialLoaded,
     loadingOlder,
     hasOlder,

@@ -35,6 +35,7 @@ export function ChatPanel({
     messages,
     error,
     isStreaming,
+    isDraftSessionTransitioning,
     loadingOlder,
     hasOlder,
     sendMessage,
@@ -147,6 +148,7 @@ export function ChatPanel({
       <ChatComposer
         ref={composerRef}
         isStreaming={isStreaming}
+        isSendDisabled={isDraftSessionTransitioning}
         onSend={sendMessage}
         onStop={stop}
         onAttachExcel={onAttachExcel}

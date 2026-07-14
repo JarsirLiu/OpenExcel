@@ -7,11 +7,13 @@ import { createMentionSuggestion, type WorkbookSource } from "./SheetMentionList
 
 export function useChatComposer({
   isStreaming,
+  isSendDisabled = false,
   onSend,
   referenceCacheRevision,
   workspaceId,
 }: {
   isStreaming: boolean;
+  isSendDisabled?: boolean;
   onSend: (text: string) => void;
   referenceCacheRevision: number;
   workspaceId: number;
@@ -67,11 +69,11 @@ export function useChatComposer({
     const editor = editorRef.current;
     if (isMentionOpenRef.current) return;
     const text = editor?.getText().trim() ?? "";
-    if (!text || isStreaming) return;
+    if (!text || isStreaming || isSendDisabled) return;
     editor?.commands.clearContent();
     editor?.commands.focus();
     onSend(text);
-  }, [isStreaming, onSend]);
+  }, [isSendDisabled, isStreaming, onSend]);
 
   const editor = useEditor({
     extensions: [

@@ -1,5 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { deleteSession, fetchSessions, type Session } from "@/api/sessions";
+import { usePendingSessionTitleRefresh } from "./usePendingSessionTitleRefresh";
+
+type RefreshMode = "background" | "authoritative";
+
+type RefreshOptions = {
+  mode?: RefreshMode;
+  resetCurrent?: boolean;
+  preserveCurrent?: boolean;
+};
+
+type ActiveRefresh = {
+  controller: AbortController;
+  epoch: number;
+  id: number;
+  promise: Promise<RefreshResult>;
+};
+
+type RefreshResult = { list: Session[] } | { cancelled: true };
 
 export function useSessionsList(workspaceId: number | null, initialSessions?: Session[]) {
   const [sessions, setSessions] = useState<Session[]>(initialSessions ?? []);
@@ -8,7 +26,9 @@ export function useSessionsList(workspaceId: number | null, initialSessions?: Se
   const [currentSessionId, setCurrentSessionId] = useState<number | null>(null);
   const previousWorkspaceIdRef = useRef<number | null>(workspaceId);
   const requestGenerationRef = useRef(0);
-  const requestControllerRef = useRef<AbortController | null>(null);
+  const refreshEpochRef = useRef(0);
+  const refreshIdRef = useRef(0);
+  const activeRefreshRef = useRef<ActiveRefresh | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const workspaceReady = previousWorkspaceIdRef.current === workspaceId;
 
@@ -16,8 +36,8 @@ export function useSessionsList(workspaceId: number | null, initialSessions?: Se
     if (previousWorkspaceIdRef.current === workspaceId) return;
     previousWorkspaceIdRef.current = workspaceId;
     requestGenerationRef.current += 1;
-    requestControllerRef.current?.abort();
-    requestControllerRef.current = null;
+    activeRefreshRef.current?.controller.abort();
+    activeRefreshRef.current = null;
     setSessions([]);
     setCurrentSessionId(null);
     setHistoryOpen(false);
@@ -26,56 +46,100 @@ export function useSessionsList(workspaceId: number | null, initialSessions?: Se
   useEffect(() => {
     return () => {
       requestGenerationRef.current += 1;
-      requestControllerRef.current?.abort();
+      activeRefreshRef.current?.controller.abort();
+      activeRefreshRef.current = null;
     };
   }, []);
 
   const refreshSessions = useCallback(
-    async (options?: { resetCurrent?: boolean; preserveCurrent?: boolean }) => {
+    async (options?: RefreshOptions) => {
       if (workspaceId == null) {
         setSessions([]);
         setCurrentSessionId(null);
         return [];
       }
 
-      requestGenerationRef.current += 1;
       const generation = requestGenerationRef.current;
-      requestControllerRef.current?.abort();
-      const controller = new AbortController();
-      requestControllerRef.current = controller;
+      const mode = options?.mode ?? "background";
+      // A read after a create/delete must start after that mutation. Background
+      // polling may join any current request, but authoritative reads replace it.
+      let requiredEpoch = refreshEpochRef.current;
+      if (mode === "authoritative") {
+        refreshEpochRef.current += 1;
+        requiredEpoch = refreshEpochRef.current;
+      }
 
-      try {
-        const list = await fetchSessions(workspaceId, { signal: controller.signal });
-        if (generation !== requestGenerationRef.current || controller.signal.aborted) return [];
+      while (true) {
+        if (generation !== requestGenerationRef.current) return [];
+        requiredEpoch = Math.max(requiredEpoch, refreshEpochRef.current);
 
-        setSessions(list);
-        if (options?.resetCurrent) {
-          setCurrentSessionId(null);
-        } else if (!options?.preserveCurrent) {
-          setCurrentSessionId((prev) => {
-            if (prev !== null && list.some((session) => session.id === prev)) {
-              return prev;
-            }
-            return list[0]?.id ?? null;
-          });
+        let activeRefresh = activeRefreshRef.current;
+        if (!activeRefresh || activeRefresh.epoch < requiredEpoch) {
+          activeRefresh?.controller.abort();
+
+          const controller = new AbortController();
+          const id = refreshIdRef.current + 1;
+          refreshIdRef.current = id;
+          const promise: Promise<RefreshResult> = fetchSessions(workspaceId, {
+            signal: controller.signal,
+          })
+            .then<RefreshResult>((result) => {
+              if (
+                generation !== requestGenerationRef.current ||
+                controller.signal.aborted ||
+                activeRefreshRef.current?.id !== id
+              ) {
+                return { cancelled: true } as const;
+              }
+              return { list: result } as const;
+            })
+            .catch((error): RefreshResult => {
+              if (controller.signal.aborted || activeRefreshRef.current?.id !== id) {
+                return { cancelled: true } as const;
+              }
+              throw error;
+            })
+            .finally(() => {
+              if (activeRefreshRef.current?.id === id) {
+                activeRefreshRef.current = null;
+              }
+            });
+          activeRefresh = { controller, epoch: requiredEpoch, id, promise };
+          activeRefreshRef.current = activeRefresh;
         }
-        return list;
-      } catch (error) {
-        if (!controller.signal.aborted) throw error;
-        return [];
+
+        if (!activeRefresh) continue;
+        const result = await activeRefresh.promise;
+        if ("list" in result) {
+          if (generation !== requestGenerationRef.current) return [];
+
+          const list = result.list;
+          setSessions(list);
+          if (options?.resetCurrent) {
+            setCurrentSessionId(null);
+          } else if (!options?.preserveCurrent) {
+            setCurrentSessionId((prev) => {
+              if (prev !== null && list.some((session) => session.id === prev)) {
+                return prev;
+              }
+              return list[0]?.id ?? null;
+            });
+          }
+          return list;
+        }
+
+        // A background request was superseded by a newer authoritative read.
+        // It must not issue another request or overwrite that newer result.
+        if (mode === "background") return [];
       }
     },
     [workspaceId],
   );
 
-  useEffect(() => {
-    if (!sessions.some((session) => session.titleStatus === "pending")) return;
-
-    const timer = window.setInterval(() => {
-      void refreshSessions({ preserveCurrent: true });
-    }, 1500);
-    return () => window.clearInterval(timer);
-  }, [refreshSessions, sessions]);
+  usePendingSessionTitleRefresh({
+    hasPendingTitle: sessions.some((session) => session.titleStatus === "pending"),
+    refreshSessions: (options) => refreshSessions({ ...options, mode: "background" }),
+  });
 
   const handleNewSession = useCallback(() => {
     setCurrentSessionId(null);
@@ -97,7 +161,7 @@ export function useSessionsList(workspaceId: number | null, initialSessions?: Se
       if (workspaceId == null) return;
       const wasCurrent = currentSessionId === id;
       await deleteSession(workspaceId, id);
-      await refreshSessions();
+      await refreshSessions({ mode: "authoritative" });
       if (wasCurrent) {
         setCurrentSessionId(null);
       }

@@ -48,7 +48,10 @@ export function useSessionWorkspace(
   const handleDraftSessionCreated = useCallback(
     async (sessionId: number) => {
       const shouldActivate = currentSessionIdRef.current == null;
-      const list = await refreshSessions({ resetCurrent: shouldActivate });
+      const list = await refreshSessions({
+        mode: "authoritative",
+        resetCurrent: shouldActivate,
+      });
       if (shouldActivate && list.some((session) => session.id === sessionId)) {
         setCurrentSessionId(sessionId);
       }
