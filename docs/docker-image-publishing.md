@@ -57,6 +57,8 @@ docker compose pull
 docker compose up -d --no-build
 ```
 
+镜像构建阶段会生成 Prisma Client，容器启动阶段会自动执行数据库迁移。服务器不需要手动运行迁移命令；如果迁移失败，容器会停止启动并在日志中显示原因。
+
 `OPENEXCEL_IMAGE` 是 Docker Compose 选择远程镜像所需的变量，不是模型配置。模型相关的 `MODEL_BASE_URL`、`MODEL_API_KEY` 和 `MODEL_NAME` 仍然配置在同一个 `.env` 文件中。
 
 镜像仓库登录凭据不需要写入 `.env`，通过 `docker login` 配置即可。

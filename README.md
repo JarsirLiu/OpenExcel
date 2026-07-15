@@ -67,7 +67,7 @@ pnpm dev
 - API：`http://localhost:4000`
 - 健康检查：`http://localhost:4000/api/health`
 
-Vite 会把 `/api` 请求代理到 `http://127.0.0.1:4000`。开发模式启动前会自动执行 Prisma 迁移。
+Vite 会把 `/api` 请求代理到 `http://127.0.0.1:4000`。开发模式启动前会自动生成 Prisma Client 并执行数据库迁移。
 
 ## 常用命令
 
@@ -77,6 +77,7 @@ pnpm typecheck      # 全仓 TypeScript 检查
 pnpm test           # 全部测试
 pnpm test:server    # Server 测试
 pnpm test:web       # Web 测试
+pnpm db:prepare     # 生成 Prisma Client 并执行数据库迁移
 pnpm db:migrate     # 执行数据库迁移
 ```
 
@@ -100,6 +101,8 @@ docker build -t openexcel:local .
 ```bash
 docker compose up -d
 ```
+
+镜像构建阶段会生成 Prisma Client，容器启动阶段会自动执行数据库迁移；不需要在服务器上手动运行迁移命令。
 
 查看状态和日志：
 

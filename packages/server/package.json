@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "predev": "tsx scripts/prisma-database.ts migrate",
+    "predev": "pnpm db:prepare",
+    "prestart": "pnpm db:generate",
     "postinstall": "tsx scripts/prisma-database.ts generate",
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
@@ -13,7 +14,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "db:generate": "tsx scripts/prisma-database.ts generate",
-    "db:migrate": "tsx scripts/prisma-database.ts migrate"
+    "db:migrate": "tsx scripts/prisma-database.ts migrate",
+    "db:prepare": "pnpm db:generate && pnpm db:migrate"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.2",

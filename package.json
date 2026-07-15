@@ -14,6 +14,7 @@
     "test:server": "pnpm --filter @openexcel/server test",
     "test:web": "pnpm --filter @openexcel/web test",
     "db:migrate": "pnpm --filter @openexcel/server db:migrate",
+    "db:prepare": "pnpm --filter @openexcel/server db:prepare",
     "check": "biome check --write . && pnpm typecheck",
     "typecheck": "pnpm --recursive --filter @openexcel/agent --filter @openexcel/core --filter @openexcel/server --filter @openexcel/web typecheck",
     "prepare": "husky",

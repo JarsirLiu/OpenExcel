@@ -27,8 +27,16 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Prepare database artifacts
+        run: |
+          pnpm --filter @openexcel/server db:generate
+          pnpm db:migrate
+
       - name: Check (lint + format + typecheck)
         run: pnpm check
 
       - name: Test
         run: pnpm -r --filter @openexcel/agent --filter @openexcel/core --filter @openexcel/server test
+
+      - name: Build Docker image
+        run: docker build -t openexcel:ci .
