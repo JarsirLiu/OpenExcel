@@ -1,6 +1,6 @@
 import type { SheetChangeDelta } from "@openexcel/core";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { WorkbookFull, WorkbookMeta } from "@/api/workbooks";
+import type { WorkbookMeta } from "@/api/workbooks";
 import {
   createWorkbook,
   deleteWorkbook,
@@ -13,11 +13,8 @@ import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatc
 import { importWorkbookFiles } from "@/features/workbook/import/workbookImporter";
 import { toast } from "@/shared/lib";
 import { patchWorkbookWithDelta } from "../workbook/utils/patchWorkbook";
-import { useWorkbookCatalog } from "./useWorkbookCatalog";
-
-function sortWorkbooks(list: WorkbookMeta[]): WorkbookMeta[] {
-  return [...list].sort((a, b) => a.order - b.order || a.id - b.id);
-}
+import { useWorkbookCatalog, type WorkbookInitial } from "./useWorkbookCatalog";
+import { sortWorkbooks } from "./workbookOrdering";
 
 const SHEET_STORAGE_KEY = "openexcel:sheetIdx";
 
@@ -29,11 +26,6 @@ function loadStoredSheetIdx(): number {
     return 0;
   }
 }
-
-type WorkbookInitial = {
-  workbooks: WorkbookMeta[];
-  currentWorkbook?: WorkbookFull | null;
-};
 
 export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookInitial) {
   const {

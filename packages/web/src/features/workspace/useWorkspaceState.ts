@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchWorkbooks, type WorkbookMeta } from "@/api/workbooks";
 import { fetchWorkspaces, type Workspace } from "@/api/workspaces";
+import { sortWorkbooks } from "./workbookOrdering";
 
 const STORAGE_KEY = "openexcel:activeWorkspaceId";
 
@@ -23,11 +24,10 @@ function saveWorkspaceId(id: number | null) {
   } catch {}
 }
 
-function sortWorkbooks(list: WorkbookMeta[]): WorkbookMeta[] {
-  return [...list].sort((a, b) => a.order - b.order || a.id - b.id);
-}
-
-export function useWorkspaceState(initialWorkspaces?: Workspace[]) {
+export function useWorkspaceState(
+  initialWorkspaces?: Workspace[],
+  selectedWorkspaceId?: number | null,
+) {
   const [workspaces, setWorkspaces] = useState(initialWorkspaces ?? []);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<number | null>(() => {
     const stored = loadStoredWorkspaceId();
@@ -93,31 +93,36 @@ export function useWorkspaceState(initialWorkspaces?: Workspace[]) {
   }, [initialWorkspaces]);
 
   useEffect(() => {
+    if (selectedWorkspaceId == null || !workspaces.some((ws) => ws.id === selectedWorkspaceId)) {
+      return;
+    }
+    setActiveWorkspaceId((currentId) =>
+      currentId === selectedWorkspaceId ? currentId : selectedWorkspaceId,
+    );
+  }, [selectedWorkspaceId, workspaces]);
+
+  useEffect(() => {
     saveWorkspaceId(activeWorkspaceId);
   }, [activeWorkspaceId]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    const list = await fetchWorkspaces();
-    setWorkspaces(list);
-    setActiveWorkspaceId((prev) => {
-      if (prev != null && list.some((w) => w.id === prev)) return prev;
-      return list[0]?.id ?? null;
-    });
-    await fetchAllWorkbooks(list);
-    setLoading(false);
+    try {
+      const list = await fetchWorkspaces();
+      setWorkspaces(list);
+      setActiveWorkspaceId((prev) => {
+        if (prev != null && list.some((w) => w.id === prev)) return prev;
+        return list[0]?.id ?? null;
+      });
+      await fetchAllWorkbooks(list);
+    } finally {
+      setLoading(false);
+    }
   }, [fetchAllWorkbooks]);
-
-  const activeWorkspace = useMemo(
-    () => workspaces.find((w) => w.id === activeWorkspaceId) ?? null,
-    [activeWorkspaceId, workspaces],
-  );
 
   return {
     workspaces,
-    activeWorkspace,
     activeWorkspaceId,
-    setActiveWorkspaceId,
     loading,
     refresh,
     workbooksMap,

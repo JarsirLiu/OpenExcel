@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { ChatSidebar } from "@/features/chat/ChatSidebar";
 import { useSessionWorkspace } from "@/features/session/useSessionWorkspace";
 import { useSheetActivation } from "@/features/workbook/editor/SheetActivationContext";
@@ -7,7 +8,6 @@ import { useWorkspaceView } from "@/features/workspace/useWorkspaceView";
 import { WorkspaceSidebar } from "@/features/workspace/WorkspaceSidebar";
 import { WorkspaceView } from "@/features/workspace/WorkspaceView";
 import type { WorkbenchRouteData } from "./routeData";
-import { useUrlSync } from "./useUrlSync";
 import styles from "./Workbench.module.css";
 
 type CurrentUser = { email: string; displayName: string };
@@ -21,27 +21,30 @@ type Props = {
 const MIN_SIDEBAR_WIDTH = 300;
 
 export function Workbench({ currentUser, onLogout, routeData }: Props) {
+  const navigate = useNavigate();
+  const location = useLocation();
   const {
     workspaces,
     activeWorkspaceId,
-    setActiveWorkspaceId,
     loading: workspaceLoading,
     refresh: workspaceRefresh,
     workbooksMap,
     refreshWorkbooks,
-  } = useWorkspaceState(routeData?.workspaces);
+  } = useWorkspaceState(routeData?.workspaces, routeData?.workspace.id);
   const [sidebarWidth, setSidebarWidth] = useState(MIN_SIDEBAR_WIDTH);
   const rafRef = useRef<number | null>(null);
 
-  const activeWorkspacePublicId = useMemo(
-    () => workspaces.find((w) => w.id === activeWorkspaceId)?.publicId ?? null,
-    [workspaces, activeWorkspaceId],
-  );
+  const routeWorkspaceId = routeData?.workspace.id ?? null;
+  const selectedWorkspaceId = routeWorkspaceId ?? activeWorkspaceId;
 
   const domainInitial = useMemo(
     () => ({
       workbook: routeData?.workbooks
-        ? { workbooks: routeData.workbooks, currentWorkbook: routeData.currentWorkbook ?? null }
+        ? {
+            workspaceId: routeData.workspace.id,
+            workbooks: routeData.workbooks,
+            currentWorkbook: routeData.currentWorkbook,
+          }
         : undefined,
       session: routeData?.sessions
         ? {
@@ -54,14 +57,22 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
     [routeData],
   );
 
-  const workbook = useWorkspaceView(activeWorkspaceId, domainInitial.workbook);
+  const workbook = useWorkspaceView(selectedWorkspaceId, domainInitial.workbook);
   const session = useSessionWorkspace(
-    activeWorkspaceId,
+    selectedWorkspaceId,
     workbook.handleWorkspaceRefresh,
     domainInitial.session,
   );
 
-  useUrlSync(activeWorkspacePublicId);
+  const handleWorkspaceSelect = useCallback(
+    (workspace: { publicId: string }) => {
+      const targetPath = `/workspaces/${workspace.publicId}`;
+      if (targetPath !== location.pathname) {
+        navigate(targetPath);
+      }
+    },
+    [location.pathname, navigate],
+  );
 
   const activeWorkbookId = useMemo(
     () => workbook.currentWorkbook?.id ?? workbook.workbooks[workbook.workbookIdx]?.id ?? null,
@@ -111,33 +122,35 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
     [workbook.handleWorkbookRename, refreshUndoAvailability],
   );
 
-  const pendingWorkbookSwitch = useRef<number | null>(null);
+  const pendingWorkbookSwitch = useRef<{ workspaceId: number; workbookId: number } | null>(null);
   const { activateSheetByIndex } = useSheetActivation();
 
   const handleWorkbookSelect = useCallback(
     (workspaceId: number, workbookId: number) => {
-      if (workspaceId !== activeWorkspaceId) {
-        setActiveWorkspaceId(workspaceId);
-        pendingWorkbookSwitch.current = workbookId;
+      if (workspaceId !== selectedWorkspaceId) {
+        const workspace = workspaces.find((item) => item.id === workspaceId);
+        if (workspace) handleWorkspaceSelect(workspace);
+        pendingWorkbookSwitch.current = { workspaceId, workbookId };
       } else {
         const idx = workbook.workbooks.findIndex((wb) => wb.id === workbookId);
         if (idx >= 0) {
+          pendingWorkbookSwitch.current = null;
           void workbook.handleSwitchWorkbook(idx);
         }
       }
     },
-    [activeWorkspaceId, setActiveWorkspaceId, workbook],
+    [handleWorkspaceSelect, selectedWorkspaceId, workbook, workspaces],
   );
 
   useEffect(() => {
-    if (pendingWorkbookSwitch.current == null) return;
-    const targetId = pendingWorkbookSwitch.current;
-    pendingWorkbookSwitch.current = null;
-    const idx = workbook.workbooks.findIndex((wb) => wb.id === targetId);
+    const pending = pendingWorkbookSwitch.current;
+    if (pending == null || pending.workspaceId !== selectedWorkspaceId) return;
+    const idx = workbook.workbooks.findIndex((wb) => wb.id === pending.workbookId);
     if (idx >= 0) {
+      pendingWorkbookSwitch.current = null;
       void workbook.handleSwitchWorkbook(idx);
     }
-  }, [activeWorkspaceId, workbook.workbooks, workbook]);
+  }, [selectedWorkspaceId, workbook.workbooks, workbook]);
 
   const handleNavigateSheet = useCallback(
     (sheetId: number) => {
@@ -193,8 +206,8 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
   return (
     <div className={styles.layout}>
       <WorkspaceSidebar
-        activeWorkspaceId={activeWorkspaceId}
-        onActiveWorkspaceChange={setActiveWorkspaceId}
+        activeWorkspaceId={selectedWorkspaceId}
+        onWorkspaceSelect={handleWorkspaceSelect}
         workspaces={workspaces}
         onRefresh={workspaceRefresh}
         workbooksMap={workbooksMap}
@@ -205,8 +218,8 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
       />
       <div className={styles.main}>
         <WorkspaceView
-          key={activeWorkspaceId ?? "no-workspace"}
-          workspaceId={activeWorkspaceId}
+          key={selectedWorkspaceId ?? "no-workspace"}
+          workspaceId={selectedWorkspaceId}
           workbooks={workbook.workbooks}
           workbookIdx={workbook.workbookIdx}
           currentWorkbook={workbook.currentWorkbook}
@@ -226,8 +239,8 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
         <div className={styles.resizeHandle} onMouseDown={handleResizeMouseDown} />
       </div>
       <ChatSidebar
-        key={activeWorkspaceId ?? "no-workspace"}
-        workspaceId={activeWorkspaceId}
+        key={selectedWorkspaceId ?? "no-workspace"}
+        workspaceId={selectedWorkspaceId}
         onWorkspaceRefresh={workbook.handleWorkspaceRefresh}
         onAttachExcel={handleAttachExcel}
         referenceCacheRevision={workbook.referenceCacheRevision}

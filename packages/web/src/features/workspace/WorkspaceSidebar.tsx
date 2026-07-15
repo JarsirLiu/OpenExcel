@@ -15,7 +15,7 @@ const SIDEBAR_WIDTH_KEY = "openexcel:sidebarWidth";
 
 type Props = {
   activeWorkspaceId: number | null;
-  onActiveWorkspaceChange: (id: number) => void;
+  onWorkspaceSelect: (workspace: Workspace) => void;
   workspaces: Workspace[];
   onRefresh: () => void;
   workbooksMap: Map<number, WorkbookMeta[]>;
@@ -27,7 +27,7 @@ type Props = {
 
 export function WorkspaceSidebar({
   activeWorkspaceId,
-  onActiveWorkspaceChange,
+  onWorkspaceSelect,
   workspaces,
   onRefresh,
   workbooksMap,
@@ -78,19 +78,18 @@ export function WorkspaceSidebar({
   const handleCreate = useCallback(async () => {
     try {
       const ws = await createWorkspace(t("new_project", "新项目"));
-      onActiveWorkspaceChange(ws.id);
-      void onRefresh();
+      onWorkspaceSelect(ws);
     } catch (e) {
       console.error("创建项目失败:", e);
     }
-  }, [onActiveWorkspaceChange, onRefresh]);
+  }, [onWorkspaceSelect]);
 
   const handleSelect = useCallback(
-    (id: number) => {
+    (workspace: Workspace) => {
       if (editingId !== null) return;
-      onActiveWorkspaceChange(id);
+      onWorkspaceSelect(workspace);
     },
-    [onActiveWorkspaceChange, editingId],
+    [onWorkspaceSelect, editingId],
   );
 
   const handleStartEdit = useCallback((e: React.MouseEvent, ws: { id: number; name: string }) => {
@@ -149,15 +148,16 @@ export function WorkspaceSidebar({
         if (ws.id === activeWorkspaceId) {
           const remaining = workspaces.filter((w) => w.id !== ws.id);
           if (remaining.length > 0) {
-            onActiveWorkspaceChange(remaining[0].id);
+            onWorkspaceSelect(remaining[0]);
           }
+        } else {
+          void onRefresh();
         }
-        void onRefresh();
       } catch (e) {
         console.error("删除项目失败:", e);
       }
     },
-    [activeWorkspaceId, onActiveWorkspaceChange, onRefresh, workspaces],
+    [activeWorkspaceId, onRefresh, onWorkspaceSelect, workspaces],
   );
 
   const handleWorkbookDeleteClick = useCallback(
@@ -278,7 +278,7 @@ export function WorkspaceSidebar({
               <div key={ws.id}>
                 <div
                   className={`${styles.item} ${isActive ? styles.itemActive : ""}`}
-                  onClick={() => handleSelect(ws.id)}
+                  onClick={() => handleSelect(ws)}
                 >
                   <span className={styles.itemIcon}>
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">

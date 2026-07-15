@@ -403,8 +403,8 @@ The `sheets` module owns Sheet content reads, cell updates, and name updates. Th
 changes separate from incremental cell mutations.
 
 Workspace entry loads directory data first. Workbook list and session list endpoints return metadata;
-full workbook content is loaded when a workbook is opened, and session messages are loaded when a
-conversation is selected, paginated from the newest messages backward.
+the current workbook content is loaded as part of the workspace route data, and session messages are
+loaded when a conversation is selected, paginated from the newest messages backward.
 The workspace always starts with an in-memory draft conversation. A conversation Session is created
 only after the user sends the first message; opening a workspace, creating a workspace, and clicking
 "new conversation" do not write an empty Session row.
@@ -493,6 +493,12 @@ Keep three kinds of state separate:
 - Derived state: streaming flags, title fallback text, patch previews
 
 Do not store unrelated server state in the same component just because they render side by side.
+
+The workspace route is the source of truth for the selected workspace. The sidebar dispatches
+navigation intents; it does not mutate a second active-workspace state. The workspace route loader
+seeds the selected workspace's workbook catalog and current workbook, while the workbook data hook
+owns subsequent workbook mutations and refreshes. Route hydration must be scoped by `workspaceId`
+and must not reset a ready workbook to a loading state.
 
 ### 6.4 Web stability boundaries
 

@@ -7,7 +7,7 @@ export type WorkbenchRouteData = {
   workspace: Workspace;
   workbooks: WorkbookMeta[];
   sessions: Session[];
-  currentWorkbook?: WorkbookFull;
+  currentWorkbook: WorkbookFull | null;
   messages?: unknown[];
   messageTotal?: number;
 };

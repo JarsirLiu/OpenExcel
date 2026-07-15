@@ -5,6 +5,7 @@ import {
   type WorkbookFull,
   type WorkbookMeta,
 } from "@/api/workbooks";
+import { sortWorkbooks } from "./workbookOrdering";
 
 const STORAGE_KEY_IDX = "openexcel:workbookIdx";
 
@@ -23,9 +24,10 @@ function saveIdx(idx: number) {
   } catch {}
 }
 
-type WorkbookInitial = {
+export type WorkbookInitial = {
+  workspaceId: number;
   workbooks: WorkbookMeta[];
-  currentWorkbook?: WorkbookFull | null;
+  currentWorkbook: WorkbookFull | null;
 };
 
 export function useWorkbookCatalog(workspaceId: number | null, initial?: WorkbookInitial) {
@@ -37,8 +39,7 @@ export function useWorkbookCatalog(workspaceId: number | null, initial?: Workboo
   const [workbookRevision, setWorkbookRevision] = useState(0);
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(!initial);
-  const previousWorkspaceIdRef = useRef(workspaceId);
-  const workspaceCatalogReadyRef = useRef(initial?.workbooks !== undefined);
+  const workspaceCatalogReadyRef = useRef(initial?.workspaceId === workspaceId);
   const requestGenerationRef = useRef(0);
 
   const invalidateRequests = useCallback(() => {
@@ -47,31 +48,31 @@ export function useWorkbookCatalog(workspaceId: number | null, initial?: Workboo
   }, []);
 
   useEffect(() => {
-    if (!initial) return;
-    setWorkbooks(initial.workbooks);
-    const idx = Math.min(loadStoredIdx(), initial.workbooks.length - 1);
-    setWorkbookIdx(idx >= 0 ? idx : 0);
-    setLoading(!initial.currentWorkbook);
-  }, [initial]);
-
-  useEffect(() => {
-    if (workspaceId != null) return;
-    invalidateRequests();
-    workspaceCatalogReadyRef.current = false;
-    setWorkbooks([]);
-    setWorkbookIdx(0);
-    setCurrentWorkbook(null);
-    setStatus("");
-    setLoading(false);
-  }, [invalidateRequests, workspaceId]);
-
-  useEffect(() => {
-    if (previousWorkspaceIdRef.current === workspaceId) return;
-    previousWorkspaceIdRef.current = workspaceId;
     const generation = invalidateRequests();
     const controller = new AbortController();
     requestGenerationRef.current = generation;
     workspaceCatalogReadyRef.current = false;
+
+    if (workspaceId == null) {
+      setWorkbooks([]);
+      setWorkbookIdx(0);
+      setCurrentWorkbook(null);
+      setStatus("");
+      setLoading(false);
+      return () => controller.abort();
+    }
+
+    if (initial?.workspaceId === workspaceId) {
+      workspaceCatalogReadyRef.current = true;
+      const safeList = sortWorkbooks(initial.workbooks);
+      setWorkbooks(safeList);
+      const idx = Math.min(loadStoredIdx(), safeList.length - 1);
+      setWorkbookIdx(idx >= 0 ? idx : 0);
+      setCurrentWorkbook(initial.currentWorkbook);
+      setLoading(safeList.length > 0 && initial.currentWorkbook == null);
+      return () => controller.abort();
+    }
+
     refreshWorkspaceCatalog();
 
     async function refreshWorkspaceCatalog() {
@@ -85,7 +86,7 @@ export function useWorkbookCatalog(workspaceId: number | null, initial?: Workboo
       try {
         const list = await fetchWorkbooks(workspaceId, { signal: controller.signal });
         if (controller.signal.aborted || generation !== requestGenerationRef.current) return;
-        const safeList = Array.isArray(list) ? list : [];
+        const safeList = Array.isArray(list) ? sortWorkbooks(list) : [];
         workspaceCatalogReadyRef.current = true;
         setWorkbooks(safeList);
         setWorkbookIdx(Math.min(loadStoredIdx(), Math.max(0, safeList.length - 1)));
@@ -101,14 +102,17 @@ export function useWorkbookCatalog(workspaceId: number | null, initial?: Workboo
     }
 
     return () => controller.abort();
-  }, [invalidateRequests, workspaceId]);
+  }, [initial, invalidateRequests, workspaceId]);
 
   useEffect(() => {
     if (!workspaceCatalogReadyRef.current) return;
     if (workspaceId == null || workbooks.length === 0) return;
     const wb = workbooks[workbookIdx];
     if (!wb) return;
-    if (currentWorkbook?.id === wb.id) return;
+    if (currentWorkbook?.id === wb.id) {
+      setLoading(false);
+      return;
+    }
     const generation = invalidateRequests();
     const controller = new AbortController();
     setLoading(true);
