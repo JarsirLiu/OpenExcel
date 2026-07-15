@@ -9,9 +9,9 @@ export const WORKBOOK_IMPORT_PAYLOAD_LIMITS = {
   maxSheetNameLength: 255,
   maxCellTextLength: 1_000_000,
   maxFormulaLength: 1_000_000,
-  maxConfigBytes: 5 * 1024 * 1024,
+  maxConfigBytes: 20 * 1024 * 1024,
   maxConfigDepth: 20,
-  maxConfigNodes: 50_000,
+  maxConfigNodes: 250_000,
   maxConfigStringLength: 1_000_000,
 } as const;
 

@@ -1,6 +1,8 @@
 import type { ImportedWorkbookBatchInput } from "@openexcel/core";
 import { API_BASE, apiFetch, readErrorMessage } from "./http";
 
+const MAX_IMPORT_REQUEST_BYTES = 100 * 1024 * 1024;
+
 export interface WorkbookMeta {
   id: number;
   publicId: string;
@@ -92,10 +94,16 @@ export async function importWorkbooks(
   payload: ImportedWorkbookBatchInput,
   options?: { signal?: AbortSignal },
 ): Promise<{ id: number; publicId: string; name: string; sheets: number }[]> {
+  const body = JSON.stringify(payload);
+  const bodyBytes = new TextEncoder().encode(body).byteLength;
+  if (bodyBytes > MAX_IMPORT_REQUEST_BYTES) {
+    throw new Error("单个工作簿转换后的 JSON 超过 100 MB，请拆分或精简文件后重试");
+  }
+
   const res = await apiFetch(`/workspaces/${workspaceId}/workbooks/import`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    body,
     signal: options?.signal,
   });
   if (!res.ok) throw new Error(await readErrorMessage(res, "导入工作簿失败"));

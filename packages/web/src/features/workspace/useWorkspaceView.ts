@@ -10,13 +10,14 @@ import {
   updateWorkbookName,
 } from "@/api/workbooks";
 import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatchSync";
-import { importWorkbookFiles } from "@/features/workbook/import/workbookImporter";
+import { importWorkbookFile } from "@/features/workbook/import/workbookImporter";
 import { toast } from "@/shared/lib";
 import { patchWorkbookWithDelta } from "../workbook/utils/patchWorkbook";
 import { useWorkbookCatalog, type WorkbookInitial } from "./useWorkbookCatalog";
 import { sortWorkbooks } from "./workbookOrdering";
 
 const SHEET_STORAGE_KEY = "openexcel:sheetIdx";
+const MAX_IMPORT_WORKBOOKS = 20;
 
 function loadStoredSheetIdx(): number {
   try {
@@ -273,15 +274,36 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
     async (files: File[]) => {
       if (workspaceId == null) return;
       if (files.length === 0) return;
+      if (files.length > MAX_IMPORT_WORKBOOKS) {
+        toast({ message: `一次最多选择 ${MAX_IMPORT_WORKBOOKS} 个文件`, variant: "error" });
+        return;
+      }
+
       const { generation, controller } = beginRequest();
-      setStatus(files.length === 1 ? "上传中..." : `正在上传 ${files.length} 个文件...`);
+      let completedFiles = 0;
+      let activeFileName = "";
       try {
-        const imported = await importWorkbookFiles(files);
-        if (!isCurrentRequest(generation, controller.signal)) return;
-        setStatus(files.length === 1 ? "正在保存..." : `正在保存 ${files.length} 个文件...`);
-        const results = await importWorkbooks(workspaceId, imported, {
-          signal: controller.signal,
-        });
+        const results: { id: number; publicId: string; name: string; sheets: number }[] = [];
+        for (let index = 0; index < files.length; index += 1) {
+          const file = files[index];
+          if (!file) continue;
+          activeFileName = file.name;
+          setStatus(`正在处理 ${index + 1}/${files.length}：${file.name}`);
+          const imported = await importWorkbookFile(file);
+          if (!isCurrentRequest(generation, controller.signal)) return;
+
+          setStatus(`正在保存 ${index + 1}/${files.length}：${file.name}`);
+          const uploaded = await importWorkbooks(
+            workspaceId,
+            { workbooks: [imported] },
+            {
+              signal: controller.signal,
+            },
+          );
+          results.push(...uploaded);
+          completedFiles += 1;
+        }
+
         const list = await fetchWorkbooks(workspaceId, { signal: controller.signal });
         if (!isCurrentRequest(generation, controller.signal)) return;
         const safeList = Array.isArray(list) ? sortWorkbooks(list) : [];
@@ -301,8 +323,23 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
       } catch (error) {
         if (controller.signal.aborted) return;
         const message = error instanceof Error ? error.message : "上传失败";
+
+        if (completedFiles > 0) {
+          try {
+            const list = await fetchWorkbooks(workspaceId, { signal: controller.signal });
+            if (isCurrentRequest(generation, controller.signal)) {
+              setWorkbooks(Array.isArray(list) ? sortWorkbooks(list) : []);
+            }
+          } catch {
+            // Keep the original import error as the user-facing message.
+          }
+        }
+
         setStatus("");
-        toast({ message: `上传失败：${message}`, variant: "error" });
+        const progress =
+          completedFiles > 0 ? `已完成 ${completedFiles}/${files.length} 个文件。` : "";
+        const file = activeFileName ? `（文件：${activeFileName}）` : "";
+        toast({ message: `${progress}上传失败${file}：${message}`, variant: "error" });
       }
     },
     [
