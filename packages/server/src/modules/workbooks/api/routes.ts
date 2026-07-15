@@ -6,6 +6,7 @@ import {
 } from "../../../middleware/resourceAccess.js";
 import * as application from "../application/index.js";
 import { WORKBOOK_IMPORT_LIMITS } from "./importLimits.js";
+import { decompressImportPayload } from "./importPayload.js";
 
 export async function workbookRoutes(app: FastifyInstance) {
   app.get<{ Params: { workspacePublicId: string } }>(
@@ -100,7 +101,10 @@ export async function workbookRoutes(app: FastifyInstance) {
     Body: ImportedWorkbookBatchInput;
   }>(
     "/api/workspaces/:workspacePublicId/workbooks/import",
-    { bodyLimit: WORKBOOK_IMPORT_LIMITS.maxBodyBytes },
+    {
+      bodyLimit: WORKBOOK_IMPORT_LIMITS.maxBodyBytes,
+      preParsing: decompressImportPayload,
+    },
     async (req, reply) => {
       try {
         const workspaceId = await resolveWorkspaceIdForRequest(

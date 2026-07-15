@@ -5,6 +5,7 @@ import {
 } from "@openexcel/core";
 import type { FortuneExcelSheet } from "./fortuneExcelAdapter";
 import { normalizeImportedCelldata } from "./importCellNormalization";
+import { validateImportFileSizes } from "./importLimits";
 import { transformFileToFortuneSheets } from "./workbookFileAdapter";
 
 export function workbookNameFromFile(file: File): string {
@@ -27,6 +28,7 @@ export function normalizeSheet(sheet: FortuneExcelSheet, index: number) {
 export async function importWorkbookFile(
   file: File,
 ): Promise<ImportedWorkbookBatchInput["workbooks"][number]> {
+  validateImportFileSizes([file]);
   const parsedSheets = await transformFileToFortuneSheets(file);
 
   return {
@@ -38,6 +40,7 @@ export async function importWorkbookFile(
 export async function importWorkbookFiles(
   files: readonly File[],
 ): Promise<ImportedWorkbookBatchInput> {
+  validateImportFileSizes(files);
   const workbooks = [];
   for (const file of files) {
     workbooks.push(await importWorkbookFile(file));

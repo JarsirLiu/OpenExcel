@@ -1,27 +1,36 @@
 import type { FastifyInstance } from "fastify";
 import { resolveWorkspaceIdForRequest } from "../../../middleware/resourceAccess.js";
+import { WORKBOOK_IMPORT_LIMITS } from "../../workbooks/api/importLimits.js";
+import { decompressImportPayload } from "../../workbooks/api/importPayload.js";
 import * as application from "../application/index.js";
 
 export async function sheetRoutes(app: FastifyInstance) {
   app.patch<{
     Params: { workspacePublicId: string; sheetId: string };
     Body: { celldata: any[]; config?: any };
-  }>("/api/workspaces/:workspacePublicId/sheets/:sheetId", async (req, reply) => {
-    const workspaceId = await resolveWorkspaceIdForRequest(
-      req,
-      req.params.workspacePublicId,
-      reply,
-    );
-    if (workspaceId == null) return;
-    const result = await application.updateSheetData(
-      workspaceId,
-      Number(req.params.sheetId),
-      req.body.celldata,
-      req.body.config,
-    );
-    if ("error" in result) return reply.status(400).send(result);
-    return result;
-  });
+  }>(
+    "/api/workspaces/:workspacePublicId/sheets/:sheetId",
+    {
+      bodyLimit: WORKBOOK_IMPORT_LIMITS.maxBodyBytes,
+      preParsing: decompressImportPayload,
+    },
+    async (req, reply) => {
+      const workspaceId = await resolveWorkspaceIdForRequest(
+        req,
+        req.params.workspacePublicId,
+        reply,
+      );
+      if (workspaceId == null) return;
+      const result = await application.updateSheetData(
+        workspaceId,
+        Number(req.params.sheetId),
+        req.body.celldata,
+        req.body.config,
+      );
+      if ("error" in result) return reply.status(400).send(result);
+      return result;
+    },
+  );
 
   app.patch<{
     Params: { workspacePublicId: string; sheetId: string };

@@ -10,6 +10,7 @@ import {
   updateWorkbookName,
 } from "@/api/workbooks";
 import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatchSync";
+import { validateImportFileSizes } from "@/features/workbook/import/importLimits";
 import { importWorkbookFile } from "@/features/workbook/import/workbookImporter";
 import { toast } from "@/shared/lib";
 import { patchWorkbookWithDelta } from "../workbook/utils/patchWorkbook";
@@ -276,6 +277,15 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
       if (files.length === 0) return;
       if (files.length > MAX_IMPORT_WORKBOOKS) {
         toast({ message: `一次最多选择 ${MAX_IMPORT_WORKBOOKS} 个文件`, variant: "error" });
+        return;
+      }
+      try {
+        validateImportFileSizes(files);
+      } catch (error) {
+        toast({
+          message: error instanceof Error ? error.message : "文件大小超过限制",
+          variant: "error",
+        });
         return;
       }
 

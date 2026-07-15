@@ -3,6 +3,24 @@ import { API_BASE, apiFetch, readErrorMessage } from "./http";
 
 const MAX_IMPORT_REQUEST_BYTES = 100 * 1024 * 1024;
 
+const MIN_GZIP_BYTES = 64 * 1024;
+
+async function encodeJsonBody(body: string): Promise<{
+  body: BodyInit;
+  contentEncoding?: string;
+}> {
+  if (new TextEncoder().encode(body).byteLength < MIN_GZIP_BYTES) {
+    return { body };
+  }
+  if (typeof CompressionStream === "undefined" || typeof Blob.prototype.stream !== "function") {
+    return { body };
+  }
+
+  const stream = new Blob([body]).stream().pipeThrough(new CompressionStream("gzip"));
+  const compressed = await new Response(stream).arrayBuffer();
+  return { body: compressed, contentEncoding: "gzip" };
+}
+
 export interface WorkbookMeta {
   id: number;
   publicId: string;
@@ -100,10 +118,15 @@ export async function importWorkbooks(
     throw new Error("单个工作簿转换后的 JSON 超过 100 MB，请拆分或精简文件后重试");
   }
 
+  const encoded = await encodeJsonBody(body);
+
   const res = await apiFetch(`/workspaces/${workspaceId}/workbooks/import`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body,
+    headers: {
+      "Content-Type": "application/json",
+      ...(encoded.contentEncoding ? { "Content-Encoding": encoded.contentEncoding } : {}),
+    },
+    body: encoded.body,
     signal: options?.signal,
   });
   if (!res.ok) throw new Error(await readErrorMessage(res, "导入工作簿失败"));
@@ -161,10 +184,14 @@ export async function updateSheetData(
 ): Promise<void> {
   const body: any = { celldata };
   if (config !== undefined) body.config = config;
+  const encoded = await encodeJsonBody(JSON.stringify(body));
   const res = await apiFetch(`/workspaces/${workspaceId}/sheets/${sheetId}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    headers: {
+      "Content-Type": "application/json",
+      ...(encoded.contentEncoding ? { "Content-Encoding": encoded.contentEncoding } : {}),
+    },
+    body: encoded.body,
   });
   if (!res.ok) throw new Error("保存失败");
 }

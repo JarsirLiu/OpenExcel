@@ -44,6 +44,7 @@ export const pinoStream = new Writable({
 /* ───── hooks 里调用的请求日志 ───── */
 export function logRequest(req: any, reply: any, startTime: number) {
   const dur = Date.now() - startTime;
+  const importPayload = req._importPayloadMetrics;
   console.log(
     JSON.stringify({
       time: localTimeISO(),
@@ -52,6 +53,13 @@ export function logRequest(req: any, reply: any, startTime: number) {
       url: req.url,
       status: reply.statusCode,
       duration: dur,
+      ...(importPayload
+        ? {
+            receivedBytes: importPayload.encodedBytes,
+            decodedBytes: importPayload.decodedBytes,
+            contentEncoding: importPayload.contentEncoding,
+          }
+        : {}),
     }),
   );
 }
