@@ -1,9 +1,11 @@
 import { Workbook } from "@fortune-sheet/react";
 import "@fortune-sheet/react/dist/index.css";
+import { useRef } from "react";
 import type { WorkbookFull } from "@/api/workbooks";
 import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatchSync";
 import styles from "./ExcelGrid.module.css";
 import { useExcelGridWorkspace } from "./useExcelGridWorkspace";
+import { useFortuneSheetWheel } from "./useFortuneSheetWheel";
 
 interface Props {
   workspaceId: number | null;
@@ -28,6 +30,7 @@ export function ExcelGrid({
   onWorkbookRefresh,
   onWorkbookMutation,
 }: Props) {
+  const gridRootRef = useRef<HTMLDivElement>(null);
   const {
     saveStatus,
     workbookRef,
@@ -51,11 +54,12 @@ export function ExcelGrid({
     onWorkbookRefresh,
     onWorkbookMutation,
   });
+  useFortuneSheetWheel(gridRootRef, workbook !== null);
 
   if (!workbook) return null;
 
   return (
-    <div className={styles.container}>
+    <div ref={gridRootRef} className={styles.container}>
       <div className={styles.inner}>
         <Workbook
           key={`${workbook.id}:${sessionKey}`}
