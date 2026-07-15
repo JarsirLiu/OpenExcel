@@ -37,13 +37,20 @@ export {
 export type { FortuneCell, FortuneCellValue } from "./excel/celldataUtils.js";
 export {
   celldataToGrid,
+  DEFAULT_FORTUNE_FONT_COLOR,
+  extractMergesFromCelldata,
   gridToCelldata,
   isCelldata,
   matrixToCelldata,
+  normalizeFortuneCellData,
 } from "./excel/celldataUtils.js";
-export { excelToGrid } from "./excel/excelToGrid.js";
 export type { FortuneSheetData, SheetConfig } from "./excel/sheetConfig.js";
 export { extractSheetConfig, restoreSheetConfig } from "./excel/sheetConfig.js";
+export type {
+  ImportedSheetInput,
+  ImportedWorkbookBatchInput,
+  ImportedWorkbookInput,
+} from "./excel/workbookImport.js";
 export { celldataToExcel } from "./exporter/celldataToExcel.js";
 export { templateToExcel } from "./exporter/templateToExcel.js";
 export { jsonToTemplate } from "./importer/jsonAnalyzer.js";

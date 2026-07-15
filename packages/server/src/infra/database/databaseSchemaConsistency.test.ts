@@ -34,7 +34,8 @@ function readSchema(schemaPath: string): string {
 function normalizeSchema(schema: string, outputPath: string, provider: string): string {
   return schema
     .replace(`output   = "${outputPath}"`, 'output   = "__OUTPUT__"')
-    .replace(`provider = "${provider}"`, 'provider = "__PROVIDER__"');
+    .replace(`provider = "${provider}"`, 'provider = "__PROVIDER__"')
+    .replace(/\s+@db\.(Text|LongText)/g, "");
 }
 
 describe("Prisma schema consistency", () => {

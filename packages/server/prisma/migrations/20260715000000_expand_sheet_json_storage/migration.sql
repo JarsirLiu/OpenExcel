@@ -1,0 +1,2 @@
+-- SQLite already stores Prisma String values as TEXT. This migration records
+-- the storage contract shared by the provider schemas.

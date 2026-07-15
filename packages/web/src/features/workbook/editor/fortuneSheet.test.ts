@@ -1,0 +1,30 @@
+import { describe, expect, it } from "vitest";
+import { toFortuneSheetData } from "./fortuneSheet";
+
+describe("toFortuneSheetData", () => {
+  it("uses black for cells without an explicit font color", () => {
+    const result = toFortuneSheetData({
+      id: 1,
+      name: "Sheet1",
+      columns: [],
+      merges: [],
+      uploadedData: [{ r: 0, c: 0, v: { v: "文字", m: "文字" } }],
+      config: null,
+    });
+
+    expect(result.celldata[0]?.v.fc).toBe("#000000");
+  });
+
+  it("preserves an explicitly white font color", () => {
+    const result = toFortuneSheetData({
+      id: 1,
+      name: "Sheet1",
+      columns: [],
+      merges: [],
+      uploadedData: [{ r: 0, c: 0, v: { v: "文字", m: "文字", fc: "#FFFFFF" } }],
+      config: null,
+    });
+
+    expect(result.celldata[0]?.v.fc).toBe("#FFFFFF");
+  });
+});

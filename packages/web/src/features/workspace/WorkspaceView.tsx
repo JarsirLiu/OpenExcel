@@ -69,7 +69,7 @@ export function WorkspaceView({
       <input
         ref={newWbInputRef}
         type="file"
-        accept=".xlsx,.xls"
+        accept=".xlsx,.xls,.csv"
         multiple
         style={{ display: "none" }}
         onChange={(e) => {

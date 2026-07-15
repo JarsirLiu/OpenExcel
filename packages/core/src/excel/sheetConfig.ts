@@ -8,7 +8,15 @@ export type { FortuneCell };
  */
 export interface SheetConfig {
   config?: any;
+  color?: string;
+  status?: string;
+  row?: number;
+  column?: number;
+  luckysheet_select_save?: any[];
+  scrollLeft?: number;
+  scrollTop?: number;
   frozen?: any;
+  freezen?: any;
   filter?: any;
   filter_select?: any;
   zoomRatio?: number;
@@ -21,6 +29,10 @@ export interface SheetConfig {
   calcChain?: any[];
   luckysheet_conditionformat_save?: any[];
   luckysheet_alternateformat_save?: any[];
+  chart?: any[];
+  isPivotTable?: boolean;
+  pivotTable?: any;
+  hide?: number;
 }
 
 /** FortuneSheetData 接口——传给 FortuneSheet Workbook 的 sheet 数据 */
@@ -31,7 +43,15 @@ export interface FortuneSheetData {
   columnWidths: Record<string, number>;
   merges: { row: [number, number]; col: [number, number] }[];
   config?: any;
+  color?: string;
+  status?: string;
+  row?: number;
+  column?: number;
+  luckysheet_select_save?: any[];
+  scrollLeft?: number;
+  scrollTop?: number;
   frozen?: any;
+  freezen?: any;
   filter?: any;
   filter_select?: any;
   zoomRatio?: number;
@@ -44,11 +64,23 @@ export interface FortuneSheetData {
   calcChain?: any[];
   luckysheet_conditionformat_save?: any[];
   luckysheet_alternateformat_save?: any[];
+  chart?: any[];
+  isPivotTable?: boolean;
+  pivotTable?: any;
+  hide?: number;
 }
 
 const CONFIG_KEYS: (keyof SheetConfig)[] = [
   "config",
+  "color",
+  "status",
+  "row",
+  "column",
+  "luckysheet_select_save",
+  "scrollLeft",
+  "scrollTop",
   "frozen",
+  "freezen",
   "filter",
   "filter_select",
   "zoomRatio",
@@ -61,6 +93,10 @@ const CONFIG_KEYS: (keyof SheetConfig)[] = [
   "calcChain",
   "luckysheet_conditionformat_save",
   "luckysheet_alternateformat_save",
+  "chart",
+  "isPivotTable",
+  "pivotTable",
+  "hide",
 ];
 
 /**

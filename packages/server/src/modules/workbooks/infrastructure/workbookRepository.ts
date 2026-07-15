@@ -107,7 +107,7 @@ export async function createWorkbookWithInitialSheet(input: {
   });
 }
 
-export async function createUploadedWorkbooks(
+export async function createImportedWorkbooks(
   workspaceId: number,
   parsedWorkbooks: readonly {
     workbookName: string;

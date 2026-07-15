@@ -56,10 +56,10 @@ model Sheet {
   sheetNo      Int
   name         String
   order        Int
-  columns      String
-  merges       String                  @default("[]")
-  uploadedData String?
-  config       String?
+  columns      String                  @db.LongText
+  merges       String                  @db.LongText
+  uploadedData String?                 @db.LongText
+  config       String?                 @db.LongText
   workbook     Workbook                @relation(fields: [workbookId], references: [id], onDelete: Cascade)
   sessions     Session[]
   runSnapshots AgentRunSheetSnapshot[]
@@ -141,8 +141,8 @@ model AgentRunSheetSnapshot {
   id           Int      @id @default(autoincrement())
   runId        Int
   sheetId      Int
-  uploadedData String?
-  config       String?
+  uploadedData String? @db.LongText
+  config       String? @db.LongText
   createdAt    DateTime @default(now())
   run          AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
   sheet        Sheet    @relation(fields: [sheetId], references: [id], onDelete: Cascade)

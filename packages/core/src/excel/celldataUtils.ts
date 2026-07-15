@@ -20,13 +20,106 @@ export interface FortuneCellValue {
   ht?: number;
   vt?: number;
   tb?: string;
-  ct?: { fa?: string; t?: string };
+  tr?: number;
+  rt?: number;
+  qp?: number;
+  va?: number;
+  ct?: { fa?: string; t?: string; s?: unknown[] };
   bd?: {
     t?: { s: number; c?: string };
     b?: { s: number; c?: string };
     l?: { s: number; c?: string };
     r?: { s: number; c?: string };
   };
+}
+
+export const DEFAULT_FORTUNE_FONT_COLOR = "#000000";
+
+const INLINE_STYLE_KEYS = ["ff", "fc", "fs", "bl", "it", "cl", "un", "va"] as const;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function normalizeSingleInlineString(value: FortuneCellValue): FortuneCellValue {
+  const format = value.ct;
+  if (format?.t !== "inlineStr" || !Array.isArray(format.s) || format.s.length !== 1) {
+    return value;
+  }
+  const run = format.s[0];
+  if (!isRecord(run) || typeof run.v !== "string") return value;
+
+  const normalized: FortuneCellValue = {
+    ...value,
+    v: run.v,
+    m: value.m || run.v,
+    ct: { fa: format.fa, t: "s" },
+  };
+  for (const key of INLINE_STYLE_KEYS) {
+    if (normalized[key] == null && run[key] != null) {
+      (normalized as unknown as Record<string, unknown>)[key] = run[key];
+    }
+  }
+  return normalized;
+}
+
+/**
+ * Normalize external Excel cell data into a stable FortuneSheet representation.
+ * Excel commonly omits default black from styles, and single-run inline strings
+ * are rendered inconsistently by FortuneSheet's canvas implementation.
+ */
+export function normalizeFortuneCellData(celldata: FortuneCell[]): FortuneCell[] {
+  let changed = false;
+  const normalized = celldata.map((cell) => {
+    if (
+      !cell ||
+      typeof cell !== "object" ||
+      !cell.v ||
+      typeof cell.v !== "object" ||
+      Array.isArray(cell.v)
+    ) {
+      return cell;
+    }
+    let value = cell.v;
+    if (value.fc == null) {
+      value = { ...value, fc: DEFAULT_FORTUNE_FONT_COLOR };
+    }
+    const inlineNormalized = normalizeSingleInlineString(value);
+    if (inlineNormalized !== cell.v) {
+      value = inlineNormalized;
+    }
+    if (value !== cell.v) {
+      changed = true;
+      return { ...cell, v: value };
+    }
+    return cell;
+  });
+
+  return changed ? normalized : celldata;
+}
+
+export function extractMergesFromCelldata(
+  celldata: FortuneCell[],
+): { row: [number, number]; col: [number, number] }[] {
+  const seen = new Set<string>();
+  const merges: { row: [number, number]; col: [number, number] }[] = [];
+
+  for (const cell of celldata) {
+    const merge = cell.v?.mc;
+    if (!merge || merge.r !== cell.r || merge.c !== cell.c) continue;
+
+    const rowEnd = merge.r + (merge.rs ?? 1) - 1;
+    const colEnd = merge.c + (merge.cs ?? 1) - 1;
+    const key = `${merge.r}_${merge.c}_${rowEnd}_${colEnd}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merges.push({
+      row: [merge.r, rowEnd],
+      col: [merge.c, colEnd],
+    });
+  }
+
+  return merges;
 }
 
 export function isCelldata(data: any): data is FortuneCell[] {

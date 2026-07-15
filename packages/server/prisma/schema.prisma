@@ -57,7 +57,7 @@ model Sheet {
   name         String
   order        Int
   columns      String
-  merges       String                  @default("[]")
+  merges       String
   uploadedData String?
   config       String?
   workbook     Workbook                @relation(fields: [workbookId], references: [id], onDelete: Cascade)

@@ -6,10 +6,11 @@ import {
   deleteWorkbook,
   fetchWorkbook,
   fetchWorkbooks,
+  importWorkbooks,
   updateWorkbookName,
-  uploadNewWorkbook,
 } from "@/api/workbooks";
 import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatchSync";
+import { importWorkbookFiles } from "@/features/workbook/import/workbookImporter";
 import { toast } from "@/shared/lib";
 import { patchWorkbookWithDelta } from "../workbook/utils/patchWorkbook";
 import { useWorkbookCatalog } from "./useWorkbookCatalog";
@@ -283,7 +284,10 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
       const { generation, controller } = beginRequest();
       setStatus(files.length === 1 ? "上传中..." : `正在上传 ${files.length} 个文件...`);
       try {
-        const results = await uploadNewWorkbook(workspaceId, files, {
+        const imported = await importWorkbookFiles(files);
+        if (!isCurrentRequest(generation, controller.signal)) return;
+        setStatus(files.length === 1 ? "正在保存..." : `正在保存 ${files.length} 个文件...`);
+        const results = await importWorkbooks(workspaceId, imported, {
           signal: controller.signal,
         });
         const list = await fetchWorkbooks(workspaceId, { signal: controller.signal });

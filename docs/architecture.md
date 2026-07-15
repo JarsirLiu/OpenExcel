@@ -26,7 +26,10 @@ The architecture must optimize for:
 
 ### 2.1 Core logic stays pure
 
-All spreadsheet transformations, delta handling, import/export logic, and schema conversion belong in `packages/core`.
+Spreadsheet primitives, delta handling, export logic, and shared schema conversion belong in `packages/core`.
+Browser-only workbook import is owned by the workbook feature in `packages/web`. The adapter routes
+`.xlsx` through FortuneExcel and `.xls`/`.csv` through SheetJS, then maps every format to the shared
+import DTO before sending it to the server.
 
 This package must not know about:
 
@@ -106,7 +109,7 @@ Responsibilities:
 - Convert Excel formats and internal grid data
 - Normalize sheet deltas
 - Parse workbook metadata
-- Export and import workbook contents
+- Export workbook contents and define import DTOs
 - Provide shared types and validation helpers
 
 ### 3.2 `packages/agent`
@@ -626,12 +629,13 @@ The bootstrap command is authenticated and idempotent. The workspace list endpoi
 - `GET /api/workspaces/:workspaceId/workbooks`
 - `GET /api/workspaces/:workspaceId/workbooks/:id`
 - `POST /api/workspaces/:workspaceId/workbooks`
-- `POST /api/workspaces/:workspaceId/workbooks/upload`
+- `POST /api/workspaces/:workspaceId/workbooks/import`
 
-  Accepts multiple multipart `file` parts. Each file creates one workbook and the response is
-  an array of created workbook summaries. The whole batch is transactional: if any file cannot
-  be parsed, no workbook from the batch is persisted. The server limits a request to 20 files,
-  50 MiB per file, and 200 MiB total.
+  Accepts a JSON batch of FortuneSheet-compatible workbooks produced by the web import adapter.
+  Each item creates one workbook and the response is an array of created workbook summaries.
+  The whole batch is transactional: if any normalized workbook is invalid, no workbook from the
+  batch is persisted. Excel parsing stays in the browser; the server validates the DTO and owns
+  the transaction.
 - `POST /api/workspaces/:workspaceId/workbooks/:id/upload`
 - `POST /api/workspaces/:workspaceId/workbooks/:workbookId/sheets`
 - `DELETE /api/workspaces/:workspaceId/workbooks/:workbookId/sheets/:sheetId`

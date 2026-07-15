@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@ai-sdk/react": "^4.0.5",
+    "@corbe30/fortune-excel": "2.3.3",
     "@fortune-sheet/react": "^1.0.4",
     "@openexcel/core": "workspace:*",
     "@tiptap/extension-mention": "^3.27.1",
@@ -26,7 +27,7 @@
     "remark-gfm": "^4.0.1",
     "streamdown": "^2.5.0",
     "tippy.js": "^6.3.7",
-    "xlsx": "^0.18.5"
+    "xlsx-js-style": "1.2.0"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",

@@ -1,10 +1,11 @@
+import type { ImportedWorkbookBatchInput } from "@openexcel/core";
 import type { FastifyInstance } from "fastify";
 import {
   resolveWorkbookIdForRequest,
   resolveWorkspaceIdForRequest,
 } from "../../../middleware/resourceAccess.js";
 import * as application from "../application/index.js";
-import { WORKBOOK_UPLOAD_LIMITS } from "./uploadLimits.js";
+import { WORKBOOK_IMPORT_LIMITS } from "./importLimits.js";
 
 export async function workbookRoutes(app: FastifyInstance) {
   app.get<{ Params: { workspacePublicId: string } }>(
@@ -39,13 +40,6 @@ export async function workbookRoutes(app: FastifyInstance) {
       );
       return reply.status(201).send(result);
     } catch (error) {
-      if (error instanceof application.WorkbookUploadError) {
-        return reply.status(error.statusCode).send({
-          error: error.message,
-          code: error.code,
-          details: error.details,
-        });
-      }
       if (error instanceof application.WorkbookCreationError) {
         return reply.status(404).send({
           error: error.message,
@@ -101,8 +95,12 @@ export async function workbookRoutes(app: FastifyInstance) {
     return result;
   });
 
-  app.post<{ Params: { workspacePublicId: string } }>(
-    "/api/workspaces/:workspacePublicId/workbooks/upload",
+  app.post<{
+    Params: { workspacePublicId: string };
+    Body: ImportedWorkbookBatchInput;
+  }>(
+    "/api/workspaces/:workspacePublicId/workbooks/import",
+    { bodyLimit: WORKBOOK_IMPORT_LIMITS.maxBodyBytes },
     async (req, reply) => {
       try {
         const workspaceId = await resolveWorkspaceIdForRequest(
@@ -111,56 +109,14 @@ export async function workbookRoutes(app: FastifyInstance) {
           reply,
         );
         if (workspaceId == null) return;
-        const files = [];
-        let totalBytes = 0;
-        for await (const data of req.files()) {
-          const chunks: Buffer[] = [];
-          let fileBytes = 0;
-          for await (const chunk of data.file) {
-            const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-            fileBytes += buffer.length;
-            totalBytes += buffer.length;
-            if (totalBytes > WORKBOOK_UPLOAD_LIMITS.maxTotalBytes) {
-              throw new application.WorkbookUploadError(
-                "本次上传文件总大小超过限制",
-                "UPLOAD_LIMIT_EXCEEDED",
-                413,
-                { fileName: data.filename, maxTotalBytes: WORKBOOK_UPLOAD_LIMITS.maxTotalBytes },
-              );
-            }
-            chunks.push(buffer);
-          }
-          if (data.file.truncated) {
-            throw new application.WorkbookUploadError(
-              "上传文件超过单文件大小限制",
-              "UPLOAD_LIMIT_EXCEEDED",
-              413,
-              { fileName: data.filename, maxFileBytes: WORKBOOK_UPLOAD_LIMITS.maxFileBytes },
-            );
-          }
-          files.push({ buffer: Buffer.concat(chunks, fileBytes), fileName: data.filename });
-        }
-        if (files.length === 0) return reply.status(400).send({ error: "No file uploaded" });
-
-        const result = await application.uploadAsNewWorkbook(workspaceId, files);
+        const result = await application.importWorkbooks(workspaceId, req.body);
         return reply.status(201).send(result);
       } catch (error) {
-        if (error instanceof application.WorkbookUploadError) {
+        if (error instanceof application.WorkbookImportError) {
           return reply.status(error.statusCode).send({
             error: error.message,
             code: error.code,
             details: error.details,
-          });
-        }
-        if (
-          typeof error === "object" &&
-          error !== null &&
-          "statusCode" in error &&
-          error.statusCode === 413
-        ) {
-          return reply.status(413).send({
-            error: "上传文件数量或大小超过限制",
-            code: "UPLOAD_LIMIT_EXCEEDED",
           });
         }
         throw error;

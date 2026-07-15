@@ -1,0 +1,10 @@
+ALTER TABLE "Sheet"
+  ALTER COLUMN "columns" TYPE TEXT,
+  ALTER COLUMN "merges" DROP DEFAULT,
+  ALTER COLUMN "merges" TYPE TEXT,
+  ALTER COLUMN "uploadedData" TYPE TEXT,
+  ALTER COLUMN "config" TYPE TEXT;
+
+ALTER TABLE "AgentRunSheetSnapshot"
+  ALTER COLUMN "uploadedData" TYPE TEXT,
+  ALTER COLUMN "config" TYPE TEXT;

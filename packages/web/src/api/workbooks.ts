@@ -1,3 +1,4 @@
+import type { ImportedWorkbookBatchInput } from "@openexcel/core";
 import { API_BASE, apiFetch, readErrorMessage } from "./http";
 
 export interface WorkbookMeta {
@@ -86,19 +87,18 @@ export async function fetchWorkbook(
   return res.json();
 }
 
-export async function uploadNewWorkbook(
+export async function importWorkbooks(
   workspaceId: number,
-  files: readonly File[],
+  payload: ImportedWorkbookBatchInput,
   options?: { signal?: AbortSignal },
 ): Promise<{ id: number; publicId: string; name: string; sheets: number }[]> {
-  const form = new FormData();
-  for (const file of files) form.append("file", file);
-  const res = await apiFetch(`/workspaces/${workspaceId}/workbooks/upload`, {
+  const res = await apiFetch(`/workspaces/${workspaceId}/workbooks/import`, {
     method: "POST",
-    body: form,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
     signal: options?.signal,
   });
-  if (!res.ok) throw new Error(await readErrorMessage(res, "上传工作簿失败"));
+  if (!res.ok) throw new Error(await readErrorMessage(res, "导入工作簿失败"));
   return res.json();
 }
 

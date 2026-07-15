@@ -1,7 +1,6 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import cors from "@fastify/cors";
-import multipart from "@fastify/multipart";
 import fastifyStatic from "@fastify/static";
 import Fastify from "fastify";
 import { pinoStream } from "./infra/observability/logger.js";
@@ -11,7 +10,6 @@ import { authRoutes } from "./modules/auth/api/routes.js";
 import { sessionRoutes } from "./modules/sessions/api/routes.js";
 import { sheetRoutes } from "./modules/sheets/api/routes.js";
 import { workbookRoutes } from "./modules/workbooks/api/routes.js";
-import { WORKBOOK_UPLOAD_LIMITS } from "./modules/workbooks/api/uploadLimits.js";
 import { workspaceRoutes } from "./modules/workspaces/api/routes.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -25,13 +23,6 @@ export async function createApp() {
   app.addHook("onResponse", responseLoggerHook);
 
   await app.register(cors, { origin: true });
-  await app.register(multipart, {
-    limits: {
-      files: WORKBOOK_UPLOAD_LIMITS.maxFiles,
-      fileSize: WORKBOOK_UPLOAD_LIMITS.maxFileBytes,
-      parts: WORKBOOK_UPLOAD_LIMITS.maxParts,
-    },
-  });
   await app.register(authRoutes);
   await app.register(workspaceRoutes);
   await app.register(workbookRoutes);

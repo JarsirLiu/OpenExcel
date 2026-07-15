@@ -1,29 +1,12 @@
 import type { FortuneCell, FortuneSheetData, SheetConfig } from "@openexcel/core";
-import { isCelldata, restoreSheetConfig } from "@openexcel/core";
+import {
+  extractMergesFromCelldata,
+  isCelldata,
+  normalizeFortuneCellData,
+  restoreSheetConfig,
+} from "@openexcel/core";
 
 export type { FortuneCell, FortuneSheetData, SheetConfig };
-
-/**
- * 从 celldata 的 mc 属性提取合并范围。
- */
-function extractMergesFromCelldata(
-  celldata: FortuneCell[],
-): { row: [number, number]; col: [number, number] }[] {
-  const seen = new Set<string>();
-  const merges: { row: [number, number]; col: [number, number] }[] = [];
-  for (const cell of celldata) {
-    const mc = cell.v?.mc;
-    if (!mc) continue;
-    const key = `${mc.r}_${mc.c}_${mc.rs}_${mc.cs}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    merges.push({
-      row: [mc.r, mc.r + (mc.rs ?? 1) - 1] as [number, number],
-      col: [mc.c, mc.c + (mc.cs ?? 1) - 1] as [number, number],
-    });
-  }
-  return merges;
-}
 
 export function toFortuneSheetData(sheet: {
   id: number;
@@ -64,6 +47,8 @@ export function toFortuneSheetData(sheet: {
       col: [m.col[0], m.col[1]],
     }));
   }
+
+  celldata = normalizeFortuneCellData(celldata);
 
   const result: FortuneSheetData = {
     id: String(sheet.id),
