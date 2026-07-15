@@ -224,7 +224,6 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
           workbookIdx={workbook.workbookIdx}
           currentWorkbook={workbook.currentWorkbook}
           workbookRevision={workbook.workbookRevision}
-          status={workbook.status}
           loading={loading}
           currentSheetIndex={workbook.currentSheetIndex}
           setCurrentSheetIndex={workbook.setCurrentSheetIndex}

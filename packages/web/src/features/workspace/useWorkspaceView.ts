@@ -35,12 +35,10 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
     workbookIdx,
     switchWorkbook,
     currentWorkbook,
-    status,
     loading,
     setWorkbooks,
     replaceCurrentWorkbook,
     setWorkbookIdx,
-    setStatus,
     workbookRevision,
   } = useWorkbookCatalog(workspaceId, initial);
 
@@ -298,11 +296,9 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
           const file = files[index];
           if (!file) continue;
           activeFileName = file.name;
-          setStatus(`正在处理 ${index + 1}/${files.length}：${file.name}`);
           const imported = await importWorkbookFile(file);
           if (!isCurrentRequest(generation, controller.signal)) return;
 
-          setStatus(`正在保存 ${index + 1}/${files.length}：${file.name}`);
           const uploaded = await importWorkbooks(
             workspaceId,
             { workbooks: [imported] },
@@ -325,7 +321,6 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
           setWorkbookIdx(idx);
           setCurrentSheetIndex(0);
         }
-        setStatus("");
         toast({
           message: files.length === 1 ? "上传完成" : `已上传 ${files.length} 个文件`,
           variant: "success",
@@ -345,7 +340,6 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
           }
         }
 
-        setStatus("");
         const progress =
           completedFiles > 0 ? `已完成 ${completedFiles}/${files.length} 个文件。` : "";
         const file = activeFileName ? `（文件：${activeFileName}）` : "";
@@ -356,7 +350,6 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
       beginRequest,
       invalidateReferenceCache,
       isCurrentRequest,
-      setStatus,
       setWorkbooks,
       setWorkbookIdx,
       workspaceId,
@@ -371,6 +364,10 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
         await deleteWorkbook(workspaceId, workbookId);
       } catch (error) {
         if (controller.signal.aborted) return;
+        toast({
+          message: error instanceof Error ? error.message : "删除工作簿失败",
+          variant: "error",
+        });
         throw error;
       }
       let list: WorkbookMeta[];
@@ -378,6 +375,10 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
         list = await fetchWorkbooks(workspaceId, { signal: controller.signal });
       } catch (error) {
         if (controller.signal.aborted) return;
+        toast({
+          message: error instanceof Error ? error.message : "刷新工作簿列表失败",
+          variant: "error",
+        });
         throw error;
       }
       if (!isCurrentRequest(generation, controller.signal)) return;
@@ -392,7 +393,7 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
         setWorkbookIdx(0);
         replaceCurrentWorkbook(null);
       }
-      setStatus("已删除");
+      toast({ message: "工作簿已删除", variant: "success" });
     },
     [
       beginRequest,
@@ -409,7 +410,6 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
     async (workspaceId: number) => {
       if (workspaceId == null) return;
       const { generation, controller } = beginRequest();
-      setStatus("创建中...");
       try {
         const result = await createWorkbook(workspaceId);
         const list = await fetchWorkbooks(workspaceId, { signal: controller.signal });
@@ -422,18 +422,17 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
           setWorkbookIdx(idx);
           setCurrentSheetIndex(0);
         }
-        setStatus("已创建");
+        toast({ message: "工作簿已创建", variant: "success" });
       } catch (error) {
         if (controller.signal.aborted) return;
         const message = error instanceof Error ? error.message : "创建失败";
-        setStatus(`创建失败：${message}`);
+        toast({ message, variant: "error" });
       }
     },
     [
       beginRequest,
       invalidateReferenceCache,
       isCurrentRequest,
-      setStatus,
       setWorkbookIdx,
       setWorkbooks,
       workspaceId,
@@ -444,7 +443,6 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
     async (workbookId: number, newName: string) => {
       if (workspaceId == null) return;
       const { generation, controller } = beginRequest();
-      setStatus("重命名中...");
       try {
         await updateWorkbookName(workspaceId, workbookId, newName);
         const list = await fetchWorkbooks(workspaceId, { signal: controller.signal });
@@ -455,11 +453,11 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
           replaceCurrentWorkbook({ ...currentWorkbook, name: newName });
         }
         invalidateReferenceCache();
-        setStatus("已重命名");
+        toast({ message: "工作簿已重命名", variant: "success" });
       } catch (error) {
         if (controller.signal.aborted) return;
         const message = error instanceof Error ? error.message : "重命名失败";
-        setStatus(`重命名失败：${message}`);
+        toast({ message, variant: "error" });
       }
     },
     [
@@ -468,7 +466,6 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
       invalidateReferenceCache,
       isCurrentRequest,
       replaceCurrentWorkbook,
-      setStatus,
       setWorkbooks,
       workspaceId,
     ],
@@ -479,7 +476,6 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
     workbookIdx,
     currentWorkbook,
     workbookRevision,
-    status,
     loading,
     currentSheetIndex,
     setCurrentSheetIndex,

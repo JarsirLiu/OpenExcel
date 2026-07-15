@@ -37,7 +37,6 @@ export function useWorkbookCatalog(workspaceId: number | null, initial?: Workboo
     initial?.currentWorkbook ?? null,
   );
   const [workbookRevision, setWorkbookRevision] = useState(0);
-  const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(!initial);
   const workspaceCatalogReadyRef = useRef(initial?.workspaceId === workspaceId);
   const requestGenerationRef = useRef(0);
@@ -57,7 +56,6 @@ export function useWorkbookCatalog(workspaceId: number | null, initial?: Workboo
       setWorkbooks([]);
       setWorkbookIdx(0);
       setCurrentWorkbook(null);
-      setStatus("");
       setLoading(false);
       return () => controller.abort();
     }
@@ -79,7 +77,6 @@ export function useWorkbookCatalog(workspaceId: number | null, initial?: Workboo
       setWorkbooks([]);
       setCurrentWorkbook(null);
       setWorkbookIdx(0);
-      setStatus("");
       setLoading(workspaceId != null);
       if (workspaceId == null) return;
 
@@ -155,8 +152,6 @@ export function useWorkbookCatalog(workspaceId: number | null, initial?: Workboo
     currentWorkbook,
     replaceCurrentWorkbook,
     workbookRevision,
-    status,
-    setStatus,
     loading,
     switchWorkbook,
   };

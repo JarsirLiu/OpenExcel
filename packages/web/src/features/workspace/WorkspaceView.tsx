@@ -18,7 +18,6 @@ type Props = {
   workbookIdx: number;
   currentWorkbook: WorkbookFull | null;
   workbookRevision: number;
-  status: string;
   loading: boolean;
   currentSheetIndex: number;
   setCurrentSheetIndex: (index: number) => void;
@@ -37,7 +36,6 @@ export function WorkspaceView({
   workbookIdx,
   currentWorkbook,
   workbookRevision,
-  status,
   loading,
   currentSheetIndex,
   setCurrentSheetIndex,
@@ -60,7 +58,6 @@ export function WorkspaceView({
       <WorkbookHeader
         workbooks={workbooks}
         activeWorkbookIdx={workbookIdx}
-        status={status}
         onSwitchWorkbook={handleSwitchWorkbook}
         onUploadNewWorkbookClick={() => newWbInputRef.current?.click()}
         onWorkbookRename={handleWorkbookRename}

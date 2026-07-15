@@ -27,7 +27,6 @@ type WorkbookTab = {
 interface Props {
   workbooks: WorkbookTab[];
   activeWorkbookIdx: number;
-  status: string;
   onSwitchWorkbook: (index: number) => void;
   onUploadNewWorkbookClick: () => void;
   onWorkbookRename?: (workbookId: number, newName: string) => Promise<void>;
@@ -36,7 +35,6 @@ interface Props {
 export function WorkbookHeader({
   workbooks,
   activeWorkbookIdx,
-  status,
   onSwitchWorkbook,
   onUploadNewWorkbookClick,
   onWorkbookRename,
@@ -114,13 +112,6 @@ export function WorkbookHeader({
         <button onClick={onUploadNewWorkbookClick} className={styles.pillBtn}>
           <FileIcon /> {t("upload", "上传Excel")}
         </button>
-        {status && (
-          <span
-            className={`${styles.status} ${status.includes("失败") ? styles.statusError : styles.statusOk}`}
-          >
-            {status}
-          </span>
-        )}
       </div>
     </div>
   );
