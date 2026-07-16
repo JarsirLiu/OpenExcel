@@ -33,6 +33,37 @@ describe("importWorkbooks", () => {
     ]);
   });
 
+  it("accepts a valid FortuneSheet filter selection", async () => {
+    await importWorkbooks(1, {
+      workbooks: [
+        {
+          name: "预算",
+          sheets: [{ ...validSheet, config: { filter_select: { row: [0, 10], column: [0, 4] } } }],
+        },
+      ],
+    });
+
+    expect(repository.createImportedWorkbooks).toHaveBeenCalled();
+  });
+
+  it.each([
+    { row: [0, 10], column: [4] },
+    { row: [10, 0], column: [0, 4] },
+    { row: [0, 10], column: [0, 16_384] },
+  ])("rejects invalid filter selections", async (filter_select) => {
+    await expect(
+      importWorkbooks(1, {
+        workbooks: [
+          {
+            name: "预算",
+            sheets: [{ ...validSheet, config: { filter_select } as never }],
+          },
+        ],
+      }),
+    ).rejects.toMatchObject({ code: "INVALID_IMPORT_PAYLOAD" });
+    expect(repository.createImportedWorkbooks).not.toHaveBeenCalled();
+  });
+
   it("rejects empty workbooks before opening a transaction", async () => {
     await expect(importWorkbooks(1, { workbooks: [] })).rejects.toBeInstanceOf(WorkbookImportError);
     expect(repository.createImportedWorkbooks).not.toHaveBeenCalled();

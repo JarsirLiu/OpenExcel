@@ -2,6 +2,7 @@ import type { ImportedWorkbookBatchInput } from "@openexcel/core";
 import { validateAndNormalizeMerges } from "./importMergeValidation.js";
 import { ImportValidationError } from "./importValidationErrors.js";
 import {
+  filterSelectionSchema,
   type ImportedWorkbookPayload,
   importedWorkbookBatchSchema,
   validateImportedConfig,
@@ -26,6 +27,15 @@ function normalizeSheet(sheet: ImportedWorkbookPayload["sheets"][number]) {
       413,
       { sheetName: sheet.name },
     );
+  }
+
+  if (sheet.config.filter_select != null) {
+    const filterResult = filterSelectionSchema.safeParse(sheet.config.filter_select);
+    if (!filterResult.success) {
+      throw new ImportValidationError("工作表筛选范围无效", "INVALID_IMPORT_PAYLOAD", 400, {
+        sheetName: sheet.name,
+      });
+    }
   }
 
   const cellKeys = new Set<string>();

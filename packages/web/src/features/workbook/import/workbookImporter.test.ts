@@ -30,6 +30,7 @@ describe("workbookImporter", () => {
         name: "数据",
         celldata: [{ r: 0, c: 0, v: { v: "标题", m: "标题", fc: "#112233" } }],
         config: { columnlen: { 0: 120 } },
+        filter_select: { row: [0, 10], column: [0, 4] },
         chart: [{ id: "chart-1" }],
       },
       0,
@@ -39,6 +40,7 @@ describe("workbookImporter", () => {
     expect(sheet.celldata[0]?.v.fc).toBe("#112233");
     expect(sheet.config.config).toEqual({ columnlen: { 0: 120 } });
     expect(sheet.config.chart).toEqual([{ id: "chart-1" }]);
+    expect(sheet.config.filter_select).toEqual({ row: [0, 10], column: [0, 4] });
   });
 
   it("preserves imported worksheet view metadata", () => {

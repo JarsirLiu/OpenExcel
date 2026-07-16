@@ -45,6 +45,12 @@ only read `.xlsx`, `.xls`, or `.csv` files and translate library-specific output
 helpers; the ExcelJS exporter consumes the same helpers in reverse. No adapter may define a second
 mapping for `ht`, `vt`, `tb`, `ct`, or formula prefixes.
 
+Workbook view metadata follows the same boundary. Excel `autoFilter` ranges are converted at the
+browser import boundary into the shared zero-based `filter_select` range used by FortuneSheet;
+ExcelJS export converts that range back to an Excel A1 range. The web adapter may use a secondary
+parser for metadata that the primary style parser does not expose, but it must not replace the
+primary `.xlsx` cell/style conversion path.
+
 ### 2.2 Agent logic is headless
 
 Agent execution, session context, compaction, and tool registry belong to an agent layer.

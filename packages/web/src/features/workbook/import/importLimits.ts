@@ -2,6 +2,9 @@ const BYTES_PER_MIB = 1024 * 1024;
 
 export const MAX_IMPORT_FILE_BYTES = 5 * BYTES_PER_MIB;
 export const MAX_IMPORT_BATCH_BYTES = 10 * BYTES_PER_MIB;
+export const MAX_XLSX_ZIP_ENTRIES = 2_000;
+export const MAX_XLSX_METADATA_XML_BYTES = 8 * BYTES_PER_MIB;
+export const MAX_XLSX_WORKSHEET_XML_BYTES = 4 * BYTES_PER_MIB;
 
 function formatMiB(bytes: number): string {
   return `${(bytes / BYTES_PER_MIB).toFixed(2)} MB`;

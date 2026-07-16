@@ -1,4 +1,5 @@
 import type { FortuneCell } from "@openexcel/core";
+import { excelAutoFilterRefToFortune } from "@openexcel/core";
 import XLSX from "xlsx-js-style";
 import type { FortuneExcelSheet } from "./fortuneExcelAdapter";
 import { createMergeIndex, toMergeConfig } from "./sheetJsMerges";
@@ -46,8 +47,10 @@ function buildSheet(name: string, worksheet: XLSX.WorkSheet): FortuneExcelSheet 
         .filter(([, height]) => height != null),
     );
   }
-
-  return { name, celldata, config };
+  const filterSelect = excelAutoFilterRefToFortune(worksheet["!autofilter"]?.ref);
+  return filterSelect
+    ? { name, celldata, config, filter_select: filterSelect }
+    : { name, celldata, config };
 }
 
 export async function transformSheetJsFileToFortuneSheets(

@@ -100,6 +100,14 @@ const mergeRangeSchema = z
   .strict();
 
 const jsonObjectSchema = z.record(z.string(), z.json());
+export const filterSelectionSchema = z
+  .object({
+    row: z.tuple([nonNegativeRow, nonNegativeRow]),
+    column: z.tuple([nonNegativeColumn, nonNegativeColumn]),
+  })
+  .strict()
+  .refine((selection) => selection.row[0] <= selection.row[1], "筛选行范围无效")
+  .refine((selection) => selection.column[0] <= selection.column[1], "筛选列范围无效");
 
 export const importedSheetSchema = z
   .object({

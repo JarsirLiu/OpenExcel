@@ -2,6 +2,11 @@ import type { FortuneCell } from "./celldataUtils.js";
 
 export type { FortuneCell };
 
+export type FilterSelection = {
+  row: [number, number];
+  column: [number, number];
+};
+
 /**
  * 所有 sheet 级配置属性，均为 optional。
  * 与 FortuneSheet 的 sheet 顶层属性一一对应。
@@ -18,7 +23,7 @@ export interface SheetConfig {
   frozen?: any;
   freezen?: any;
   filter?: any;
-  filter_select?: any;
+  filter_select?: FilterSelection;
   zoomRatio?: number;
   showGridLines?: boolean | number;
   defaultRowHeight?: number;
@@ -53,7 +58,7 @@ export interface FortuneSheetData {
   frozen?: any;
   freezen?: any;
   filter?: any;
-  filter_select?: any;
+  filter_select?: FilterSelection;
   zoomRatio?: number;
   showGridLines?: boolean | number;
   defaultRowHeight?: number;

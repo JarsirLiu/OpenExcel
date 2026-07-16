@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import XLSX from "xlsx-js-style";
 import { transformSheetJsFileToFortuneSheets } from "./sheetJsAdapter";
 import { toFortuneValue } from "./sheetJsStyles";
@@ -47,6 +47,27 @@ describe("sheetJsAdapter", () => {
         expect.objectContaining({ r: 1, c: 1, v: expect.objectContaining({ v: 3 }) }),
       ]),
     );
+  });
+
+  it("keeps legacy XLS filter metadata at the sheet boundary", async () => {
+    const read = vi.spyOn(XLSX, "read").mockReturnValueOnce({
+      SheetNames: ["库存"],
+      Sheets: {
+        库存: {
+          "!ref": "A1:B2",
+          "!autofilter": { ref: "A1:B2" },
+        },
+      },
+    } as never);
+
+    try {
+      const [sheet] = await transformSheetJsFileToFortuneSheets(new File([], "库存.xls"));
+
+      expect(sheet?.filter_select).toEqual({ row: [0, 1], column: [0, 1] });
+      expect((sheet?.config as Record<string, unknown>).filter_select).toBeUndefined();
+    } finally {
+      read.mockRestore();
+    }
   });
 
   it("preserves indexed and themed colors from cell styles", () => {

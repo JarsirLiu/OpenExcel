@@ -44,6 +44,11 @@ export {
   matrixToCelldata,
   normalizeFortuneCellData,
 } from "./excel/celldataUtils.js";
+export {
+  excelAutoFilterRefToFortune,
+  fortuneFilterSelectionToExcelRef,
+  isFilterSelection,
+} from "./excel/excelFilter.js";
 export type {
   FortuneCellNormalizationOptions,
   FortuneCellScalar,
@@ -67,7 +72,7 @@ export {
   fortuneVerticalToExcel,
   fortuneWrapToExcel,
 } from "./excel/fortuneStyle.js";
-export type { FortuneSheetData, SheetConfig } from "./excel/sheetConfig.js";
+export type { FilterSelection, FortuneSheetData, SheetConfig } from "./excel/sheetConfig.js";
 export { extractSheetConfig, restoreSheetConfig } from "./excel/sheetConfig.js";
 export type {
   ImportedSheetInput,

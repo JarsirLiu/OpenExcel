@@ -26,6 +26,7 @@ describe("celldataToExcel", () => {
         ],
         config: {
           luckysheet_select_save: [{ row: [28, 28], column: [7, 7] }],
+          filter_select: { row: [0, 2], column: [0, 4] },
           config: { columnlen: { 0: 219 } },
           borderInfo: [
             {
@@ -43,6 +44,7 @@ describe("celldataToExcel", () => {
 
     expect(worksheet).toBeDefined();
     expect(worksheet?.views[0]?.activeCell).toBe("H29");
+    expect(worksheet?.autoFilter).toBe("A1:E3");
     expect(worksheet?.getColumn(1).width).toBeCloseTo(219 / 7);
     expect(worksheet?.getCell("A1").alignment).toMatchObject({
       horizontal: "center",

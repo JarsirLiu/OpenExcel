@@ -3,6 +3,7 @@ import type { FortuneCell, FortuneCellValue } from "../excel/celldataUtils.js";
 import type { ExcelSheetInput } from "./celldataToExcel.js";
 import { applyFortuneBorderInfo } from "./excelJsBorder.js";
 import { applyFortuneCell } from "./excelJsCell.js";
+import { applyFortuneAutoFilter } from "./excelJsFilter.js";
 
 type MergeRange = {
   row: [number, number];
@@ -158,5 +159,6 @@ export function writeSheetToWorksheet(worksheet: Worksheet, sheet: ExcelSheetInp
   applyFortuneBorderInfo(worksheet, config.borderInfo ?? layoutConfig.borderInfo);
 
   applyDimensions(worksheet, config, sheet.columnWidths, sheet.rowHeights);
+  applyFortuneAutoFilter(worksheet, config);
   applyWorksheetView(worksheet, config);
 }
