@@ -62,4 +62,18 @@ describe("sheetJsAdapter", () => {
     expect(value.fc).toBe("#FF0000");
     expect(value.bg).toBe("#729ACA");
   });
+
+  it("maps Excel alignment and wrapping to FortuneSheet semantics", () => {
+    const value = toFortuneValue({
+      t: "s",
+      v: "标题",
+      s: {
+        alignment: { horizontal: "center", vertical: "top", wrapText: false },
+      },
+    });
+
+    expect(value.ht).toBe(0);
+    expect(value.vt).toBe(1);
+    expect(value.tb).toBe("1");
+  });
 });

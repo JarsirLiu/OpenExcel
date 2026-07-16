@@ -112,7 +112,29 @@ describe("workbookImporter", () => {
   it("wraps primitive converter values in the FortuneSheet value shape", () => {
     const sheet = normalizeSheet({ name: "数据", celldata: [{ r: 0, c: 0, v: 123 } as never] }, 0);
 
-    expect(sheet.celldata[0]?.v).toEqual({ v: 123, m: "123", fc: "#000000" });
+    expect(sheet.celldata[0]?.v).toEqual({
+      v: 123,
+      m: "123",
+      fc: "#000000",
+      ht: 2,
+      ct: { t: "n" },
+    });
+  });
+
+  it("normalizes numeric strings and formula prefixes at the import boundary", () => {
+    const sheet = normalizeSheet(
+      {
+        name: "数据",
+        celldata: [
+          { r: 0, c: 0, v: { v: "0.18", m: "0.18", ct: { t: "n" } } },
+          { r: 0, c: 1, v: { v: 3, m: "3", f: "=A1*2", ct: { t: "n" } } },
+        ],
+      },
+      0,
+    );
+
+    expect(sheet.celldata[0]?.v).toMatchObject({ v: 0.18, m: "0.18" });
+    expect(sheet.celldata[1]?.v.f).toBe("A1*2");
   });
 
   it("converts an imported file into the shared import DTO", async () => {

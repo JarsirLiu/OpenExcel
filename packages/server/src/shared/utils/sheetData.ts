@@ -1,4 +1,4 @@
-import type { FortuneCell } from "@openexcel/core";
+import { type FortuneCell, normalizeFortuneCellData } from "@openexcel/core";
 import type { Prisma } from "../../infra/database/prismaTypes.js";
 
 export type SheetRecord = Prisma.SheetGetPayload<{}>;
@@ -22,10 +22,24 @@ export function parseUploadedCelldata(
   return parsed as FortuneCell[];
 }
 
+function isPersistedFortuneCell(value: unknown): value is FortuneCell {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const cell = value as Record<string, unknown>;
+  return (
+    Number.isInteger(cell.r) &&
+    Number(cell.r) >= 0 &&
+    Number.isInteger(cell.c) &&
+    Number(cell.c) >= 0 &&
+    !!cell.v &&
+    typeof cell.v === "object" &&
+    !Array.isArray(cell.v)
+  );
+}
+
 export function sheetRecordToCelldata(sheet: Pick<SheetRecord, "uploadedData">): FortuneCell[] {
   const uploadedData = parseUploadedCelldata(sheet.uploadedData);
   if (uploadedData && uploadedData.length > 0) {
-    return uploadedData;
+    return normalizeFortuneCellData(uploadedData.filter(isPersistedFortuneCell));
   }
   return uploadedData ?? [];
 }

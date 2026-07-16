@@ -43,5 +43,5 @@ export function normalizeImportedCelldata(input: unknown): FortuneCell[] {
     };
   });
 
-  return normalizeFortuneCellData(celldata);
+  return normalizeFortuneCellData(celldata, { inferGeneralNumeric: true });
 }

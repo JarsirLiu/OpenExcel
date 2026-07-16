@@ -44,6 +44,29 @@ export {
   matrixToCelldata,
   normalizeFortuneCellData,
 } from "./excel/celldataUtils.js";
+export type {
+  FortuneCellNormalizationOptions,
+  FortuneCellScalar,
+} from "./excel/fortuneCellValue.js";
+export {
+  displayValueOfFortuneScalar,
+  fortuneCellValueToScalar,
+  normalizeFortuneCellValue,
+  normalizeFortuneFormula,
+} from "./excel/fortuneCellValue.js";
+export type { ExcelColorInput } from "./excel/fortuneStyle.js";
+export {
+  excelBorderStyleToFortune,
+  excelColorToFortune,
+  excelHorizontalToFortune,
+  excelVerticalToFortune,
+  excelWrapToFortune,
+  fortuneBorderStyleToExcel,
+  fortuneColorToArgb,
+  fortuneHorizontalToExcel,
+  fortuneVerticalToExcel,
+  fortuneWrapToExcel,
+} from "./excel/fortuneStyle.js";
 export type { FortuneSheetData, SheetConfig } from "./excel/sheetConfig.js";
 export { extractSheetConfig, restoreSheetConfig } from "./excel/sheetConfig.js";
 export type {

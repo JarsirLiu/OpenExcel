@@ -1,4 +1,9 @@
-import { celldataToGrid, type FortuneCell, toOneBasedIndex } from "@openexcel/core";
+import {
+  celldataToGrid,
+  type FortuneCell,
+  normalizeFortuneFormula,
+  toOneBasedIndex,
+} from "@openexcel/core";
 
 export interface SheetChangePreviewMerge {
   startRow: number;
@@ -158,13 +163,6 @@ export function normalizeWriteOperations(input: WriteCellsInput): NormalizedWrit
   };
 }
 
-function normalizeFormula(formula?: string): string | undefined {
-  if (formula == null) return undefined;
-  const trimmed = formula.trim();
-  if (!trimmed) return undefined;
-  return trimmed.startsWith("=") ? trimmed.slice(1) : trimmed;
-}
-
 export function stripCellContent(
   value: Record<string, unknown> | undefined | null,
 ): Record<string, unknown> | null {
@@ -182,7 +180,7 @@ export function applyCellWrite(
   formula?: string,
 ) {
   const key = `${row0},${col0}`;
-  const normalizedFormula = normalizeFormula(formula);
+  const normalizedFormula = normalizeFortuneFormula(formula);
   if (cellMap.has(key)) {
     const existing = cellMap.get(key);
     const nextValue: Record<string, unknown> = { ...(existing.v ?? {}) };

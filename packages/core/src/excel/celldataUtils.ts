@@ -1,3 +1,8 @@
+import {
+  type FortuneCellNormalizationOptions,
+  normalizeFortuneCellValue,
+} from "./fortuneCellValue.js";
+
 export interface FortuneCell {
   r: number;
   c: number;
@@ -68,7 +73,10 @@ function normalizeSingleInlineString(value: FortuneCellValue): FortuneCellValue 
  * Excel commonly omits default black from styles, and single-run inline strings
  * are rendered inconsistently by FortuneSheet's canvas implementation.
  */
-export function normalizeFortuneCellData(celldata: FortuneCell[]): FortuneCell[] {
+export function normalizeFortuneCellData(
+  celldata: FortuneCell[],
+  options: FortuneCellNormalizationOptions = {},
+): FortuneCell[] {
   let changed = false;
   const normalized = celldata.map((cell) => {
     if (
@@ -85,9 +93,7 @@ export function normalizeFortuneCellData(celldata: FortuneCell[]): FortuneCell[]
       value = { ...value, fc: DEFAULT_FORTUNE_FONT_COLOR };
     }
     const inlineNormalized = normalizeSingleInlineString(value);
-    if (inlineNormalized !== cell.v) {
-      value = inlineNormalized;
-    }
+    value = normalizeFortuneCellValue(inlineNormalized, options);
     if (value !== cell.v) {
       changed = true;
       return { ...cell, v: value };

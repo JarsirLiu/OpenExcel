@@ -1,4 +1,8 @@
-import { type SheetChangeDelta, sheetChangeDeltaToZeroBased } from "@openexcel/core";
+import {
+  normalizeFortuneFormula,
+  type SheetChangeDelta,
+  sheetChangeDeltaToZeroBased,
+} from "@openexcel/core";
 import type { SheetSchema, WorkbookFull } from "@/api/workbooks";
 
 function toColRef(c: number): string {
@@ -62,7 +66,7 @@ export function patchWorkbookWithDelta(
     for (const { row, col, value, formula } of cells) {
       const key = `${row},${col}`;
       const newVal = value ?? "";
-      const normalizedFormula = typeof formula === "string" ? formula.trim().replace(/^=/, "") : "";
+      const normalizedFormula = normalizeFortuneFormula(formula) ?? "";
       const hasFormula = normalizedFormula.length > 0;
 
       if (hasFormula) {

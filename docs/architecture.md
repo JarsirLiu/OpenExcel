@@ -39,6 +39,12 @@ This package must not know about:
 - SSE or WebSocket
 - AI model providers
 
+Spreadsheet format adapters use the shared FortuneSheet conversion layer in `core`. That layer
+owns alignment, wrapping, borders, colors, scalar values, and formula semantics. Browser adapters
+only read `.xlsx`, `.xls`, or `.csv` files and translate library-specific output through those pure
+helpers; the ExcelJS exporter consumes the same helpers in reverse. No adapter may define a second
+mapping for `ht`, `vt`, `tb`, `ct`, or formula prefixes.
+
 ### 2.2 Agent logic is headless
 
 Agent execution, session context, compaction, and tool registry belong to an agent layer.

@@ -1,6 +1,7 @@
 import type { Worksheet } from "exceljs";
 import type { FortuneCell, FortuneCellValue } from "../excel/celldataUtils.js";
 import type { ExcelSheetInput } from "./celldataToExcel.js";
+import { applyFortuneBorderInfo } from "./excelJsBorder.js";
 import { applyFortuneCell } from "./excelJsCell.js";
 
 type MergeRange = {
@@ -152,6 +153,9 @@ export function writeSheetToWorksheet(worksheet: Worksheet, sheet: ExcelSheetInp
     const end = `${columnName(merge.col[1])}${merge.row[1] + 1}`;
     if (start !== end) worksheet.mergeCells(`${start}:${end}`);
   }
+
+  const layoutConfig = nestedFortuneConfig(config);
+  applyFortuneBorderInfo(worksheet, config.borderInfo ?? layoutConfig.borderInfo);
 
   applyDimensions(worksheet, config, sheet.columnWidths, sheet.rowHeights);
   applyWorksheetView(worksheet, config);
