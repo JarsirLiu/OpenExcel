@@ -10,7 +10,7 @@ import styles from "./WorkspaceSidebar.module.css";
 const MIN_WIDTH = 210;
 const DEFAULT_WIDTH = 220;
 const COLLAPSED_WIDTH = 32;
-const SIDEBAR_COLLAPSED_KEY = "openexcel:sidebarCollapsed";
+const SIDEBAR_COLLAPSED_KEY = "openexcel:sidebarCollapsed:v2";
 const SIDEBAR_WIDTH_KEY = "openexcel:sidebarWidth";
 
 type Props = {
@@ -38,7 +38,7 @@ export function WorkspaceSidebar({
 }: Props) {
   const [collapsed, setCollapsed] = useState(() => {
     const stored = sessionStorage.getItem(SIDEBAR_COLLAPSED_KEY);
-    return stored !== null ? stored === "true" : true;
+    return stored !== null ? stored === "true" : false;
   });
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const stored = sessionStorage.getItem(SIDEBAR_WIDTH_KEY);
@@ -59,7 +59,6 @@ export function WorkspaceSidebar({
     sessionStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarWidth));
   }, [sidebarWidth]);
 
-  // No auto-expand — user controls expand/collapse manually.
   const expandedSet = expandedWorkspaces;
 
   const toggleExpand = useCallback(
