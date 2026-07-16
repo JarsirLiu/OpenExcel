@@ -106,12 +106,23 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
     [workbook.handleWorkbookDelete, refreshUndoAvailability, refreshWorkbooks, workspaces],
   );
 
+  const handleWorkbookImport = useCallback(
+    async (files: File[]) => {
+      const changed = await workbook.handleNewWorkbookFileChange(files);
+      if (changed) {
+        await refreshWorkbooks(workspaces);
+      }
+      return changed;
+    },
+    [refreshWorkbooks, workbook.handleNewWorkbookFileChange, workspaces],
+  );
+
   const handleAttachExcel = useCallback(
     async (files: File[]) => {
-      await workbook.handleNewWorkbookFileChange(files);
+      await handleWorkbookImport(files);
       await refreshUndoAvailability();
     },
-    [workbook.handleNewWorkbookFileChange, refreshUndoAvailability],
+    [handleWorkbookImport, refreshUndoAvailability],
   );
 
   const handleWorkbookRename = useCallback(
@@ -228,7 +239,7 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
           currentSheetIndex={workbook.currentSheetIndex}
           setCurrentSheetIndex={workbook.setCurrentSheetIndex}
           handleSwitchWorkbook={workbook.handleSwitchWorkbook}
-          handleNewWorkbookFileChange={workbook.handleNewWorkbookFileChange}
+          handleNewWorkbookFileChange={handleWorkbookImport}
           handleWorkbookDelete={workbook.handleWorkbookDelete}
           handleWorkbookRename={handleWorkbookRename}
           handleWorkbookStructureChanged={workbook.handleWorkbookStructureChanged}

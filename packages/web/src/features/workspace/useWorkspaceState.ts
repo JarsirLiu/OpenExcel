@@ -37,29 +37,37 @@ export function useWorkspaceState(
   });
   const [loading, setLoading] = useState(!initialWorkspaces);
   const [workbooksMap, setWorkbooksMap] = useState<Map<number, WorkbookMeta[]>>(new Map());
-  const fetchingRef = useRef<Set<number>>(new Set());
+  const workbookCatalogRequestRef = useRef(0);
 
-  // Fetch workbooks for all workspaces
   const fetchAllWorkbooks = useCallback(async (wsList: Workspace[]) => {
+    const requestId = ++workbookCatalogRequestRef.current;
     const results = await Promise.all(
-      wsList.map(async (ws): Promise<readonly [number, WorkbookMeta[]]> => {
-        if (fetchingRef.current.has(ws.id)) return [ws.id, []];
-        fetchingRef.current.add(ws.id);
+      wsList.map(async (ws): Promise<readonly [number, WorkbookMeta[]] | null> => {
         try {
           const list = await fetchWorkbooks(ws.id);
           return [ws.id, sortWorkbooks(list)];
         } catch {
-          return [ws.id, []];
-        } finally {
-          fetchingRef.current.delete(ws.id);
+          return null;
         }
       }),
     );
-    setWorkbooksMap(new Map(results));
+    if (requestId !== workbookCatalogRequestRef.current) return;
+    setWorkbooksMap((current) => {
+      const next = new Map(current);
+      const workspaceIds = new Set(wsList.map((ws) => ws.id));
+      for (const workspaceId of next.keys()) {
+        if (!workspaceIds.has(workspaceId)) next.delete(workspaceId);
+      }
+      for (const result of results) {
+        if (result) next.set(result[0], result[1]);
+      }
+      return next;
+    });
   }, []);
 
   useEffect(() => {
     if (workspaces.length === 0) {
+      workbookCatalogRequestRef.current += 1;
       setWorkbooksMap(new Map());
       return;
     }
@@ -114,7 +122,6 @@ export function useWorkspaceState(
         if (prev != null && list.some((w) => w.id === prev)) return prev;
         return list[0]?.id ?? null;
       });
-      await fetchAllWorkbooks(list);
     } finally {
       setLoading(false);
     }

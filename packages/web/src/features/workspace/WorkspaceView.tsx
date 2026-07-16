@@ -22,7 +22,7 @@ type Props = {
   currentSheetIndex: number;
   setCurrentSheetIndex: (index: number) => void;
   handleSwitchWorkbook: (index: number) => void;
-  handleNewWorkbookFileChange: (files: File[]) => void;
+  handleNewWorkbookFileChange: (files: File[]) => Promise<boolean>;
   handleWorkbookDelete: (workbookId: number) => void;
   handleWorkbookRename: (workbookId: number, newName: string) => Promise<void>;
   handleWorkbookStructureChanged: (update: WorkbookStructureUpdate) => void;

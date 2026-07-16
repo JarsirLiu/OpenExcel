@@ -270,12 +270,12 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
   );
 
   const handleNewWorkbookFileChange = useCallback(
-    async (files: File[]) => {
-      if (workspaceId == null) return;
-      if (files.length === 0) return;
+    async (files: File[]): Promise<boolean> => {
+      if (workspaceId == null) return false;
+      if (files.length === 0) return false;
       if (files.length > MAX_IMPORT_WORKBOOKS) {
         toast({ message: `一次最多选择 ${MAX_IMPORT_WORKBOOKS} 个文件`, variant: "error" });
-        return;
+        return false;
       }
       try {
         validateImportFileSizes(files);
@@ -284,7 +284,7 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
           message: error instanceof Error ? error.message : "文件大小超过限制",
           variant: "error",
         });
-        return;
+        return false;
       }
 
       const { generation, controller } = beginRequest();
@@ -297,7 +297,7 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
           if (!file) continue;
           activeFileName = file.name;
           const imported = await importWorkbookFile(file);
-          if (!isCurrentRequest(generation, controller.signal)) return;
+          if (!isCurrentRequest(generation, controller.signal)) return false;
 
           const uploaded = await importWorkbooks(
             workspaceId,
@@ -311,7 +311,7 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
         }
 
         const list = await fetchWorkbooks(workspaceId, { signal: controller.signal });
-        if (!isCurrentRequest(generation, controller.signal)) return;
+        if (!isCurrentRequest(generation, controller.signal)) return results.length > 0;
         const safeList = Array.isArray(list) ? sortWorkbooks(list) : [];
         setWorkbooks(safeList);
         invalidateReferenceCache();
@@ -325,8 +325,9 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
           message: files.length === 1 ? "上传完成" : `已上传 ${files.length} 个文件`,
           variant: "success",
         });
+        return results.length > 0;
       } catch (error) {
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted) return completedFiles > 0;
         const message = error instanceof Error ? error.message : "上传失败";
 
         if (completedFiles > 0) {
@@ -344,6 +345,7 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
           completedFiles > 0 ? `已完成 ${completedFiles}/${files.length} 个文件。` : "";
         const file = activeFileName ? `（文件：${activeFileName}）` : "";
         toast({ message: `${progress}上传失败${file}：${message}`, variant: "error" });
+        return completedFiles > 0;
       }
     },
     [
