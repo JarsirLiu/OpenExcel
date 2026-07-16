@@ -49,7 +49,9 @@ Workbook view metadata follows the same boundary. Excel `autoFilter` ranges are 
 browser import boundary into the shared zero-based `filter_select` range used by FortuneSheet;
 ExcelJS export converts that range back to an Excel A1 range. The web adapter may use a secondary
 parser for metadata that the primary style parser does not expose, but it must not replace the
-primary `.xlsx` cell/style conversion path.
+primary `.xlsx` cell/style conversion path. The current secondary XLSX load is a known deferred
+performance issue; see [docs/issues.md](issues.md#xlsx-解析入口重复加载) for its constraints and
+future acceptance criteria.
 
 ### 2.2 Agent logic is headless
 

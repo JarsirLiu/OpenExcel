@@ -1,28 +1,36 @@
 # 标准化 Agent 系统实施方案
 
-本文档用于规划当前项目的对话能力升级方案。目标是把现有“只存最终文本”的聊天模式，演进为一套可追踪、可中断、可展示步骤、可落库、可回放的 Agent 系统。
+本文档用于记录当前项目 Agent 系统的实现基线和后续演进方案。文档不是接口契约；实际行为以
+`packages/agent`、`packages/server/src/modules/sessions` 和 Prisma schema 为准。
 
-## 1. 现状问题
+> **文档状态（2026-07-16）**：AgentRun、AgentStep、工具调用、流式中断、会话消息持久化和
+> workbook undo 已经落地。本文档中标记为“已实现”的内容是当前基线；“规划”部分是尚未完成的
+> 演进方向。不要按旧的 Phase 1 重新创建已经存在的模型或接口。
 
-结合当前代码实现，主要有以下几个问题：
+## 1. 当前实现基线与剩余问题
 
-1. **消息模型过于简单**
-   - 目前数据库中仅有 `user / assistant` 文本消息。
-   - 没有拆分为 `thinking / tool_call / tool_result / final` 等标准步骤。
+当前代码已经具备 Agent 运行的基本闭环：
 
-2. **前后端协议不统一**
-   - 前端使用 `useChat()` 传递 `messages[]`。
-   - 后端又从历史消息重新拼上下文。
-   - 缺少统一的运行状态协议，无法完整表达一次 Agent 执行过程。
+1. **运行和步骤已经落库**
+   - `AgentRun` 记录运行状态、模型、输入、输出、错误和时间。
+   - `AgentStep` 记录模型步骤、工具名、输入、输出和顺序。
+   - `AgentRunSheetSnapshot` 支持工具修改工作簿后的撤销。
 
-3. **数据库落库不适合 Agent**
-   - 当前 `Message` 更接近“纯聊天记录”。
-   - Agent 需要记录的是：一次运行、多个步骤、工具调用链、最终输出、错误与中断状态。
+2. **消息仍以 JSON transcript 为主**
+   - `Session.chatMessages` 保存 AI SDK UI message transcript。
+   - `AgentRun.inputText` 和 `outputText` 提供历史回放的降级来源。
+   - 当前没有独立的 `ChatMessage` 表，也没有把每个 message part 单独结构化落库。
 
-4. **界面不支持展示思考与工具链**
-   - 当前前端只展示文本消息。
-   - 没有思考过程展示。
-   - 没有 tool call / tool result 卡片。
+3. **运行协议采用现有聊天传输**
+   - 前端通过 AI SDK `useChat()` 发送和接收 UI message stream。
+   - 服务端在 workspace/session 作用域下创建和完成 `AgentRun`，并在 step 完成时写入 `AgentStep`。
+   - 客户端断开连接会触发 abort；当前没有独立的运行事件回放总线。
+
+4. **仍待解决的边界**
+   - 运行详情和步骤查询目前是嵌套在 session 下的读取接口，没有独立的事件流接口。
+   - `AgentStep.type` 和 `status` 仍是字符串，尚未收敛为跨包共享的判别联合类型。
+   - 部分聊天边界仍使用 AI SDK 类型之外的运行时数据，需要逐步减少 `any`。
+   - reasoning/tool parts 已支持前端展示，但持久化和回放仍以 transcript 与 run 摘要为主。
 
 ---
 
@@ -68,81 +76,80 @@
 
 ---
 
-## 4. 推荐的数据模型
+## 4. 当前数据模型
+
+下面是当前 Prisma 模型的职责摘要，不是建议中的待创建 schema。字段变更必须同时更新 SQLite、
+PostgreSQL、MySQL schema 和迁移。
 
 ### 4.1 Session
 
-保留现有 Session 概念。
+`Session` 是 workspace 下的会话容器。`sheetId` 可以为空；会话消息暂存在 JSON 字段中，运行记录
+通过 `runs` 关联。
 
 ```prisma
 model Session {
-  id        Int      @id @default(autoincrement())
-  sheetId   Int
-  name      String
-  sheet     Sheet    @relation(fields: [sheetId], references: [id], onDelete: Cascade)
-  runs      AgentRun[]
-  createdAt DateTime @default(now())
+  id           Int        @id @default(autoincrement())
+  publicId     String     @unique
+  workspaceId  Int
+  sheetId      Int?
+  name         String
+  titleStatus  String     @default("pending")
+  chatMessages String?    @default("[]")
+  undoRunId    Int?
+  runs         AgentRun[]
+  createdAt    DateTime   @default(now())
 }
 ```
 
 ### 4.2 AgentRun
 
-一次 Agent 调用的主记录。
+一次用户请求对应一个 `AgentRun`。`clientRequestId` 用于草稿会话幂等，`undoInvalidated`、
+`revertedAt` 用于撤销生命周期。
 
 ```prisma
 model AgentRun {
-  id            Int      @id @default(autoincrement())
-  sessionId     Int
-  userMessageId Int?
-  status        String   // pending | running | completed | failed | aborted
-  model         String?
-  systemPrompt  String?
-  inputText     String?
-  outputText    String?
-  errorMessage  String?
-  startedAt     DateTime @default(now())
-  endedAt       DateTime?
-  session       Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  steps         AgentStep[]
+  id               Int      @id @default(autoincrement())
+  sessionId        Int
+  clientRequestId  String?  @unique
+  status           String
+  model            String?
+  systemPrompt     String?
+  inputText        String?
+  outputText       String?
+  errorMessage     String?
+  undoInvalidated  Boolean  @default(false)
+  revertedAt       DateTime?
+  startedAt        DateTime @default(now())
+  endedAt          DateTime?
+  steps            AgentStep[]
 }
 ```
 
 ### 4.3 AgentStep
 
-记录每一个可观察步骤。
+每个模型步骤完成后由服务端写入一条 `AgentStep`。工具调用和工具结果目前分别保存在 `input`、
+`output` JSON 字符串中，而不是拆成独立表。
 
 ```prisma
 model AgentStep {
-  id          Int      @id @default(autoincrement())
-  runId       Int
-  type        String   // thinking | tool_call | tool_result | final | error
-  status      String   // started | streaming | completed | failed
-  toolName    String?
-  input       String?
-  output      String?
-  content     String?
-  order       Int
-  createdAt   DateTime @default(now())
-  run         AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  id        Int      @id @default(autoincrement())
+  runId     Int
+  type      String
+  status    String
+  content   String?
+  toolName  String?
+  input     String?
+  output    String?
+  order     Int
+  createdAt DateTime @default(now())
 }
 ```
 
-### 4.4 ChatMessage
+### 4.4 不存在的 ChatMessage 模型
 
-如需保留统一聊天视角，可增加一层消息表。
-
-```prisma
-model ChatMessage {
-  id          Int      @id @default(autoincrement())
-  sessionId   Int
-  runId       Int?
-  role        String   // user | assistant | system | tool
-  partType    String?  // text | reasoning | tool-call | tool-result
-  content     String
-  metadata    String?
-  createdAt   DateTime @default(now())
-}
-```
+当前没有独立 `ChatMessage` 表。前端的 AI SDK UI messages 由 `Session.chatMessages` 持久化，
+`AgentRun` 则负责运行审计和工具撤销。只有在需要按 message/part 查询、事件回放或精细审计时，
+才重新评估是否引入独立消息模型；不要仅按旧方案新增一张重复存储表。
 
 ---
 
@@ -262,72 +269,56 @@ type AgentEvent =
 
 ---
 
-## 9. 推荐 API 设计
+## 9. 当前 API 与后续 API 规划
 
-### 9.1 创建 Run
+当前 API 以 workspace 和 session 公共 ID 为资源边界，运行记录不会通过全局 `runId` 暴露。
 
-```http
-POST /api/sessions/:sessionId/runs
-```
-
-请求：
-
-```json
-{
-  "input": "帮我分析这张表"
-}
-```
-
-响应：
-
-```json
-{
-  "runId": 123,
-  "status": "running"
-}
-```
-
-### 9.2 获取 Run 详情
+### 9.1 当前聊天入口
 
 ```http
-GET /api/runs/:runId
+POST /api/workspaces/:workspacePublicId/sessions/draft/chat
+POST /api/workspaces/:workspacePublicId/sessions/:sessionPublicId/chat
 ```
 
-### 9.3 获取 Run Steps
+请求体是 AI SDK UI messages；服务端在聊天流开始时创建 `AgentRun`，在流结束时写入最终状态。
+草稿入口使用 `Idempotency-Key` 防止重复创建会话。
+
+### 9.2 当前运行查询和撤销
 
 ```http
-GET /api/runs/:runId/steps
+GET  /api/workspaces/:workspacePublicId/sessions/:sessionPublicId/runs
+POST /api/workspaces/:workspacePublicId/sessions/:sessionPublicId/runs/undo-latest
 ```
 
-### 9.4 事件流
+运行查询返回 session 下的 runs 及其 steps。撤销只处理当前 session 的单个 undo checkpoint，
+并同时恢复 Sheet snapshot、删除结构性创建结果和修剪对应 transcript。
 
-```http
-GET /api/runs/:runId/events
-```
+### 9.3 当前中断方式
 
-可用 SSE 或 WebSocket 实现。
+前端停止聊天或连接断开时，服务端通过请求生命周期的 `AbortController` 取消 Agent stream，
+并将运行记录标记为 `aborted`。当前没有独立的 `POST /runs/:id/abort` 接口。
 
-### 9.5 中断 Run
+### 9.4 后续可选 API
 
-```http
-POST /api/runs/:runId/abort
-```
+如果未来需要跨请求的运行监控或事件回放，再在 workspace/session 资源边界下增加运行详情、步骤
+分页和事件流接口。新增接口必须复用现有资源授权，不得引入全局 run ID 查询或绕过 session 归属校验。
 
 ---
 
-## 10. 后端执行引擎建议
+## 10. 当前后端执行边界
 
-当前实现更接近“流式聊天”，不是完整 agent。
+当前没有单独命名为 `AgentExecutor` 的服务；`packages/agent/src/runtime/streamChat.ts` 负责
+模型流式执行和上下文窗口，`packages/server/src/modules/sessions/chat/streamChat.ts` 负责
+workspace/session 资源校验、运行创建、工具组装、step 持久化、transcript 持久化、标题调度和
+运行收尾。
 
-建议新增一个 `AgentExecutor`，负责：
+后续如需拆分执行器，应保持以下职责边界：
 
-- 读取上下文。
-- 调用模型。
-- 解析 tool call。
-- 执行工具。
-- 记录 step。
-- 输出事件。
-- 支持 abort。
+- `packages/agent`：模型调用、上下文裁剪、工具协议和工具结果预算；
+- `packages/server`：资源授权、数据库运行生命周期、快照和会话 transcript；
+- `packages/web`：AI SDK stream 消费、消息 part 展示、停止操作和工作簿刷新。
+
+不要把数据库写入、workspace 授权或 UI 状态移入 `packages/agent`。
 
 ---
 
@@ -390,30 +381,27 @@ interface AgentTool {
 
 ---
 
-## 14. 当前项目的推荐改造阶段
+## 14. 当前项目的改造阶段
 
-### Phase 1：统一数据模型
+### Phase 1：统一数据模型（已完成基础版本）
 
 目标：
 
-- 引入 `AgentRun`。
-- 引入 `AgentStep`。
-- 保留 `Message` 作为兼容层或迁移层。
+- `AgentRun`、`AgentStep` 和 `AgentRunSheetSnapshot` 已存在。
+- `Session.chatMessages` 保留 AI SDK transcript。
+- 运行状态、步骤和撤销状态已有服务端持久化路径。
 
 改动范围：
 
-- Prisma schema。
-- repository。
-- service。
-- API 返回结构。
+- 后续只补充类型约束、分页和审计能力，不重复创建已有模型。
 
-### Phase 2：前端改成事件渲染
+### Phase 2：前端消息 part 与运行状态（部分完成）
 
 目标：
 
-- 消息列表支持渲染 step。
-- 支持 tool 卡片。
-- 支持思考展示。
+- 消息列表已经支持 reasoning、tool part 和步骤分隔展示。
+- 工作簿工具调用完成后会触发工作区刷新。
+- 运行列表 API 已可读取持久化 steps，但前端尚未完整展示独立的 run/step 时间线。
 
 改动范围：
 
@@ -421,13 +409,13 @@ interface AgentTool {
 - 消息渲染组件拆分。
 - 增加 step renderer。
 
-### Phase 3：加入 abort / stop
+### Phase 3：abort / stop（已完成请求级中断）
 
 目标：
 
-- 前端提供停止按钮。
-- 后端取消执行。
-- 数据库记录 aborted。
+- 前端 `useChat().stop()` 会中断当前 stream。
+- 服务端使用请求连接生命周期的 `AbortController` 取消执行。
+- `AgentRun` 会记录 `aborted` 状态。
 
 改动范围：
 
@@ -435,13 +423,13 @@ interface AgentTool {
 - `AbortController`。
 - `streamText({ abortSignal })`。
 
-### Phase 4：加入真正的 tool calling
+### Phase 4：完善 tool calling 与事件回放（基础能力已完成，增强项待规划）
 
 目标：
 
-- 模型可调用工具。
-- 工具结果可回填。
-- 支持多步 agent loop。
+- 模型已经可以调用 workbook/sheet 工具，工具结果会回填模型并持久化到 step。
+- `packages/agent` 已提供工具 catalog、运行上下文和结果预算。
+- 尚未实现独立事件总线、断线重连后的运行事件回放和强类型 step 状态协议。
 
 改动范围：
 
@@ -452,15 +440,16 @@ interface AgentTool {
 
 ---
 
-## 15. MVP 建议
+## 15. 当前 MVP 基线
 
-如果先做最小可行版本，建议至少包含：
+当前 MVP 已包含：
 
 ### 数据
 
-- `Message`
+- `Session.chatMessages` transcript
 - `AgentRun`
 - `AgentStep`
+- `AgentRunSheetSnapshot`
 
 ### 消息类型
 
@@ -475,25 +464,26 @@ interface AgentTool {
 - 消息按 part 渲染。
 - reasoning 折叠。
 - tool 卡片展示。
-- stop 按钮。
+- stop 按钮和请求级 abort。
+- workbook mutation 后的 workspace refresh。
 
 ### 后端
 
-- run 创建。
+- run 创建和幂等处理。
 - step 落库。
-- 流式事件输出。
-- abort 支持。
+- AI SDK 流式输出。
+- abort、错误收尾和 transcript 持久化。
+- 单个 session undo checkpoint。
 
 ---
 
-## 16. 实施建议
+## 16. 后续实施建议
 
-建议不要一次性推翻现有实现，而是逐步迁移：
+建议继续增量演进：
 
-1. 保留现有 `Message` 表。
-2. 新增 `AgentRun` / `AgentStep`。
-3. 先把思考、工具调用、工具结果作为 step 记录。
-4. 前端先支持展示 step。
-5. 再把聊天接口逐步迁移成 event-driven agent 接口。
+1. 先为 `AgentRun.status`、`AgentStep.type` 和 `AgentStep.status` 建立共享的受限类型与边界校验。
+2. 再决定是否需要独立的运行事件流；没有断线恢复、监控或审计需求时，不新增事件总线。
+3. 如引入事件流，复用现有 workspace/session 授权和运行持久化，不改变 transcript 的唯一用户历史来源。
+4. 运行详情、step 分页和回放能力稳定后，再评估是否拆分 server 的 chat orchestration 文件。
 
 这样风险最小，也更容易验证。
