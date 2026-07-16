@@ -57,7 +57,7 @@ export const excelToolSpecs = {
   },
   readSheet: {
     description:
-      "读取指定 Sheet。首次或不传范围时返回 overview：整表规模、列画像、数值统计、空值情况，以及头部/中部/尾部的少量代表性样本，不返回整表原始数据。传入 startRow/endRow/startCol/endCol 或 mode=range 时返回指定范围的稀疏数据。单次范围最多返回约4000个网格单元。需要统计、筛选、排序时不要连续分页读取整表，应优先使用其他分析工具（如果可用）。行号和列号按 Excel 视觉顺序从 1 开始。",
+      "读取指定 Sheet 的单元格数据和基础分析结果。首次或不传范围时返回 overview：整表规模、列画像、数值统计、空值情况，以及头部/中部/尾部的少量代表性样本；传入 startRow/endRow/startCol/endCol 或 mode=range 时返回指定范围的稀疏数据。单次范围最多返回约4000个网格单元。该工具不返回完整样式、公式表达式、图表、透视表、VBA 或其他 Excel 对象；行号和列号按 Excel 视觉顺序从 1 开始。",
     inputSchema: z.object({
       sheetId: z.coerce.number().describe("Sheet ID"),
       mode: z
@@ -96,7 +96,7 @@ export const excelToolSpecs = {
   },
   writeCells: {
     description:
-      "批量写入单元格数据。使用 operations 数组，支持两种操作：cell 用于离散单格写入，range 用于连续区域填充同一个值。value 可以是字符串、数字或布尔值；如果要写公式，请额外传 formula，并尽量同时提供该公式的当前结果 value 作为缓存显示值。行号和列号都从 1 开始；如果要清空内容，请使用 clearCells。",
+      "批量写入单元格内容。使用 operations 数组，支持 cell 离散写入和 range 连续区域填充同一个值或公式。value 可以是字符串、数字或布尔值；写公式时传入 formula，并且只有已知结果时才提供 value 作为缓存显示值。行号和列号都从 1 开始；该工具不修改样式、筛选、图表或其他 Excel 对象，也不负责通用公式重算；清空内容请使用 clearCells。",
     needsRunContext: true,
     inputSchema: z.object({
       sheetId: z.coerce.number().describe("Sheet ID"),
@@ -138,7 +138,7 @@ export const excelToolSpecs = {
   },
   clearCells: {
     description:
-      "清空单元格内容。仅在用户明确要求清空时使用。使用 operations 数组，cell 用于清空离散单格，range 用于清空连续区域。行号和列号都从 1 开始；如果要写入内容，请使用 writeCells。",
+      "清空单元格内容，不修改单元格的非内容属性。使用 operations 数组，cell 用于清空离散单格，range 用于清空连续区域。行号和列号都从 1 开始；如果要写入内容，请使用 writeCells。",
     needsRunContext: true,
     inputSchema: z.object({
       sheetId: z.coerce.number().describe("Sheet ID"),
@@ -165,7 +165,7 @@ export const excelToolSpecs = {
   },
   mergeCells: {
     description:
-      "合并指定范围的单元格。仅在用户明确要求合并时使用。使用 operations 数组，每项都是一个 range；合并后只有左上角单元格保留值，其余格子的值会被清除。行号和列号都从 1 开始。",
+      "合并指定范围的单元格。使用 operations 数组，每项都是一个 range；合并后只有左上角单元格保留内容，范围内其他单元格的内容会被清除。该工具只处理合并状态和单元格内容，不修改样式或其他 Excel 对象；行号和列号都从 1 开始。",
     needsRunContext: true,
     inputSchema: z.object({
       sheetId: z.coerce.number().describe("Sheet ID"),
@@ -185,7 +185,7 @@ export const excelToolSpecs = {
   },
   unmergeCells: {
     description:
-      "取消指定范围内的单元格合并。仅在用户明确要求取消合并时使用。使用 operations 数组，每项都是一个 range；取消后每个单元格独立。行号和列号都从 1 开始。",
+      "取消指定范围内的单元格合并。使用 operations 数组，每项都是一个 range；取消后每个单元格独立，但不会恢复合并时已清除的非左上角内容。该工具不修改样式或其他 Excel 对象；行号和列号都从 1 开始。",
     needsRunContext: true,
     inputSchema: z.object({
       sheetId: z.coerce.number().describe("Sheet ID"),

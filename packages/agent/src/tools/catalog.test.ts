@@ -16,6 +16,9 @@ describe("buildExcelToolCatalog", () => {
     expect(catalog).toContain("**readSheet**");
     expect(catalog).toContain("**writeCells**");
     expect(catalog).toContain(excelToolSpecs.readSheet.description);
+    expect(catalog).toContain("不支持：删除工作簿或 Sheet");
+    expect(catalog).toContain("透视表、透视图表、数据透视筛选器、VBA/宏");
+    expect(catalog).toContain("不要用写入单元格或其他近似操作强行模拟");
   });
 });
 

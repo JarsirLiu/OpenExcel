@@ -1,9 +1,12 @@
+import { EXCEL_TOOL_CAPABILITY_BOUNDARY } from "./capabilities.js";
 import { type ExcelToolName, type ExcelToolSpec, excelToolSpecs } from "./schema.js";
 
 export function buildExcelToolCatalog(): string {
-  return Object.entries(excelToolSpecs)
+  const tools = Object.entries(excelToolSpecs)
     .map(([name, tool]) => `- **${name}**: ${tool.description}`)
     .join("\n");
+
+  return `${tools}\n\n## 能力边界\n\n${EXCEL_TOOL_CAPABILITY_BOUNDARY}`;
 }
 
 export function buildWorkspaceToolContext(
