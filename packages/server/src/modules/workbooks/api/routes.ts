@@ -221,9 +221,11 @@ export async function workbookRoutes(app: FastifyInstance) {
         "Content-Type",
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       );
+      reply.header("Content-Length", String(buffer.byteLength));
+      const downloadName = name.replace(/[\\/:*?"<>|\r\n]/g, "_").trim() || "workbook";
       reply.header(
         "Content-Disposition",
-        `attachment; filename="${encodeURIComponent(name)}.xlsx"`,
+        `attachment; filename="workbook.xlsx"; filename*=UTF-8''${encodeURIComponent(`${downloadName}.xlsx`)}`,
       );
       return reply.send(buffer);
     },

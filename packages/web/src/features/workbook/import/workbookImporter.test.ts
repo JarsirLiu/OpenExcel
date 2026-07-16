@@ -41,6 +41,27 @@ describe("workbookImporter", () => {
     expect(sheet.config.chart).toEqual([{ id: "chart-1" }]);
   });
 
+  it("preserves imported worksheet view metadata", () => {
+    const sheet = normalizeSheet(
+      {
+        name: "数据",
+        celldata: [{ r: 0, c: 0, v: { v: "内容", m: "内容" } }],
+        luckysheet_select_save: [{ row: [28, 28], column: [7, 7] }],
+        scrollLeft: 420,
+        scrollTop: 180,
+        zoomRatio: 0.9,
+        showGridLines: "1",
+      },
+      0,
+    );
+
+    expect(sheet.config.luckysheet_select_save).toEqual([{ row: [28, 28], column: [7, 7] }]);
+    expect(sheet.config.scrollLeft).toBe(420);
+    expect(sheet.config.scrollTop).toBe(180);
+    expect(sheet.config.zoomRatio).toBe(0.9);
+    expect(sheet.config.showGridLines).toBe("1");
+  });
+
   it("fills omitted display values from FortuneExcel for empty styled cells", () => {
     const sheet = normalizeSheet(
       {

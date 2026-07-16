@@ -29,6 +29,6 @@ export async function exportWorkbook(workspaceId: number, id: number) {
     };
   });
 
-  const ab = celldataToExcel(sheets);
+  const ab = await celldataToExcel(sheets);
   return { buffer: Buffer.from(ab), name: wb.name };
 }

@@ -41,7 +41,6 @@ export function ExcelGrid({
     handleBeforeAddSheet,
     handleBeforeDeleteSheet,
     handleBeforeUpdateSheetName,
-    handleDownload,
     handleDeleteWorkbook,
   } = useExcelGridWorkspace({
     workspaceId,

@@ -1,5 +1,5 @@
 import type { WorkbookInstance } from "@fortune-sheet/react";
-import { celldataToExcel, extractSheetConfig, matrixToCelldata } from "@openexcel/core";
+import { extractSheetConfig, matrixToCelldata } from "@openexcel/core";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { WorkbookFull } from "@/api/workbooks";
 import {
@@ -222,29 +222,6 @@ export function useExcelGridWorkspace({
     [onWorkbookMutation, workspaceId],
   );
 
-  const handleDownload = useCallback(() => {
-    const inst = workbookRef.current;
-    if (!inst) return;
-    const allSheets = inst.getAllSheets();
-    if (!allSheets || allSheets.length === 0) return;
-
-    const buf = celldataToExcel(
-      (allSheets as any[]).map((sheet) => ({
-        name: sheet.name,
-        celldata: matrixToCelldata(sheet.data ?? []),
-        config: extractSheetConfig(sheet),
-        columnWidths: sheet.columnWidths ?? null,
-        rowHeights: sheet.rowlen ?? sheet.rowHeights ?? null,
-      })),
-    );
-    const blob = new Blob([buf], { type: "application/octet-stream" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `${workbook?.name ?? "export"}.xlsx`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-  }, [workbook]);
-
   const handleDeleteWorkbook = useCallback(async () => {
     if (!workbook) return;
     const ok = await confirm({
@@ -270,7 +247,6 @@ export function useExcelGridWorkspace({
     handleBeforeAddSheet,
     handleBeforeDeleteSheet,
     handleBeforeUpdateSheetName,
-    handleDownload,
     handleDeleteWorkbook,
   };
 }

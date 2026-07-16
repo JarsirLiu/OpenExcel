@@ -481,8 +481,19 @@ Workbook UI should eventually be split into:
 Workbook UI should also separate behavior from rendering:
 
 - `useWorkbookWorkspace` owns workbook list, switching, import preview, and sheet list derivation
-- `useExcelGridWorkspace` owns persistence, export, delete, and sheet activation sync
+- `useExcelGridWorkspace` owns persistence, delete, and sheet activation sync
 - `ExcelGrid` should render the spreadsheet and toolbar, but not own workbook data fetching
+
+Workbook export has one explicit source:
+
+- The sidebar download uses the server export endpoint and persisted workbook data. The export
+  adapter consumes the same stored FortuneSheet cell/config model used by the editor, including
+  imported worksheet view metadata, and writes a standard ZIP-compressed `.xlsx` with ExcelJS.
+  The `.xlsx` import adapter maps `sheetViews/selection` into that config before persistence, so
+  export does not need to guess or hardcode a starting cell.
+
+Browser download mechanics are shared in `features`/`shared` helpers; Excel generation remains
+outside UI components.
 
 ### 6.3 State ownership
 

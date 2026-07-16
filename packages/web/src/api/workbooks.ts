@@ -1,4 +1,5 @@
 import type { ImportedWorkbookBatchInput } from "@openexcel/core";
+import { downloadBlob, XLSX_MIME_TYPE } from "@/shared/lib";
 import { API_BASE, apiFetch, readErrorMessage } from "./http";
 
 const MAX_IMPORT_REQUEST_BYTES = 100 * 1024 * 1024;
@@ -166,14 +167,7 @@ export async function downloadWorkbook(
   const res = await apiFetch(`/workspaces/${workspaceId}/workbooks/${workbookId}/template`);
   if (!res.ok) throw new Error(await readErrorMessage(res, "下载工作簿失败"));
   const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${fileName}.xlsx`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  downloadBlob(new Blob([blob], { type: XLSX_MIME_TYPE }), `${fileName}.xlsx`);
 }
 
 export async function updateSheetData(
