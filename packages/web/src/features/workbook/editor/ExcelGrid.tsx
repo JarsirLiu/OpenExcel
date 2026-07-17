@@ -4,6 +4,7 @@ import { useRef } from "react";
 import type { WorkbookFull } from "@/api/workbooks";
 import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatchSync";
 import styles from "./ExcelGrid.module.css";
+import { useFortuneSheetFilterMenu } from "./fortuneSheetFilterMenu";
 import { useExcelGridWorkspace } from "./useExcelGridWorkspace";
 import { useFortuneSheetWheel } from "./useFortuneSheetWheel";
 
@@ -53,6 +54,7 @@ export function ExcelGrid({
     onWorkbookRefresh,
     onWorkbookMutation,
   });
+  useFortuneSheetFilterMenu(gridRootRef, workbook !== null);
   useFortuneSheetWheel(gridRootRef, workbook !== null);
 
   if (!workbook) return null;
