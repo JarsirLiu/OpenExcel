@@ -1,4 +1,4 @@
-import { createOpenAI } from "@ai-sdk/openai";
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import type { LanguageModel } from "ai";
 
 export interface ModelConfig {
@@ -7,19 +7,21 @@ export interface ModelConfig {
   modelName: string;
 }
 
-function createOpenAIProvider(config: ModelConfig) {
-  return createOpenAI({
+function createOpenAICompatibleProvider(config: ModelConfig) {
+  return createOpenAICompatible({
+    name: "openexcel",
     baseURL: config.baseUrl,
     apiKey: config.apiKey,
+    includeUsage: true,
   });
 }
 
 export function createChatModel(config: ModelConfig): LanguageModel {
-  const openai = createOpenAIProvider(config);
-  return openai.chat(config.modelName);
+  const provider = createOpenAICompatibleProvider(config);
+  return provider.chatModel(config.modelName);
 }
 
 export function createTitleModel(config: ModelConfig): LanguageModel {
-  const openai = createOpenAIProvider(config);
-  return openai.chat(config.modelName);
+  const provider = createOpenAICompatibleProvider(config);
+  return provider.chatModel(config.modelName);
 }

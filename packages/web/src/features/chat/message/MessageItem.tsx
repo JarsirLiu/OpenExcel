@@ -140,7 +140,7 @@ function renderAssistantParts(
         result.push(
           <div key={`reasoning-${i}`}>
             <ReasoningCard
-              reasoning={part.reasoning}
+              reasoning={typeof part.text === "string" ? part.text : ""}
               open={thinkingOpen[msg.id] ?? true}
               onToggle={() => setThinkingOpen((prev) => ({ ...prev, [msg.id]: !prev[msg.id] }))}
             />

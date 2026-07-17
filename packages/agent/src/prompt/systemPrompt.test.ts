@@ -3,11 +3,12 @@ import { buildSystemPrompt, DEFAULT_PROMPT } from "./systemPrompt.js";
 
 describe("system prompt", () => {
   it("keeps a strict permission boundary for Excel operations", () => {
-    expect(DEFAULT_PROMPT).toContain("只有用户明确要求变更且目标和范围明确时");
     expect(DEFAULT_PROMPT).toContain("只调用已提供的工具");
     expect(DEFAULT_PROMPT).toContain("先理解请求中的目标、对象、操作、范围和验收标准");
-    expect(DEFAULT_PROMPT).toContain("批量数据、清空、合并、较大范围或可能丢失内容");
-    expect(DEFAULT_PROMPT).toContain("工具报错、结果被截断或核验不通过时，明确报告实际状态");
+    expect(DEFAULT_PROMPT).toContain(
+      "如果目标、范围、原始数据处理方式或预期结果存在会影响正确性的歧义",
+    );
+    expect(DEFAULT_PROMPT).toContain("工具报错、结果被截断或核验不通过时，不要无限重复调用工具");
   });
 
   it("delegates tool-specific rules to the tool catalog", () => {

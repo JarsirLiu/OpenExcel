@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockChat = vi.fn();
-const mockCreateOpenAI = vi.fn(() => ({
-  chat: mockChat,
+const mockCreateOpenAICompatible = vi.fn(() => ({
+  chatModel: mockChat,
 }));
 
-vi.mock("@ai-sdk/openai", () => ({
-  createOpenAI: mockCreateOpenAI,
+vi.mock("@ai-sdk/openai-compatible", () => ({
+  createOpenAICompatible: mockCreateOpenAICompatible,
 }));
 
 const { createChatModel, createTitleModel } = await import("./model.js");
@@ -24,9 +24,11 @@ describe("agent model factory", () => {
       modelName: "test-model",
     });
 
-    expect(mockCreateOpenAI).toHaveBeenCalledWith({
+    expect(mockCreateOpenAICompatible).toHaveBeenCalledWith({
+      name: "openexcel",
       baseURL: "http://test.local",
       apiKey: "test-key",
+      includeUsage: true,
     });
     expect(mockChat).toHaveBeenCalledWith("test-model");
     expect(model).toBe("chat-model");
@@ -39,9 +41,11 @@ describe("agent model factory", () => {
       modelName: "test-model",
     });
 
-    expect(mockCreateOpenAI).toHaveBeenCalledWith({
+    expect(mockCreateOpenAICompatible).toHaveBeenCalledWith({
+      name: "openexcel",
       baseURL: "http://test.local",
       apiKey: "test-key",
+      includeUsage: true,
     });
     expect(mockChat).toHaveBeenCalledWith("test-model");
     expect(model).toBe("chat-model");
