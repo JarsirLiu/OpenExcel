@@ -107,9 +107,9 @@ const UndoIcon = ({ size = 14 }: { size?: number }) => (
   </svg>
 );
 
-function renderAssistantParts(msg: any, isStreaming: boolean) {
+function renderAssistantParts(msg: any, isMessageStreaming: boolean) {
   if (!msg.parts || msg.parts.length === 0) {
-    return <MessageMarkdown content={msg.content || ""} isStreaming={isStreaming} />;
+    return <MessageMarkdown content={msg.content || ""} isStreaming={isMessageStreaming} />;
   }
 
   const result: JSX.Element[] = [];
@@ -117,7 +117,7 @@ function renderAssistantParts(msg: any, isStreaming: boolean) {
   const flushText = (key: string) => {
     if (textParts.length > 0) {
       result.push(
-        <MessageMarkdown key={key} content={textParts.join("")} isStreaming={isStreaming} />,
+        <MessageMarkdown key={key} content={textParts.join("")} isStreaming={isMessageStreaming} />,
       );
       textParts = [];
     }
@@ -133,7 +133,10 @@ function renderAssistantParts(msg: any, isStreaming: boolean) {
         flushText(`reasoning-${i}-flush`);
         result.push(
           <div key={`reasoning-${i}`}>
-            <ReasoningCard reasoning={typeof part.text === "string" ? part.text : ""} />
+            <ReasoningCard
+              reasoning={typeof part.text === "string" ? part.text : ""}
+              isStreaming={isMessageStreaming}
+            />
           </div>,
         );
         break;
@@ -161,7 +164,7 @@ function renderAssistantParts(msg: any, isStreaming: boolean) {
 
 export function MessageItem({
   msg,
-  isStreaming,
+  isMessageStreaming,
   isLastAssistantMessage,
   isLastUserMessage,
   onRegenerate,
@@ -170,7 +173,7 @@ export function MessageItem({
   onNavigateSheet,
 }: {
   msg: any;
-  isStreaming: boolean;
+  isMessageStreaming: boolean;
   isLastAssistantMessage: boolean;
   isLastUserMessage: boolean;
   onRegenerate?: () => void;
@@ -187,7 +190,7 @@ export function MessageItem({
         </div>
         <div className={styles.msgBody}>
           <div className={styles.userText}>{getMessageText(msg)}</div>
-          {!isStreaming && isLastUserMessage && onUndo && (
+          {!isMessageStreaming && isLastUserMessage && onUndo && (
             <div className={styles.actions}>
               <button
                 type="button"
@@ -212,11 +215,11 @@ export function MessageItem({
         <span className={styles.roleName}>AI 助手</span>
       </div>
       <div className={styles.msgBody}>
-        {renderAssistantParts(msg, isStreaming)}
-        {!isStreaming && msg.role === "assistant" && msg.parts && (
+        {renderAssistantParts(msg, isMessageStreaming)}
+        {!isMessageStreaming && msg.role === "assistant" && msg.parts && (
           <SheetChangeSummary parts={msg.parts} onNavigateSheet={onNavigateSheet} />
         )}
-        {!isStreaming && isLastAssistantMessage && (
+        {!isMessageStreaming && isLastAssistantMessage && (
           <div className={styles.actions}>
             {onRegenerate && (
               <button onClick={onRegenerate} className={styles.actionBtn} title="重新生成">

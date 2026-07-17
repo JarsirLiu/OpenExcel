@@ -55,6 +55,11 @@ export function MessageList({
 
   const lastAssistantMsg = [...messages].reverse().find((m) => m.role === "assistant");
   const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");
+  const lastMessage = messages[messages.length - 1];
+  const activeAssistantMessageId =
+    isStreaming && lastMessage?.role === "assistant" && lastMessage.id != null
+      ? lastMessage.id
+      : null;
 
   return (
     <div ref={containerRef} className={styles.messageList}>
@@ -121,7 +126,7 @@ export function MessageList({
         <MessageRenderBoundary key={`${msg?.id || idx}:${msg?.parts?.length ?? 0}`}>
           <MessageItem
             msg={msg}
-            isStreaming={isStreaming}
+            isMessageStreaming={msg.id != null && msg.id === activeAssistantMessageId}
             isLastAssistantMessage={
               !isStreaming && msg.role === "assistant" && msg.id === lastAssistantMsg?.id
             }

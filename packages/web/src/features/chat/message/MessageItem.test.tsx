@@ -11,7 +11,7 @@ describe("MessageItem", () => {
           role: "assistant",
           parts: [{ type: "reasoning", text: "先读取目标 Sheet，再整理结果。" }],
         }}
-        isStreaming={false}
+        isMessageStreaming={true}
         isLastAssistantMessage={false}
         isLastUserMessage={false}
       />,
@@ -31,7 +31,7 @@ describe("MessageItem", () => {
             { type: "reasoning", text: "第二段思考" },
           ],
         }}
-        isStreaming={false}
+        isMessageStreaming={true}
         isLastAssistantMessage={false}
         isLastUserMessage={false}
       />,
@@ -45,5 +45,37 @@ describe("MessageItem", () => {
 
     expect(screen.queryByText("第一段思考")).toBeNull();
     expect(screen.getByText("第二段思考")).toBeTruthy();
+  });
+
+  it("collapses reasoning automatically when streaming ends", () => {
+    const { rerender } = render(
+      <MessageItem
+        msg={{
+          id: "assistant-3",
+          role: "assistant",
+          parts: [{ type: "reasoning", text: "正在思考中..." }],
+        }}
+        isMessageStreaming={true}
+        isLastAssistantMessage={false}
+        isLastUserMessage={false}
+      />,
+    );
+
+    expect(screen.getByText("正在思考中...")).toBeTruthy();
+
+    rerender(
+      <MessageItem
+        msg={{
+          id: "assistant-3",
+          role: "assistant",
+          parts: [{ type: "reasoning", text: "正在思考中..." }],
+        }}
+        isMessageStreaming={false}
+        isLastAssistantMessage={false}
+        isLastUserMessage={false}
+      />,
+    );
+
+    expect(screen.queryByText("正在思考中...")).toBeNull();
   });
 });
