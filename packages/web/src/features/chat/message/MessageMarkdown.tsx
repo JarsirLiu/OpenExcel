@@ -1,8 +1,8 @@
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
-import { useState } from "react";
 import { Streamdown } from "streamdown";
 import "streamdown/styles.css";
 import remarkGfm from "remark-gfm";
+import styles from "./MessageMarkdown.module.css";
 
 function extractText(node: ReactNode): string {
   if (typeof node === "string") return node;
@@ -38,56 +38,17 @@ function CopyIcon() {
 }
 
 function CodeBlock({ children, ...props }: JSX.IntrinsicElements["pre"]) {
-  const [hovered, setHovered] = useState(false);
   const codeText = extractText(children);
 
   return (
-    <div
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        margin: "8px 0",
-        borderRadius: "var(--radius)",
-        overflow: "hidden",
-        background: "var(--muted)",
-        border: "1px solid var(--border)",
-        position: "relative",
-      }}
-    >
-      <pre
-        style={{
-          margin: 0,
-          padding: "14px 40px 14px 16px",
-          overflowX: "auto",
-          fontSize: 14,
-          lineHeight: 1.6,
-          color: "var(--foreground)",
-          whiteSpace: "pre",
-          fontFamily: "ui-monospace, 'Cascadia Code', 'JetBrains Mono', 'Fira Code', monospace",
-        }}
-      >
+    <div className={styles.codeBlock}>
+      <pre {...props} className={styles.code}>
         <code>{children}</code>
       </pre>
       <button
+        type="button"
+        className={styles.copyButton}
         onClick={() => navigator.clipboard.writeText(codeText)}
-        style={{
-          position: "absolute",
-          top: 8,
-          right: 8,
-          width: 28,
-          height: 28,
-          borderRadius: "var(--radius-pill)",
-          border: "1px solid var(--border)",
-          background: "var(--background)",
-          color: "var(--muted-foreground)",
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          transition: "opacity 0.15s",
-          opacity: hovered ? 1 : 0,
-          pointerEvents: hovered ? "auto" : "none",
-        }}
         title="复制"
       >
         <CopyIcon />
@@ -98,8 +59,8 @@ function CodeBlock({ children, ...props }: JSX.IntrinsicElements["pre"]) {
 
 function MarkdownTable({ children, ...props }: Record<string, unknown> & { children?: ReactNode }) {
   return (
-    <div style={{ maxWidth: "100%", overflowX: "auto", whiteSpace: "nowrap" }}>
-      <table {...(props as ComponentPropsWithoutRef<"table">)} style={{ minWidth: "max-content" }}>
+    <div className={styles.tableScroll}>
+      <table className={styles.table} {...(props as ComponentPropsWithoutRef<"table">)}>
         {children}
       </table>
     </div>
@@ -114,16 +75,7 @@ export function MessageMarkdown({
   isStreaming?: boolean;
 }) {
   return (
-    <div
-      className="md-content"
-      style={{
-        fontSize: 15,
-        lineHeight: 1.7,
-        color: "var(--foreground)",
-        maxWidth: "100%",
-        minWidth: 0,
-      }}
-    >
+    <div className={styles.markdown}>
       <Streamdown
         animated
         isAnimating={isStreaming}

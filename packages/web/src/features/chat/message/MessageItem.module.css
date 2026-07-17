@@ -13,25 +13,25 @@
 .msgHeader {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 6px;
+  gap: 9px;
+  margin-bottom: 5px;
 }
 
 .msgBody {
-  padding-left: 36px;
+  padding-left: 33px;
   min-width: 0;
   box-sizing: border-box;
 }
 
 .avatar {
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fff;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   flex-shrink: 0;
   user-select: none;
@@ -46,15 +46,15 @@
 }
 
 .roleName {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text-primary);
 }
 
 .userText {
   white-space: pre-wrap;
-  font-size: 15px;
-  line-height: 1.7;
+  font-size: 14px;
+  line-height: 1.65;
   color: var(--text-primary);
 }
 

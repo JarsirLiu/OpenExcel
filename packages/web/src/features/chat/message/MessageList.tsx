@@ -149,18 +149,18 @@ export function MessageList({
           if (!showDots) return null;
           return (
             <div style={{ marginBottom: 24 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 5 }}>
                 <div
                   style={{
-                    width: 26,
-                    height: 26,
+                    width: 24,
+                    height: 24,
                     borderRadius: "50%",
                     background: "var(--avatar-ai)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     color: "#fff",
-                    fontSize: 11,
+                    fontSize: 10,
                     fontWeight: 600,
                     flexShrink: 0,
                     userSelect: "none",
@@ -168,11 +168,11 @@ export function MessageList({
                 >
                   AI
                 </div>
-                <span style={{ fontSize: 14, fontWeight: 600, color: "var(--foreground)" }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "var(--foreground)" }}>
                   AI 助手
                 </span>
               </div>
-              <div style={{ paddingLeft: 36, display: "flex", alignItems: "center", gap: 6 }}>
+              <div style={{ paddingLeft: 33, display: "flex", alignItems: "center", gap: 6 }}>
                 <span
                   style={{
                     width: 6,

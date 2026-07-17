@@ -9,11 +9,11 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 34px;
-  padding: 6px 0;
+  min-height: 31px;
+  padding: 5px 0;
   border-bottom: 1px solid var(--border-default);
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .status {

@@ -1,0 +1,143 @@
+.markdown {
+  min-width: 0;
+  max-width: 100%;
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.markdown :global(p) {
+  margin: 0 0 7px;
+}
+
+.markdown :global(p:last-child) {
+  margin-bottom: 0;
+}
+
+.markdown :global(ul),
+.markdown :global(ol) {
+  margin: 4px 0;
+  padding-left: 20px;
+}
+
+.markdown :global(li) {
+  margin: 2px 0;
+}
+
+.markdown :global(code) {
+  padding: 2px 5px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-muted);
+  font-size: 0.9em;
+}
+
+.markdown :global(pre) {
+  margin: 8px 0;
+}
+
+.markdown :global(pre code) {
+  padding: 0;
+  background: transparent;
+}
+
+.markdown :global(blockquote) {
+  margin: 8px 0;
+  padding-left: 12px;
+  border-left: 3px solid var(--border-strong);
+  color: var(--text-secondary);
+}
+
+.markdown :global(h1),
+.markdown :global(h2),
+.markdown :global(h3),
+.markdown :global(h4),
+.markdown :global(h5),
+.markdown :global(h6) {
+  margin: 10px 0 5px;
+  line-height: 1.4;
+  font-weight: 600;
+}
+
+.markdown :global(h1) {
+  font-size: 16px;
+}
+
+.markdown :global(h2),
+.markdown :global(h3) {
+  font-size: 15px;
+}
+
+.markdown :global(h4),
+.markdown :global(h5),
+.markdown :global(h6) {
+  font-size: 14px;
+}
+
+.codeBlock {
+  position: relative;
+  margin: 8px 0;
+  overflow: hidden;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius);
+  background: var(--bg-muted);
+}
+
+.code {
+  margin: 0;
+  padding: 12px 40px 12px 14px;
+  overflow-x: auto;
+  color: var(--text-primary);
+  font-family: ui-monospace, "Cascadia Code", "JetBrains Mono", "Fira Code", monospace;
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre;
+}
+
+.copyButton {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 27px;
+  height: 27px;
+  padding: 0;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-pill);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+
+.codeBlock:hover .copyButton,
+.copyButton:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.tableScroll {
+  max-width: 100%;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.table {
+  min-width: max-content;
+  border-collapse: collapse;
+  margin: 8px 0;
+  font-size: 13px;
+}
+
+.table :global(th),
+.table :global(td) {
+  padding: 5px 8px;
+  border: 1px solid var(--border-default);
+}
+
+.table :global(th) {
+  background: var(--bg-muted);
+}
