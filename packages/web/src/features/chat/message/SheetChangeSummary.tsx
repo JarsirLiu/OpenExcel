@@ -1,4 +1,5 @@
 import { useState } from "react";
+import styles from "./SheetChangeSummary.module.css";
 import { SheetPreview } from "./SheetPreview";
 
 function isRecord(value: unknown): value is Record<string, any> {
@@ -133,57 +134,34 @@ export function SheetChangeSummary({
   };
 
   return (
-    <div style={{ marginTop: 12 }}>
-      <div
-        style={{ fontSize: 12, fontWeight: 600, color: "var(--muted-foreground)", marginBottom: 6 }}
-      >
-        修改了 {sheets.length} 个工作表
-      </div>
+    <div className={styles.summary}>
+      <div className={styles.heading}>修改了 {sheets.length} 个工作表</div>
       {sheets.map((sheet) => (
-        <div key={sheet.sheetId} style={{ marginBottom: 4 }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              cursor: "pointer",
-              padding: "6px 8px",
-              background: "var(--muted)",
-              borderRadius: "var(--radius-sm)",
-              fontSize: 13,
-              border: "1px solid var(--border)",
-            }}
-            onClick={() => onNavigateSheet?.(sheet.sheetId)}
-          >
-            <span style={{ fontWeight: 500, color: "var(--foreground)" }}>
-              {sheet.sheetName}
-              {sheet.sheetNo != null ? ` (#${sheet.sheetNo})` : ""}
-            </span>
-            <span style={{ color: "var(--hint-foreground)", fontSize: 12 }}>
-              {sheet.changeCount} 处改动
-            </span>
-            <span
-              style={{
-                marginLeft: "auto",
-                flexShrink: 0,
-                color: "var(--muted-foreground)",
-                fontSize: 10,
-                cursor: "pointer",
-                padding: "2px 4px",
-                borderRadius: "var(--radius-sm)",
-                transition: "transform 0.15s",
-                transform: expandedSheets.has(sheet.sheetId) ? "rotate(90deg)" : "rotate(0deg)",
-              }}
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleSheet(sheet.sheetId);
-              }}
+        <div key={sheet.sheetId} className={styles.sheet}>
+          <div className={styles.sheetRow}>
+            <button
+              type="button"
+              className={styles.sheetLink}
+              onClick={() => onNavigateSheet?.(sheet.sheetId)}
             >
-              ▶
-            </span>
+              <span className={styles.sheetName}>
+                {sheet.sheetName}
+                {sheet.sheetNo != null ? ` (#${sheet.sheetNo})` : ""}
+              </span>
+              <span className={styles.changeCount}>{sheet.changeCount} 处改动</span>
+            </button>
+            <button
+              type="button"
+              className={styles.toggle}
+              onClick={() => toggleSheet(sheet.sheetId)}
+              aria-label={`${expandedSheets.has(sheet.sheetId) ? "收起" : "展开"} ${sheet.sheetName} 变更预览`}
+              aria-expanded={expandedSheets.has(sheet.sheetId)}
+            >
+              <span className={styles.chevron} aria-hidden="true" />
+            </button>
           </div>
           {expandedSheets.has(sheet.sheetId) && sheet.lastPreview && (
-            <div style={{ paddingLeft: 16, marginTop: 4 }}>
+            <div className={styles.preview}>
               <SheetPreview preview={sheet.lastPreview} changedCells={sheet.changedCells} />
             </div>
           )}

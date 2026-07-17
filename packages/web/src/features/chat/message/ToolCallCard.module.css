@@ -1,0 +1,95 @@
+.tool {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 3px 0 8px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-default);
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.success {
+  color: var(--color-success-text);
+}
+
+.error {
+  color: var(--color-danger-text);
+}
+
+.pending {
+  width: 12px;
+  height: 12px;
+  margin: 2px;
+  border: 1.5px solid var(--border-strong);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: toolSpin 0.7s linear infinite;
+}
+
+.name {
+  flex: 0 0 auto;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.summary {
+  min-width: 0;
+  overflow: hidden;
+  flex: 1;
+  color: var(--text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.state {
+  flex: 0 0 auto;
+  color: var(--text-hint);
+  font-size: 12px;
+}
+
+.stateSuccess {
+  color: var(--color-success-text);
+}
+
+.stateError {
+  color: var(--color-danger-text);
+}
+
+.statePending {
+  color: var(--color-accent);
+}
+
+.detail {
+  padding-left: 24px;
+  color: var(--text-hint);
+  font-size: 12px;
+}
+
+.preview {
+  padding-left: 24px;
+}
+
+@keyframes toolSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}

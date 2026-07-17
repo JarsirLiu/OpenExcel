@@ -1,0 +1,98 @@
+.summary {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-default);
+}
+
+.heading {
+  margin-bottom: 4px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.sheet {
+  margin-bottom: 3px;
+}
+
+.sheetRow {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 32px;
+}
+
+.sheetLink {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+  min-height: 32px;
+  padding: 5px 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sheetLink:hover {
+  color: var(--color-accent);
+}
+
+.sheetLink:focus-visible,
+.toggle:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+.sheetName {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.changeCount {
+  color: var(--text-hint);
+  font-size: 12px;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin-left: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-hint);
+  cursor: pointer;
+}
+
+.toggle:hover {
+  color: var(--text-primary);
+}
+
+.chevron {
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 0.15s ease;
+}
+
+.expanded .chevron {
+  transform: rotate(45deg);
+}
+
+.preview {
+  padding-left: 16px;
+}

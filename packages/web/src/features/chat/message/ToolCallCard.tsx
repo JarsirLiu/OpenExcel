@@ -1,4 +1,5 @@
 import { normalizePreviewData, SheetPreview } from "./SheetPreview";
+import styles from "./ToolCallCard.module.css";
 
 function isStaticToolPart(part: any): boolean {
   return part.args === undefined && part.input !== undefined;
@@ -152,76 +153,41 @@ export function ToolCallCard({ part }: { part: any }) {
   const preview = normalizePreviewData(output?.preview);
   const sheetInfo = output?.sheetInfo ?? null;
   const changedCells = computeChangedCells(output?.delta);
+  const stateClass = isComplete
+    ? isError
+      ? styles.stateError
+      : styles.stateSuccess
+    : styles.statePending;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          padding: "8px 12px",
-          background: "var(--muted)",
-          border: "1px solid var(--border)",
-          borderRadius: "var(--radius-sm)",
-          fontSize: 13,
-          color: "var(--muted-foreground)",
-        }}
-      >
+    <div className={styles.tool}>
+      <div className={styles.row}>
         {isComplete ? (
           isError ? (
-            <span style={{ color: "#ef4444", fontSize: 14, flexShrink: 0 }}>✕</span>
+            <span className={`${styles.status} ${styles.error}`} aria-hidden="true">
+              ×
+            </span>
           ) : (
-            <span style={{ color: "#22c55e", fontSize: 14, flexShrink: 0 }}>✓</span>
+            <span className={`${styles.status} ${styles.success}`} aria-hidden="true">
+              ✓
+            </span>
           )
         ) : (
-          <span
-            style={{
-              width: 14,
-              height: 14,
-              borderRadius: "50%",
-              border: "2px solid var(--border)",
-              borderTopColor: "#3b82f6",
-              animation: "spin 0.6s linear infinite",
-              display: "inline-block",
-              flexShrink: 0,
-            }}
-          />
+          <span className={`${styles.status} ${styles.pending}`} aria-hidden="true" />
         )}
-        <span style={{ fontWeight: 500, color: "var(--foreground)", flexShrink: 0 }}>
-          {toolName}
-        </span>
-        <span
-          style={{
-            color: "var(--hint-foreground)",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-            flex: 1,
-            minWidth: 0,
-          }}
-        >
-          {summary}
-        </span>
-        <span
-          style={{
-            fontSize: 12,
-            color: isComplete ? (isError ? "#ef4444" : "#22c55e") : "#3b82f6",
-            flexShrink: 0,
-          }}
-        >
+        <span className={styles.name}>{toolName}</span>
+        <span className={styles.summary}>{summary}</span>
+        <span className={`${styles.state} ${stateClass}`}>
           {isComplete ? (isError ? "失败" : "已完成") : "运行中..."}
         </span>
       </div>
       {isComplete && !isError && preview && preview.rows.length > 0 && (
-        <div style={{ paddingLeft: 22, marginTop: 4 }}>
+        <div className={styles.preview}>
           <SheetPreview preview={preview} changedCells={changedCells} />
         </div>
       )}
       {isComplete && sheetInfo && (
-        <div
-          style={{ paddingLeft: 22, marginTop: 2, fontSize: 12, color: "var(--hint-foreground)" }}
-        >
+        <div className={styles.detail}>
           {getSheetActionLabel(toolName)}: {sheetInfo.sheetName}
           {sheetInfo.sheetNo != null ? ` (#${sheetInfo.sheetNo})` : ""}
         </div>

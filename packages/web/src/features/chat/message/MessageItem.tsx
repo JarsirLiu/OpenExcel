@@ -1,5 +1,4 @@
 import type { JSX } from "react";
-import { useState } from "react";
 import { getMessageText } from "@/features/shared/messageUtils";
 import styles from "./MessageItem.module.css";
 import { MessageMarkdown } from "./MessageMarkdown";
@@ -108,12 +107,7 @@ const UndoIcon = ({ size = 14 }: { size?: number }) => (
   </svg>
 );
 
-function renderAssistantParts(
-  msg: any,
-  isStreaming: boolean,
-  thinkingOpen: Record<string, boolean>,
-  setThinkingOpen: (fn: (prev: Record<string, boolean>) => Record<string, boolean>) => void,
-) {
+function renderAssistantParts(msg: any, isStreaming: boolean) {
   if (!msg.parts || msg.parts.length === 0) {
     return <MessageMarkdown content={msg.content || ""} isStreaming={isStreaming} />;
   }
@@ -135,18 +129,15 @@ function renderAssistantParts(
       case "text":
         textParts.push(part.text);
         break;
-      case "reasoning":
+      case "reasoning": {
         flushText(`reasoning-${i}-flush`);
         result.push(
           <div key={`reasoning-${i}`}>
-            <ReasoningCard
-              reasoning={typeof part.text === "string" ? part.text : ""}
-              open={thinkingOpen[msg.id] ?? true}
-              onToggle={() => setThinkingOpen((prev) => ({ ...prev, [msg.id]: !prev[msg.id] }))}
-            />
+            <ReasoningCard reasoning={typeof part.text === "string" ? part.text : ""} />
           </div>,
         );
         break;
+      }
       case "step-start":
         flushText(`step-${i}-flush`);
         result.push(<div key={`step-${i}`} className={styles.stepDivider} />);
@@ -187,8 +178,6 @@ export function MessageItem({
   isUndoing?: boolean;
   onNavigateSheet?: (sheetId: number) => void;
 }) {
-  const [thinkingOpen, setThinkingOpen] = useState<Record<string, boolean>>({});
-
   if (msg.role === "user") {
     return (
       <div className={styles.userMsg}>
@@ -223,7 +212,7 @@ export function MessageItem({
         <span className={styles.roleName}>AI 助手</span>
       </div>
       <div className={styles.msgBody}>
-        {renderAssistantParts(msg, isStreaming, thinkingOpen, setThinkingOpen)}
+        {renderAssistantParts(msg, isStreaming)}
         {!isStreaming && msg.role === "assistant" && msg.parts && (
           <SheetChangeSummary parts={msg.parts} onNavigateSheet={onNavigateSheet} />
         )}
