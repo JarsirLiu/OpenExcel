@@ -1,9 +1,9 @@
-import { gridToCelldata } from "@openexcel/core";
 import { prisma } from "../../../infra/database/db.js";
 import {
   generateWorkbookPublicId,
   generateWorkspacePublicId,
 } from "../../../shared/utils/publicId.js";
+import { buildExampleSheetPersistence } from "./exampleSheetPersistence.js";
 import { loadExampleTemplate } from "./exampleTemplateReader.js";
 
 function normalizeName(name: string | undefined, fallback: string) {
@@ -85,15 +85,16 @@ export async function provisionExampleWorkspaceForUser(
       });
 
       for (const [sheetIndex, sheetDef] of workbookDef.sheets.entries()) {
+        const sheetData = buildExampleSheetPersistence(sheetDef);
         await tx.sheet.create({
           data: {
             workbookId: workbook.id,
             sheetNo: sheetIndex + 1,
             name: normalizeName(sheetDef.name, `Sheet${sheetIndex + 1}`),
             order: sheetIndex,
-            columns: JSON.stringify(sheetDef.columns ?? []),
-            merges: JSON.stringify(sheetDef.merges ?? []),
-            uploadedData: JSON.stringify(gridToCelldata(sheetDef.rows ?? [])),
+            columns: sheetData.columns,
+            merges: sheetData.merges,
+            uploadedData: sheetData.uploadedData,
             config: null,
           },
         });

@@ -498,6 +498,13 @@ Workbook UI should also separate behavior from rendering:
 - `useExcelGridWorkspace` owns persistence, delete, and sheet activation sync
 - `ExcelGrid` should render the spreadsheet and toolbar, but not own workbook data fetching
 
+Sheet persistence has one canonical cell model. `uploadedData` contains every real visible cell,
+including table headers; `columns` contains column layout metadata such as widths and must not be
+converted into cells by the web editor. The editor is a pure view/interaction adapter: loading a
+sheet must not add rows or shift cell coordinates, and saving a sheet must not persist presentation-
+only data. Template provisioning is responsible for materializing template headers into
+`uploadedData` before the sheet is stored.
+
 Workbook export has one explicit source:
 
 - The sidebar download uses the server export endpoint and persisted workbook data. The export

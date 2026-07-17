@@ -107,8 +107,10 @@ describe("provisionExampleWorkspaceForUser", () => {
     const firstSheetData = mocks.sheetCreate.mock.calls[0][0].data;
     expect(firstSheetData.columns).toContain("指标名称");
     expect(JSON.parse(firstSheetData.uploadedData)).toEqual([
-      { r: 0, c: 0, v: { v: "A", m: "A" } },
-      { r: 0, c: 1, v: { v: "1", m: "1" } },
+      { r: 0, c: 0, v: { v: "指标名称", m: "指标名称" } },
+      { r: 0, c: 1, v: { v: "数值/说明", m: "数值/说明" } },
+      { r: 1, c: 0, v: { v: "A", m: "A" } },
+      { r: 1, c: 1, v: { v: "1", m: "1" } },
     ]);
   });
 
