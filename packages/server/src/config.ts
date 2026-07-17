@@ -31,11 +31,18 @@ export interface ModelConfig {
 
 let cachedConfig: ModelConfig | null = null;
 
+const DEFAULT_MODEL_MAX_RETRIES = 2;
+const MAX_MODEL_MAX_RETRIES = 3;
+
 function readNonNegativeInt(name: string, fallback: number): number {
   const value = process.env[name]?.trim();
   if (!value) return fallback;
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+function readBoundedNonNegativeInt(name: string, fallback: number, max: number): number {
+  return Math.min(readNonNegativeInt(name, fallback), max);
 }
 
 function readPositiveInt(name: string, fallback: number): number {
@@ -64,7 +71,11 @@ export function loadModelConfig(): ModelConfig {
     baseUrl: baseUrl as string,
     apiKey: apiKey as string,
     modelName: modelName as string,
-    maxRetries: readNonNegativeInt("MODEL_MAX_RETRIES", 2),
+    maxRetries: readBoundedNonNegativeInt(
+      "MODEL_MAX_RETRIES",
+      DEFAULT_MODEL_MAX_RETRIES,
+      MAX_MODEL_MAX_RETRIES,
+    ),
     timeoutMs: readNonNegativeInt("MODEL_TIMEOUT_MS", 120_000),
     chunkTimeoutMs: readNonNegativeInt("MODEL_CHUNK_TIMEOUT_MS", 30_000),
     contextWindowTokens: readPositiveInt("MODEL_CONTEXT_WINDOW_TOKENS", 180_000),

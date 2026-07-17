@@ -33,7 +33,7 @@ describe("environment model config", () => {
     vi.stubEnv("MODEL_BASE_URL", "https://test.api.com/v1");
     vi.stubEnv("MODEL_API_KEY", "sk-test123");
     vi.stubEnv("MODEL_NAME", "gpt-4o-mini");
-    vi.stubEnv("MODEL_MAX_RETRIES", "4");
+    vi.stubEnv("MODEL_MAX_RETRIES", "3");
     vi.stubEnv("MODEL_TIMEOUT_MS", "90000");
     vi.stubEnv("MODEL_CHUNK_TIMEOUT_MS", "15000");
     vi.stubEnv("MODEL_CONTEXT_WINDOW_TOKENS", "120000");
@@ -41,7 +41,7 @@ describe("environment model config", () => {
 
     const { loadModelConfig } = await import("../config.js");
     expect(loadModelConfig()).toMatchObject({
-      maxRetries: 4,
+      maxRetries: 3,
       timeoutMs: 90_000,
       chunkTimeoutMs: 15_000,
       contextWindowTokens: 120_000,
@@ -52,6 +52,16 @@ describe("environment model config", () => {
       toolResultMaxTokens: 8_000,
       readSheetBudgetTokens: 24_000,
     });
+  });
+
+  it("caps model retries to keep transient failures bounded", async () => {
+    vi.stubEnv("MODEL_BASE_URL", "https://test.api.com/v1");
+    vi.stubEnv("MODEL_API_KEY", "sk-test123");
+    vi.stubEnv("MODEL_NAME", "gpt-4o-mini");
+    vi.stubEnv("MODEL_MAX_RETRIES", "99");
+
+    const { loadModelConfig } = await import("../config.js");
+    expect(loadModelConfig().maxRetries).toBe(3);
   });
 
   it("throws when a required variable is missing", async () => {
