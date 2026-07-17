@@ -1,4 +1,5 @@
 import { useChat } from "@ai-sdk/react";
+import type { ChatReferenceTarget } from "@openexcel/chat-contracts";
 import { DefaultChatTransport } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -285,10 +286,23 @@ export function useChatConversation({
   }, [flushPendingWorkspaceRefresh, isStreaming]);
 
   const handleSend = useCallback(
-    (text: string) => {
+    (text: string, references: ChatReferenceTarget[]) => {
       if (!text || isStreaming || isSendLocked()) return;
       invalidateUndoAvailability();
-      sendMessage({ text });
+      if (references.length === 0) {
+        sendMessage({ text });
+        return;
+      }
+
+      sendMessage({
+        parts: [
+          { type: "text", text },
+          ...references.map((reference) => ({
+            type: "data-chat-reference" as const,
+            data: { reference },
+          })),
+        ],
+      });
     },
     [invalidateUndoAvailability, isSendLocked, isStreaming, sendMessage],
   );

@@ -1,3 +1,4 @@
+import type { ChatReferenceTarget } from "@openexcel/chat-contracts";
 import { EditorContent } from "@tiptap/react";
 import {
   type ChangeEvent,
@@ -19,7 +20,7 @@ export type ChatComposerHandle = {
 type ChatComposerProps = {
   isStreaming: boolean;
   isSendDisabled?: boolean;
-  onSend: (text: string) => void;
+  onSend: (text: string, references: ChatReferenceTarget[]) => void;
   onStop: () => void;
   onAttachExcel: (files: File[]) => Promise<void> | void;
   referenceCacheRevision: number;

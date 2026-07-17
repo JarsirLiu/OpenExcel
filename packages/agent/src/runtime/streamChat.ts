@@ -1,6 +1,12 @@
 globalThis.AI_SDK_LOG_WARNINGS = false;
 
 import {
+  chatReferenceDataSchema,
+  chatReferenceSchema,
+  formatChatReference,
+  formatUnavailableChatReference,
+} from "@openexcel/chat-contracts";
+import {
   convertToModelMessages,
   isLoopFinished,
   streamText,
@@ -17,6 +23,30 @@ import {
   trimMessagesToContextWindow,
 } from "../session/contextWindow.js";
 import { formatAIError } from "./formatAIError.js";
+
+export function convertChatReferenceDataPart(part: unknown) {
+  if (typeof part !== "object" || part === null) return undefined;
+  const record = part as Record<string, unknown>;
+  if (record.type !== "data-chat-reference") return undefined;
+
+  const parsed = chatReferenceDataSchema.safeParse(record.data);
+  if (!parsed.success) return undefined;
+
+  if (parsed.data.status === "unavailable") {
+    return {
+      type: "text" as const,
+      text: formatUnavailableChatReference(parsed.data.reference),
+    };
+  }
+
+  const reference = chatReferenceSchema.safeParse(parsed.data.reference);
+  if (!reference.success) return undefined;
+
+  return {
+    type: "text" as const,
+    text: formatChatReference(reference.data),
+  };
+}
 
 export interface StreamChatInput {
   modelConfig: ModelConfig;
@@ -73,7 +103,9 @@ export async function streamChat(
   const result = streamText({
     model: createChatModel(input.modelConfig),
     system: input.systemPrompt,
-    messages: await convertToModelMessages(validatedMessages as any),
+    messages: await convertToModelMessages(validatedMessages as any, {
+      convertDataPart: convertChatReferenceDataPart,
+    }),
     tools: input.tools as any,
     toolsContext: input.toolsContext as any,
     prepareStep: input.prepareStep as any,

@@ -630,6 +630,13 @@ If a bug affects two panes at once, treat it as a boundary bug and add a regress
 5. Server persists the complete transcript, run, and step data; compaction only affects the model request and does not remove history from the session.
 6. Web renders streaming messages and tool output.
 
+Sheet and workbook mentions use the lightweight `@openexcel/chat-contracts` protocol and an AI SDK `data-chat-reference` message part. The web editor only
+extracts stable workbook or Sheet IDs; it does not serialize TipTap nodes or rely on display names.
+The server resolves those IDs against the current workspace and replaces the payload with authoritative
+workbook/Sheet metadata. The agent converts the resolved data part into model-facing identity text,
+while the persisted/UI message keeps the user-visible text separate from that hidden context. This
+keeps editor, resource authorization, and model prompt formatting in separate ownership boundaries.
+
 Tool results are processed at one run-scoped boundary before they are returned to the model. The default shared result budget is 32,000 tokens per run, each result is capped at 8,000 tokens, and `readSheet` has a 24,000-token sub-budget. A result larger than its remaining allowance is structurally compacted, retaining scalar metadata and representative array items. When no allowance remains, the wrapper returns a normal `truncated` result without executing the underlying tool; on the next model step, exhausted tools are removed from `activeTools`, allowing the model to finish without an error or an unbounded tool loop. These limits are configured with `MODEL_TOOL_RESULT_BUDGET_TOKENS`, `MODEL_TOOL_RESULT_MAX_TOKENS`, and `MODEL_READ_SHEET_BUDGET_TOKENS`.
 
 Spreadsheet reads are bounded at the tool boundary. A default `readSheet` call returns an overview of the whole Sheet (dimensions, column profiles, numeric statistics, and representative samples) without returning all raw cells. Explicit `mode=range` calls return up to approximately 4,000 grid cells and expose the next row or column through `hasMoreRows`, `hasMoreCols`, and the range in the response. This lets the model understand a large Sheet before requesting a focused range and keeps repeated analysis from filling the context with an unbounded tool result.

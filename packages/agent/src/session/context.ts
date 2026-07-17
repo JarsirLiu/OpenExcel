@@ -1,6 +1,7 @@
 export interface WorkspaceSheetSummary {
   id: number;
   name: string;
+  sheetNo?: number;
 }
 
 export interface WorkspaceWorkbookSummary {

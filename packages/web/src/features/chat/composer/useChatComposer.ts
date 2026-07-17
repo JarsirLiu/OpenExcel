@@ -1,8 +1,10 @@
+import type { ChatReferenceTarget } from "@openexcel/chat-contracts";
 import Mention from "@tiptap/extension-mention";
 import { useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchWorkbookReferenceCandidates } from "@/api/workbooks";
+import { extractChatReferences } from "./chatReferences";
 import { createMentionSuggestion, type WorkbookSource } from "./SheetMentionList";
 
 export function useChatComposer({
@@ -14,7 +16,7 @@ export function useChatComposer({
 }: {
   isStreaming: boolean;
   isSendDisabled?: boolean;
-  onSend: (text: string) => void;
+  onSend: (text: string, references: ChatReferenceTarget[]) => void;
   referenceCacheRevision: number;
   workspaceId: number;
 }) {
@@ -70,9 +72,10 @@ export function useChatComposer({
     if (isMentionOpenRef.current) return;
     const text = editor?.getText().trim() ?? "";
     if (!text || isStreaming || isSendDisabled) return;
+    const references = extractChatReferences(editor?.getJSON());
     editor?.commands.clearContent();
     editor?.commands.focus();
-    onSend(text);
+    onSend(text, references);
   }, [isSendDisabled, isStreaming, onSend]);
 
   const editor = useEditor({

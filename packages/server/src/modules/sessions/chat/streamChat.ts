@@ -22,7 +22,8 @@ import {
   clearSessionUndoCheckpoint,
   completeRunAndUpdateUndoCheckpoint,
 } from "../runs/undoCheckpoint.js";
-import { buildWorkspaceContext } from "./context.js";
+import { loadWorkspaceChatContext } from "./context.js";
+import { resolveChatMessageReferences } from "./references.js";
 
 function serializeJson(value: unknown): string | null {
   if (value === undefined) return null;
@@ -59,9 +60,11 @@ export async function streamChat(
   if (!session) throw new Error("Session not found");
 
   const config = loadModelConfig();
-  const workspaceContext = await buildWorkspaceContext(workspaceId);
+  const workspace = await loadWorkspaceChatContext(workspaceId);
+  const resolvedMessages = resolveChatMessageReferences(messages, workspace.workbooks);
+  const workspaceContext = workspace.prompt;
   const systemPrompt = buildSystemPrompt(workspaceContext, buildExcelToolCatalog());
-  const inputText = extractLatestUserText(messages);
+  const inputText = extractLatestUserText(resolvedMessages);
 
   const run = await withSessionLock(sessionId, async () => {
     const activeRun = await runRepo.findActiveRun(sessionId);
@@ -159,7 +162,7 @@ export async function streamChat(
     return await streamAgentChat({
       modelConfig: config,
       systemPrompt,
-      messages,
+      messages: resolvedMessages,
       maxRetries: config.maxRetries,
       contextWindowTokens: config.contextWindowTokens,
       outputReserveTokens: config.outputReserveTokens,
