@@ -1,7 +1,15 @@
 import { excelToolSpecs, workspaceToolContextSchema } from "@openexcel/agent";
-import type { FortuneCell } from "@openexcel/core";
+import {
+  type FortuneCell,
+  fortuneMergesToToolRanges,
+  type StorageIndex,
+  storageIndex,
+  storageIndexToTool,
+  type ToolIndex,
+  toolIndex,
+  toolIndexToStorage,
+} from "@openexcel/core";
 import { sheetRecordToCelldata } from "../../../shared/utils/sheetData.js";
-import { parseMergesFromCelldata } from "../domain/sheet.js";
 import { findSheetForWorkspace } from "../infrastructure/sheetRepository.js";
 
 const DEFAULT_PAGE_SIZE = 30;
@@ -38,43 +46,34 @@ function getColumnCount(celldata: FortuneCell[]): number {
   return maxColumn + 1;
 }
 
-function detectHeader(celldata: FortuneCell[]): boolean {
-  let hasRow0 = false;
-  let hasRow1 = false;
-  for (const cell of celldata) {
-    if (cell.r === 0) hasRow0 = true;
-    if (cell.r === 1) hasRow1 = true;
-    if (hasRow0 && hasRow1) return true;
-  }
-  return false;
-}
-
-function getHeaders(celldata: FortuneCell[], columnCount: number): string[] {
-  const headers = Array(columnCount).fill("");
+function getFirstRowValues(celldata: FortuneCell[], columnCount: number): string[] {
+  const firstRowValues = Array(columnCount).fill("");
   for (const cell of celldata) {
     if (cell.r === 0 && cell.c < columnCount) {
-      headers[cell.c] = String(cell.v?.v ?? "");
+      firstRowValues[cell.c] = String(cell.v?.v ?? "");
     }
   }
-  return headers;
+  return firstRowValues;
 }
 
-function getDataRowCount(celldata: FortuneCell[], hasHeader: boolean): number {
+/**
+ * 返回 Sheet 的视觉行总数（celldata 最大 r + 1）。
+ * 第 1 行始终是 Excel 视觉上的第 1 行，不根据内容推断或扣除表头。
+ */
+function getVisualRowCount(celldata: FortuneCell[]): number {
   if (celldata.length === 0) return 0;
   let maxRow = 0;
   for (const cell of celldata) {
     maxRow = Math.max(maxRow, cell.r);
   }
-  if (hasHeader) return maxRow;
   return maxRow + 1;
 }
 
 function buildColumnAnalysis(
   celldata: FortuneCell[],
   columnCount: number,
-  headers: string[],
-  hasHeader: boolean,
-  dataRowCount: number,
+  firstRowValues: string[],
+  visualRowCount: number,
 ): {
   columnTypes: string[];
   columnStats: Record<string, { min: number; max: number; avg: number; count: number }>;
@@ -91,7 +90,6 @@ function buildColumnAnalysis(
   }));
 
   for (const cell of celldata) {
-    if (hasHeader && cell.r === 0) continue;
     const state = states[cell.c];
     if (!state) continue;
     const value = String(cell.v?.v ?? "");
@@ -120,14 +118,13 @@ function buildColumnAnalysis(
   );
   const columnStats: Record<string, { min: number; max: number; avg: number; count: number }> = {};
   const columnProfiles: ColumnProfile[] = states.map((state, index) => {
-    const empty = Math.max(0, dataRowCount - state.nonEmpty);
     const type = columnTypes[index] as "string" | "number";
     const profile: ColumnProfile = {
       index: index + 1,
-      name: headers[index] || `Column ${index + 1}`,
+      name: firstRowValues[index] || `Column ${index + 1}`,
       type,
       nonEmpty: state.nonEmpty,
-      empty,
+      empty: Math.max(0, visualRowCount - state.nonEmpty),
       sampleValues: state.sampleValues,
     };
 
@@ -168,30 +165,39 @@ function getSampleRowNumbers(rowCount: number): number[] {
   return [...rows].sort((a, b) => a - b).slice(0, MAX_SAMPLE_ROWS);
 }
 
+/**
+ * 抽样行号使用 Excel 视觉 1-based 行号，与 celldata 的 0-based r
+ * 通过 `storageIndexToTool` / `toolIndexToStorage` 单向转换。
+ * 不再引入 headerOffset：第 1 行就是 celldata r=0。
+ */
 function buildSampleRows(
   celldata: FortuneCell[],
   sampleRows: number[],
   columnCount: number,
-  headerOffset: number,
 ): Array<{ row: number; values: string[] }> {
   const sampleColumnCount = Math.min(
     columnCount,
     MAX_OVERVIEW_COLUMNS,
     Math.max(1, Math.floor(MAX_OVERVIEW_SAMPLE_CELLS / Math.max(1, sampleRows.length))),
   );
-  const rowSet = new Set(sampleRows.map((row) => row - 1 + headerOffset));
-  const valuesByRow = new Map<number, string[]>();
+  const storageRowSet = new Set<StorageIndex>(
+    sampleRows.map((row) => toolIndexToStorage(toolIndex(row))),
+  );
+  const valuesByStorageRow = new Map<number, string[]>();
 
   for (const cell of celldata) {
-    if (!rowSet.has(cell.r) || cell.c >= sampleColumnCount) continue;
-    const values = valuesByRow.get(cell.r) ?? Array(sampleColumnCount).fill("");
+    const row = storageIndex(cell.r);
+    if (!storageRowSet.has(row) || cell.c >= sampleColumnCount) continue;
+    const values = valuesByStorageRow.get(row) ?? Array(sampleColumnCount).fill("");
     values[cell.c] = String(cell.v?.v ?? "").slice(0, MAX_SAMPLE_VALUE_LENGTH);
-    valuesByRow.set(cell.r, values);
+    valuesByStorageRow.set(row, values);
   }
 
   return sampleRows.map((row) => ({
     row,
-    values: valuesByRow.get(row - 1 + headerOffset) ?? Array(sampleColumnCount).fill(""),
+    values:
+      valuesByStorageRow.get(toolIndexToStorage(toolIndex(row))) ??
+      Array(sampleColumnCount).fill(""),
   }));
 }
 
@@ -276,22 +282,19 @@ export const readSheet = {
 
     const celldata: FortuneCell[] = sheetRecordToCelldata(sheet);
     const columnCount = getColumnCount(celldata);
-    const hasHeader = detectHeader(celldata);
-    const dataRowCount = getDataRowCount(celldata, hasHeader);
-    const headers = getHeaders(celldata, columnCount);
+    const visualRowCount = getVisualRowCount(celldata);
+    const firstRowValues = getFirstRowValues(celldata, columnCount);
     const { columnTypes, columnStats, columnProfiles } = buildColumnAnalysis(
       celldata,
       columnCount,
-      headers,
-      hasHeader,
-      dataRowCount,
+      firstRowValues,
+      visualRowCount,
     );
 
     const hasExplicitRange =
       startRow != null || endRow != null || startCol != null || endCol != null;
     const isOverview = mode === "overview" || (mode !== "range" && !hasExplicitRange);
-    const sampleRows = getSampleRowNumbers(dataRowCount);
-    const headerOffset = hasHeader ? 1 : 0;
+    const sampleRows = getSampleRowNumbers(visualRowCount);
     const overviewColumnCount = Math.min(columnCount, MAX_OVERVIEW_COLUMNS);
     const sampleColumnCount = Math.min(
       columnCount,
@@ -300,7 +303,7 @@ export const readSheet = {
     );
 
     if (isOverview) {
-      const overviewHeaders = headers.slice(0, overviewColumnCount);
+      const overviewFirstRowValues = firstRowValues.slice(0, overviewColumnCount);
       const overviewTypes = columnTypes.slice(0, overviewColumnCount);
       const overviewStats = Object.fromEntries(
         Object.entries(columnStats).filter(([column]) => Number(column) <= overviewColumnCount),
@@ -318,14 +321,13 @@ export const readSheet = {
         sheetInfo: { sheetNo: sheet.sheetNo, sheetName: sheet.name },
         sheetName: sheet.name,
         sheetNo: sheet.sheetNo,
-        totalRowCount: dataRowCount,
+        totalRowCount: visualRowCount,
         totalColumnCount: columnCount,
-        hasFirstRowAsHeader: hasHeader,
-        headers: overviewHeaders,
+        firstRowValues: overviewFirstRowValues,
         columnTypes: overviewTypes,
         columnStats: overviewStats,
         columnProfiles: columnProfiles.slice(0, overviewColumnCount),
-        sampleRows: buildSampleRows(celldata, sampleRows, sampleColumnCount, headerOffset),
+        sampleRows: buildSampleRows(celldata, sampleRows, sampleColumnCount),
         sampleRowCount: sampleRows.length,
         sampleColumnCount,
         sampled: true,
@@ -339,40 +341,36 @@ export const readSheet = {
       };
     }
 
-    const mergesFull = parseMergesFromCelldata(celldata);
+    const mergesFull = fortuneMergesToToolRanges(celldata);
 
-    const maxCol1 = columnCount;
+    const maxCol1 = Math.max(1, columnCount);
 
-    const sr1 = startRow ?? 1;
-    const er1 = endRow ?? Math.min(sr1 + DEFAULT_PAGE_SIZE - 1, dataRowCount);
-    const sc1 = startCol ?? 1;
-    const ec1 = endCol ?? maxCol1;
+    const sr1: ToolIndex = toolIndex(startRow ?? 1);
+    const er1: ToolIndex = toolIndex(
+      endRow ?? (visualRowCount > 0 ? Math.min(sr1 + DEFAULT_PAGE_SIZE - 1, visualRowCount) : sr1),
+    );
+    const sc1: ToolIndex = toolIndex(startCol ?? 1);
+    const ec1: ToolIndex = toolIndex(endCol ?? maxCol1);
     const limitedRange = limitRangeToCellBudget(sr1, er1, sc1, ec1);
-    const limitedEr1 = limitedRange.endRow;
-    const limitedEc1 = limitedRange.endCol;
+    const limitedEr1 = toolIndex(limitedRange.endRow);
+    const limitedEc1 = toolIndex(limitedRange.endCol);
 
-    const sr0 = sr1 - 1 + headerOffset;
-    const er0 = limitedEr1 - 1 + headerOffset;
-    const sc0 = sc1 - 1;
-    const ec0 = limitedEc1 - 1;
+    // 工具 1-based → 存储 0-based，单一转换入口，不再叠加 headerOffset。
+    const sr0 = toolIndexToStorage(sr1);
+    const er0 = toolIndexToStorage(limitedEr1);
+    const sc0 = toolIndexToStorage(sc1);
+    const ec0 = toolIndexToStorage(limitedEc1);
 
     const filteredCelldata = filterCelldataByRange(celldata, sr0, er0, sc0, ec0);
-    const mergesNormalized = hasHeader
-      ? mergesFull.map((m) => ({
-          ...m,
-          startRow: m.startRow - 1,
-          endRow: m.endRow - 1,
-        }))
-      : mergesFull;
-    const slicedMerges = filterMergesByRange(mergesNormalized, sr1, limitedEr1, sc1, limitedEc1);
+    const slicedMerges = filterMergesByRange(mergesFull, sr1, limitedEr1, sc1, limitedEc1);
 
     const data: SparseCell[] = filteredCelldata.map((c) => ({
-      row: c.r + 1 - headerOffset,
-      col: c.c + 1,
+      row: storageIndexToTool(storageIndex(c.r)),
+      col: storageIndexToTool(storageIndex(c.c)),
       value: String(c.v?.v ?? ""),
     }));
 
-    const hasMoreRows = limitedEr1 < dataRowCount;
+    const hasMoreRows = limitedEr1 < visualRowCount;
     const hasMoreCols = limitedEc1 < maxCol1;
     const hasMoreRowsAbove = sr1 > 1;
     const wasLimitedByCellBudget = limitedEr1 < er1 || limitedEc1 < ec1;
@@ -385,7 +383,7 @@ export const readSheet = {
     const hintParts: string[] = [];
     if (hasMoreRows) {
       hintParts.push(
-        `还有${dataRowCount - limitedEr1}行未读取（可用 startRow=${limitedEr1 + 1} 继续读取）`,
+        `还有${visualRowCount - limitedEr1}行未读取（可用 startRow=${limitedEr1 + 1} 继续读取）`,
       );
     }
     if (hasMoreCols) {
@@ -405,10 +403,9 @@ export const readSheet = {
       sheetInfo,
       sheetName: sheet.name,
       sheetNo: sheet.sheetNo,
-      totalRowCount: dataRowCount,
+      totalRowCount: visualRowCount,
       totalColumnCount: columnCount,
-      hasFirstRowAsHeader: hasHeader,
-      headers: includeMetadata ? headers : [],
+      firstRowValues: includeMetadata ? firstRowValues : [],
       columnTypes: includeMetadata ? columnTypes : [],
       columnStats: includeMetadata ? columnStats : {},
       columnProfiles: includeMetadata ? columnProfiles : [],

@@ -57,7 +57,7 @@ export const excelToolSpecs = {
   },
   readSheet: {
     description:
-      "读取指定 Sheet 的单元格数据和基础分析结果。首次或不传范围时返回 overview：整表规模、列画像、数值统计、空值情况，以及头部/中部/尾部的少量代表性样本；传入 startRow/endRow/startCol/endCol 或 mode=range 时返回指定范围的稀疏数据。单次范围最多返回约4000个网格单元。该工具不返回完整样式、公式表达式、图表、透视表、VBA 或其他 Excel 对象；行号和列号按 Excel 视觉顺序从 1 开始。",
+      "读取指定 Sheet 的单元格数据和基础分析结果。首次或不传范围时返回 overview：整表规模、列画像、数值统计、空值情况、第一行原始值 firstRowValues，以及头部/中部/尾部的少量代表性样本；firstRowValues 仅表示实际 Excel 第 1 行，不代表系统推断出的表头。传入 startRow/endRow/startCol/endCol 或 mode=range 时返回指定范围的稀疏数据。单次范围最多返回约4000个网格单元。该工具不返回完整样式、公式表达式、图表、透视表、VBA 或其他 Excel 对象；行号和列号按 Excel 视觉顺序从 1 开始。",
     inputSchema: z.object({
       sheetId: z.coerce.number().describe("Sheet ID"),
       mode: z

@@ -4,14 +4,13 @@ import {
   type SheetChangeRangeOperation,
   sheetChangePatchOutputSchema,
   sheetChangeRangeToZeroBased,
+  storageIndex,
+  toolCellToA1Ref,
+  toolIndex,
+  toolRangeToA1Ref,
 } from "@openexcel/core";
 import { sheetRecordToCelldata } from "../../../shared/utils/sheetData.js";
-import {
-  applyMergeOperation,
-  buildSheetChangePreview,
-  toA1CellRef,
-  toA1Range,
-} from "../domain/sheet.js";
+import { applyMergeOperation, buildSheetChangePreview } from "../domain/sheet.js";
 import * as sheetRepo from "../infrastructure/sheetRepository.js";
 import { runSheetMutation } from "./runSheetMutation.js";
 
@@ -32,17 +31,22 @@ export const mergeCells = {
       }
 
       const mergedRanges: string[] = [];
-      let minRow = Number.POSITIVE_INFINITY;
-      let maxRow = Number.NEGATIVE_INFINITY;
+      let minRow = storageIndex(Number.MAX_SAFE_INTEGER);
+      let maxRow = storageIndex(0);
 
       for (const operation of operations) {
         const storageRange = sheetChangeRangeToZeroBased(operation);
         applyMergeOperation(cellMap, storageRange);
         mergedRanges.push(
-          toA1Range(operation.startRow, operation.startCol, operation.endRow, operation.endCol),
+          toolRangeToA1Ref({
+            startRow: toolIndex(operation.startRow),
+            startCol: toolIndex(operation.startCol),
+            endRow: toolIndex(operation.endRow),
+            endCol: toolIndex(operation.endCol),
+          }),
         );
-        minRow = Math.min(minRow, storageRange.startRow);
-        maxRow = Math.max(maxRow, storageRange.endRow);
+        minRow = storageIndex(Math.min(minRow, storageRange.startRow));
+        maxRow = storageIndex(Math.max(maxRow, storageRange.endRow));
       }
 
       const updatedCelldata = Array.from(cellMap.values());
@@ -50,7 +54,10 @@ export const mergeCells = {
       config.merge = { ...(config.merge ?? {}) };
       for (const operation of operations) {
         const storageRange = sheetChangeRangeToZeroBased(operation);
-        const cellRef = toA1CellRef(operation.startRow, operation.startCol);
+        const cellRef = toolCellToA1Ref(
+          toolIndex(operation.startRow),
+          toolIndex(operation.startCol),
+        );
         config.merge[cellRef] = {
           r: storageRange.startRow,
           c: storageRange.startCol,

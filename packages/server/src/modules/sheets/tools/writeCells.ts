@@ -4,6 +4,9 @@ import {
   sheetChangeCellToZeroBased,
   sheetChangePatchOutputSchema,
   sheetChangeRangeToZeroBased,
+  storageIndex,
+  type ToolIndex,
+  toolIndexToStorage,
 } from "@openexcel/core";
 import { sheetRecordToCelldata } from "../../../shared/utils/sheetData.js";
 import {
@@ -34,7 +37,7 @@ export const writeCells = {
 
       const touchedCells = new Map<
         string,
-        { row: number; col: number; value: string | number | boolean; formula?: string }
+        { row: ToolIndex; col: ToolIndex; value: string | number | boolean; formula?: string }
       >();
       for (const operation of operations) {
         if (operation.type === "cell") {
@@ -57,8 +60,16 @@ export const writeCells = {
           endCol: operation.endCol,
         });
 
-        for (let row = storageRange.startRow; row <= storageRange.endRow; row += 1) {
-          for (let col = storageRange.startCol; col <= storageRange.endCol; col += 1) {
+        for (
+          let row = storageRange.startRow;
+          row <= storageRange.endRow;
+          row = storageIndex(row + 1)
+        ) {
+          for (
+            let col = storageRange.startCol;
+            col <= storageRange.endCol;
+            col = storageIndex(col + 1)
+          ) {
             applyCellWrite(cellMap, touchedCells, row, col, operation.value, operation.formula);
           }
         }
@@ -73,8 +84,12 @@ export const writeCells = {
       );
 
       const touchedValues = Array.from(touchedCells.values());
-      const minRow = Math.min(...touchedValues.map((cell) => cell.row - 1));
-      const maxRow = Math.max(...touchedValues.map((cell) => cell.row - 1));
+      const minRow = storageIndex(
+        Math.min(...touchedValues.map((cell) => toolIndexToStorage(cell.row))),
+      );
+      const maxRow = storageIndex(
+        Math.max(...touchedValues.map((cell) => toolIndexToStorage(cell.row))),
+      );
 
       const delta: SheetChangeDelta = {
         type: "write",

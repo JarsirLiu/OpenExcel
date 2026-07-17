@@ -1,3 +1,4 @@
+import { storageIndex, type ToolIndex } from "@openexcel/core";
 import { describe, expect, it } from "vitest";
 import {
   applyCellWrite,
@@ -5,18 +6,9 @@ import {
   applyMergeOperation,
   buildSheetChangePreview,
   normalizeWriteOperations,
-  parseMergesFromCelldata,
-  toA1CellRef,
-  toA1Range,
 } from "./sheet.js";
 
 describe("sheet domain helpers", () => {
-  it("formats A1 references", () => {
-    expect(toA1CellRef(1, 1)).toBe("A1");
-    expect(toA1CellRef(2, 27)).toBe("AA2");
-    expect(toA1Range(1, 1, 2, 3)).toBe("A1:C2");
-  });
-
   it("normalizes write operations without changing semantics", () => {
     const result = normalizeWriteOperations({
       sheetId: 3,
@@ -51,35 +43,50 @@ describe("sheet domain helpers", () => {
     });
   });
 
-  it("parses merged ranges from celldata", () => {
-    const merges = parseMergesFromCelldata([
-      { r: 0, c: 0, v: { mc: { rs: 2, cs: 3 } } },
-      { r: 4, c: 2, v: {} },
-    ]);
-
-    expect(merges).toEqual([{ startRow: 1, startCol: 1, endRow: 2, endCol: 3 }]);
-  });
-
-  it("builds previews from a celldata slice", () => {
+  it("builds previews with explicit 1-based row numbers from a celldata slice", () => {
     const preview = buildSheetChangePreview(
       [
         { r: 0, c: 0, v: { v: "A" } },
-        { r: 1, c: 1, v: { v: "B", mc: { rs: 2, cs: 2 } } },
+        { r: 1, c: 1, v: { v: "B", mc: { r: 1, c: 1, rs: 2, cs: 2 } } },
         { r: 2, c: 2, v: { v: "C" } },
       ] as any,
       "Sheet1",
       7,
-      0,
-      1,
+      storageIndex(0),
+      storageIndex(1),
     );
 
     expect(preview.sheetId).toBe(7);
     expect(preview.sheetName).toBe("Sheet1");
+    // range 也是 1-based 工具坐标：minRow0=0 → startRow=1, maxRow0=1 → endRow=2。
+    expect(preview.range).toEqual({ startRow: 1, endRow: 2, startCol: 1, endCol: 3 });
+    // 行结构携带显式 1-based 行号，前端无需用数组下标推断。
     expect(preview.rows).toEqual([
-      ["A", "", ""],
-      ["", "B", ""],
+      { row: 1, values: ["A", "", ""] },
+      { row: 2, values: ["", "B", ""] },
     ]);
     expect(preview.merges).toEqual([{ startRow: 2, startCol: 2, endRow: 3, endCol: 3 }]);
+  });
+
+  it("keeps explicit row numbers in preview when middle rows are empty", () => {
+    // minRow0=0, maxRow0=2，但 r=1 没有数据；preview 仍应输出 row=2 的空行。
+    const preview = buildSheetChangePreview(
+      [
+        { r: 0, c: 0, v: { v: "first" } },
+        { r: 2, c: 0, v: { v: "third" } },
+      ] as any,
+      "Sheet1",
+      7,
+      storageIndex(0),
+      storageIndex(2),
+    );
+
+    expect(preview.range).toEqual({ startRow: 1, endRow: 3, startCol: 1, endCol: 1 });
+    expect(preview.rows).toEqual([
+      { row: 1, values: ["first"] },
+      { row: 2, values: [""] },
+      { row: 3, values: ["third"] },
+    ]);
   });
 
   it("applies merge and clear operations to a cell map", () => {
@@ -89,7 +96,12 @@ describe("sheet domain helpers", () => {
       ["3,3", { r: 3, c: 3, v: { v: 3, m: "3", f: "A1+B1" } }],
     ]);
 
-    applyMergeOperation(cellMap, { startRow: 1, startCol: 1, endRow: 2, endCol: 2 });
+    applyMergeOperation(cellMap, {
+      startRow: storageIndex(1),
+      startCol: storageIndex(1),
+      endRow: storageIndex(2),
+      endCol: storageIndex(2),
+    });
     expect(cellMap.get("1,1").v.mc).toEqual({ r: 1, c: 1, rs: 2, cs: 2 });
 
     const touched = applyClearOperation(cellMap, { type: "cell", row: 3, col: 3 } as any);
@@ -101,13 +113,13 @@ describe("sheet domain helpers", () => {
     const cellMap = new Map<string, any>();
     const touchedCells = new Map<
       string,
-      { row: number; col: number; value: string | number | boolean; formula?: string }
+      { row: ToolIndex; col: ToolIndex; value: string | number | boolean; formula?: string }
     >();
 
-    applyCellWrite(cellMap, touchedCells, 0, 0, 3, "A1+B1");
+    applyCellWrite(cellMap, touchedCells, storageIndex(0), storageIndex(0), 3, "A1+B1");
     expect(cellMap.get("0,0").v).toEqual({ v: 3, m: "3", f: "A1+B1" });
 
-    applyCellWrite(cellMap, touchedCells, 0, 0, "plain text");
+    applyCellWrite(cellMap, touchedCells, storageIndex(0), storageIndex(0), "plain text");
     expect(cellMap.get("0,0").v).toEqual({ v: "plain text", m: "plain text" });
   });
 });

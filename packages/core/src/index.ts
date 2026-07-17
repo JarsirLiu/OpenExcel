@@ -19,6 +19,10 @@ export {
   sheetChangeRangeSchema,
 } from "./chat/sheetChange.js";
 export type {
+  StorageIndex,
+  StorageRange,
+  ToolIndex,
+  ToolRange,
   ZeroBasedSheetChangeCell,
   ZeroBasedSheetChangeClearOperation,
   ZeroBasedSheetChangeDelta,
@@ -28,12 +32,21 @@ export {
   sheetChangeCellToZeroBased,
   sheetChangeDeltaToZeroBased,
   sheetChangeRangeToZeroBased,
-  toOneBasedIndex,
-  toZeroBasedIndex,
+  storageIndex,
+  storageIndexToTool,
+  storageRangeToTool,
+  toolIndex,
+  toolIndexToStorage,
+  toolRangeToStorage,
   zeroBasedSheetChangeCellToSheetChangeCell,
   zeroBasedSheetChangeDeltaToSheetChangeDelta,
   zeroBasedSheetChangeRangeToSheetChangeRange,
 } from "./chat/sheetCoordinates.js";
+export {
+  fortuneMergesToToolRanges,
+  toolCellToA1Ref,
+  toolRangeToA1Ref,
+} from "./chat/sheetGeometry.js";
 export type { FortuneCell, FortuneCellValue } from "./excel/celldataUtils.js";
 export {
   celldataToGrid,

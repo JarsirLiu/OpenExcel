@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   sheetChangeDeltaToZeroBased,
+  storageIndex,
   zeroBasedSheetChangeDeltaToSheetChangeDelta,
 } from "./sheetCoordinates.js";
 
@@ -22,7 +23,14 @@ describe("sheet coordinate conversions", () => {
   it("converts a zero-based delta back to one-based", () => {
     const delta = zeroBasedSheetChangeDeltaToSheetChangeDelta({
       type: "merge",
-      operations: [{ startRow: 0, startCol: 1, endRow: 2, endCol: 3 }],
+      operations: [
+        {
+          startRow: storageIndex(0),
+          startCol: storageIndex(1),
+          endRow: storageIndex(2),
+          endCol: storageIndex(3),
+        },
+      ],
     });
 
     expect(delta).toEqual({
@@ -47,5 +55,9 @@ describe("sheet coordinate conversions", () => {
         { type: "range", startRow: 3, startCol: 4, endRow: 5, endCol: 6 },
       ],
     });
+  });
+
+  it("rejects invalid coordinate and merge inputs at the boundary", () => {
+    expect(() => storageIndex(-1)).toThrow("non-negative");
   });
 });

@@ -4,7 +4,9 @@ import {
   type SheetChangeDelta,
   sheetChangePatchOutputSchema,
   sheetChangeRangeToZeroBased,
-  toZeroBasedIndex,
+  storageIndex,
+  toolIndex,
+  toolIndexToStorage,
 } from "@openexcel/core";
 import { sheetRecordToCelldata } from "../../../shared/utils/sheetData.js";
 import { applyClearOperation, buildSheetChangePreview } from "../domain/sheet.js";
@@ -34,8 +36,8 @@ export const clearCells = {
           operation.type === "cell"
             ? {
                 type: "cell" as const,
-                row: toZeroBasedIndex(operation.row),
-                col: toZeroBasedIndex(operation.col),
+                row: toolIndexToStorage(toolIndex(operation.row)),
+                col: toolIndexToStorage(toolIndex(operation.col)),
               }
             : { type: "range" as const, ...sheetChangeRangeToZeroBased(operation) };
         const touchedKeys = applyClearOperation(cellMap, zeroBased);
@@ -55,8 +57,8 @@ export const clearCells = {
       );
 
       const touchedRows = Array.from(touchedRowIndices.values());
-      const minRow = touchedRows.length > 0 ? Math.min(...touchedRows) : 0;
-      const maxRow = touchedRows.length > 0 ? Math.max(...touchedRows) : 0;
+      const minRow = storageIndex(touchedRows.length > 0 ? Math.min(...touchedRows) : 0);
+      const maxRow = storageIndex(touchedRows.length > 0 ? Math.max(...touchedRows) : 0);
 
       const delta: SheetChangeDelta = {
         type: "clear",

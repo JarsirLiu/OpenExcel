@@ -4,9 +4,12 @@ import {
   type SheetChangeRangeOperation,
   sheetChangePatchOutputSchema,
   sheetChangeRangeToZeroBased,
+  storageIndex,
+  toolIndex,
+  toolRangeToA1Ref,
 } from "@openexcel/core";
 import { sheetRecordToCelldata } from "../../../shared/utils/sheetData.js";
-import { buildSheetChangePreview, toA1Range } from "../domain/sheet.js";
+import { buildSheetChangePreview } from "../domain/sheet.js";
 import * as sheetRepo from "../infrastructure/sheetRepository.js";
 import { runSheetMutation } from "./runSheetMutation.js";
 
@@ -65,8 +68,8 @@ export const unmergeCells = {
         context.workspaceId,
       );
 
-      const minRow = Math.min(...storageRanges.map((range) => range.startRow));
-      const maxRow = Math.max(...storageRanges.map((range) => range.endRow));
+      const minRow = storageIndex(Math.min(...storageRanges.map((range) => range.startRow)));
+      const maxRow = storageIndex(Math.max(...storageRanges.map((range) => range.endRow)));
 
       const delta: SheetChangeDelta = {
         type: "unmerge",
@@ -76,7 +79,12 @@ export const unmergeCells = {
       const output = {
         success: true,
         unmergedRanges: operations.map((operation) =>
-          toA1Range(operation.startRow, operation.startCol, operation.endRow, operation.endCol),
+          toolRangeToA1Ref({
+            startRow: toolIndex(operation.startRow),
+            startCol: toolIndex(operation.startCol),
+            endRow: toolIndex(operation.endRow),
+            endCol: toolIndex(operation.endCol),
+          }),
         ),
         delta,
         preview: buildSheetChangePreview(celldata, sheet.name, sheetId, minRow, maxRow),

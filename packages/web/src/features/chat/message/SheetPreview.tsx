@@ -5,11 +5,16 @@ interface PreviewMerge {
   endCol: number;
 }
 
+interface PreviewRow {
+  row: number;
+  values: string[];
+}
+
 export interface PreviewData {
   sheetId: number;
   sheetName: string;
   range: { startRow: number; endRow: number; startCol: number; endCol: number };
-  rows: string[][];
+  rows: PreviewRow[];
   merges: PreviewMerge[];
 }
 
@@ -35,26 +40,41 @@ function formatPreviewValue(value: unknown): string {
   return String(value);
 }
 
-function normalizePreviewRows(value: unknown): string[][] {
+/**
+ * 兼容两种历史输入：
+ * - 新规范：`{ row, values }[]`，行号由服务端显式给出。
+ * - 旧规范：`string[][]` 或 `{ values: [] }[]`，行号回退到 `range.startRow + index`。
+ *
+ * 服务端始终输出新规范；这里的回退只为容错，不进行任何坐标换算。
+ */
+function normalizePreviewRows(value: unknown, fallbackStartRow: number): PreviewRow[] {
   if (!Array.isArray(value)) return [];
 
-  return value.map((row) => {
-    if (Array.isArray(row)) return row.map(formatPreviewValue);
-
-    if (isRecord(row) && Array.isArray(row.values)) {
-      return row.values.map(formatPreviewValue);
-    }
-
+  return value.map((row, index) => {
     if (isRecord(row)) {
+      if (typeof row.row === "number" && Array.isArray(row.values)) {
+        return { row: row.row, values: row.values.map(formatPreviewValue) };
+      }
+      if (Array.isArray(row.values)) {
+        return {
+          row: fallbackStartRow + index,
+          values: row.values.map(formatPreviewValue),
+        };
+      }
       const numericKeys = Object.keys(row)
         .filter((key) => /^\d+$/.test(key))
         .sort((a, b) => Number(a) - Number(b));
       if (numericKeys.length > 0) {
-        return numericKeys.map((key) => formatPreviewValue(row[key]));
+        return {
+          row: fallbackStartRow + index,
+          values: numericKeys.map((key) => formatPreviewValue(row[key])),
+        };
       }
     }
-
-    return [formatPreviewValue(row)];
+    if (Array.isArray(row)) {
+      return { row: fallbackStartRow + index, values: row.map(formatPreviewValue) };
+    }
+    return { row: fallbackStartRow + index, values: [formatPreviewValue(row)] };
   });
 }
 
@@ -62,6 +82,10 @@ export function normalizePreviewData(value: unknown): PreviewData | null {
   if (!isRecord(value)) return null;
 
   const range = isRecord(value.range) ? value.range : {};
+  const startRow = typeof range.startRow === "number" ? range.startRow : 1;
+  const endRow = typeof range.endRow === "number" ? range.endRow : 1;
+  const startCol = typeof range.startCol === "number" ? range.startCol : 1;
+  const endCol = typeof range.endCol === "number" ? range.endCol : 1;
   const merges = Array.isArray(value.merges)
     ? value.merges.filter(
         (merge): merge is PreviewMerge =>
@@ -76,13 +100,8 @@ export function normalizePreviewData(value: unknown): PreviewData | null {
   return {
     sheetId: typeof value.sheetId === "number" ? value.sheetId : 0,
     sheetName: typeof value.sheetName === "string" ? value.sheetName : "Sheet",
-    range: {
-      startRow: typeof range.startRow === "number" ? range.startRow : 1,
-      endRow: typeof range.endRow === "number" ? range.endRow : 1,
-      startCol: typeof range.startCol === "number" ? range.startCol : 1,
-      endCol: typeof range.endCol === "number" ? range.endCol : 1,
-    },
-    rows: normalizePreviewRows(value.rows),
+    range: { startRow, endRow, startCol, endCol },
+    rows: normalizePreviewRows(value.rows, startRow),
     merges,
   };
 }
@@ -110,7 +129,6 @@ export function SheetPreview({
 
   const mergeMap = buildMergeMap(preview.merges);
   const skipped = new Set<string>();
-  const rowBase = preview.range.startRow;
   const colBase = preview.range.startCol;
 
   return (
@@ -132,14 +150,14 @@ export function SheetPreview({
           <tbody>
             {preview.rows.map((row, ri) => (
               <tr key={ri}>
-                {row.map((val, ci) => {
-                  const key = `${ri},${ci}`;
+                {row.values.map((val, ci) => {
+                  const key = `${row.row},${ci + colBase}`;
                   if (skipped.has(key)) return null;
-                  const merge = mergeMap.get(`${ri + rowBase},${ci + colBase}`);
+                  const merge = mergeMap.get(key);
                   if (merge) {
-                    for (let r = ri; r < ri + merge.rs; r++) {
-                      for (let c = ci; c < ci + merge.cs; c++) {
-                        if (r !== ri || c !== ci) skipped.add(`${r},${c}`);
+                    for (let r = row.row; r < row.row + merge.rs; r++) {
+                      for (let c = ci + colBase; c < ci + colBase + merge.cs; c++) {
+                        if (r !== row.row || c !== ci + colBase) skipped.add(`${r},${c}`);
                       }
                     }
                   }
@@ -153,7 +171,7 @@ export function SheetPreview({
                         padding: "4px 8px",
                         whiteSpace: "nowrap",
                         minWidth: 60,
-                        background: changedCells?.has(`${ri + rowBase},${ci + colBase}`)
+                        background: changedCells?.has(key)
                           ? "#d4edda"
                           : ri === 0
                             ? "var(--muted)"

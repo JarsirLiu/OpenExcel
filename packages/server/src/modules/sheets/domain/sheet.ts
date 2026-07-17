@@ -1,8 +1,13 @@
 import {
   celldataToGrid,
   type FortuneCell,
+  fortuneMergesToToolRanges,
   normalizeFortuneFormula,
-  toOneBasedIndex,
+  type StorageIndex,
+  storageIndex,
+  storageIndexToTool,
+  storageRangeToTool,
+  type ToolIndex,
 } from "@openexcel/core";
 
 export interface SheetChangePreviewMerge {
@@ -12,19 +17,21 @@ export interface SheetChangePreviewMerge {
   endCol: number;
 }
 
+/**
+ * 预览行携带显式的 1-based 行号，避免前端通过数组下标自行换算。
+ * 即使中间存在空行，行号也能对齐 Excel 视觉位置。
+ */
+export interface SheetChangePreviewRow {
+  row: number;
+  values: string[];
+}
+
 export interface SheetChangePreview {
   sheetId: number;
   sheetName: string;
   range: { startRow: number; endRow: number; startCol: number; endCol: number };
-  rows: string[][];
+  rows: SheetChangePreviewRow[];
   merges: SheetChangePreviewMerge[];
-}
-
-export interface SheetChangeRange {
-  startRow: number;
-  startCol: number;
-  endRow: number;
-  endCol: number;
 }
 
 export type CellWriteValue = string | number | boolean;
@@ -51,87 +58,37 @@ export type NormalizedWriteCellsInput = {
   operations: WriteCellOperation[];
 };
 
-export function parseMergesFromCelldata(
-  celldata: any[],
-): { startRow: number; startCol: number; endRow: number; endCol: number }[] {
-  const merges: { startRow: number; startCol: number; endRow: number; endCol: number }[] = [];
-  for (const cell of celldata) {
-    const mc = cell.v?.mc;
-    if (mc) {
-      const r = cell.r;
-      const c = cell.c;
-      merges.push({
-        startRow: toOneBasedIndex(r),
-        startCol: toOneBasedIndex(c),
-        endRow: toOneBasedIndex(r + (mc.rs ?? 1) - 1),
-        endCol: toOneBasedIndex(c + (mc.cs ?? 1) - 1),
-      });
-    }
-  }
-  return merges;
-}
-
-function toColRef(index: number): string {
-  let ref = "";
-  let n = index;
-  while (n >= 0) {
-    ref = String.fromCharCode(65 + (n % 26)) + ref;
-    n = Math.floor(n / 26) - 1;
-  }
-  return ref;
-}
-
-export function toA1CellRef(row1: number, col1: number): string {
-  return `${toColRef(col1 - 1)}${row1}`;
-}
-
-export function toA1Range(
-  rowStart1: number,
-  colStart1: number,
-  rowEnd1: number,
-  colEnd1: number,
-): string {
-  return `${toA1CellRef(rowStart1, colStart1)}:${toA1CellRef(rowEnd1, colEnd1)}`;
-}
-
 export function buildSheetChangePreview(
   celldata: FortuneCell[],
   sheetName: string,
   sheetId: number,
-  minRow0: number,
-  maxRow0: number,
+  minRow0: StorageIndex,
+  maxRow0: StorageIndex,
 ): SheetChangePreview {
   const maxCol0 = Math.max(...celldata.map((c) => c.c), 0);
   const columnCount = maxCol0 + 1;
   const grid = celldataToGrid(celldata, columnCount);
-  const rows = grid.slice(minRow0, maxRow0 + 1).map((row) => row.slice(0, columnCount));
-
-  const merges: SheetChangePreviewMerge[] = [];
-  for (const cell of celldata) {
-    const mc = cell.v?.mc;
-    if (!mc) continue;
-    const row0 = cell.r;
-    const col0 = cell.c;
-    if (row0 < minRow0 || row0 > maxRow0) continue;
-
-    const rs = mc.rs ?? 1;
-    const cs = mc.cs ?? 1;
-    merges.push({
-      startRow: toOneBasedIndex(row0),
-      startCol: toOneBasedIndex(col0),
-      endRow: toOneBasedIndex(row0 + rs - 1),
-      endCol: toOneBasedIndex(col0 + cs - 1),
-    });
+  const previewRange = storageRangeToTool({
+    startRow: minRow0,
+    startCol: storageIndex(0),
+    endRow: maxRow0,
+    endCol: storageIndex(Math.max(0, columnCount - 1)),
+  });
+  const rows: SheetChangePreviewRow[] = [];
+  for (let row0 = minRow0; row0 <= maxRow0; row0 = storageIndex(row0 + 1)) {
+    const gridRow = grid[row0] ?? Array(columnCount).fill("");
+    rows.push({ row: storageIndexToTool(row0), values: gridRow.slice(0, columnCount) });
   }
+
+  const merges: SheetChangePreviewMerge[] = fortuneMergesToToolRanges(celldata).filter(
+    (merge) => merge.startRow <= previewRange.endRow && merge.startRow >= previewRange.startRow,
+  );
 
   return {
     sheetId,
     sheetName,
     range: {
-      startRow: toOneBasedIndex(minRow0),
-      endRow: toOneBasedIndex(maxRow0),
-      startCol: 1,
-      endCol: columnCount,
+      ...previewRange,
     },
     rows,
     merges,
@@ -173,9 +130,12 @@ export function stripCellContent(
 
 export function applyCellWrite(
   cellMap: Map<string, any>,
-  touchedCells: Map<string, { row: number; col: number; value: CellWriteValue; formula?: string }>,
-  row0: number,
-  col0: number,
+  touchedCells: Map<
+    string,
+    { row: ToolIndex; col: ToolIndex; value: CellWriteValue; formula?: string }
+  >,
+  row0: StorageIndex,
+  col0: StorageIndex,
   value: CellWriteValue,
   formula?: string,
 ) {
@@ -213,8 +173,8 @@ export function applyCellWrite(
   }
 
   touchedCells.set(key, {
-    row: row0 + 1,
-    col: col0 + 1,
+    row: storageIndexToTool(row0),
+    col: storageIndexToTool(col0),
     value,
     formula: normalizedFormula,
   });
@@ -223,8 +183,14 @@ export function applyCellWrite(
 export function applyClearOperation(
   cellMap: Map<string, any>,
   operation:
-    | { type: "cell"; row: number; col: number }
-    | { type: "range"; startRow: number; startCol: number; endRow: number; endCol: number },
+    | { type: "cell"; row: StorageIndex; col: StorageIndex }
+    | {
+        type: "range";
+        startRow: StorageIndex;
+        startCol: StorageIndex;
+        endRow: StorageIndex;
+        endCol: StorageIndex;
+      },
 ) {
   const touchedKeys: string[] = [];
 
@@ -247,20 +213,28 @@ export function applyClearOperation(
     return touchedKeys;
   }
 
-  for (let r = operation.startRow; r <= operation.endRow; r += 1) {
-    for (let c = operation.startCol; c <= operation.endCol; c += 1) {
+  for (let r = operation.startRow; r <= operation.endRow; r = storageIndex(r + 1)) {
+    for (let c = operation.startCol; c <= operation.endCol; c = storageIndex(c + 1)) {
       clearCell(r, c);
     }
   }
   return touchedKeys;
 }
 
-export function applyMergeOperation(cellMap: Map<string, any>, operation: SheetChangeRange) {
+export function applyMergeOperation(
+  cellMap: Map<string, any>,
+  operation: {
+    startRow: StorageIndex;
+    startCol: StorageIndex;
+    endRow: StorageIndex;
+    endCol: StorageIndex;
+  },
+) {
   const rs = operation.endRow - operation.startRow + 1;
   const cs = operation.endCol - operation.startCol + 1;
 
-  for (let r = operation.startRow; r <= operation.endRow; r += 1) {
-    for (let c = operation.startCol; c <= operation.endCol; c += 1) {
+  for (let r = operation.startRow; r <= operation.endRow; r = storageIndex(r + 1)) {
+    for (let c = operation.startCol; c <= operation.endCol; c = storageIndex(c + 1)) {
       const key = `${r},${c}`;
       if (r === operation.startRow && c === operation.startCol) {
         const cell = cellMap.get(key) ?? { r, c, v: {} };

@@ -363,6 +363,13 @@ Current files such as:
 
 should remain framework-free and continue to act as shared primitives.
 
+Spreadsheet coordinates use one explicit boundary. FortuneSheet and persisted `uploadedData` use
+0-based coordinates (`r=0,c=0` is A1); agent tools and chat previews use Excel's 1-based visual
+coordinates. The core chat coordinate and geometry modules own conversion between these
+representations, including merge ranges and A1 references. Server tools must not infer or remove a
+header row, and `readSheet` reports the actual visual row numbers. `firstRowValues` is raw row-one
+data only and is never treated as an implicit table-header contract.
+
 ### 5.2 `packages/server`
 
 Authentication and workspace boundaries have completed the first application-layer extraction:

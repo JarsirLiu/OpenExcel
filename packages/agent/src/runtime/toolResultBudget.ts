@@ -116,7 +116,7 @@ function compactValue(value: unknown, maxTokens: number): unknown {
     "hasMoreRows",
     "hasMoreCols",
     "hint",
-    "headers",
+    "firstRowValues",
     "columnTypes",
     "columnStats",
     "columnProfiles",
