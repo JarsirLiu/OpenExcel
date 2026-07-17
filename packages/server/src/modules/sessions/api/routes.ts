@@ -172,6 +172,22 @@ export async function sessionRoutes(app: FastifyInstance) {
     },
   );
 
+  app.get<{ Params: { workspacePublicId: string; sessionPublicId: string } }>(
+    "/api/workspaces/:workspacePublicId/sessions/:sessionPublicId/runs/undo-availability",
+    async (req, reply) => {
+      const ids = await resolveSessionIdForRequest(
+        req,
+        req.params.workspacePublicId,
+        req.params.sessionPublicId,
+        reply,
+      );
+      if (ids == null) return;
+      const session = await application.getSession(ids.workspaceId, ids.sessionId);
+      if (!session) return reply.status(404).send({ error: "Session not found" });
+      return application.getUndoAvailability(ids.workspaceId, ids.sessionId);
+    },
+  );
+
   app.post<{ Params: { workspacePublicId: string; sessionPublicId: string } }>(
     "/api/workspaces/:workspacePublicId/sessions/:sessionPublicId/runs/undo-latest",
     async (req, reply) => {

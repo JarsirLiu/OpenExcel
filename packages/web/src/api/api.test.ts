@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fetchMessages, fetchRuns, undoLatestRun } from "./chat";
+import { fetchMessages, fetchRuns, fetchUndoAvailability, undoLatestRun } from "./chat";
 import { generateSessionTitle } from "./sessions";
 import {
   createSheet,
@@ -206,6 +206,18 @@ describe("fetchRuns", () => {
     const result = await fetchRuns(9, 3);
     expect(result).toEqual(runs);
     expect(mockFetch).toHaveBeenCalledWith("/api/workspaces/9/sessions/3/runs", {});
+  });
+});
+
+describe("fetchUndoAvailability", () => {
+  it("returns the current session undo state", async () => {
+    mockFetch.mockResolvedValue(new Response(JSON.stringify({ canUndo: true }), { status: 200 }));
+
+    await expect(fetchUndoAvailability(9, 3)).resolves.toEqual({ canUndo: true });
+    expect(mockFetch).toHaveBeenCalledWith(
+      "/api/workspaces/9/sessions/3/runs/undo-availability",
+      {},
+    );
   });
 });
 

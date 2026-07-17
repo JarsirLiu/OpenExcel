@@ -54,7 +54,6 @@ export function MessageList({
   }, [handleScroll, hasOlder, onLoadOlder]);
 
   const lastAssistantMsg = [...messages].reverse().find((m) => m.role === "assistant");
-  const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");
   const lastMessage = messages[messages.length - 1];
   const activeAssistantMessageId =
     isStreaming && lastMessage?.role === "assistant" && lastMessage.id != null
@@ -130,7 +129,6 @@ export function MessageList({
             isLastAssistantMessage={
               !isStreaming && msg.role === "assistant" && msg.id === lastAssistantMsg?.id
             }
-            isLastUserMessage={!isStreaming && msg.role === "user" && msg.id === lastUserMsg?.id}
             onRegenerate={onRegenerate}
             onUndo={onUndo}
             isUndoing={isUndoing}

@@ -114,7 +114,6 @@ export function SessionShell({
           <ChatPanel
             key={currentSessionId}
             sessionId={currentSessionId}
-            hasUndoCheckpoint={currentSession?.undoRunId != null}
             onRunSettled={handleRunSettled}
           />
         ) : (

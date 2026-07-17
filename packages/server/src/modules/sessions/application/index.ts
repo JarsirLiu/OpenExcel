@@ -1,5 +1,6 @@
 export { streamChat } from "../chat/index.js";
 export { undoLatestRun } from "../runs/undo.js";
+export { getUndoAvailability } from "../runs/undoAvailability.js";
 export {
   deleteSession,
   getMessages,

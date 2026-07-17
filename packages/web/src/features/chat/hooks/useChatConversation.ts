@@ -1,7 +1,11 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { fetchMessages as fetchChatMessages, undoLatestRun } from "@/api/chat";
+import {
+  fetchMessages as fetchChatMessages,
+  fetchUndoAvailability,
+  undoLatestRun,
+} from "@/api/chat";
 import { useDraftSessionTransition } from "./useDraftSessionTransition";
 import { collectWorkbookMutationToolCallIds } from "./useSheetPatchSync";
 
@@ -75,6 +79,7 @@ export function useChatConversation({
   const messagesRef = useRef<any[]>(initialMessages ?? []);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [hasOlder, setHasOlder] = useState(false);
+  const [canUndo, setCanUndo] = useState(false);
   const [initialLoaded, setInitialLoaded] = useState(!!initialMessages);
   const seenWorkbookMutationToolCallIdsRef = useRef<Set<string>>(new Set());
   const hasPrimedWorkbookMutationHistoryRef = useRef(false);
@@ -82,6 +87,7 @@ export function useChatConversation({
   const wasStreamingRef = useRef(false);
   const loadedOffsetRef = useRef(initialMessages?.length ?? 0);
   const requestGenerationRef = useRef(0);
+  const undoAvailabilityRequestRef = useRef(0);
   const mountedRef = useRef(true);
   const {
     draftRequestId,
@@ -93,6 +99,35 @@ export function useChatConversation({
     isDraft: sessionId == null,
     onDraftSessionCreated,
   });
+
+  const invalidateUndoAvailability = useCallback(() => {
+    undoAvailabilityRequestRef.current += 1;
+    setCanUndo(false);
+  }, []);
+
+  const refreshUndoAvailability = useCallback(async () => {
+    const requestId = undoAvailabilityRequestRef.current + 1;
+    undoAvailabilityRequestRef.current = requestId;
+
+    if (sessionId == null) {
+      if (mountedRef.current && requestId === undoAvailabilityRequestRef.current) {
+        setCanUndo(false);
+      }
+      return;
+    }
+
+    try {
+      const result = await fetchUndoAvailability(workspaceId, sessionId);
+      if (mountedRef.current && requestId === undoAvailabilityRequestRef.current) {
+        setCanUndo(result.canUndo);
+      }
+    } catch (error) {
+      if (mountedRef.current && requestId === undoAvailabilityRequestRef.current) {
+        setCanUndo(false);
+      }
+      console.error("[chat] Failed to refresh undo availability:", error);
+    }
+  }, [sessionId, workspaceId]);
 
   const transport = useMemo(() => {
     const isDraft = sessionId == null;
@@ -113,12 +148,13 @@ export function useChatConversation({
     id: `${workspaceId}:${sessionId}`,
     messages: initialMessages ?? [],
     transport,
-    onFinish: ({ isAbort, messages: finishedMessages }) => {
+    onFinish: async ({ isAbort, messages: finishedMessages }) => {
       if (!isAbort) {
         beginDraftSessionTransition();
       }
       if (!mountedRef.current) return;
-      void onRunSettled?.(finishedMessages);
+      await onRunSettled?.(finishedMessages);
+      await refreshUndoAvailability();
     },
   });
 
@@ -179,6 +215,10 @@ export function useChatConversation({
       controller.abort();
     };
   }, [sessionId, workspaceId, initialMessages, setMessages]);
+
+  useEffect(() => {
+    void refreshUndoAvailability();
+  }, [refreshUndoAvailability]);
 
   useEffect(() => {
     return () => {
@@ -247,9 +287,10 @@ export function useChatConversation({
   const handleSend = useCallback(
     (text: string) => {
       if (!text || isStreaming || isSendLocked()) return;
+      invalidateUndoAvailability();
       sendMessage({ text });
     },
-    [isSendLocked, isStreaming, sendMessage],
+    [invalidateUndoAvailability, isSendLocked, isStreaming, sendMessage],
   );
 
   const loadOlderMessages = useCallback(async () => {
@@ -289,13 +330,15 @@ export function useChatConversation({
     if (!mountedRef.current) throw new Error("当前会话已切换");
     const nextMessages = trimMessagesAfterUserTurn(messagesRef.current, result.undoneUserText);
     setMessages(nextMessages);
+    invalidateUndoAvailability();
 
     return { undoneUserText: result.undoneUserText };
-  }, [workspaceId, sessionId, isStreaming, setMessages]);
+  }, [invalidateUndoAvailability, workspaceId, sessionId, isStreaming, setMessages]);
 
   return {
     messages,
     error,
+    canUndo,
     isStreaming,
     isDraftSessionTransitioning,
     initialLoaded,

@@ -14,14 +14,12 @@ export function ChatPanel({
   onDraftSessionCreated,
   onRunSettled,
   onRegenerate,
-  hasUndoCheckpoint = false,
 }: {
   sessionId: number | null;
   isDraft?: boolean;
   onDraftSessionCreated?: (sessionId: number) => Promise<void> | void;
   onRunSettled?: (sessionId: number, messages: any[]) => Promise<void> | void;
   onRegenerate?: () => void;
-  hasUndoCheckpoint?: boolean;
 }) {
   const {
     workspaceId,
@@ -36,6 +34,7 @@ export function ChatPanel({
   const {
     messages,
     error,
+    canUndo,
     isStreaming,
     isDraftSessionTransitioning,
     loadingOlder,
@@ -99,7 +98,7 @@ export function ChatPanel({
         messages={messages}
         isStreaming={isStreaming}
         onRegenerate={onRegenerate}
-        onUndo={!isDraft && hasUndoCheckpoint ? handleUndo : undefined}
+        onUndo={!isDraft && canUndo ? handleUndo : undefined}
         isUndoing={isUndoing}
         loadingOlder={loadingOlder}
         hasOlder={hasOlder}

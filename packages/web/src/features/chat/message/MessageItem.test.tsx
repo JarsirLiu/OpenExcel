@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { MessageItem } from "./MessageItem";
 
 describe("MessageItem", () => {
@@ -13,7 +13,6 @@ describe("MessageItem", () => {
         }}
         isMessageStreaming={true}
         isLastAssistantMessage={false}
-        isLastUserMessage={false}
       />,
     );
 
@@ -33,7 +32,6 @@ describe("MessageItem", () => {
         }}
         isMessageStreaming={true}
         isLastAssistantMessage={false}
-        isLastUserMessage={false}
       />,
     );
 
@@ -57,7 +55,6 @@ describe("MessageItem", () => {
         }}
         isMessageStreaming={true}
         isLastAssistantMessage={false}
-        isLastUserMessage={false}
       />,
     );
 
@@ -72,10 +69,35 @@ describe("MessageItem", () => {
         }}
         isMessageStreaming={false}
         isLastAssistantMessage={false}
-        isLastUserMessage={false}
       />,
     );
 
     expect(screen.queryByText("正在思考中...")).toBeNull();
+  });
+
+  it("renders undo on the latest assistant message", () => {
+    render(
+      <MessageItem
+        msg={{ id: "assistant-undo", role: "assistant", parts: [{ type: "text", text: "已修改" }] }}
+        isMessageStreaming={false}
+        isLastAssistantMessage
+        onUndo={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "撤销" })).toBeTruthy();
+  });
+
+  it("does not render undo on a user message", () => {
+    render(
+      <MessageItem
+        msg={{ id: "user-undo", role: "user", parts: [{ type: "text", text: "请修改" }] }}
+        isMessageStreaming={false}
+        isLastAssistantMessage={false}
+        onUndo={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "撤销" })).toBeNull();
   });
 });

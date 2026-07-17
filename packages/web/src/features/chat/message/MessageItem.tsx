@@ -166,7 +166,6 @@ export function MessageItem({
   msg,
   isMessageStreaming,
   isLastAssistantMessage,
-  isLastUserMessage,
   onRegenerate,
   onUndo,
   isUndoing,
@@ -175,7 +174,6 @@ export function MessageItem({
   msg: any;
   isMessageStreaming: boolean;
   isLastAssistantMessage: boolean;
-  isLastUserMessage: boolean;
   onRegenerate?: () => void;
   onUndo?: () => void;
   isUndoing?: boolean;
@@ -190,19 +188,6 @@ export function MessageItem({
         </div>
         <div className={styles.msgBody}>
           <div className={styles.userText}>{getMessageText(msg)}</div>
-          {!isMessageStreaming && isLastUserMessage && onUndo && (
-            <div className={styles.actions}>
-              <button
-                type="button"
-                onClick={isUndoing ? undefined : onUndo}
-                className={`${styles.actionBtn} ${isUndoing ? styles.actionBtnDisabled : ""}`}
-                disabled={isUndoing}
-              >
-                <UndoIcon size={14} />
-                {isUndoing ? "撤销中..." : "撤销"}
-              </button>
-            </div>
-          )}
         </div>
       </div>
     );
@@ -221,6 +206,18 @@ export function MessageItem({
         )}
         {!isMessageStreaming && isLastAssistantMessage && (
           <div className={styles.actions}>
+            {onUndo && (
+              <button
+                type="button"
+                onClick={isUndoing ? undefined : onUndo}
+                className={`${styles.actionBtn} ${isUndoing ? styles.actionBtnDisabled : ""}`}
+                disabled={isUndoing}
+                title="撤销本轮修改"
+              >
+                <UndoIcon size={14} />
+                {isUndoing ? "撤销中..." : "撤销"}
+              </button>
+            )}
             {onRegenerate && (
               <button onClick={onRegenerate} className={styles.actionBtn} title="重新生成">
                 <RefreshIcon size={14} />

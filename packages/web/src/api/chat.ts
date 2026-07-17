@@ -21,6 +21,17 @@ export async function fetchRuns(workspaceId: number, sessionId: number): Promise
   return res.json();
 }
 
+export async function fetchUndoAvailability(
+  workspaceId: number,
+  sessionId: number,
+): Promise<{ canUndo: boolean }> {
+  const res = await apiFetch(
+    `/workspaces/${workspaceId}/sessions/${sessionId}/runs/undo-availability`,
+  );
+  if (!res.ok) throw new Error("加载撤销状态失败");
+  return res.json();
+}
+
 export async function undoLatestRun(
   workspaceId: number,
   sessionId: number,
