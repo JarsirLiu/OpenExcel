@@ -22,7 +22,10 @@ export async function createApp() {
   app.addHook("onRequest", resolveUserHook);
   app.addHook("onResponse", responseLoggerHook);
 
-  await app.register(cors, { origin: true });
+  await app.register(cors, {
+    origin: true,
+    exposedHeaders: ["X-OpenExcel-Session-Id", "X-OpenExcel-Session-Name"],
+  });
   await app.register(authRoutes);
   await app.register(workspaceRoutes);
   await app.register(workbookRoutes);

@@ -79,8 +79,10 @@ export async function sessionRoutes(app: FastifyInstance) {
         return;
       }
 
-      reply.header("X-OpenExcel-Session-Id", String(sessionId));
-      reply.header("X-OpenExcel-Session-Name", encodeURIComponent(result.session.name));
+      // The stream is written directly to the raw response after hijacking;
+      // Fastify reply headers would otherwise be skipped.
+      reply.raw.setHeader("X-OpenExcel-Session-Id", String(sessionId));
+      reply.raw.setHeader("X-OpenExcel-Session-Name", encodeURIComponent(result.session.name));
       reply.hijack();
       pipeUIMessageStreamToResponse({ response: reply.raw, stream: result.stream });
     } catch (error) {
