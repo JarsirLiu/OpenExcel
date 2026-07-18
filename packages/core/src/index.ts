@@ -1,3 +1,23 @@
+export type { ChartCommand, ChartCommandResult, ChartUpdate } from "./chart/chartCommands.js";
+export {
+  applyChartCommand,
+  ChartCommandError,
+} from "./chart/chartCommands.js";
+export type {
+  CellAddress,
+  ChartAnchor,
+  ChartAnchorPoint,
+  ChartSeriesName,
+  ChartSeriesSpec,
+  ChartSpec,
+  RangeReference,
+} from "./chart/chartModel.js";
+export {
+  chartSpecSchema,
+  isChartSpec,
+  parseChartSpec,
+} from "./chart/chartModel.js";
+export { cellAddressToA1, rangeReferenceToA1 } from "./chart/chartReference.js";
 export type {
   SheetChangeCell,
   SheetChangeClearCell,

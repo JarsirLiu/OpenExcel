@@ -125,6 +125,17 @@ Responsibilities:
 - Parse workbook metadata
 - Export workbook contents and define import DTOs
 - Provide shared types and validation helpers
+- Define framework-free chart models, cell references, anchors, and chart command contracts
+
+Chart data is a separate domain from the FortuneSheet view model. `packages/core` owns the
+stable `ChartSpec` contract and Excel-compatible logical references. `packages/web` may render a
+chart through ECharts or another renderer, but renderer options and instances are never persisted
+as the source of truth. `packages/server` owns chart use cases and persistence, while the Excel
+format adapter owns OOXML chart and drawing import/export.
+
+The current FortuneSheet `chart` configuration field is a compatibility projection only. New
+features must not depend on its `any[]` shape. Charts use stable workbook and sheet identities,
+not sheet names, so same-named sheets in different workbooks remain unambiguous.
 
 ### 3.2 `packages/agent`
 
