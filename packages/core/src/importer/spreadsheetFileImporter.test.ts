@@ -3,7 +3,10 @@ import ExcelJS from "exceljs";
 import JSZip from "jszip";
 import { describe, expect, it } from "vitest";
 import XLSX from "xlsx-js-style";
+import type { ChartSpec } from "../chart/chartModel.js";
+import { workbookToXlsx } from "../exporter/xlsxWorkbookExporter.js";
 import { parseSpreadsheetFile } from "./spreadsheetFileImporter.js";
+import { parseXlsxCharts } from "./xlsxChartImporter.js";
 import {
   assertXlsxContainerSafe,
   XlsxContainerError,
@@ -57,6 +60,55 @@ async function configuredXlsxBytes(): Promise<ArrayBuffer> {
   });
   worksheet.addImage(imageId, { tl: { col: 1, row: 1 }, ext: { width: 20, height: 20 } });
   return workbook.xlsx.writeBuffer();
+}
+
+async function chartXlsxBytes(): Promise<ArrayBuffer> {
+  const chart: ChartSpec = {
+    id: "chart-1",
+    workbookId: "workbook-1",
+    sheetId: "sheet-1",
+    type: "line",
+    title: "销售趋势",
+    anchor: {
+      kind: "twoCell",
+      from: { row: 1, col: 3 },
+      to: { row: 12, col: 10 },
+    },
+    series: [
+      {
+        id: "series-1",
+        name: "销售额",
+        categoryRef: {
+          sheetId: "sheet-1",
+          start: { row: 0, col: 0 },
+          end: { row: 2, col: 0 },
+        },
+        valueRef: {
+          sheetId: "sheet-1",
+          start: { row: 0, col: 1 },
+          end: { row: 2, col: 1 },
+        },
+      },
+    ],
+  };
+  return workbookToXlsx({
+    workbookId: "workbook-1",
+    sheets: [
+      {
+        id: "sheet-1",
+        name: "销售明细",
+        celldata: [
+          { r: 0, c: 0, v: { v: "一月", m: "一月" } },
+          { r: 0, c: 1, v: { v: 12, m: "12" } },
+          { r: 1, c: 0, v: { v: "二月", m: "二月" } },
+          { r: 1, c: 1, v: { v: 18, m: "18" } },
+          { r: 2, c: 0, v: { v: "三月", m: "三月" } },
+          { r: 2, c: 1, v: { v: 21, m: "21" } },
+        ],
+      },
+    ],
+    charts: [chart],
+  });
 }
 
 describe("parseSpreadsheetFile", () => {
@@ -140,6 +192,114 @@ describe("parseSpreadsheetFile", () => {
     expect(sheet?.config.config).toEqual(
       expect.objectContaining({ columnlen: expect.any(Object), rowlen: expect.any(Object) }),
     );
+  });
+
+  it("imports charts from the XLSX drawing and chart parts", async () => {
+    const result = await parseSpreadsheetFile({
+      fileName: "销售.xlsx",
+      format: "xlsx",
+      bytes: await chartXlsxBytes(),
+    });
+
+    expect(result.charts).toHaveLength(1);
+    expect(result.charts[0]).toMatchObject({
+      type: "line",
+      title: "销售趋势",
+      sheetKey: "sheet-0",
+      anchor: {
+        kind: "twoCell",
+        from: { row: 1, col: 3 },
+        to: { row: 12, col: 10 },
+      },
+      series: [
+        {
+          name: "销售额",
+          categoryRef: {
+            sheetKey: "sheet-0",
+            start: { row: 0, col: 0 },
+            end: { row: 2, col: 0 },
+          },
+          valueRef: {
+            sheetKey: "sheet-0",
+            start: { row: 0, col: 1 },
+            end: { row: 2, col: 1 },
+          },
+        },
+      ],
+    });
+  });
+
+  it("enforces chart limits while reading the XLSX package", async () => {
+    await expect(
+      parseXlsxCharts(await chartXlsxBytes(), {
+        maxChartsPerWorkbook: 0,
+        maxSeriesPerChart: 100,
+        maxTotalSeries: 10_000,
+      }),
+    ).rejects.toThrow("图表数量超过安全限制");
+  });
+
+  it("rejects chart presentation that is not represented by ChartSpec", async () => {
+    const zip = await JSZip.loadAsync(await chartXlsxBytes());
+    const chartFile = zip.file("xl/charts/chart1.xml");
+    if (!chartFile) throw new Error("test chart part is missing");
+    const chartXml = await chartFile.async("string");
+    zip.file(
+      "xl/charts/chart1.xml",
+      chartXml.replace("<c:plotArea>", '<c:legend><c:legendPos val="b"/></c:legend><c:plotArea>'),
+    );
+
+    await expect(
+      parseSpreadsheetFile({
+        fileName: "带图例.xlsx",
+        format: "xlsx",
+        bytes: await zip.generateAsync({ type: "arraybuffer" }),
+      }),
+    ).rejects.toThrow("尚未建模的展示属性");
+  });
+
+  it.each([
+    "stacked",
+    "percentStacked",
+  ] as const)("rejects %s charts that cannot round-trip through ChartSpec", async (grouping) => {
+    const zip = await JSZip.loadAsync(await chartXlsxBytes());
+    const chartFile = zip.file("xl/charts/chart1.xml");
+    if (!chartFile) throw new Error("test chart part is missing");
+    const chartXml = await chartFile.async("string");
+    zip.file(
+      "xl/charts/chart1.xml",
+      chartXml.replace('<c:grouping val="standard"/>', `<c:grouping val="${grouping}"/>`),
+    );
+
+    await expect(
+      parseSpreadsheetFile({
+        fileName: "堆叠图.xlsx",
+        format: "xlsx",
+        bytes: await zip.generateAsync({ type: "arraybuffer" }),
+      }),
+    ).rejects.toThrow("图表分组方式");
+  });
+
+  it("rejects chart titles linked to cells instead of flattening their formula", async () => {
+    const zip = await JSZip.loadAsync(await chartXlsxBytes());
+    const chartFile = zip.file("xl/charts/chart1.xml");
+    if (!chartFile) throw new Error("test chart part is missing");
+    const chartXml = await chartFile.async("string");
+    zip.file(
+      "xl/charts/chart1.xml",
+      chartXml.replace(
+        /<c:title>[\s\S]*?<\/c:title>/,
+        '<c:title><c:tx><c:strRef><c:f>\'销售明细\'!$A$1</c:f><c:strCache><c:ptCount val="1"/><c:pt idx="0"><c:v>销售趋势</c:v></c:pt></c:strCache></c:strRef></c:tx></c:title>',
+      ),
+    );
+
+    await expect(
+      parseSpreadsheetFile({
+        fileName: "动态标题.xlsx",
+        format: "xlsx",
+        bytes: await zip.generateAsync({ type: "arraybuffer" }),
+      }),
+    ).rejects.toThrow("引用单元格的 XLSX 图表标题");
   });
 
   it("supports FortuneExcel's Node runtime when an XLSX contains images", async () => {

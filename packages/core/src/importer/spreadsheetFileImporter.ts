@@ -23,6 +23,7 @@ import {
   type SheetConfig,
 } from "../excel/sheetConfig.js";
 import type { ImportedSheetInput, ImportedWorkbookInput } from "../excel/workbookImport.js";
+import { parseXlsxCharts } from "./xlsxChartImporter.js";
 import { assertXlsxContainerSafe } from "./xlsxSafetyGuard.js";
 
 export type SpreadsheetFileFormat = "xlsx" | "xls" | "csv";
@@ -322,6 +323,7 @@ function normalizeFortuneSheet(sheet: FortuneExcelSheet, index: number): Importe
     typeof sheet.name === "string" && sheet.name.trim() ? sheet.name : `Sheet${index + 1}`;
   const celldata = normalizeImportedCelldata(sheet.celldata);
   return {
+    key: `sheet-${index}`,
     name,
     celldata,
     merges: extractMergesFromCelldata(celldata),
@@ -374,6 +376,7 @@ async function parseXlsxWithFortuneExcel(
     throw new Error("工作簿不包含可导入的工作表");
   }
   const filterSelections = readXlsxAutoFilterSelections(bytes);
+  const charts = await parseXlsxCharts(bytes);
   return {
     name: workbookNameFromFile(input.fileName),
     sheets: parsedSheets.map((sheet, index) => {
@@ -385,10 +388,11 @@ async function parseXlsxWithFortuneExcel(
         config: { ...normalized.config, filter_select: filterSelect },
       };
     }),
+    charts,
   };
 }
 
-function buildSheet(name: string, worksheet: XLSX.WorkSheet): ImportedSheetInput {
+function buildSheet(name: string, worksheet: XLSX.WorkSheet, index: number): ImportedSheetInput {
   const range = worksheet["!ref"]
     ? XLSX.utils.decode_range(worksheet["!ref"])
     : { s: { r: 0, c: 0 }, e: { r: 0, c: 0 } };
@@ -437,6 +441,7 @@ function buildSheet(name: string, worksheet: XLSX.WorkSheet): ImportedSheetInput
   if (filterSelect) config.filter_select = filterSelect;
 
   return {
+    key: `sheet-${index}`,
     name,
     celldata: normalizeFortuneCellData(celldata),
     merges: merges.map((merge) => ({
@@ -464,7 +469,13 @@ export async function parseSpreadsheetFile(
     raw: true,
   });
 
-  const sheets = workbook.SheetNames.map((name) => buildSheet(name, workbook.Sheets[name]));
+  const sheets = workbook.SheetNames.map((name, index) =>
+    buildSheet(name, workbook.Sheets[name], index),
+  );
   if (sheets.length === 0) throw new Error("工作簿不包含可导入的工作表");
-  return { name: workbookNameFromFile(input.fileName), sheets };
+  return {
+    name: workbookNameFromFile(input.fileName),
+    sheets,
+    charts: [],
+  };
 }

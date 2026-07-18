@@ -1,8 +1,6 @@
 import { prisma } from "../../../infra/database/db.js";
 import type { Prisma } from "../../../infra/database/prismaTypes.js";
 import { generateWorkbookPublicId } from "../../../shared/utils/publicId.js";
-import type { AssetRecord } from "../../assets/domain/asset.js";
-import type { AssetImportActivator } from "../../assets/domain/assetRepository.js";
 import {
   buildBlankSheetInitialization,
   buildSourceSheetInitialization,
@@ -109,79 +107,6 @@ export async function createWorkbookWithInitialSheet(input: {
         order: initialSheet.order,
       },
     };
-  });
-}
-
-export async function createImportedWorkbooks(
-  workspaceId: number,
-  parsedWorkbooks: readonly {
-    workbookName: string;
-    sheetNames: readonly string[];
-    results: readonly {
-      celldata: unknown[];
-      merges: unknown[];
-      config?: unknown;
-    }[];
-  }[],
-  sourceAsset?: AssetRecord,
-  activateAsset?: AssetImportActivator,
-) {
-  return prisma.$transaction(async (tx) => {
-    await tx.workspace.update({
-      where: { id: workspaceId },
-      data: { updatedAt: new Date() },
-    });
-    const maxOrder = await tx.workbook.aggregate({
-      where: { workspaceId },
-      _max: { order: true },
-    });
-    let nextOrder = (maxOrder._max.order ?? -1) + 1;
-    const uploaded = [];
-    if (sourceAsset) {
-      if (!activateAsset) throw new Error("导入资产激活器未提供");
-      await activateAsset(tx, workspaceId, sourceAsset.id);
-    }
-
-    for (const parsedWorkbook of parsedWorkbooks) {
-      const wb = await tx.workbook.create({
-        data: {
-          publicId: generateWorkbookPublicId(),
-          workspaceId,
-          name: parsedWorkbook.workbookName,
-          order: nextOrder++,
-          sourceAssetId: sourceAsset?.id,
-        },
-      });
-
-      for (let index = 0; index < parsedWorkbook.sheetNames.length; index += 1) {
-        const parsed = parsedWorkbook.results[index] ?? {
-          celldata: [],
-          merges: [],
-          config: {},
-        };
-        await tx.sheet.create({
-          data: {
-            workbookId: wb.id,
-            sheetNo: index + 1,
-            name: parsedWorkbook.sheetNames[index],
-            order: index,
-            columns: JSON.stringify([]),
-            merges: JSON.stringify(parsed.merges),
-            uploadedData: JSON.stringify(parsed.celldata),
-            config: JSON.stringify(parsed.config ?? {}),
-          },
-        });
-      }
-
-      uploaded.push({
-        id: wb.id,
-        publicId: wb.publicId,
-        name: parsedWorkbook.workbookName,
-        sheets: parsedWorkbook.sheetNames.length,
-      });
-    }
-
-    return uploaded;
   });
 }
 

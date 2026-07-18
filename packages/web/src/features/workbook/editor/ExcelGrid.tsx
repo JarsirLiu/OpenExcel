@@ -3,6 +3,7 @@ import "@fortune-sheet/react/dist/index.css";
 import { useRef } from "react";
 import type { WorkbookFull } from "@/api/workbooks";
 import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatchSync";
+import { useChartInsertion } from "@/features/workbook/charts/useChartInsertion";
 import styles from "./ExcelGrid.module.css";
 import { useFortuneSheetFilterMenu } from "./fortuneSheetFilterMenu";
 import { useExcelGridWorkspace } from "./useExcelGridWorkspace";
@@ -57,6 +58,14 @@ export function ExcelGrid({
   useFortuneSheetFilterMenu(gridRootRef, workbook !== null);
   useFortuneSheetWheel(gridRootRef, workbook !== null);
 
+  const { dialog, handleSelectionChange, toolbarItems } = useChartInsertion({
+    workspaceId,
+    workbook,
+    currentSheetIndex,
+    onWorkbookRefresh,
+    onWorkbookMutation,
+  });
+
   if (!workbook) return null;
 
   return (
@@ -91,6 +100,7 @@ export function ExcelGrid({
             "link",
             "comment",
           ]}
+          customToolbarItems={toolbarItems}
           cellContextMenu={[
             "copy",
             "paste",
@@ -114,12 +124,14 @@ export function ExcelGrid({
           allowUpdate={true}
           hooks={{
             afterActivateSheet: handleActivateSheet,
+            afterSelectionChange: handleSelectionChange,
             beforeAddSheet: handleBeforeAddSheet,
             beforeDeleteSheet: handleBeforeDeleteSheet,
             beforeUpdateSheetName: handleBeforeUpdateSheetName,
           }}
         />
       </div>
+      {dialog}
     </div>
   );
 }

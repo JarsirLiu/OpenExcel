@@ -53,11 +53,14 @@ XLSX chart/drawing/rels
 - 服务端真实导出已读取数据库中的 ChartSpec；
 - AI 工具已提供创建、修改、删除、查询图表的入口，并使用图表级撤销快照；
 - Web 已有独立的 ChartSpec -> ECharts 图表区域渲染；
-- XLSX 导入没有读取 chart、drawing 和关系部件；
+- Web 已提供基础的“插入图表”工具栏入口，可将当前二维选区转换为 ChartSpec 并持久化；
+- XLSX 导入已读取基础 chart、drawing 和关系部件，并把图表引用转换为导入批次内的 Sheet key；
+- XLSX 导入遇到当前模型不支持的图表类型或展示属性会拒绝导入，不静默丢失；
+- XLSX 图表数量和系列数量在 core 解析阶段受限，避免先构造超大对象再由 server 拒绝；
 - 生成的 OOXML 尚未通过 Excel 实际打开验证；
 - `Sheet.config.chart` 仍是旧格式字段，不能作为新功能的数据源。
 
-AI 图表变更完成后，Web 会通过工作簿刷新契约重新读取 ChartSpec。当前渲染位于独立图表区域，尚未接入网格内锚点定位、拖拽和缩放交互。
+AI 或用户图表变更完成后，Web 会通过工作簿刷新契约重新读取 ChartSpec。当前用户创建和渲染位于独立图表区域，尚未接入网格内锚点定位、拖拽、缩放、选中和删除交互。
 
 任何“生成一个独立样例文件”的代码都不属于产品能力，样例只能用于格式适配器测试。
 
@@ -239,7 +242,10 @@ Web 不负责：
 
 ## 5. XLSX 图表导入
 
-图表导入必须在 core 内完成，并复用统一的 XLSX ZIP 安全预检。
+图表导入必须在 core 内完成，并复用统一的 XLSX ZIP 安全预检。当前已支持
+`bar`、`line`、`area`、`pie`、`scatter` 和由柱形/折线/面积组成的 `combo`。
+为保证 `ChartSpec -> XLSX` 不改变图表语义，导入会拒绝堆叠/百分比堆叠分组、横向条形图、第二坐标轴组合图、引用单元格的动态图表标题，以及尚未进入 `ChartSpec` 的图例、系列样式、数据标签和坐标轴展示属性。
+导入结果使用导入批次内的 `sheetKey`，server 在创建 Sheet 后于同一事务映射为数据库 ID。
 
 解析路径：
 
@@ -264,10 +270,10 @@ ImportedWorkbookInput
   charts
 ```
 
-对于当前 `ChartSpec` 暂不支持的 Excel 图表特性，必须明确采用以下策略之一：
+对于当前 `ChartSpec` 暂不支持的 Excel 图表特性，当前导入采用“拒绝导入”策略；后续
+只有在完成领域建模和 round-trip 测试后才能放开：
 
 - 完整建模并 round-trip；
-- 以受控的原始 OOXML package part 保存并原样保留；
 - 导入时报告不支持并阻止产生静默丢失。
 
 不能静默删除图表或关系部件。
@@ -352,7 +358,7 @@ WorkbookObject
 2. 建立 Chart 持久化和 Workbook 查询契约；
 3. 让真实导出读取持久化 Chart；
 4. 接入 `createChart/updateChart/deleteChart/listCharts` AI 工具；
-5. 接入 Web 图表渲染和交互；
+5. 完成 Web 图表的网格内锚点定位、选中、移动、缩放和删除交互；
 6. 实现 XLSX 图表导入 round-trip；
 7. 另行规划 Excel Table、Named Range、PivotTable 等对象。
 

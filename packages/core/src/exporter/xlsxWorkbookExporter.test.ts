@@ -106,6 +106,8 @@ describe("workbookToXlsx", () => {
     expect(chartXml).toContain("'销售明细'!$A$2:$A$6");
     expect(chartXml).toContain("'销售明细'!$B$2:$B$6");
     expect(drawingXml).toContain("twoCellAnchor");
+    expect(drawingXml).toContain("<xdr:from>");
+    expect(drawingXml).toContain("<xdr:to>");
     expect(drawingXml).toContain('r:id="rId1"');
     expect(drawingRelationships).toContain('Target="../charts/chart1.xml"');
     expect(worksheetRelationships).toContain('Target="../drawings/drawing1.xml"');

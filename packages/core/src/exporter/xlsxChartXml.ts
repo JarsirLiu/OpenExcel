@@ -181,9 +181,9 @@ export function createDrawingXml(
         return `<xdr:absoluteAnchor><xdr:pos x="${chart.anchor.xEmu}" y="${chart.anchor.yEmu}"/><xdr:ext cx="${chart.anchor.widthEmu}" cy="${chart.anchor.heightEmu}"/>${graphic}${clientData}</xdr:absoluteAnchor>`;
       }
       if (chart.anchor.kind === "oneCell") {
-        return `<xdr:oneCellAnchor>${marker(chart.anchor.from)}<xdr:ext cx="${chart.anchor.widthEmu}" cy="${chart.anchor.heightEmu}"/>${graphic}${clientData}</xdr:oneCellAnchor>`;
+        return `<xdr:oneCellAnchor><xdr:from>${marker(chart.anchor.from)}</xdr:from><xdr:ext cx="${chart.anchor.widthEmu}" cy="${chart.anchor.heightEmu}"/>${graphic}${clientData}</xdr:oneCellAnchor>`;
       }
-      return `<xdr:twoCellAnchor>${marker(chart.anchor.from)}${marker(chart.anchor.to)}${graphic}${clientData}</xdr:twoCellAnchor>`;
+      return `<xdr:twoCellAnchor><xdr:from>${marker(chart.anchor.from)}</xdr:from><xdr:to>${marker(chart.anchor.to)}</xdr:to>${graphic}${clientData}</xdr:twoCellAnchor>`;
     })
     .join("");
 

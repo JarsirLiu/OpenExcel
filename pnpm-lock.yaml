@@ -73,6 +73,9 @@ importers:
       '@corbe30/fortune-excel':
         specifier: 2.3.3
         version: 2.3.3
+      '@xmldom/xmldom':
+        specifier: 0.9.10
+        version: 0.9.10
       exceljs:
         specifier: 4.4.0
         version: 4.4.0
@@ -1682,6 +1685,10 @@ packages:
 
   '@workflow/serde@4.1.0':
     resolution: {integrity: sha512-pav4F2BoirECWR7Nf1TKt+2eETcBj7jj4cBefQ8VXQCA6NPkaKeLfj/zMgi+3zYV5ZIBT4GuUiphsj0/b9hPQQ==}
+
+  '@xmldom/xmldom@0.9.10':
+    resolution: {integrity: sha512-A9gOqLdi6cV4ibazAjcQufGj0B1y/vDqYrcuP6d/6x8P27gRS8643Dj9o1dEKtB6O7fwxb2FgBmJS2mX7gpvdw==}
+    engines: {node: '>=14.6'}
 
   abstract-logging@2.0.1:
     resolution: {integrity: sha512-2BjRTZxTPvheOvGbBslFSYOUkr+SjPtOnrLP33f+VIWLzezQpZcqVg7ja3L4dBXmzzgwT+a029jRx5PCi3JuiA==}
@@ -5601,6 +5608,8 @@ snapshots:
       tinyrainbow: 2.0.0
 
   '@workflow/serde@4.1.0': {}
+
+  '@xmldom/xmldom@0.9.10': {}
 
   abstract-logging@2.0.1: {}
 

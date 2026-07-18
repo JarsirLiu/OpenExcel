@@ -28,6 +28,11 @@ export {
   parseChartSpec,
 } from "./chart/chartModel.js";
 export { cellAddressToA1, rangeReferenceToA1 } from "./chart/chartReference.js";
+export {
+  type ImportedChartMappingContext,
+  ImportedChartMappingError,
+  materializeImportedChart,
+} from "./chart/importedChart.js";
 export type {
   SheetChangeCell,
   SheetChangeClearCell,
@@ -119,6 +124,9 @@ export { type JsonValue, toJsonObject, toJsonValue } from "./excel/jsonValue.js"
 export type { FilterSelection, FortuneSheetData, SheetConfig } from "./excel/sheetConfig.js";
 export { extractSheetConfig, restoreSheetConfig } from "./excel/sheetConfig.js";
 export type {
+  ImportedChartInput,
+  ImportedChartSeries,
+  ImportedRangeReference,
   ImportedSheetInput,
   ImportedWorkbookBatchInput,
   ImportedWorkbookInput,
@@ -133,6 +141,12 @@ export {
   type SpreadsheetFileFormat,
   type SpreadsheetFileInput,
 } from "./importer/spreadsheetFileImporter.js";
+export type { XlsxChartImportLimits } from "./importer/xlsxChartImporter.js";
+export {
+  DEFAULT_XLSX_CHART_IMPORT_LIMITS,
+  parseXlsxCharts,
+  XlsxChartImportError,
+} from "./importer/xlsxChartImporter.js";
 export {
   assertXlsxContainerSafe,
   DEFAULT_XLSX_SAFETY_LIMITS,

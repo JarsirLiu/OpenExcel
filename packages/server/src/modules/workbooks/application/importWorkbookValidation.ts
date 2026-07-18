@@ -77,6 +77,7 @@ function normalizeSheet(sheet: ImportedWorkbookPayload["sheets"][number]) {
   }
 
   return {
+    key: sheet.key.trim(),
     name: sheet.name.trim(),
     celldata: sheet.celldata,
     merges: validateAndNormalizeMerges(sheet),
@@ -93,6 +94,7 @@ function normalizeWorkbook(workbook: ImportedWorkbookPayload) {
   }
 
   const sheetNames = new Set<string>();
+  const sheetKeys = new Set<string>();
   const results = workbook.sheets.map((sheet) => {
     if (sheetNames.has(sheet.name)) {
       throw new ImportValidationError("工作簿包含重复的工作表名称", "INVALID_IMPORT_PAYLOAD", 400, {
@@ -101,12 +103,54 @@ function normalizeWorkbook(workbook: ImportedWorkbookPayload) {
       });
     }
     sheetNames.add(sheet.name);
+    if (sheetKeys.has(sheet.key)) {
+      throw new ImportValidationError(
+        "导入工作簿包含重复的 Sheet key",
+        "INVALID_IMPORT_PAYLOAD",
+        400,
+        {
+          workbookName: workbook.name,
+          sheetKey: sheet.key,
+        },
+      );
+    }
+    sheetKeys.add(sheet.key);
     return normalizeSheet(sheet);
   });
+  const validSheetKeys = new Set(results.map((sheet) => sheet.key));
+  for (const chart of workbook.charts) {
+    if (!validSheetKeys.has(chart.sheetKey)) {
+      throw new ImportValidationError("图表锚定的 Sheet 不存在", "INVALID_IMPORT_PAYLOAD", 400, {
+        workbookName: workbook.name,
+        sheetKey: chart.sheetKey,
+      });
+    }
+    for (const series of chart.series) {
+      const references = [series.valueRef, series.categoryRef].filter(
+        (reference): reference is NonNullable<typeof reference> => reference != null,
+      );
+      if (typeof series.name === "object") references.push(series.name);
+      for (const reference of references) {
+        if (!validSheetKeys.has(reference.sheetKey)) {
+          throw new ImportValidationError(
+            "图表数据引用的 Sheet 不存在",
+            "INVALID_IMPORT_PAYLOAD",
+            400,
+            {
+              workbookName: workbook.name,
+              sheetKey: reference.sheetKey,
+            },
+          );
+        }
+      }
+    }
+  }
   return {
     workbookName: workbook.name.trim(),
     sheetNames: results.map((sheet) => sheet.name),
     results,
+    sheetKeys: results.map((sheet) => sheet.key),
+    charts: workbook.charts,
   };
 }
 

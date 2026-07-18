@@ -1,8 +1,11 @@
+import { DEFAULT_XLSX_CHART_IMPORT_LIMITS } from "@openexcel/core";
 import { z } from "zod";
 
 export const WORKBOOK_IMPORT_PAYLOAD_LIMITS = {
   maxWorkbooks: 20,
   maxSheetsPerWorkbook: 200,
+  maxChartsPerWorkbook: DEFAULT_XLSX_CHART_IMPORT_LIMITS.maxChartsPerWorkbook,
+  maxSeriesPerChart: DEFAULT_XLSX_CHART_IMPORT_LIMITS.maxSeriesPerChart,
   maxCellsPerSheet: 500_000,
   maxMergesPerSheet: 100_000,
   maxWorkbookNameLength: 255,
@@ -21,6 +24,87 @@ const MAX_COLUMN = 16_383;
 const nonNegativeRow = z.number().int().min(0).max(MAX_ROW);
 const nonNegativeColumn = z.number().int().min(0).max(MAX_COLUMN);
 const mergeSize = z.number().int().min(1).max(1_048_576);
+
+const cellAddressSchema = z.object({
+  row: nonNegativeRow,
+  col: nonNegativeColumn,
+});
+
+const importedRangeSchema = z
+  .object({
+    sheetKey: z.string().trim().min(1).max(255),
+    start: cellAddressSchema,
+    end: cellAddressSchema,
+  })
+  .strict()
+  .refine(
+    (range) => range.end.row === range.start.row || range.end.col === range.start.col,
+    "图表数据范围必须是单行或单列",
+  )
+  .refine(
+    (range) => range.end.row >= range.start.row && range.end.col >= range.start.col,
+    "图表数据范围无效",
+  );
+
+const chartAnchorPointSchema = cellAddressSchema.extend({
+  offsetXEmu: z.number().int().min(0).optional(),
+  offsetYEmu: z.number().int().min(0).optional(),
+});
+
+const importedChartAnchorSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("oneCell"),
+      from: chartAnchorPointSchema,
+      widthEmu: z.number().int().positive(),
+      heightEmu: z.number().int().positive(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("twoCell"),
+      from: chartAnchorPointSchema,
+      to: chartAnchorPointSchema,
+    })
+    .strict()
+    .refine(
+      (anchor) => anchor.to.row >= anchor.from.row && anchor.to.col >= anchor.from.col,
+      "图表锚点范围无效",
+    ),
+  z
+    .object({
+      kind: z.literal("absolute"),
+      xEmu: z.number().int().min(0),
+      yEmu: z.number().int().min(0),
+      widthEmu: z.number().int().positive(),
+      heightEmu: z.number().int().positive(),
+    })
+    .strict(),
+]);
+
+const importedChartSeriesSchema = z
+  .object({
+    id: z.string().trim().min(1).max(255),
+    name: z.union([z.string().trim().min(1).max(255), importedRangeSchema]).optional(),
+    categoryRef: importedRangeSchema.optional(),
+    valueRef: importedRangeSchema,
+    chartType: z.enum(["bar", "line", "area"]).optional(),
+  })
+  .strict();
+
+const importedChartSchema = z
+  .object({
+    id: z.string().trim().min(1).max(255),
+    sheetKey: z.string().trim().min(1).max(255),
+    type: z.enum(["bar", "line", "pie", "area", "scatter", "combo"]),
+    title: z.string().max(255).optional(),
+    anchor: importedChartAnchorSchema,
+    series: z
+      .array(importedChartSeriesSchema)
+      .min(1)
+      .max(WORKBOOK_IMPORT_PAYLOAD_LIMITS.maxSeriesPerChart),
+  })
+  .strict();
 
 const mergeCellSchema = z
   .object({
@@ -111,6 +195,7 @@ export const filterSelectionSchema = z
 
 export const importedSheetSchema = z
   .object({
+    key: z.string().trim().min(1).max(255),
     name: z.string().trim().min(1).max(WORKBOOK_IMPORT_PAYLOAD_LIMITS.maxSheetNameLength),
     celldata: z.array(cellSchema),
     merges: z.array(mergeRangeSchema),
@@ -122,6 +207,7 @@ export const importedWorkbookSchema = z
   .object({
     name: z.string().trim().min(1).max(WORKBOOK_IMPORT_PAYLOAD_LIMITS.maxWorkbookNameLength),
     sheets: z.array(importedSheetSchema).min(1),
+    charts: z.array(importedChartSchema).max(WORKBOOK_IMPORT_PAYLOAD_LIMITS.maxChartsPerWorkbook),
   })
   .strict();
 

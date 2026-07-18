@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@corbe30/fortune-excel": "2.3.3",
+    "@xmldom/xmldom": "0.9.10",
     "exceljs": "4.4.0",
     "jszip": "3.10.1",
     "xlsx": "^0.18.5",

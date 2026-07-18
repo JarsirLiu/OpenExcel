@@ -2,14 +2,15 @@ import { readFile } from "node:fs/promises";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AssetService } from "../../assets/application/assetService.js";
 import { ASSET_STATES, type AssetRecord } from "../../assets/domain/asset.js";
-import * as repository from "../infrastructure/workbookRepository.js";
+import * as repository from "../infrastructure/workbookImportRepository.js";
 import { importStoredWorkbook, importWorkbooks, WorkbookImportError } from "./importWorkbook.js";
 
-vi.mock("../infrastructure/workbookRepository.js", () => ({
+vi.mock("../infrastructure/workbookImportRepository.js", () => ({
   createImportedWorkbooks: vi.fn(),
 }));
 
 const validSheet = {
+  key: "sheet-0",
   name: "Sheet1",
   celldata: [{ r: 0, c: 0, v: { v: "标题", m: "标题", fc: "#112233" } }],
   merges: [],
@@ -24,14 +25,16 @@ describe("importWorkbooks", () => {
 
   it("normalizes imported sheets and persists them as one batch", async () => {
     await importWorkbooks(1, {
-      workbooks: [{ name: "预算", sheets: [validSheet] }],
+      workbooks: [{ name: "预算", sheets: [validSheet], charts: [] }],
     });
 
     expect(repository.createImportedWorkbooks).toHaveBeenCalledWith(1, [
       {
         workbookName: "预算",
+        sheetKeys: ["sheet-0"],
         sheetNames: ["Sheet1"],
         results: [validSheet],
+        charts: [],
       },
     ]);
   });
@@ -42,6 +45,7 @@ describe("importWorkbooks", () => {
         {
           name: "预算",
           sheets: [{ ...validSheet, config: { filter_select: { row: [0, 10], column: [0, 4] } } }],
+          charts: [],
         },
       ],
     });
@@ -60,6 +64,7 @@ describe("importWorkbooks", () => {
           {
             name: "预算",
             sheets: [{ ...validSheet, config: { filter_select } as never }],
+            charts: [],
           },
         ],
       }),
@@ -72,6 +77,32 @@ describe("importWorkbooks", () => {
     expect(repository.createImportedWorkbooks).not.toHaveBeenCalled();
   });
 
+  it("rejects charts with too many series before persistence", async () => {
+    const reference = {
+      sheetKey: "sheet-0",
+      start: { row: 0, col: 0 },
+      end: { row: 0, col: 0 },
+    };
+    const chart = {
+      id: "chart-1",
+      sheetKey: "sheet-0",
+      type: "line" as const,
+      anchor: { kind: "oneCell" as const, from: { row: 1, col: 1 }, widthEmu: 1, heightEmu: 1 },
+      series: Array.from({ length: 101 }, (_, index) => ({
+        id: `series-${index}`,
+        categoryRef: reference,
+        valueRef: reference,
+      })),
+    };
+
+    await expect(
+      importWorkbooks(1, {
+        workbooks: [{ name: "预算", sheets: [validSheet], charts: [chart] }],
+      }),
+    ).rejects.toMatchObject({ code: "INVALID_IMPORT_PAYLOAD" });
+    expect(repository.createImportedWorkbooks).not.toHaveBeenCalled();
+  });
+
   it("rejects sheets with malformed payloads", async () => {
     await expect(
       importWorkbooks(1, {
@@ -79,6 +110,7 @@ describe("importWorkbooks", () => {
           {
             name: "预算",
             sheets: [{ ...validSheet, celldata: "invalid" as never }],
+            charts: [],
           },
         ],
       }),
@@ -96,7 +128,7 @@ describe("importWorkbooks", () => {
   ])("rejects %s before persistence", async (_caseName, sheet) => {
     await expect(
       importWorkbooks(1, {
-        workbooks: [{ name: "预算", sheets: [sheet as never] }],
+        workbooks: [{ name: "预算", sheets: [sheet as never], charts: [] }],
       }),
     ).rejects.toMatchObject({ code: "INVALID_IMPORT_PAYLOAD" });
     expect(repository.createImportedWorkbooks).not.toHaveBeenCalled();
@@ -114,6 +146,7 @@ describe("importWorkbooks", () => {
                 celldata: [validSheet.celldata[0], validSheet.celldata[0]],
               },
             ],
+            charts: [],
           },
         ],
       }),
@@ -128,6 +161,7 @@ describe("importWorkbooks", () => {
           name: "预算",
           sheets: [
             {
+              key: "sheet-0",
               name: "Sheet1",
               celldata: [
                 { r: 0, c: 0, v: { v: "标题", m: "标题", mc: { r: 0, c: 0, rs: 2, cs: 2 } } },
@@ -139,6 +173,7 @@ describe("importWorkbooks", () => {
               config: {},
             },
           ],
+          charts: [],
         },
       ],
     });
@@ -168,7 +203,7 @@ describe("importWorkbooks", () => {
   ])("rejects %s before persistence", async (_caseName, sheet) => {
     await expect(
       importWorkbooks(1, {
-        workbooks: [{ name: "预算", sheets: [sheet as never] }],
+        workbooks: [{ name: "预算", sheets: [sheet as never], charts: [] }],
       }),
     ).rejects.toMatchObject({ code: "INVALID_IMPORT_PAYLOAD" });
     expect(repository.createImportedWorkbooks).not.toHaveBeenCalled();

@@ -6,7 +6,7 @@ import {
 import type { AssetService } from "../../assets/application/assetService.js";
 import type { AssetRecord } from "../../assets/domain/asset.js";
 import type { AssetImportActivator } from "../../assets/domain/assetRepository.js";
-import * as repo from "../infrastructure/workbookRepository.js";
+import * as repo from "../infrastructure/workbookImportRepository.js";
 import { ImportValidationError } from "./importValidationErrors.js";
 import { normalizeImportedBatch } from "./importWorkbookValidation.js";
 
