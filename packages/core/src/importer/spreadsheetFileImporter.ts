@@ -23,6 +23,7 @@ import {
   type SheetConfig,
 } from "../excel/sheetConfig.js";
 import type { ImportedSheetInput, ImportedWorkbookInput } from "../excel/workbookImport.js";
+import { assertXlsxContainerSafe } from "./xlsxSafetyGuard.js";
 
 export type SpreadsheetFileFormat = "xlsx" | "xls" | "csv";
 
@@ -351,6 +352,7 @@ async function parseXlsxWithFortuneExcel(
   input: SpreadsheetFileInput,
 ): Promise<ImportedWorkbookInput> {
   const bytes = toUint8Array(input.bytes);
+  await assertXlsxContainerSafe(bytes);
   let parsedSheets: FortuneExcelSheet[] | undefined;
   await runFortuneExcel(async () => {
     const fileConstructor = (globalThis as unknown as RuntimeGlobals).File;

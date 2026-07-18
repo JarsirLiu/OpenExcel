@@ -1,6 +1,11 @@
-import { type ImportedWorkbookBatchInput, parseSpreadsheetFile } from "@openexcel/core";
-import type { WorkbookSourceAsset } from "../domain/sourceAsset.js";
-import type { WorkbookSourceAssetStorage } from "../domain/sourceAssetStorage.js";
+import {
+  type ImportedWorkbookBatchInput,
+  parseSpreadsheetFile,
+  XlsxSafetyLimitError,
+} from "@openexcel/core";
+import type { AssetService } from "../../assets/application/assetService.js";
+import type { AssetRecord } from "../../assets/domain/asset.js";
+import type { AssetImportActivator } from "../../assets/domain/assetRepository.js";
 import * as repo from "../infrastructure/workbookRepository.js";
 import { ImportValidationError } from "./importValidationErrors.js";
 import { normalizeImportedBatch } from "./importWorkbookValidation.js";
@@ -29,12 +34,13 @@ export class WorkbookImportError extends Error {
 export async function importWorkbooks(
   workspaceId: number,
   input: ImportedWorkbookBatchInput,
-  sourceAsset?: WorkbookSourceAsset,
+  sourceAsset?: AssetRecord,
+  activateAsset?: AssetImportActivator,
 ) {
   try {
     const parsedWorkbooks = normalizeImportedBatch(input);
     return sourceAsset
-      ? repo.createImportedWorkbooks(workspaceId, parsedWorkbooks, sourceAsset)
+      ? repo.createImportedWorkbooks(workspaceId, parsedWorkbooks, sourceAsset, activateAsset)
       : repo.createImportedWorkbooks(workspaceId, parsedWorkbooks);
   } catch (error) {
     if (error instanceof ImportValidationError) {
@@ -46,24 +52,42 @@ export async function importWorkbooks(
 
 export async function importStoredWorkbook(
   workspaceId: number,
-  sourceAsset: WorkbookSourceAsset,
-  sourceAssetStorage: WorkbookSourceAssetStorage,
+  sourceAsset: AssetRecord,
+  assets: AssetService,
 ) {
-  const bytes = await sourceAssetStorage.read(sourceAsset.storageKey);
-  let workbook: ImportedWorkbookBatchInput["workbooks"][number];
+  let importStarted = false;
   try {
-    workbook = await parseSpreadsheetFile({
-      fileName: sourceAsset.originalFileName,
-      format: sourceAsset.detectedFormat,
-      bytes,
+    const importingAsset = await assets.beginImport(sourceAsset.id, workspaceId);
+    importStarted = true;
+    return await assets.withAssetLease(importingAsset.id, async () => {
+      const bytes = await assets.read(importingAsset);
+      const workbook = await parseSpreadsheetFile({
+        fileName: importingAsset.originalFileName,
+        format: importingAsset.detectedFormat,
+        bytes,
+      });
+      return importWorkbooks(
+        workspaceId,
+        { workbooks: [workbook] },
+        importingAsset,
+        assets.completeImport,
+      );
     });
   } catch (error) {
+    if (importStarted) {
+      await assets
+        .markOrphaned(sourceAsset.id, error instanceof Error ? error.message : "Excel 导入失败")
+        .catch(() => undefined);
+    }
+    if (error instanceof ImportValidationError) {
+      throw new WorkbookImportError(error.message, error.code, error.statusCode, error.details);
+    }
+    if (error instanceof WorkbookImportError) throw error;
+    const limitExceeded = error instanceof XlsxSafetyLimitError;
     throw new WorkbookImportError(
       error instanceof Error ? `Excel 文件解析失败：${error.message}` : "Excel 文件解析失败",
-      "INVALID_IMPORT_PAYLOAD",
-      400,
+      limitExceeded ? "IMPORT_LIMIT_EXCEEDED" : "INVALID_IMPORT_PAYLOAD",
+      limitExceeded ? 413 : 400,
     );
   }
-
-  return importWorkbooks(workspaceId, { workbooks: [workbook] }, sourceAsset);
 }

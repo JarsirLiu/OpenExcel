@@ -28,19 +28,28 @@ model Workbook {
 model UploadAsset {
   id               Int        @id @default(autoincrement())
   publicId         String     @unique
-  workspaceId      Int
+  workspaceId      Int?
+  state            String     @default("UPLOADING")
   storageKey       String
   originalFileName String
   detectedFormat   String
   mimeType         String
   sizeBytes        Int
   sha256           String
-  workspace        Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  cleanupLeaseUntil DateTime?
+  cleanupLeaseToken String?
+  cleanupAttempts   Int       @default(0)
+  cleanupNextAttemptAt DateTime?
+  cleanupLastError  String?
+  workspace        Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
   workbooks        Workbook[]
   createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
 
   @@index([workspaceId])
   @@index([sha256])
+  @@index([state, cleanupNextAttemptAt])
+  @@index([cleanupLeaseUntil])
 }
 
 model User {

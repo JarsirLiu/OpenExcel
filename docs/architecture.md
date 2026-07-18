@@ -48,6 +48,9 @@ consumes the same helpers in reverse. No adapter may define a second mapping for
 Workbook view metadata follows the same boundary. Excel `autoFilter` ranges are converted at the
 shared import boundary into the zero-based `filter_select` range used by FortuneSheet; ExcelJS
 export converts that range back to an Excel A1 range. The browser does not participate in parsing.
+The XLSX path performs ZIP preflight checks for entry count and declared uncompressed sizes before
+FortuneExcel or optional metadata parsing runs. These limits belong to the core parser because
+multipart request limits only protect the compressed HTTP body.
 
 ### 2.2 Agent logic is headless
 
@@ -161,7 +164,16 @@ Uploaded workbook files are stored as immutable source assets. In local developm
 root is `.data/storage`; production may replace the local storage adapter with S3, MinIO, or
 another object store through `OPENEXCEL_STORAGE_ROOT`. The database stores only asset metadata and
 the storage key, never the XLSX binary. Import requests use `multipart/form-data` and contain only
-the original file; the server owns the file-to-domain import conversion.
+the original file; the server owns the file-to-domain import conversion. Asset metadata is created
+in `UPLOADING` state before the object is written, becomes `READY` after the object hash and size
+are recorded, enters `IMPORTING` through an atomic claim before parsing, and becomes `ACTIVE` only
+in the same transaction that attaches it to imported workbooks. Failed imports become `ORPHANED`,
+so a failed physical delete never loses the durable record needed for retry. A background asset
+worker atomically claims bounded batches with a lease, skips active imports, reclaims expired
+import leases, deletes storage objects idempotently, and removes metadata only after storage
+deletion succeeds.
+Unreferenced active assets and interrupted uploads are reclaimed by the same worker after their
+retention window; request handlers never perform storage cleanup.
 
 The server's database layer should be selectable at startup by configuration.
 The current implementation can keep multiple Prisma clients available and pick one from `DATABASE_PROVIDER` and `DATABASE_URL` when the process starts.
@@ -228,6 +240,10 @@ packages/server/src/
 │   │   ├── domain/       # workbook creation rules and errors
 │   │   ├── infrastructure/ # Prisma and workbook transactions
 │   │   └── tools/        # Agent workbook tool adapters
+│   ├── assets/
+│   │   ├── application/  # upload staging and background cleanup use cases
+│   │   ├── domain/       # asset state, storage, and repository ports
+│   │   └── infrastructure/ # object storage and asset metadata persistence
 │   └── sheets/
 │       ├── api/          # sheet read and patch HTTP routes
 │       ├── application/  # sheet query and content/name update use cases
@@ -399,6 +415,10 @@ Authentication and workspace boundaries have completed the first application-lay
 - `src/modules/workbooks/application/*` owns workbook import/export, creation/deletion, and sheet creation/deletion use cases.
 - `src/modules/workbooks/domain/*` owns workbook creation rules and predictable errors.
 - `src/modules/workbooks/infrastructure/*` owns workbook persistence and cross-workbook/sheet transactions.
+- `src/modules/assets/application/*` owns upload staging, activation, and background cleanup.
+- `src/modules/assets/domain/*` owns asset state and storage/repository ports; workspaces and
+  workbooks do not perform storage cleanup or write asset lifecycle fields directly.
+- `src/modules/assets/infrastructure/*` owns object storage and upload-asset metadata persistence.
 - `src/modules/sheets/api/*` owns Sheet content and name HTTP adapters.
 - `src/modules/sheets/application/*` owns Sheet query and content/name update use cases.
 - `src/modules/sheets/infrastructure/*` owns Sheet persistence and workspace-scoped access.

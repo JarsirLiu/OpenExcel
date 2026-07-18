@@ -1,17 +1,21 @@
 import { Readable } from "node:stream";
 import type { FastifyRequest } from "fastify";
 import { describe, expect, it, vi } from "vitest";
-import type { WorkbookSourceAssetStorage } from "../domain/sourceAssetStorage.js";
+import type { AssetService } from "../../assets/application/assetService.js";
+import { ASSET_STATES, type StagedAsset } from "../../assets/domain/asset.js";
 import { parseWorkbookImportMultipart, WorkbookMultipartError } from "./importMultipart.js";
 
-const sourceAsset = {
+const stagedAsset: StagedAsset = {
+  id: 9,
   publicId: "asset_test",
+  workspaceId: 1,
   storageKey: "uploads/1/asset_test/original.xlsx",
   originalFileName: "预算.xlsx",
-  detectedFormat: "xlsx" as const,
+  detectedFormat: "xlsx",
   mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   sizeBytes: 4,
   sha256: "hash",
+  state: ASSET_STATES.ready,
 };
 
 function requestWithParts(parts: readonly unknown[]): FastifyRequest {
@@ -22,90 +26,86 @@ function requestWithParts(parts: readonly unknown[]): FastifyRequest {
   } as unknown as FastifyRequest;
 }
 
-function createStorage() {
-  const storage: WorkbookSourceAssetStorage = {
-    store: vi.fn(async (_workspaceId, upload) => {
+function createAssets() {
+  const assets: AssetService = {
+    stageUpload: vi.fn(async (_workspaceId, upload) => {
       for await (const _chunk of upload.file as unknown as AsyncIterable<Buffer>) {
         // Consume the stream so the multipart parser can continue to the next part.
       }
-      return sourceAsset;
+      return stagedAsset;
     }),
-    read: vi.fn(async () => new Uint8Array()),
-    delete: vi.fn(async () => undefined),
+    read: vi.fn(),
+    markOrphaned: vi.fn(async () => undefined),
+    withAssetLease: vi.fn(async (_assetId, action) => action()),
+    beginImport: vi.fn(),
+    completeImport: vi.fn(),
   };
-  return storage;
+  return assets;
 }
 
 describe("parseWorkbookImportMultipart", () => {
-  it("parses the payload and stores the original file through the port", async () => {
-    const storage = createStorage();
+  it("stages the original file through the asset service", async () => {
+    const assets = createAssets();
     const request = requestWithParts([
       {
         type: "file",
         fieldname: "file",
         filename: "预算.xlsx",
-        mimetype: sourceAsset.mimeType,
-        file: Readable.from([Buffer.from("PK\x03\x04")]),
+        mimetype: stagedAsset.mimeType,
+        file: Readable.from([Buffer.from("PK\\x03\\x04")]),
       },
     ]);
 
-    await expect(parseWorkbookImportMultipart(request, 1, storage)).resolves.toEqual(sourceAsset);
-    expect(storage.store).toHaveBeenCalledWith(
+    await expect(parseWorkbookImportMultipart(request, 1, assets)).resolves.toEqual(stagedAsset);
+    expect(assets.stageUpload).toHaveBeenCalledWith(
       1,
-      expect.objectContaining({ filename: "预算.xlsx", mimetype: sourceAsset.mimeType }),
+      expect.objectContaining({ filename: "预算.xlsx", mimetype: stagedAsset.mimeType }),
     );
-    expect(storage.delete).not.toHaveBeenCalled();
+    expect(assets.markOrphaned).not.toHaveBeenCalled();
   });
 
-  it("deletes a stored file when another multipart field is present", async () => {
-    const storage = createStorage();
+  it("marks a staged asset orphaned when another multipart field is present", async () => {
+    const assets = createAssets();
     const request = requestWithParts([
       {
         type: "file",
         fieldname: "file",
         filename: "预算.xlsx",
-        mimetype: sourceAsset.mimeType,
-        file: Readable.from([Buffer.from("PK\x03\x04")]),
+        mimetype: stagedAsset.mimeType,
+        file: Readable.from([Buffer.from("PK\\x03\\x04")]),
       },
       { type: "field", fieldname: "payload", value: "forbidden" },
     ]);
 
-    await expect(parseWorkbookImportMultipart(request, 1, storage)).rejects.toBeInstanceOf(
+    await expect(parseWorkbookImportMultipart(request, 1, assets)).rejects.toBeInstanceOf(
       WorkbookMultipartError,
     );
-    expect(storage.delete).toHaveBeenCalledWith(sourceAsset.storageKey);
+    expect(assets.markOrphaned).toHaveBeenCalledWith(9, expect.any(String));
   });
 
   it("rejects a file field with an unexpected name", async () => {
-    const storage = createStorage();
+    const assets = createAssets();
     const request = requestWithParts([
       {
         type: "file",
         fieldname: "other",
         filename: "预算.xlsx",
-        mimetype: sourceAsset.mimeType,
-        file: Readable.from([Buffer.from("PK\x03\x04")]),
+        mimetype: stagedAsset.mimeType,
+        file: Readable.from([Buffer.from("PK\\x03\\x04")]),
       },
     ]);
 
-    await expect(parseWorkbookImportMultipart(request, 1, storage)).rejects.toMatchObject({
+    await expect(parseWorkbookImportMultipart(request, 1, assets)).rejects.toMatchObject({
       code: "INVALID_IMPORT_PAYLOAD",
     });
-    expect(storage.store).not.toHaveBeenCalled();
+    expect(assets.stageUpload).not.toHaveBeenCalled();
   });
 
-  it("rejects an extra multipart field", async () => {
-    const storage = createStorage();
-    const request = requestWithParts([
-      {
-        type: "field",
-        fieldname: "payload",
-        value: JSON.stringify({ workbooks: [] }),
-      },
-      { type: "field", fieldname: "payload", value: JSON.stringify({ workbooks: [] }) },
-    ]);
+  it("rejects extra multipart fields", async () => {
+    const assets = createAssets();
+    const request = requestWithParts([{ type: "field", fieldname: "payload", value: "forbidden" }]);
 
-    await expect(parseWorkbookImportMultipart(request, 1, storage)).rejects.toMatchObject({
+    await expect(parseWorkbookImportMultipart(request, 1, assets)).rejects.toMatchObject({
       code: "INVALID_IMPORT_PAYLOAD",
     });
   });

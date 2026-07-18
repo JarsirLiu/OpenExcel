@@ -3,22 +3,20 @@ import {
   resolveWorkbookIdForRequest,
   resolveWorkspaceIdForRequest,
 } from "../../../middleware/resourceAccess.js";
+import type { AssetService } from "../../assets/application/assetService.js";
+import { AssetError } from "../../assets/domain/asset.js";
 import * as application from "../application/index.js";
-import {
-  type WorkbookSourceAssetStorage,
-  WorkbookSourceAssetStorageError,
-} from "../domain/sourceAssetStorage.js";
 import { parseWorkbookImportMultipart, WorkbookMultipartError } from "./importMultipart.js";
 
 export type WorkbookRouteDependencies = {
-  sourceAssetStorage: WorkbookSourceAssetStorage;
+  assets: AssetService;
 };
 
 function sendWorkbookImportError(reply: FastifyReply, error: unknown): unknown | undefined {
-  if (error instanceof WorkbookSourceAssetStorageError) {
-    return reply.status(400).send({
+  if (error instanceof AssetError) {
+    return reply.status(error.statusCode).send({
       error: error.message,
-      code: "INVALID_UPLOAD_FILE",
+      code: error.code,
     });
   }
   if (error instanceof application.WorkbookImportError) {
@@ -138,13 +136,9 @@ export async function workbookRoutes(
       );
       if (workspaceId == null) return;
 
-      let sourceAsset: Awaited<ReturnType<typeof parseWorkbookImportMultipart>>;
+      let stagedAsset: Awaited<ReturnType<typeof parseWorkbookImportMultipart>>;
       try {
-        sourceAsset = await parseWorkbookImportMultipart(
-          req,
-          workspaceId,
-          dependencies.sourceAssetStorage,
-        );
+        stagedAsset = await parseWorkbookImportMultipart(req, workspaceId, dependencies.assets);
       } catch (error) {
         const response = sendWorkbookImportError(reply, error);
         if (response !== undefined) return response;
@@ -154,12 +148,11 @@ export async function workbookRoutes(
       try {
         const result = await application.importStoredWorkbook(
           workspaceId,
-          sourceAsset,
-          dependencies.sourceAssetStorage,
+          stagedAsset,
+          dependencies.assets,
         );
         return reply.status(201).send(result);
       } catch (error) {
-        await dependencies.sourceAssetStorage.delete(sourceAsset.storageKey).catch(() => undefined);
         const response = sendWorkbookImportError(reply, error);
         if (response !== undefined) return response;
         throw error;

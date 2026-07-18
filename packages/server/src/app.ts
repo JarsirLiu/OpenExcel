@@ -5,9 +5,11 @@ import multipart from "@fastify/multipart";
 import fastifyStatic from "@fastify/static";
 import Fastify from "fastify";
 import { pinoStream } from "./infra/observability/logger.js";
-import { localFileStorage, MAX_UPLOAD_FILE_BYTES } from "./infra/storage/localFileStorage.js";
+import { localAssetStorage, MAX_UPLOAD_FILE_BYTES } from "./infra/storage/localFileStorage.js";
 import { responseLoggerHook, startTimerHook } from "./middleware/requestLogger.js";
 import { resolveUserHook } from "./middleware/resolveUser.js";
+import { createAssetService } from "./modules/assets/application/assetService.js";
+import { createAssetCleanupWorker } from "./modules/assets/application/cleanupAssets.js";
 import { authRoutes } from "./modules/auth/api/routes.js";
 import { sessionRoutes } from "./modules/sessions/api/routes.js";
 import { sheetRoutes } from "./modules/sheets/api/routes.js";
@@ -18,6 +20,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export async function createApp() {
   const app = Fastify({ logger: { stream: pinoStream, level: "info" } });
+  const assets = createAssetService(localAssetStorage);
+  const assetCleanup = createAssetCleanupWorker(localAssetStorage);
   app.decorateRequest("currentUser", null);
 
   app.addHook("onRequest", startTimerHook);
@@ -38,7 +42,9 @@ export async function createApp() {
   });
   await app.register(authRoutes);
   await app.register(workspaceRoutes);
-  await app.register(workbookRoutes, { sourceAssetStorage: localFileStorage });
+  await app.register(workbookRoutes, { assets });
+  app.addHook("onReady", async () => assetCleanup.start());
+  app.addHook("onClose", async () => assetCleanup.stop());
   await app.register(sheetRoutes);
   await app.register(sessionRoutes);
 

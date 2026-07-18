@@ -1,12 +1,13 @@
 import { prisma } from "../../../infra/database/db.js";
 import type { Prisma } from "../../../infra/database/prismaTypes.js";
 import { generateWorkbookPublicId } from "../../../shared/utils/publicId.js";
+import type { AssetRecord } from "../../assets/domain/asset.js";
+import type { AssetImportActivator } from "../../assets/domain/assetRepository.js";
 import {
   buildBlankSheetInitialization,
   buildSourceSheetInitialization,
   WorkbookCreationError,
 } from "../domain/creation.js";
-import type { WorkbookSourceAsset } from "../domain/sourceAsset.js";
 
 export async function findWorkbooks(workspaceId: number): Promise<Prisma.WorkbookGetPayload<{}>[]> {
   return prisma.workbook.findMany({
@@ -119,7 +120,8 @@ export async function createImportedWorkbooks(
       config?: unknown;
     }[];
   }[],
-  sourceAsset?: WorkbookSourceAsset,
+  sourceAsset?: AssetRecord,
+  activateAsset?: AssetImportActivator,
 ) {
   return prisma.$transaction(async (tx) => {
     await tx.workspace.update({
@@ -132,20 +134,10 @@ export async function createImportedWorkbooks(
     });
     let nextOrder = (maxOrder._max.order ?? -1) + 1;
     const uploaded = [];
-    const asset = sourceAsset
-      ? await tx.uploadAsset.create({
-          data: {
-            publicId: sourceAsset.publicId,
-            workspaceId,
-            storageKey: sourceAsset.storageKey,
-            originalFileName: sourceAsset.originalFileName,
-            detectedFormat: sourceAsset.detectedFormat,
-            mimeType: sourceAsset.mimeType,
-            sizeBytes: sourceAsset.sizeBytes,
-            sha256: sourceAsset.sha256,
-          },
-        })
-      : null;
+    if (sourceAsset) {
+      if (!activateAsset) throw new Error("导入资产激活器未提供");
+      await activateAsset(tx, workspaceId, sourceAsset.id);
+    }
 
     for (const parsedWorkbook of parsedWorkbooks) {
       const wb = await tx.workbook.create({
@@ -154,7 +146,7 @@ export async function createImportedWorkbooks(
           workspaceId,
           name: parsedWorkbook.workbookName,
           order: nextOrder++,
-          sourceAssetId: asset?.id,
+          sourceAssetId: sourceAsset?.id,
         },
       });
 

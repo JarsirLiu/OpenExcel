@@ -4,12 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
 import { afterEach, describe, expect, it } from "vitest";
-import {
-  deleteStoredUpload,
-  FileStorageError,
-  storeUploadFile,
-  type UploadFilePart,
-} from "./localFileStorage.js";
+import { type AssetUploadFile, describeAssetUpload } from "../../modules/assets/domain/asset.js";
+import { deleteAsset, FileStorageError, writeAsset } from "./localFileStorage.js";
 
 const temporaryRoots: string[] = [];
 
@@ -25,7 +21,7 @@ async function createRoot(): Promise<string> {
   return root;
 }
 
-function filePart(filename: string, bytes: Uint8Array): UploadFilePart {
+function filePart(filename: string, bytes: Uint8Array): AssetUploadFile {
   return {
     filename,
     mimetype: "application/octet-stream",
@@ -33,47 +29,53 @@ function filePart(filename: string, bytes: Uint8Array): UploadFilePart {
   };
 }
 
-describe("storeUploadFile", () => {
+describe("writeAsset", () => {
   it("stores an XLSX as an immutable asset and returns its hash", async () => {
     const rootDir = await createRoot();
     const bytes = Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x01]);
-    const asset = await storeUploadFile(7, filePart("预算.xlsx", bytes), { rootDir });
+    const storageKey = "uploads/7/asset_test/original.xlsx";
+    const content = await writeAsset(storageKey, "xlsx", filePart("预算.xlsx", bytes), { rootDir });
 
-    expect(asset.detectedFormat).toBe("xlsx");
-    expect(asset.storageKey).toMatch(/^uploads\/7\/asset_[^/]+\/original\.xlsx$/);
-    expect(asset.sizeBytes).toBe(bytes.byteLength);
-    expect(asset.sha256).toBe(createHash("sha256").update(bytes).digest("hex"));
-    expect(await readFile(join(rootDir, asset.storageKey))).toEqual(bytes);
+    expect(content.sizeBytes).toBe(bytes.byteLength);
+    expect(content.sha256).toBe(createHash("sha256").update(bytes).digest("hex"));
+    expect(await readFile(join(rootDir, storageKey))).toEqual(bytes);
 
-    await deleteStoredUpload(asset.storageKey, { rootDir });
-    await expect(readFile(join(rootDir, asset.storageKey))).rejects.toThrow();
+    await deleteAsset(storageKey, { rootDir });
+    await expect(readFile(join(rootDir, storageKey))).rejects.toThrow();
   });
 
   it("accepts XLS files and rejects invalid signatures", async () => {
     const rootDir = await createRoot();
     const xlsHeader = Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
     await expect(
-      storeUploadFile(7, filePart("legacy.xls", xlsHeader), { rootDir }),
-    ).resolves.toMatchObject({ detectedFormat: "xls" });
+      writeAsset("uploads/7/legacy/original.xls", "xls", filePart("legacy.xls", xlsHeader), {
+        rootDir,
+      }),
+    ).resolves.toMatchObject({ sizeBytes: xlsHeader.byteLength });
     await expect(
-      storeUploadFile(7, filePart("invalid.xlsx", Buffer.from("not-xlsx")), { rootDir }),
+      writeAsset(
+        "uploads/7/invalid/original.xlsx",
+        "xlsx",
+        filePart("invalid.xlsx", Buffer.from("not-xlsx")),
+        { rootDir },
+      ),
     ).rejects.toBeInstanceOf(FileStorageError);
   });
 
   it("rejects unsupported extensions before writing a file", async () => {
     const rootDir = await createRoot();
 
-    await expect(
-      storeUploadFile(7, filePart("notes.txt", Buffer.from("text")), { rootDir }),
-    ).rejects.toThrow("仅支持 .xlsx、.xls 和 .csv 文件");
+    expect(() => describeAssetUpload("notes.txt", "text/plain")).toThrow(
+      "仅支持 .xlsx、.xls 和 .csv 文件",
+    );
   });
 });
 
-describe("deleteStoredUpload", () => {
+describe("deleteAsset", () => {
   it("rejects paths outside the configured storage root", async () => {
     const rootDir = await createRoot();
 
-    await expect(deleteStoredUpload("../outside.xlsx", { rootDir })).rejects.toBeInstanceOf(
+    await expect(deleteAsset("../outside.xlsx", { rootDir })).rejects.toBeInstanceOf(
       FileStorageError,
     );
   });

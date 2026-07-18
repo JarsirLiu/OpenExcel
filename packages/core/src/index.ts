@@ -121,6 +121,13 @@ export {
   type SpreadsheetFileFormat,
   type SpreadsheetFileInput,
 } from "./importer/spreadsheetFileImporter.js";
+export {
+  assertXlsxContainerSafe,
+  DEFAULT_XLSX_SAFETY_LIMITS,
+  XlsxContainerError,
+  XlsxSafetyLimitError,
+  type XlsxSafetyLimits,
+} from "./importer/xlsxSafetyGuard.js";
 export type {
   ColumnDef,
   InitConfig,

@@ -1,5 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { AssetService } from "../../assets/application/assetService.js";
+import { ASSET_STATES, type AssetRecord } from "../../assets/domain/asset.js";
 import * as repository from "../infrastructure/workbookRepository.js";
 import { importStoredWorkbook, importWorkbooks, WorkbookImportError } from "./importWorkbook.js";
 
@@ -174,25 +176,66 @@ describe("importWorkbooks", () => {
 });
 
 describe("importStoredWorkbook", () => {
-  it("parses the stored source file before opening the import transaction", async () => {
-    const sourceAsset = {
-      publicId: "asset_csv",
-      storageKey: "uploads/1/asset_csv/original.csv",
-      originalFileName: "库存.csv",
-      detectedFormat: "csv" as const,
-      mimeType: "text/csv",
-      sizeBytes: 12,
+  function createAsset(overrides: Partial<AssetRecord> = {}): AssetRecord {
+    return {
+      id: 9,
+      publicId: "asset_test",
+      workspaceId: 1,
+      storageKey: "uploads/1/asset_test/original.xlsx",
+      originalFileName: "预算.xlsx",
+      detectedFormat: "xlsx",
+      mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      sizeBytes: 2,
       sha256: "hash",
+      state: ASSET_STATES.ready,
+      ...overrides,
     };
-    const storage = {
-      store: vi.fn(),
-      read: vi.fn(async () => new TextEncoder().encode("名称,数量\n商品 A,3")),
-      delete: vi.fn(),
+  }
+
+  function createAssets(bytes: Uint8Array, sourceAsset: AssetRecord): AssetService {
+    return {
+      stageUpload: vi.fn(),
+      beginImport: vi.fn(
+        async (assetId: number, _workspaceId: number): Promise<AssetRecord> => ({
+          ...sourceAsset,
+          id: assetId,
+          state: ASSET_STATES.importing,
+        }),
+      ),
+      read: vi.fn(async () => bytes),
+      markOrphaned: vi.fn(async () => undefined),
+      withAssetLease: vi.fn(async (_assetId, action) => action()),
+      completeImport: vi.fn(async () => undefined),
     };
+  }
 
-    await importStoredWorkbook(1, sourceAsset, storage);
+  it("returns an invalid payload error for a malformed XLSX container", async () => {
+    const sourceAsset = createAsset({ originalFileName: "损坏.xlsx" });
+    const assets = createAssets(new Uint8Array([0x50, 0x4b]), sourceAsset);
 
-    expect(storage.read).toHaveBeenCalledWith(sourceAsset.storageKey);
+    await expect(importStoredWorkbook(1, sourceAsset, assets)).rejects.toMatchObject({
+      code: "INVALID_IMPORT_PAYLOAD",
+      statusCode: 400,
+    });
+    expect(repository.createImportedWorkbooks).not.toHaveBeenCalled();
+    expect(assets.markOrphaned).toHaveBeenCalledWith(9, expect.any(String));
+  });
+
+  it("parses the stored source file before opening the import transaction", async () => {
+    const sourceAsset = createAsset({
+      originalFileName: "库存.csv",
+      detectedFormat: "csv",
+      mimeType: "text/csv",
+      storageKey: "uploads/1/asset_csv/original.csv",
+      sizeBytes: 12,
+    });
+    const assets = createAssets(new TextEncoder().encode("名称,数量\n商品 A,3"), sourceAsset);
+
+    await importStoredWorkbook(1, sourceAsset, assets);
+
+    expect(assets.read).toHaveBeenCalledWith(
+      expect.objectContaining({ id: sourceAsset.id, state: ASSET_STATES.importing }),
+    );
     expect(repository.createImportedWorkbooks).toHaveBeenCalledWith(
       1,
       [
@@ -201,42 +244,32 @@ describe("importStoredWorkbook", () => {
           sheetNames: ["Sheet1"],
         }),
       ],
-      sourceAsset,
+      expect.objectContaining({ id: sourceAsset.id, state: ASSET_STATES.importing }),
+      expect.any(Function),
     );
   });
 
   it("accepts XLSX files whose FortuneExcel config uses class instances", async () => {
-    const sourceAsset = {
-      publicId: "asset_xlsx",
-      storageKey: "uploads/1/asset_xlsx/original.xlsx",
-      originalFileName: "图片.xlsx",
-      detectedFormat: "xlsx" as const,
-      mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      sizeBytes: 1,
-      sha256: "hash",
-    };
-    const storage = {
-      store: vi.fn(),
-      read: vi.fn(
-        async () =>
-          new Uint8Array(
-            await readFile(
-              new URL(
-                "../../../../../core/node_modules/@corbe30/fortune-excel/test/fixtures/xls_preview.xlsx",
-                import.meta.url,
-              ),
-            ),
+    const sourceAsset = createAsset({ originalFileName: "图片.xlsx" });
+    const assets = createAssets(new Uint8Array(), sourceAsset);
+    vi.mocked(assets.read).mockResolvedValue(
+      new Uint8Array(
+        await readFile(
+          new URL(
+            "../../../../../core/node_modules/@corbe30/fortune-excel/test/fixtures/xls_preview.xlsx",
+            import.meta.url,
           ),
+        ),
       ),
-      delete: vi.fn(),
-    };
+    );
 
-    await importStoredWorkbook(1, sourceAsset, storage);
+    await importStoredWorkbook(1, sourceAsset, assets);
 
     expect(repository.createImportedWorkbooks).toHaveBeenCalledWith(
       1,
       [expect.objectContaining({ workbookName: "图片", sheetNames: ["Feuille1"] })],
-      sourceAsset,
+      expect.objectContaining({ id: sourceAsset.id, state: ASSET_STATES.importing }),
+      expect.any(Function),
     );
   });
 });

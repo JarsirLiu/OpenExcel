@@ -1,8 +1,14 @@
 import { readFile } from "node:fs/promises";
 import ExcelJS from "exceljs";
+import JSZip from "jszip";
 import { describe, expect, it } from "vitest";
 import XLSX from "xlsx-js-style";
 import { parseSpreadsheetFile } from "./spreadsheetFileImporter.js";
+import {
+  assertXlsxContainerSafe,
+  XlsxContainerError,
+  XlsxSafetyLimitError,
+} from "./xlsxSafetyGuard.js";
 
 function workbookBytes(bookType: "xlsx" | "xls"): Uint8Array {
   const workbook = XLSX.utils.book_new();
@@ -150,5 +156,43 @@ describe("parseSpreadsheetFile", () => {
     });
 
     expect(result.sheets[0]?.config.images).toHaveLength(1);
+  });
+});
+
+describe("assertXlsxContainerSafe", () => {
+  it("rejects a workbook with too many ZIP entries before parsing", async () => {
+    const zip = new JSZip();
+    for (let index = 0; index < 3; index += 1) {
+      zip.file(`xl/worksheets/sheet${index}.xml`, "<worksheet />");
+    }
+    const bytes = await zip.generateAsync({ type: "uint8array" });
+
+    await expect(
+      assertXlsxContainerSafe(bytes, {
+        maxZipEntries: 2,
+        maxEntryUncompressedBytes: 1024,
+        maxTotalUncompressedBytes: 4096,
+      }),
+    ).rejects.toBeInstanceOf(XlsxSafetyLimitError);
+  });
+
+  it("rejects a ZIP whose declared uncompressed size exceeds the limit", async () => {
+    const zip = new JSZip();
+    zip.file("xl/worksheets/sheet1.xml", "x".repeat(32));
+    const bytes = await zip.generateAsync({ type: "uint8array" });
+
+    await expect(
+      assertXlsxContainerSafe(bytes, {
+        maxZipEntries: 10,
+        maxEntryUncompressedBytes: 8,
+        maxTotalUncompressedBytes: 64,
+      }),
+    ).rejects.toBeInstanceOf(XlsxSafetyLimitError);
+  });
+
+  it("rejects a malformed ZIP as an invalid container", async () => {
+    await expect(assertXlsxContainerSafe(new Uint8Array([0x50, 0x4b]))).rejects.toBeInstanceOf(
+      XlsxContainerError,
+    );
   });
 });
