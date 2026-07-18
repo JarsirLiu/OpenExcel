@@ -5,6 +5,7 @@ export { deleteSheet } from "./deleteSheet.js";
 export { deleteWorkbook } from "./deleteWorkbook.js";
 export { exportWorkbook } from "./exportWorkbook.js";
 export {
+  importStoredWorkbook,
   importWorkbooks,
   WorkbookImportError,
   type WorkbookImportErrorCode,

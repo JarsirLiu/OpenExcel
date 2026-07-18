@@ -9,6 +9,8 @@ import {
 } from "@openexcel/agent";
 import { config as loadDotenv } from "dotenv";
 
+export { loadStorageConfig } from "./infra/storage/storageConfig.js";
+
 loadDotenv({
   path: resolve(dirname(fileURLToPath(import.meta.url)), "../../../.env"),
 });

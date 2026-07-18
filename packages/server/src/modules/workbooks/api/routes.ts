@@ -1,14 +1,46 @@
-import type { ImportedWorkbookBatchInput } from "@openexcel/core";
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply } from "fastify";
 import {
   resolveWorkbookIdForRequest,
   resolveWorkspaceIdForRequest,
 } from "../../../middleware/resourceAccess.js";
 import * as application from "../application/index.js";
-import { WORKBOOK_IMPORT_LIMITS } from "./importLimits.js";
-import { decompressImportPayload } from "./importPayload.js";
+import {
+  type WorkbookSourceAssetStorage,
+  WorkbookSourceAssetStorageError,
+} from "../domain/sourceAssetStorage.js";
+import { parseWorkbookImportMultipart, WorkbookMultipartError } from "./importMultipart.js";
 
-export async function workbookRoutes(app: FastifyInstance) {
+export type WorkbookRouteDependencies = {
+  sourceAssetStorage: WorkbookSourceAssetStorage;
+};
+
+function sendWorkbookImportError(reply: FastifyReply, error: unknown): unknown | undefined {
+  if (error instanceof WorkbookSourceAssetStorageError) {
+    return reply.status(400).send({
+      error: error.message,
+      code: "INVALID_UPLOAD_FILE",
+    });
+  }
+  if (error instanceof application.WorkbookImportError) {
+    return reply.status(error.statusCode).send({
+      error: error.message,
+      code: error.code,
+      details: error.details,
+    });
+  }
+  if (error instanceof WorkbookMultipartError) {
+    return reply.status(error.statusCode).send({
+      error: error.message,
+      code: error.code,
+    });
+  }
+  return undefined;
+}
+
+export async function workbookRoutes(
+  app: FastifyInstance,
+  dependencies: WorkbookRouteDependencies,
+) {
   app.get<{ Params: { workspacePublicId: string } }>(
     "/api/workspaces/:workspacePublicId/workbooks",
     async (req, reply) => {
@@ -96,33 +128,40 @@ export async function workbookRoutes(app: FastifyInstance) {
     return result;
   });
 
-  app.post<{
-    Params: { workspacePublicId: string };
-    Body: ImportedWorkbookBatchInput;
-  }>(
+  app.post<{ Params: { workspacePublicId: string } }>(
     "/api/workspaces/:workspacePublicId/workbooks/import",
-    {
-      bodyLimit: WORKBOOK_IMPORT_LIMITS.maxBodyBytes,
-      preParsing: decompressImportPayload,
-    },
     async (req, reply) => {
+      const workspaceId = await resolveWorkspaceIdForRequest(
+        req,
+        req.params.workspacePublicId,
+        reply,
+      );
+      if (workspaceId == null) return;
+
+      let sourceAsset: Awaited<ReturnType<typeof parseWorkbookImportMultipart>>;
       try {
-        const workspaceId = await resolveWorkspaceIdForRequest(
+        sourceAsset = await parseWorkbookImportMultipart(
           req,
-          req.params.workspacePublicId,
-          reply,
+          workspaceId,
+          dependencies.sourceAssetStorage,
         );
-        if (workspaceId == null) return;
-        const result = await application.importWorkbooks(workspaceId, req.body);
+      } catch (error) {
+        const response = sendWorkbookImportError(reply, error);
+        if (response !== undefined) return response;
+        throw error;
+      }
+
+      try {
+        const result = await application.importStoredWorkbook(
+          workspaceId,
+          sourceAsset,
+          dependencies.sourceAssetStorage,
+        );
         return reply.status(201).send(result);
       } catch (error) {
-        if (error instanceof application.WorkbookImportError) {
-          return reply.status(error.statusCode).send({
-            error: error.message,
-            code: error.code,
-            details: error.details,
-          });
-        }
+        await dependencies.sourceAssetStorage.delete(sourceAsset.storageKey).catch(() => undefined);
+        const response = sendWorkbookImportError(reply, error);
+        if (response !== undefined) return response;
         throw error;
       }
     },

@@ -27,9 +27,10 @@ The architecture must optimize for:
 ### 2.1 Core logic stays pure
 
 Spreadsheet primitives, delta handling, export logic, and shared schema conversion belong in `packages/core`.
-Browser-only workbook import is owned by the workbook feature in `packages/web`. The adapter routes
-`.xlsx` through FortuneExcel and `.xls`/`.csv` through SheetJS, then maps every format to the shared
-import DTO before sending it to the server.
+Workbook file parsing is owned by `packages/core`. The server stores the original upload, invokes
+the FortuneExcel-backed `.xlsx` adapter or the SheetJS-style `.xls/.csv` adapter, validates the
+resulting import DTO, and persists it transactionally. `packages/web` only uploads the original
+file and refreshes the workbook list.
 
 This package must not know about:
 
@@ -39,19 +40,14 @@ This package must not know about:
 - SSE or WebSocket
 - AI model providers
 
-Spreadsheet format adapters use the shared FortuneSheet conversion layer in `core`. That layer
-owns alignment, wrapping, borders, colors, scalar values, and formula semantics. Browser adapters
-only read `.xlsx`, `.xls`, or `.csv` files and translate library-specific output through those pure
-helpers; the ExcelJS exporter consumes the same helpers in reverse. No adapter may define a second
-mapping for `ht`, `vt`, `tb`, `ct`, or formula prefixes.
+Spreadsheet format adapters use the shared FortuneSheet conversion layer in `core`. That layer owns
+alignment, wrapping, borders, colors, scalar values, and formula semantics; the ExcelJS exporter
+consumes the same helpers in reverse. No adapter may define a second mapping for `ht`, `vt`, `tb`,
+`ct`, or formula prefixes.
 
 Workbook view metadata follows the same boundary. Excel `autoFilter` ranges are converted at the
-browser import boundary into the shared zero-based `filter_select` range used by FortuneSheet;
-ExcelJS export converts that range back to an Excel A1 range. The web adapter may use a secondary
-parser for metadata that the primary style parser does not expose, but it must not replace the
-primary `.xlsx` cell/style conversion path. The current secondary XLSX load is a known deferred
-performance issue; see [docs/issues.md](issues.md#xlsx-解析入口重复加载) for its constraints and
-future acceptance criteria.
+shared import boundary into the zero-based `filter_select` range used by FortuneSheet; ExcelJS
+export converts that range back to an Excel A1 range. The browser does not participate in parsing.
 
 ### 2.2 Agent logic is headless
 
@@ -160,6 +156,12 @@ Responsibilities:
 - Workbook and sheet persistence
 - Session title generation
 - Authentication, if needed
+
+Uploaded workbook files are stored as immutable source assets. In local development the default
+root is `.data/storage`; production may replace the local storage adapter with S3, MinIO, or
+another object store through `OPENEXCEL_STORAGE_ROOT`. The database stores only asset metadata and
+the storage key, never the XLSX binary. Import requests use `multipart/form-data` and contain only
+the original file; the server owns the file-to-domain import conversion.
 
 The server's database layer should be selectable at startup by configuration.
 The current implementation can keep multiple Prisma clients available and pick one from `DATABASE_PROVIDER` and `DATABASE_URL` when the process starts.
@@ -694,11 +696,11 @@ The bootstrap command is authenticated and idempotent. The workspace list endpoi
 - `POST /api/workspaces/:workspaceId/workbooks`
 - `POST /api/workspaces/:workspaceId/workbooks/import`
 
-  Accepts a JSON batch of FortuneSheet-compatible workbooks produced by the web import adapter.
-  Each item creates one workbook and the response is an array of created workbook summaries.
-  The whole batch is transactional: if any normalized workbook is invalid, no workbook from the
-  batch is persisted. Excel parsing stays in the browser; the server validates the DTO and owns
-  the transaction.
+  Accepts `multipart/form-data` with exactly one original `file` field. The server stores the file
+  as an immutable source asset, parses `.xlsx`, `.xls`, or `.csv` through the shared core importer,
+  validates the resulting domain DTO, and persists the workbook transactionally. The response is
+  an array of created workbook summaries. No client-generated workbook JSON is accepted by this
+  endpoint.
 - `POST /api/workspaces/:workspaceId/workbooks/:id/upload`
 - `POST /api/workspaces/:workspaceId/workbooks/:workbookId/sheets`
 - `DELETE /api/workspaces/:workspaceId/workbooks/:workbookId/sheets/:sheetId`

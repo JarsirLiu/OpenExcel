@@ -1,6 +1,7 @@
+import { readFile } from "node:fs/promises";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as repository from "../infrastructure/workbookRepository.js";
-import { importWorkbooks, WorkbookImportError } from "./importWorkbook.js";
+import { importStoredWorkbook, importWorkbooks, WorkbookImportError } from "./importWorkbook.js";
 
 vi.mock("../infrastructure/workbookRepository.js", () => ({
   createImportedWorkbooks: vi.fn(),
@@ -169,5 +170,73 @@ describe("importWorkbooks", () => {
       }),
     ).rejects.toMatchObject({ code: "INVALID_IMPORT_PAYLOAD" });
     expect(repository.createImportedWorkbooks).not.toHaveBeenCalled();
+  });
+});
+
+describe("importStoredWorkbook", () => {
+  it("parses the stored source file before opening the import transaction", async () => {
+    const sourceAsset = {
+      publicId: "asset_csv",
+      storageKey: "uploads/1/asset_csv/original.csv",
+      originalFileName: "库存.csv",
+      detectedFormat: "csv" as const,
+      mimeType: "text/csv",
+      sizeBytes: 12,
+      sha256: "hash",
+    };
+    const storage = {
+      store: vi.fn(),
+      read: vi.fn(async () => new TextEncoder().encode("名称,数量\n商品 A,3")),
+      delete: vi.fn(),
+    };
+
+    await importStoredWorkbook(1, sourceAsset, storage);
+
+    expect(storage.read).toHaveBeenCalledWith(sourceAsset.storageKey);
+    expect(repository.createImportedWorkbooks).toHaveBeenCalledWith(
+      1,
+      [
+        expect.objectContaining({
+          workbookName: "库存",
+          sheetNames: ["Sheet1"],
+        }),
+      ],
+      sourceAsset,
+    );
+  });
+
+  it("accepts XLSX files whose FortuneExcel config uses class instances", async () => {
+    const sourceAsset = {
+      publicId: "asset_xlsx",
+      storageKey: "uploads/1/asset_xlsx/original.xlsx",
+      originalFileName: "图片.xlsx",
+      detectedFormat: "xlsx" as const,
+      mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      sizeBytes: 1,
+      sha256: "hash",
+    };
+    const storage = {
+      store: vi.fn(),
+      read: vi.fn(
+        async () =>
+          new Uint8Array(
+            await readFile(
+              new URL(
+                "../../../../../core/node_modules/@corbe30/fortune-excel/test/fixtures/xls_preview.xlsx",
+                import.meta.url,
+              ),
+            ),
+          ),
+      ),
+      delete: vi.fn(),
+    };
+
+    await importStoredWorkbook(1, sourceAsset, storage);
+
+    expect(repository.createImportedWorkbooks).toHaveBeenCalledWith(
+      1,
+      [expect.objectContaining({ workbookName: "图片", sheetNames: ["Feuille1"] })],
+      sourceAsset,
+    );
   });
 });

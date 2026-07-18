@@ -1,9 +1,11 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import cors from "@fastify/cors";
+import multipart from "@fastify/multipart";
 import fastifyStatic from "@fastify/static";
 import Fastify from "fastify";
 import { pinoStream } from "./infra/observability/logger.js";
+import { localFileStorage, MAX_UPLOAD_FILE_BYTES } from "./infra/storage/localFileStorage.js";
 import { responseLoggerHook, startTimerHook } from "./middleware/requestLogger.js";
 import { resolveUserHook } from "./middleware/resolveUser.js";
 import { authRoutes } from "./modules/auth/api/routes.js";
@@ -26,9 +28,17 @@ export async function createApp() {
     origin: true,
     exposedHeaders: ["X-OpenExcel-Session-Id", "X-OpenExcel-Session-Name"],
   });
+  await app.register(multipart, {
+    limits: {
+      fileSize: MAX_UPLOAD_FILE_BYTES,
+      files: 1,
+      fields: 1,
+      parts: 2,
+    },
+  });
   await app.register(authRoutes);
   await app.register(workspaceRoutes);
-  await app.register(workbookRoutes);
+  await app.register(workbookRoutes, { sourceAssetStorage: localFileStorage });
   await app.register(sheetRoutes);
   await app.register(sessionRoutes);
 

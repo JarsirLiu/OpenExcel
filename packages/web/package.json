@@ -13,7 +13,6 @@
   },
   "dependencies": {
     "@ai-sdk/react": "^4.0.5",
-    "@corbe30/fortune-excel": "2.3.3",
     "@fortune-sheet/react": "^1.0.4",
     "@openexcel/chat-contracts": "workspace:*",
     "@openexcel/core": "workspace:*",
@@ -22,14 +21,12 @@
     "@tiptap/starter-kit": "^3.27.1",
     "@tiptap/suggestion": "^3.27.1",
     "ai": "^7.0.4",
-    "jszip": "3.10.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.18.1",
     "remark-gfm": "^4.0.1",
     "streamdown": "^2.5.0",
-    "tippy.js": "^6.3.7",
-    "xlsx-js-style": "1.2.0"
+    "tippy.js": "^6.3.7"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",

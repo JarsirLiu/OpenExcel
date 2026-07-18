@@ -4,7 +4,6 @@ import type { WorkbookMeta } from "@/api/workbooks";
 
 const mocks = vi.hoisted(() => ({
   fetchWorkbooks: vi.fn(),
-  importWorkbookFile: vi.fn(),
   importWorkbooks: vi.fn(),
   toast: vi.fn(),
   setWorkbooks: vi.fn(),
@@ -15,10 +14,6 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/api/workbooks", () => ({
   fetchWorkbooks: mocks.fetchWorkbooks,
   importWorkbooks: mocks.importWorkbooks,
-}));
-
-vi.mock("@/features/workbook/import/workbookImporter", () => ({
-  importWorkbookFile: mocks.importWorkbookFile,
 }));
 
 vi.mock("@/features/workspace/useWorkbookCatalog", () => ({
@@ -57,7 +52,6 @@ function deferred<T>() {
 describe("useWorkspaceView", () => {
   beforeEach(() => {
     mocks.fetchWorkbooks.mockReset();
-    mocks.importWorkbookFile.mockReset();
     mocks.importWorkbooks.mockReset();
     mocks.toast.mockReset();
     mocks.setWorkbooks.mockReset();
@@ -71,7 +65,6 @@ describe("useWorkspaceView", () => {
     mocks.fetchWorkbooks
       .mockReturnValueOnce(importedCatalog.promise)
       .mockReturnValueOnce(replacementCatalog.promise);
-    mocks.importWorkbookFile.mockResolvedValue({});
     mocks.importWorkbooks.mockResolvedValue([
       { id: 7, publicId: "workbook-7", name: "Imported", sheets: 1 },
     ]);

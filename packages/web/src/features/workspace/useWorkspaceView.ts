@@ -10,8 +10,6 @@ import {
   updateWorkbookName,
 } from "@/api/workbooks";
 import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatchSync";
-import { validateImportFileSizes } from "@/features/workbook/import/importLimits";
-import { importWorkbookFile } from "@/features/workbook/import/workbookImporter";
 import { toast } from "@/shared/lib";
 import { patchWorkbookWithDelta } from "../workbook/utils/patchWorkbook";
 import { useWorkbookCatalog, type WorkbookInitial } from "./useWorkbookCatalog";
@@ -277,16 +275,6 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
         toast({ message: `一次最多选择 ${MAX_IMPORT_WORKBOOKS} 个文件`, variant: "error" });
         return false;
       }
-      try {
-        validateImportFileSizes(files);
-      } catch (error) {
-        toast({
-          message: error instanceof Error ? error.message : "文件大小超过限制",
-          variant: "error",
-        });
-        return false;
-      }
-
       const { generation, controller } = beginRequest();
       let completedFiles = 0;
       let activeFileName = "";
@@ -296,16 +284,9 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
           const file = files[index];
           if (!file) continue;
           activeFileName = file.name;
-          const imported = await importWorkbookFile(file);
-          if (!isCurrentRequest(generation, controller.signal)) return false;
-
-          const uploaded = await importWorkbooks(
-            workspaceId,
-            { workbooks: [imported] },
-            {
-              signal: controller.signal,
-            },
-          );
+          const uploaded = await importWorkbooks(workspaceId, file, {
+            signal: controller.signal,
+          });
           results.push(...uploaded);
           completedFiles += 1;
         }

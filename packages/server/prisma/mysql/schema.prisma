@@ -14,12 +14,33 @@ model Workbook {
   workspaceId Int
   name        String
   order       Int
+  sourceAssetId Int?
   sheets      Sheet[]
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  sourceAsset UploadAsset? @relation(fields: [sourceAssetId], references: [id], onDelete: SetNull)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
   @@index([workspaceId])
+  @@index([sourceAssetId])
+}
+
+model UploadAsset {
+  id               Int        @id @default(autoincrement())
+  publicId         String     @unique
+  workspaceId      Int
+  storageKey       String
+  originalFileName String
+  detectedFormat   String
+  mimeType         String
+  sizeBytes        Int
+  sha256           String
+  workspace        Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workbooks        Workbook[]
+  createdAt        DateTime   @default(now())
+
+  @@index([workspaceId])
+  @@index([sha256])
 }
 
 model User {
@@ -78,6 +99,7 @@ model Workspace {
   order       Int
   owner       User       @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
   workbooks   Workbook[]
+  uploadAssets UploadAsset[]
   sessions    Session[]
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt

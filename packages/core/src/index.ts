@@ -105,6 +105,7 @@ export {
   fortuneVerticalToExcel,
   fortuneWrapToExcel,
 } from "./excel/fortuneStyle.js";
+export { type JsonValue, toJsonObject, toJsonValue } from "./excel/jsonValue.js";
 export type { FilterSelection, FortuneSheetData, SheetConfig } from "./excel/sheetConfig.js";
 export { extractSheetConfig, restoreSheetConfig } from "./excel/sheetConfig.js";
 export type {
@@ -115,6 +116,11 @@ export type {
 export { celldataToExcel } from "./exporter/celldataToExcel.js";
 export { templateToExcel } from "./exporter/templateToExcel.js";
 export { jsonToTemplate } from "./importer/jsonAnalyzer.js";
+export {
+  parseSpreadsheetFile,
+  type SpreadsheetFileFormat,
+  type SpreadsheetFileInput,
+} from "./importer/spreadsheetFileImporter.js";
 export type {
   ColumnDef,
   InitConfig,
