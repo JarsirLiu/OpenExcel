@@ -1,3 +1,4 @@
+import { parseChartSpec } from "@openexcel/core";
 import { prisma } from "../../../infra/database/db.js";
 import type { Prisma } from "../../../infra/database/prismaTypes.js";
 import { withWorkspaceUndoLock } from "../infrastructure/workspaceUndoLock.js";
@@ -197,6 +198,59 @@ async function restoreSheetSnapshots(
   return restoredSheetIds;
 }
 
+async function restoreChartSnapshots(
+  tx: Prisma.TransactionClient,
+  runId: number,
+  excludedSheetIds: Set<number>,
+): Promise<void> {
+  const snapshots = await tx.agentRunChartSnapshot.findMany({
+    where: { runId },
+    orderBy: { id: "asc" },
+  });
+
+  for (const snapshot of snapshots) {
+    if (snapshot.spec == null) {
+      await tx.chart.deleteMany({ where: { publicId: snapshot.chartId } });
+      continue;
+    }
+    if (excludedSheetIds.has(snapshot.sheetId)) continue;
+
+    let spec: unknown;
+    try {
+      spec = JSON.parse(snapshot.spec);
+    } catch (error) {
+      throw new Error(`运行记录中的图表快照损坏，无法撤销: ${snapshot.chartId}`, { cause: error });
+    }
+    const chart = parseChartSpec(spec);
+    if (
+      chart.id !== snapshot.chartId ||
+      chart.workbookId !== String(snapshot.workbookId) ||
+      chart.sheetId !== String(snapshot.sheetId)
+    ) {
+      throw new Error(`运行记录中的图表快照身份不一致，无法撤销: ${snapshot.chartId}`);
+    }
+
+    await tx.chart.upsert({
+      where: { publicId: snapshot.chartId },
+      create: {
+        publicId: snapshot.chartId,
+        workbookId: snapshot.workbookId,
+        sheetId: snapshot.sheetId,
+        order: snapshot.order,
+        spec: JSON.stringify(chart),
+      },
+      update: {
+        workbookId: snapshot.workbookId,
+        sheetId: snapshot.sheetId,
+        order: snapshot.order,
+        spec: JSON.stringify(chart),
+      },
+    });
+  }
+
+  await tx.agentRunChartSnapshot.deleteMany({ where: { runId } });
+}
+
 async function deleteSheetAndReindex(
   tx: Prisma.TransactionClient,
   workbookId: number,
@@ -281,6 +335,9 @@ async function undoLatestRunInternal(workspaceId: number, sessionId: number) {
     const restoredMessages = trimMessagesAfterUserTurn(messages, transcriptInputText);
 
     const restoredSheetIds = await restoreSheetSnapshots(tx, run.id, createdSheetIds);
+    if ((run.chartSnapshots?.length ?? 0) > 0) {
+      await restoreChartSnapshots(tx, run.id, createdSheetIds);
+    }
 
     for (const effect of createdSheetEffects.slice().reverse()) {
       if (createdWorkbookIds.has(effect.workbookId)) {

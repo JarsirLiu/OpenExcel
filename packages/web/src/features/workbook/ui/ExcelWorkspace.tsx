@@ -1,5 +1,6 @@
 import type { WorkbookFull } from "@/api/workbooks";
 import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatchSync";
+import { ChartViewport } from "@/features/workbook/charts/ChartViewport";
 import { ExcelGrid } from "@/features/workbook/editor/ExcelGrid";
 import styles from "./ExcelWorkspace.module.css";
 
@@ -26,19 +27,26 @@ export function ExcelWorkspace({
   onWorkbookRefresh,
   onWorkbookMutation,
 }: Props) {
+  const currentSheet = workbook?.sheets[currentSheetIndex];
+
   return (
     <div className={styles.container}>
-      <ExcelGrid
-        workspaceId={workspaceId}
-        workbook={workbook}
-        workbookRevision={workbookRevision}
-        currentSheetIndex={currentSheetIndex}
-        onSheetIndexChange={onSheetIndexChange}
-        onWorkbookDelete={onWorkbookDelete}
-        onWorkbookStructureChanged={onWorkbookStructureChanged}
-        onWorkbookRefresh={onWorkbookRefresh}
-        onWorkbookMutation={onWorkbookMutation}
-      />
+      <div className={styles.grid}>
+        <ExcelGrid
+          workspaceId={workspaceId}
+          workbook={workbook}
+          workbookRevision={workbookRevision}
+          currentSheetIndex={currentSheetIndex}
+          onSheetIndexChange={onSheetIndexChange}
+          onWorkbookDelete={onWorkbookDelete}
+          onWorkbookStructureChanged={onWorkbookStructureChanged}
+          onWorkbookRefresh={onWorkbookRefresh}
+          onWorkbookMutation={onWorkbookMutation}
+        />
+      </div>
+      {workbook && currentSheet ? (
+        <ChartViewport workbook={workbook} sheetId={currentSheet.id} />
+      ) : null}
     </div>
   );
 }

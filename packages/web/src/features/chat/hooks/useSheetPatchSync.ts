@@ -225,6 +225,16 @@ export function collectWorkbookMutationToolCallIds(
     toolCallIds.add(update.toolCallId);
   }
 
+  for (const message of messages) {
+    if (message.role !== "assistant" || !Array.isArray(message.parts)) continue;
+    for (const part of message.parts) {
+      if (!isCompletedToolPart(part) || seenAfterPatchUpdates.has(part.toolCallId)) continue;
+      if (["createChart", "updateChart", "deleteChart"].includes(getToolName(part))) {
+        toolCallIds.add(part.toolCallId);
+      }
+    }
+  }
+
   return Array.from(toolCallIds);
 }
 

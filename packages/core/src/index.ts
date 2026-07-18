@@ -1,3 +1,13 @@
+export type {
+  ChartData,
+  ChartDataSheet,
+  ChartSeriesData,
+} from "./chart/chartAnalysis.js";
+export {
+  chartDependencySheetIds,
+  chartReferenceLength,
+  resolveChartData,
+} from "./chart/chartAnalysis.js";
 export type { ChartCommand, ChartCommandResult, ChartUpdate } from "./chart/chartCommands.js";
 export {
   applyChartCommand,

@@ -1,3 +1,4 @@
+import type { ChartSpec } from "@openexcel/core";
 import { downloadBlob, XLSX_MIME_TYPE } from "@/shared/lib";
 import { API_BASE, apiFetch, readErrorMessage } from "./http";
 
@@ -56,6 +57,7 @@ export interface WorkbookFull {
   publicId: string;
   name: string;
   sheets: SheetSchema[];
+  charts: ChartSpec[];
 }
 
 export interface WorkbookCreateResult {

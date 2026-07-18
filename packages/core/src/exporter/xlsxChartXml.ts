@@ -98,7 +98,7 @@ function chartGroupXml(
     return `<c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:varyColors val="0"/>${seriesMarkup}<c:dLbls/><c:gapWidth val="150"/><c:axId val="${categoryAxisId}"/><c:axId val="${valueAxisId}"/></c:barChart>`;
   }
   if (type === "line") {
-    return `<c:lineChart><c:grouping val="standard"/><c:varyColors val="0"/>${seriesMarkup}<c:dLbls/><c:marker val="1"/><c:axId val="${categoryAxisId}"/><c:axId val="${valueAxisId}"/></c:lineChart>`;
+    return `<c:lineChart><c:grouping val="standard"/><c:varyColors val="0"/>${seriesMarkup}<c:dLbls/><c:marker><c:symbol val="circle"/></c:marker><c:axId val="${categoryAxisId}"/><c:axId val="${valueAxisId}"/></c:lineChart>`;
   }
   if (type === "area") {
     return `<c:areaChart><c:grouping val="standard"/><c:varyColors val="0"/>${seriesMarkup}<c:dropLines/><c:axId val="${categoryAxisId}"/><c:axId val="${valueAxisId}"/></c:areaChart>`;

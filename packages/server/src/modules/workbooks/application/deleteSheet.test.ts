@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { findChartsReferencingSheet } from "../../charts/application/index.js";
 import * as repo from "../infrastructure/workbookRepository.js";
 import { deleteSheet } from "./deleteSheet.js";
 
@@ -7,12 +8,16 @@ vi.mock("../infrastructure/workbookRepository.js", () => ({
   deleteSheetAndReindex: vi.fn(),
 }));
 
+vi.mock("../../charts/application/index.js", () => ({
+  findChartsReferencingSheet: vi.fn(),
+}));
+
 vi.mock("../../sessions/runs/undoCheckpoint.js", () => ({
-  withUndoTrackedSheetMutation: (
+  withUndoTrackedMutation: (
     _workspaceId: number,
-    _sheetIds: number[],
+    resolveSheetIds: () => Promise<number[]>,
     mutation: () => Promise<unknown>,
-  ) => mutation(),
+  ) => resolveSheetIds().then(() => mutation()),
 }));
 
 const mockedRepo = vi.mocked(repo);
@@ -20,6 +25,7 @@ const mockedRepo = vi.mocked(repo);
 describe("deleteSheet", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(findChartsReferencingSheet).mockResolvedValue([]);
   });
 
   it("returns null when the workbook is missing", async () => {
@@ -61,5 +67,22 @@ describe("deleteSheet", () => {
       order: 1,
     });
     expect(mockedRepo.deleteSheetAndReindex).toHaveBeenCalledWith(1, 11, 1);
+  });
+
+  it("blocks deleting a sheet referenced by a chart", async () => {
+    mockedRepo.findWorkbookWithSheets.mockResolvedValue({
+      id: 1,
+      sheets: [
+        { id: 10, sheetNo: 1, order: 0 },
+        { id: 11, sheetNo: 2, order: 1 },
+      ],
+    } as any);
+    vi.mocked(findChartsReferencingSheet).mockResolvedValue(["chart-1"]);
+
+    await expect(deleteSheet(1, 1, 11)).resolves.toEqual({
+      error: "无法删除 Sheet：仍有 1 个图表引用它",
+      statusCode: 409,
+    });
+    expect(mockedRepo.deleteSheetAndReindex).not.toHaveBeenCalled();
   });
 });

@@ -11,6 +11,7 @@ import { resolveUserHook } from "./middleware/resolveUser.js";
 import { createAssetService } from "./modules/assets/application/assetService.js";
 import { createAssetCleanupWorker } from "./modules/assets/application/cleanupAssets.js";
 import { authRoutes } from "./modules/auth/api/routes.js";
+import { chartRoutes } from "./modules/charts/api/routes.js";
 import { sessionRoutes } from "./modules/sessions/api/routes.js";
 import { sheetRoutes } from "./modules/sheets/api/routes.js";
 import { workbookRoutes } from "./modules/workbooks/api/routes.js";
@@ -43,6 +44,7 @@ export async function createApp() {
   await app.register(authRoutes);
   await app.register(workspaceRoutes);
   await app.register(workbookRoutes, { assets });
+  await app.register(chartRoutes);
   app.addHook("onReady", async () => assetCleanup.start());
   app.addHook("onClose", async () => assetCleanup.stop());
   await app.register(sheetRoutes);

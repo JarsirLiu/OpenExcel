@@ -8,10 +8,10 @@ const mocks = vi.hoisted(() => ({
   snapshotDeleteMany: vi.fn(),
   findSessionUndoCheckpoint: vi.fn(),
   setSessionUndoRun: vi.fn(),
-  findRunsWithSheetSnapshots: vi.fn(),
+  findRunsWithSnapshotsForSheets: vi.fn(),
   updateRun: vi.fn(),
   findRunUndoState: vi.fn(),
-  deleteRunSheetSnapshots: vi.fn(),
+  deleteRunSnapshots: vi.fn(),
 }));
 
 vi.mock("../../../infra/database/db.js", () => ({
@@ -25,6 +25,9 @@ vi.mock("../../../infra/database/db.js", () => ({
       updateMany: mocks.agentRunUpdateMany,
     },
     agentRunSheetSnapshot: {
+      deleteMany: mocks.snapshotDeleteMany,
+    },
+    agentRunChartSnapshot: {
       deleteMany: mocks.snapshotDeleteMany,
     },
   },
@@ -42,8 +45,8 @@ vi.mock("../infrastructure/sessionRepository.js", () => ({
 vi.mock("./repository.js", () => ({
   updateRun: mocks.updateRun,
   findRunUndoState: mocks.findRunUndoState,
-  findRunsWithSheetSnapshots: mocks.findRunsWithSheetSnapshots,
-  deleteRunSheetSnapshots: mocks.deleteRunSheetSnapshots,
+  findRunsWithSnapshotsForSheets: mocks.findRunsWithSnapshotsForSheets,
+  deleteRunSnapshots: mocks.deleteRunSnapshots,
 }));
 
 import {
@@ -73,7 +76,7 @@ describe("undo checkpoint", () => {
       endedAt: expect.any(Date),
     });
     expect(mocks.setSessionUndoRun).toHaveBeenCalledWith(5, 3, 17);
-    expect(mocks.deleteRunSheetSnapshots).not.toHaveBeenCalled();
+    expect(mocks.deleteRunSnapshots).not.toHaveBeenCalled();
   });
 
   it("discards snapshots when a run has no undo effects", async () => {
@@ -86,15 +89,15 @@ describe("undo checkpoint", () => {
     await completeRunAndUpdateUndoCheckpoint(3, 5, 17, { status: "completed" });
 
     expect(mocks.setSessionUndoRun).not.toHaveBeenCalled();
-    expect(mocks.deleteRunSheetSnapshots).toHaveBeenCalledWith(17);
+    expect(mocks.deleteRunSnapshots).toHaveBeenCalledWith(17);
   });
 
   it("invalidates every active checkpoint candidate that snapshots the changed sheets", async () => {
-    mocks.findRunsWithSheetSnapshots.mockResolvedValueOnce([19]);
+    mocks.findRunsWithSnapshotsForSheets.mockResolvedValueOnce([19]);
 
     await invalidateUndoCheckpointsForSheets(3, [7]);
 
-    expect(mocks.findRunsWithSheetSnapshots).toHaveBeenCalledWith(3, [7], undefined);
+    expect(mocks.findRunsWithSnapshotsForSheets).toHaveBeenCalledWith(3, [7], undefined);
 
     expect(mocks.agentRunUpdateMany).toHaveBeenCalledWith({
       where: { id: { in: [19] } },
@@ -111,7 +114,7 @@ describe("undo checkpoint", () => {
   });
 
   it("keeps unrelated checkpoints intact", async () => {
-    mocks.findRunsWithSheetSnapshots.mockResolvedValueOnce([]);
+    mocks.findRunsWithSnapshotsForSheets.mockResolvedValueOnce([]);
 
     await invalidateUndoCheckpointsForSheets(3, [7]);
 
@@ -119,15 +122,15 @@ describe("undo checkpoint", () => {
   });
 
   it("excludes the mutating run while invalidating concurrent candidates", async () => {
-    mocks.findRunsWithSheetSnapshots.mockResolvedValueOnce([]);
+    mocks.findRunsWithSnapshotsForSheets.mockResolvedValueOnce([]);
 
     await invalidateUndoCheckpointsForSheets(3, [7], 17);
 
-    expect(mocks.findRunsWithSheetSnapshots).toHaveBeenCalledWith(3, [7], 17);
+    expect(mocks.findRunsWithSnapshotsForSheets).toHaveBeenCalledWith(3, [7], 17);
   });
 
   it("invalidates checkpoints before applying a sheet mutation", async () => {
-    mocks.findRunsWithSheetSnapshots.mockResolvedValueOnce([19]);
+    mocks.findRunsWithSnapshotsForSheets.mockResolvedValueOnce([19]);
     const mutation = vi.fn().mockResolvedValueOnce("written");
 
     await expect(withUndoTrackedSheetMutation(3, [7], mutation)).resolves.toBe("written");
@@ -147,6 +150,6 @@ describe("undo checkpoint", () => {
     await completeRunAndUpdateUndoCheckpoint(3, 5, 17, { status: "completed" });
 
     expect(mocks.setSessionUndoRun).not.toHaveBeenCalled();
-    expect(mocks.deleteRunSheetSnapshots).toHaveBeenCalledWith(17);
+    expect(mocks.deleteRunSnapshots).toHaveBeenCalledWith(17);
   });
 });

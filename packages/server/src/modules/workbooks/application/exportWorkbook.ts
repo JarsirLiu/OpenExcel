@@ -1,6 +1,7 @@
 import { workbookToXlsx } from "@openexcel/core";
 import { sheetRecordToCelldata } from "../../../shared/utils/sheetData.js";
 import { deserializeSheet } from "../../../shared/utils/sheetSerialization.js";
+import { deserializeChartSpec } from "../../charts/domain/chart.js";
 import * as repo from "../infrastructure/workbookRepository.js";
 
 export async function exportWorkbook(workspaceId: number, id: number) {
@@ -33,7 +34,7 @@ export async function exportWorkbook(workspaceId: number, id: number) {
   const ab = await workbookToXlsx({
     workbookId: String(wb.id),
     sheets,
-    charts: [],
+    charts: wb.charts.map(deserializeChartSpec),
   });
   return { buffer: Buffer.from(ab), name: wb.name };
 }

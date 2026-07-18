@@ -30,12 +30,16 @@ describe("buildExcelToolContext", () => {
 
     expect(workspaceContext).toEqual({
       readSheet: { workspaceId: 3 },
+      listCharts: { workspaceId: 3 },
     });
 
     expect(runContext).toEqual({
       createWorkbook: { runId: 7, workspaceId: 3 },
       createSheet: { runId: 7, workspaceId: 3 },
       writeCells: { runId: 7, workspaceId: 3 },
+      createChart: { runId: 7, workspaceId: 3 },
+      updateChart: { runId: 7, workspaceId: 3 },
+      deleteChart: { runId: 7, workspaceId: 3 },
       clearCells: { runId: 7, workspaceId: 3 },
       mergeCells: { runId: 7, workspaceId: 3 },
       unmergeCells: { runId: 7, workspaceId: 3 },
@@ -43,9 +47,13 @@ describe("buildExcelToolContext", () => {
 
     expect(mergedContext).toEqual({
       readSheet: { workspaceId: 3 },
+      listCharts: { workspaceId: 3 },
       createWorkbook: { runId: 7, workspaceId: 3 },
       createSheet: { runId: 7, workspaceId: 3 },
       writeCells: { runId: 7, workspaceId: 3 },
+      createChart: { runId: 7, workspaceId: 3 },
+      updateChart: { runId: 7, workspaceId: 3 },
+      deleteChart: { runId: 7, workspaceId: 3 },
       clearCells: { runId: 7, workspaceId: 3 },
       mergeCells: { runId: 7, workspaceId: 3 },
       unmergeCells: { runId: 7, workspaceId: 3 },

@@ -9,6 +9,7 @@ import {
   wrapToolSetWithResultBudget,
 } from "@openexcel/agent";
 import { loadModelConfig } from "../../../config.js";
+import { chartTools } from "../../charts/tools/index.js";
 import { excelTools } from "../../sheets/tools/index.js";
 import { workbookTools } from "../../workbooks/tools/index.js";
 import { extractFirstUserText, extractLatestUserText } from "../application/messageText.js";
@@ -97,7 +98,7 @@ export async function streamChat(
     toolBudgets: { readSheet: config.readSheetBudgetTokens },
   });
   const tools = wrapToolSetWithResultBudget(
-    { ...workbookTools, ...excelTools } as any,
+    { ...workbookTools, ...excelTools, ...chartTools } as any,
     toolResultBudget,
   );
   const toolNames = Object.keys(tools);

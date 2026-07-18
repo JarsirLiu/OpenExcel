@@ -67,6 +67,7 @@ export async function findUndoCheckpointRun(workspaceId: number, sessionId: numb
       status: { in: ["completed", "aborted", "error"] },
       OR: [
         { snapshots: { some: {} } },
+        { chartSnapshots: { some: {} } },
         {
           steps: {
             some: {
@@ -86,6 +87,9 @@ export async function findUndoCheckpointRun(workspaceId: number, sessionId: numb
       snapshots: {
         orderBy: { id: "asc" },
       },
+      chartSnapshots: {
+        orderBy: { id: "asc" },
+      },
     },
     orderBy: [{ startedAt: "desc" }, { id: "desc" }],
   });
@@ -98,7 +102,7 @@ export async function findRunUndoState(runId: number) {
       id: true,
       undoInvalidated: true,
       _count: {
-        select: { snapshots: true },
+        select: { snapshots: true, chartSnapshots: true },
       },
     },
   });
@@ -107,7 +111,7 @@ export async function findRunUndoState(runId: number) {
   return {
     id: run.id,
     undoInvalidated: run.undoInvalidated,
-    hasUndoEffects: run._count.snapshots > 0,
+    hasUndoEffects: run._count.snapshots > 0 || run._count.chartSnapshots > 0,
   };
 }
 
@@ -166,6 +170,46 @@ export async function upsertRunSheetSnapshot(data: {
   });
 }
 
+export async function upsertRunChartSnapshot(data: {
+  runId: number;
+  chartId: string;
+  workbookId: number;
+  sheetId: number;
+  sheetIds: number[];
+  order: number;
+  spec: string | null;
+}) {
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.agentRunChartSnapshot.findUnique({
+      where: {
+        runId_chartId: {
+          runId: data.runId,
+          chartId: data.chartId,
+        },
+      },
+    });
+    if (existing) return existing;
+
+    const snapshot = await tx.agentRunChartSnapshot.create({
+      data: {
+        runId: data.runId,
+        chartId: data.chartId,
+        workbookId: data.workbookId,
+        sheetId: data.sheetId,
+        order: data.order,
+        spec: data.spec,
+      },
+    });
+    const sheetIds = [...new Set(data.sheetIds)];
+    if (sheetIds.length > 0) {
+      await tx.agentRunChartSnapshotSheet.createMany({
+        data: sheetIds.map((sheetId) => ({ snapshotId: snapshot.id, sheetId })),
+      });
+    }
+    return snapshot;
+  });
+}
+
 export async function findRunSheetSnapshots(runId: number) {
   return prisma.agentRunSheetSnapshot.findMany({
     where: { runId },
@@ -173,14 +217,14 @@ export async function findRunSheetSnapshots(runId: number) {
   });
 }
 
-export async function findRunsWithSheetSnapshots(
+export async function findRunsWithSnapshotsForSheets(
   workspaceId: number,
   sheetIds: number[],
   originRunId?: number,
 ) {
   if (sheetIds.length === 0) return [];
 
-  const snapshots = await prisma.agentRunSheetSnapshot.findMany({
+  const sheetSnapshots = await prisma.agentRunSheetSnapshot.findMany({
     where: {
       sheetId: { in: sheetIds },
       run: {
@@ -193,13 +237,34 @@ export async function findRunsWithSheetSnapshots(
     select: { runId: true },
   });
 
-  return [...new Set(snapshots.map((snapshot) => snapshot.runId))];
+  const chartSnapshots = await prisma.agentRunChartSnapshotSheet.findMany({
+    where: {
+      sheetId: { in: sheetIds },
+      snapshot: {
+        run: {
+          undoInvalidated: false,
+          status: { in: ["running", "completed", "aborted", "error"] },
+          session: { workspaceId },
+          ...(originRunId == null ? {} : { id: { not: originRunId } }),
+        },
+      },
+    },
+    select: { snapshot: { select: { runId: true } } },
+  });
+
+  return [
+    ...new Set([
+      ...sheetSnapshots.map((snapshot) => snapshot.runId),
+      ...chartSnapshots.map((snapshot) => snapshot.snapshot.runId),
+    ]),
+  ];
 }
 
-export async function deleteRunSheetSnapshots(runId: number) {
-  await prisma.agentRunSheetSnapshot.deleteMany({
-    where: { runId },
-  });
+export async function deleteRunSnapshots(runId: number) {
+  await prisma.$transaction([
+    prisma.agentRunSheetSnapshot.deleteMany({ where: { runId } }),
+    prisma.agentRunChartSnapshot.deleteMany({ where: { runId } }),
+  ]);
 }
 
 export async function restoreRunSheetSnapshots(runId: number) {

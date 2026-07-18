@@ -21,6 +21,7 @@ const workbookMeta = (id: number): WorkbookMeta => ({
 const workbookFull = (id: number): WorkbookFull => ({
   ...workbookMeta(id),
   sheets: [],
+  charts: [],
 });
 
 function deferred<T>() {

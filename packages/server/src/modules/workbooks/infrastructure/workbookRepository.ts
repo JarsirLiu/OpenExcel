@@ -27,7 +27,10 @@ export async function findWorkbooksWithSheets(workspaceId: number) {
 export async function findWorkbookWithSheets(id: number, workspaceId: number) {
   const workbook = await prisma.workbook.findFirst({
     where: { id, workspaceId },
-    include: { sheets: { orderBy: { order: "asc" } } },
+    include: {
+      sheets: { orderBy: { order: "asc" } },
+      charts: { orderBy: [{ order: "asc" }, { id: "asc" }] },
+    },
   });
   return workbook;
 }

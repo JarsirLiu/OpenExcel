@@ -122,6 +122,90 @@ describe("chart model", () => {
 
     expect(result.success).toBe(false);
   });
+
+  it("requires exactly one series for pie charts", () => {
+    const result = chartSpecSchema.safeParse({
+      ...chart(),
+      type: "pie",
+      series: [
+        { ...chart().series[0], categoryRef: chart().series[0].categoryRef },
+        { ...chart().series[0], id: "series-2", categoryRef: chart().series[0].categoryRef },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects two-dimensional data ranges instead of guessing their meaning", () => {
+    const result = chartSpecSchema.safeParse({
+      ...chart(),
+      series: [
+        {
+          ...chart().series[0],
+          valueRef: {
+            sheetId: "sheet-1",
+            start: { row: 0, col: 0 },
+            end: { row: 2, col: 1 },
+          },
+        },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("requires equal category and value lengths", () => {
+    const result = chartSpecSchema.safeParse({
+      ...chart(),
+      series: [
+        {
+          ...chart().series[0],
+          valueRef: {
+            sheetId: "sheet-1",
+            start: { row: 0, col: 1 },
+            end: { row: 2, col: 1 },
+          },
+        },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects unsupported or implicit combo series types", () => {
+    const missingType = chartSpecSchema.safeParse({
+      ...chart(),
+      type: "combo",
+    });
+    const unsupportedType = chartSpecSchema.safeParse({
+      ...chart(),
+      type: "combo",
+      series: [{ ...chart().series[0], chartType: "scatter" }],
+    });
+
+    expect(missingType.success).toBe(false);
+    expect(unsupportedType.success).toBe(false);
+  });
+
+  it("requires one shared category reference for all series", () => {
+    const result = chartSpecSchema.safeParse({
+      ...chart(),
+      series: [
+        chart().series[0],
+        {
+          ...chart().series[0],
+          id: "series-2",
+          categoryRef: {
+            sheetId: "sheet-1",
+            start: { row: 2, col: 0 },
+            end: { row: 5, col: 0 },
+          },
+        },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+  });
 });
 
 describe("chart references", () => {

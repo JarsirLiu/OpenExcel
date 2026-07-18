@@ -101,6 +101,8 @@ describe("workbookToXlsx", () => {
       ?.async("string");
 
     expect(chartXml).toContain("销售趋势");
+    expect(chartXml).toContain('<c:marker><c:symbol val="circle"/></c:marker>');
+    expect(chartXml).not.toContain('<c:marker val="1"/>');
     expect(chartXml).toContain("'销售明细'!$A$2:$A$6");
     expect(chartXml).toContain("'销售明细'!$B$2:$B$6");
     expect(drawingXml).toContain("twoCellAnchor");

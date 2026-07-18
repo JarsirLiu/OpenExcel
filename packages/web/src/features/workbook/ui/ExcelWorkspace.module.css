@@ -1,6 +1,14 @@
 .container {
+  display: flex;
+  flex-direction: column;
   flex: 1;
   min-width: 0;
+  min-height: 0;
   overflow: hidden;
   border-right: 1px solid var(--border-default);
+}
+
+.grid {
+  flex: 1;
+  min-height: 0;
 }

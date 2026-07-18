@@ -15,6 +15,9 @@ async function clearSessionUndoCheckpointInternal(workspaceId: number, sessionId
     prisma.agentRunSheetSnapshot.deleteMany({
       where: { runId: session.undoRunId },
     }),
+    prisma.agentRunChartSnapshot.deleteMany({
+      where: { runId: session.undoRunId },
+    }),
   ]);
 }
 
@@ -32,7 +35,7 @@ async function invalidateUndoCheckpointsForSheetsInternal(
   const uniqueSheetIds = [...new Set(sheetIds.filter(Number.isInteger))];
   if (uniqueSheetIds.length === 0) return;
 
-  const affectedRunIds = await runRepo.findRunsWithSheetSnapshots(
+  const affectedRunIds = await runRepo.findRunsWithSnapshotsForSheets(
     workspaceId,
     uniqueSheetIds,
     originRunId,
@@ -51,6 +54,9 @@ async function invalidateUndoCheckpointsForSheetsInternal(
     prisma.agentRunSheetSnapshot.deleteMany({
       where: { runId: { in: affectedRunIds } },
     }),
+    prisma.agentRunChartSnapshot.deleteMany({
+      where: { runId: { in: affectedRunIds } },
+    }),
   ]);
 }
 
@@ -64,16 +70,26 @@ export async function invalidateUndoCheckpointsForSheets(
   );
 }
 
+export async function withUndoTrackedMutation<T>(
+  workspaceId: number,
+  sheetIds: number[] | (() => number[] | Promise<number[]>),
+  mutation: () => Promise<T>,
+  originRunId?: number,
+) {
+  return withWorkspaceUndoLock(workspaceId, async () => {
+    const resolvedSheetIds = typeof sheetIds === "function" ? await sheetIds() : sheetIds;
+    await invalidateUndoCheckpointsForSheetsInternal(workspaceId, resolvedSheetIds, originRunId);
+    return mutation();
+  });
+}
+
 export async function withUndoTrackedSheetMutation<T>(
   workspaceId: number,
   sheetIds: number[],
   mutation: () => Promise<T>,
   originRunId?: number,
 ) {
-  return withWorkspaceUndoLock(workspaceId, async () => {
-    await invalidateUndoCheckpointsForSheetsInternal(workspaceId, sheetIds, originRunId);
-    return mutation();
-  });
+  return withUndoTrackedMutation(workspaceId, sheetIds, mutation, originRunId);
 }
 
 export async function completeRunAndUpdateUndoCheckpoint(
@@ -96,6 +112,6 @@ export async function completeRunAndUpdateUndoCheckpoint(
       if (armed) return;
     }
 
-    await runRepo.deleteRunSheetSnapshots(runId);
+    await runRepo.deleteRunSnapshots(runId);
   });
 }

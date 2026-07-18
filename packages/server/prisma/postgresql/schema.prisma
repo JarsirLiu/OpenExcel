@@ -16,6 +16,7 @@ model Workbook {
   order       Int
   sourceAssetId Int?
   sheets      Sheet[]
+  charts      Chart[]
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   sourceAsset UploadAsset? @relation(fields: [sourceAssetId], references: [id], onDelete: SetNull)
   createdAt   DateTime  @default(now())
@@ -93,11 +94,28 @@ model Sheet {
   workbook     Workbook                @relation(fields: [workbookId], references: [id], onDelete: Cascade)
   sessions     Session[]
   runSnapshots AgentRunSheetSnapshot[]
+  charts       Chart[]
   createdAt    DateTime                @default(now())
   updatedAt    DateTime                @updatedAt
 
   @@unique([workbookId, sheetNo])
   @@index([workbookId, order])
+}
+
+model Chart {
+  id         Int      @id @default(autoincrement())
+  publicId   String   @unique
+  workbookId Int
+  sheetId    Int
+  order      Int
+  spec       String    @db.Text
+  workbook   Workbook @relation(fields: [workbookId], references: [id], onDelete: Cascade)
+  sheet      Sheet    @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([workbookId, order])
+  @@index([sheetId])
 }
 
 model Workspace {
@@ -150,6 +168,7 @@ model AgentRun {
   session      Session                 @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   steps        AgentStep[]
   snapshots    AgentRunSheetSnapshot[]
+  chartSnapshots AgentRunChartSnapshot[]
   startedAt    DateTime                @default(now())
   endedAt      DateTime?
 }
@@ -180,5 +199,32 @@ model AgentRunSheetSnapshot {
 
   @@unique([runId, sheetId])
   @@index([runId])
+  @@index([sheetId])
+}
+
+model AgentRunChartSnapshot {
+  id         Int      @id @default(autoincrement())
+  runId      Int
+  chartId    String
+  workbookId Int
+  sheetId    Int
+  order      Int
+  spec       String?   @db.Text
+  createdAt  DateTime @default(now())
+  run        AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  sheets     AgentRunChartSnapshotSheet[]
+
+  @@unique([runId, chartId])
+  @@index([runId])
+  @@index([sheetId])
+}
+
+model AgentRunChartSnapshotSheet {
+  id         Int                   @id @default(autoincrement())
+  snapshotId Int
+  sheetId    Int
+  snapshot   AgentRunChartSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  @@unique([snapshotId, sheetId])
   @@index([sheetId])
 }

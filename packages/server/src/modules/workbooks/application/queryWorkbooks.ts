@@ -1,4 +1,5 @@
 import { deserializeSheet } from "../../../shared/utils/sheetSerialization.js";
+import { deserializeChartSpec } from "../../charts/domain/chart.js";
 import * as repo from "../infrastructure/workbookRepository.js";
 
 export async function getWorkbooks(workspaceId: number) {
@@ -27,6 +28,7 @@ export async function getWorkbook(id: number, workspaceId: number) {
     publicId: wb.publicId,
     name: wb.name,
     sheets: wb.sheets.map((s) => deserializeSheet(s)),
+    charts: wb.charts.map(deserializeChartSpec),
   };
 }
 

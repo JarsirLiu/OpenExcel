@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   sessionFindFirst: vi.fn(),
   agentRunSheetSnapshotFindMany: vi.fn(),
   agentRunSheetSnapshotDeleteMany: vi.fn(),
+  agentRunChartSnapshotFindMany: vi.fn(),
+  agentRunChartSnapshotDeleteMany: vi.fn(),
   sheetUpdate: vi.fn(),
   sheetDelete: vi.fn(),
   sheetFindMany: vi.fn(),
@@ -13,6 +15,8 @@ const mocks = vi.hoisted(() => ({
   workbookDelete: vi.fn(),
   sessionUpdate: vi.fn(),
   agentRunUpdate: vi.fn(),
+  chartDeleteMany: vi.fn(),
+  chartUpsert: vi.fn(),
 }));
 
 vi.mock("./repository.js", () => ({
@@ -41,6 +45,10 @@ function buildTx() {
       findMany: mocks.agentRunSheetSnapshotFindMany,
       deleteMany: mocks.agentRunSheetSnapshotDeleteMany,
     },
+    agentRunChartSnapshot: {
+      findMany: mocks.agentRunChartSnapshotFindMany,
+      deleteMany: mocks.agentRunChartSnapshotDeleteMany,
+    },
     sheet: {
       update: mocks.sheetUpdate,
       delete: mocks.sheetDelete,
@@ -53,6 +61,10 @@ function buildTx() {
     agentRun: {
       update: mocks.agentRunUpdate,
     },
+    chart: {
+      deleteMany: mocks.chartDeleteMany,
+      upsert: mocks.chartUpsert,
+    },
   } as any;
 }
 
@@ -63,6 +75,8 @@ describe("undoLatestRun", () => {
     mocks.sessionFindFirst.mockReset();
     mocks.agentRunSheetSnapshotFindMany.mockReset();
     mocks.agentRunSheetSnapshotDeleteMany.mockReset();
+    mocks.agentRunChartSnapshotFindMany.mockReset();
+    mocks.agentRunChartSnapshotDeleteMany.mockReset();
     mocks.sheetUpdate.mockReset();
     mocks.sheetDelete.mockReset();
     mocks.sheetFindMany.mockReset();
@@ -70,6 +84,8 @@ describe("undoLatestRun", () => {
     mocks.workbookDelete.mockReset();
     mocks.sessionUpdate.mockReset();
     mocks.agentRunUpdate.mockReset();
+    mocks.chartDeleteMany.mockReset();
+    mocks.chartUpsert.mockReset();
   });
 
   it("should undo a created workbook and restore the prompt", async () => {
@@ -190,5 +206,39 @@ describe("undoLatestRun", () => {
       where: { id: 6 },
       data: { chatMessages: "[]", undoRunId: null },
     });
+  });
+
+  it("should remove a chart created by the latest run", async () => {
+    mocks.findUndoCheckpointRun.mockResolvedValueOnce({
+      id: 13,
+      inputText: "创建图表",
+      steps: [],
+      snapshots: [],
+      chartSnapshots: [{ chartId: "chart_1", spec: null }],
+    });
+    mocks.transaction.mockImplementationOnce(async (callback: (tx: any) => Promise<any>) =>
+      callback(buildTx()),
+    );
+    mocks.sessionFindFirst.mockResolvedValueOnce({
+      id: 7,
+      undoRunId: 13,
+      chatMessages: JSON.stringify([
+        { role: "user", content: "创建图表" },
+        { role: "assistant", content: "已创建" },
+      ]),
+    });
+    mocks.agentRunSheetSnapshotFindMany.mockResolvedValueOnce([]);
+    mocks.agentRunChartSnapshotFindMany.mockResolvedValueOnce([
+      { chartId: "chart_1", spec: null, sheetId: 11 },
+    ]);
+    mocks.chartDeleteMany.mockResolvedValueOnce({ count: 1 });
+    mocks.agentRunChartSnapshotDeleteMany.mockResolvedValueOnce({ count: 1 });
+    mocks.sessionUpdate.mockResolvedValueOnce({ id: 7 });
+    mocks.agentRunUpdate.mockResolvedValueOnce({ id: 13 });
+
+    await undoLatestRun(8, 7);
+
+    expect(mocks.chartDeleteMany).toHaveBeenCalledWith({ where: { publicId: "chart_1" } });
+    expect(mocks.agentRunChartSnapshotDeleteMany).toHaveBeenCalledWith({ where: { runId: 13 } });
   });
 });

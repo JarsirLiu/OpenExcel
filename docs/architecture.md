@@ -132,6 +132,14 @@ chart through ECharts or another renderer, but renderer options and instances ar
 as the source of truth. `packages/server` owns chart use cases and persistence, while the Excel
 format adapter owns OOXML chart and drawing import/export.
 
+Chart domain rules are closed in `core`: a series reference is one-dimensional, category and value
+references have equal lengths, all series share one category reference, and unsupported chart
+combinations are rejected during `ChartSpec` validation. `chartDependencySheetIds` and
+`resolveChartData` are the only shared interpretations of chart dependencies and cell ranges.
+Server chart writes go through one `ChartMutationService`, which owns persistence coordination and
+undo snapshots for API, AI, and future UI callers. Tool adapters and routes do not calculate chart
+dependencies or write snapshots themselves.
+
 Chart implementation follows one round-trip path: define and validate the core `ChartSpec`, write
 it to OOXML and verify that Excel can reopen the result, read existing OOXML charts back into the
 same model, then connect persistence, API, AI tools, and web rendering. Rendering is not considered
@@ -246,6 +254,12 @@ packages/server/src/
 │   │   ├── domain/       # workbook creation rules and errors
 │   │   ├── infrastructure/ # Prisma and workbook transactions
 │   │   └── tools/        # Agent workbook tool adapters
+│   ├── charts/
+│   │   ├── api/          # chart HTTP adapters
+│   │   ├── application/  # chart queries and ChartMutationService
+│   │   ├── domain/       # persisted chart contracts and errors
+│   │   ├── infrastructure/ # chart persistence
+│   │   └── tools/        # Agent chart tool adapters
 │   ├── assets/
 │   │   ├── application/  # upload staging and background cleanup use cases
 │   │   ├── domain/       # asset state, storage, and repository ports
