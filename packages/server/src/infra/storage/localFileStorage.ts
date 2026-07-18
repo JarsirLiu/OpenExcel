@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
-import { createReadStream, createWriteStream } from "node:fs";
+import { createWriteStream } from "node:fs";
 import { mkdir, open, readFile, rename, rm } from "node:fs/promises";
-import { dirname, extname, isAbsolute, relative, resolve, sep } from "node:path";
+import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import {
@@ -79,7 +79,7 @@ function resolveStoragePath(storageKey: string, rootDir: string): string {
   return filePath;
 }
 
-export async function writeAsset(
+async function writeAsset(
   storageKey: string,
   format: AssetFormat,
   part: AssetUploadFile,
@@ -104,34 +104,20 @@ export async function writeAsset(
   }
 }
 
-export async function readAsset(
-  storageKey: string,
-  config = loadStorageConfig(),
-): Promise<Uint8Array> {
+async function readAsset(storageKey: string, config = loadStorageConfig()): Promise<Uint8Array> {
   return readFile(resolveStoragePath(storageKey, config.rootDir));
 }
 
-export async function deleteAsset(storageKey: string, config = loadStorageConfig()): Promise<void> {
+async function deleteAsset(storageKey: string, config = loadStorageConfig()): Promise<void> {
   await rm(resolveStoragePath(storageKey, config.rootDir), { force: true });
 }
 
-export const localAssetStorage: AssetStorage = {
-  write: writeAsset,
-  read: readAsset,
-  delete: deleteAsset,
-};
-
-export function createStoredAssetReadStream(
-  storageKey: string,
-  config = loadStorageConfig(),
-): NodeJS.ReadableStream {
-  return createReadStream(resolveStoragePath(storageKey, config.rootDir));
+export function createLocalAssetStorage(config = loadStorageConfig()): AssetStorage {
+  return {
+    write: (storageKey, format, part) => writeAsset(storageKey, format, part, config),
+    read: (storageKey) => readAsset(storageKey, config),
+    delete: (storageKey) => deleteAsset(storageKey, config),
+  };
 }
 
-export function assetFormatFromFileName(filename: string): AssetFormat {
-  const extension = extname(filename).toLowerCase().slice(1);
-  if (extension !== "xlsx" && extension !== "xls" && extension !== "csv") {
-    throw new FileStorageError("仅支持 .xlsx、.xls 和 .csv 文件");
-  }
-  return extension;
-}
+export const localAssetStorage = createLocalAssetStorage();

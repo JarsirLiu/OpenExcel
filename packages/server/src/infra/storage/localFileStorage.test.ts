@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { Readable } from "node:stream";
 import { afterEach, describe, expect, it } from "vitest";
 import { type AssetUploadFile, describeAssetUpload } from "../../modules/assets/domain/asset.js";
-import { deleteAsset, FileStorageError, writeAsset } from "./localFileStorage.js";
+import { createLocalAssetStorage, FileStorageError } from "./localFileStorage.js";
 
 const temporaryRoots: string[] = [];
 
@@ -32,32 +32,31 @@ function filePart(filename: string, bytes: Uint8Array): AssetUploadFile {
 describe("writeAsset", () => {
   it("stores an XLSX as an immutable asset and returns its hash", async () => {
     const rootDir = await createRoot();
+    const storage = createLocalAssetStorage({ rootDir });
     const bytes = Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x01]);
     const storageKey = "uploads/7/asset_test/original.xlsx";
-    const content = await writeAsset(storageKey, "xlsx", filePart("预算.xlsx", bytes), { rootDir });
+    const content = await storage.write(storageKey, "xlsx", filePart("预算.xlsx", bytes));
 
     expect(content.sizeBytes).toBe(bytes.byteLength);
     expect(content.sha256).toBe(createHash("sha256").update(bytes).digest("hex"));
     expect(await readFile(join(rootDir, storageKey))).toEqual(bytes);
 
-    await deleteAsset(storageKey, { rootDir });
+    await storage.delete(storageKey);
     await expect(readFile(join(rootDir, storageKey))).rejects.toThrow();
   });
 
   it("accepts XLS files and rejects invalid signatures", async () => {
     const rootDir = await createRoot();
+    const storage = createLocalAssetStorage({ rootDir });
     const xlsHeader = Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
     await expect(
-      writeAsset("uploads/7/legacy/original.xls", "xls", filePart("legacy.xls", xlsHeader), {
-        rootDir,
-      }),
+      storage.write("uploads/7/legacy/original.xls", "xls", filePart("legacy.xls", xlsHeader)),
     ).resolves.toMatchObject({ sizeBytes: xlsHeader.byteLength });
     await expect(
-      writeAsset(
+      storage.write(
         "uploads/7/invalid/original.xlsx",
         "xlsx",
         filePart("invalid.xlsx", Buffer.from("not-xlsx")),
-        { rootDir },
       ),
     ).rejects.toBeInstanceOf(FileStorageError);
   });
@@ -74,9 +73,8 @@ describe("writeAsset", () => {
 describe("deleteAsset", () => {
   it("rejects paths outside the configured storage root", async () => {
     const rootDir = await createRoot();
+    const storage = createLocalAssetStorage({ rootDir });
 
-    await expect(deleteAsset("../outside.xlsx", { rootDir })).rejects.toBeInstanceOf(
-      FileStorageError,
-    );
+    await expect(storage.delete("../outside.xlsx")).rejects.toBeInstanceOf(FileStorageError);
   });
 });
