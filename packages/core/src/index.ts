@@ -113,8 +113,10 @@ export type {
   ImportedWorkbookBatchInput,
   ImportedWorkbookInput,
 } from "./excel/workbookImport.js";
-export { celldataToExcel } from "./exporter/celldataToExcel.js";
 export { templateToExcel } from "./exporter/templateToExcel.js";
+export type { ExcelSheetInput } from "./exporter/xlsxExportTypes.js";
+export type { XlsxWorkbookInput } from "./exporter/xlsxWorkbookExporter.js";
+export { workbookToXlsx } from "./exporter/xlsxWorkbookExporter.js";
 export { jsonToTemplate } from "./importer/jsonAnalyzer.js";
 export {
   parseSpreadsheetFile,

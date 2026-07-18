@@ -1,9 +1,9 @@
 import type { Worksheet } from "exceljs";
 import type { FortuneCell, FortuneCellValue } from "../excel/celldataUtils.js";
-import type { ExcelSheetInput } from "./celldataToExcel.js";
 import { applyFortuneBorderInfo } from "./excelJsBorder.js";
 import { applyFortuneCell } from "./excelJsCell.js";
 import { applyFortuneAutoFilter } from "./excelJsFilter.js";
+import type { ExcelSheetInput } from "./xlsxExportTypes.js";
 
 type MergeRange = {
   row: [number, number];

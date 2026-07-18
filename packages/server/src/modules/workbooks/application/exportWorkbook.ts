@@ -1,4 +1,4 @@
-import { celldataToExcel } from "@openexcel/core";
+import { workbookToXlsx } from "@openexcel/core";
 import { sheetRecordToCelldata } from "../../../shared/utils/sheetData.js";
 import { deserializeSheet } from "../../../shared/utils/sheetSerialization.js";
 import * as repo from "../infrastructure/workbookRepository.js";
@@ -21,6 +21,7 @@ export async function exportWorkbook(workspaceId: number, id: number) {
     );
 
     return {
+      id: String(s.id),
       name: s.name,
       celldata,
       config: parsed.config,
@@ -29,6 +30,10 @@ export async function exportWorkbook(workspaceId: number, id: number) {
     };
   });
 
-  const ab = await celldataToExcel(sheets);
+  const ab = await workbookToXlsx({
+    workbookId: String(wb.id),
+    sheets,
+    charts: [],
+  });
   return { buffer: Buffer.from(ab), name: wb.name };
 }
