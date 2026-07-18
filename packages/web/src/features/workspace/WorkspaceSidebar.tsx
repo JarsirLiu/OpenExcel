@@ -23,6 +23,8 @@ type Props = {
   onWorkbookSelect: (workspaceId: number, workbookId: number) => void;
   onWorkbookDelete: (workbookId: number) => Promise<void>;
   onWorkbookCreate: (workspaceId: number) => Promise<void>;
+  readOnly?: boolean;
+  storageNamespace?: string;
 };
 
 export function WorkspaceSidebar({
@@ -35,13 +37,21 @@ export function WorkspaceSidebar({
   onWorkbookSelect,
   onWorkbookDelete,
   onWorkbookCreate,
+  readOnly = false,
+  storageNamespace,
 }: Props) {
+  const collapsedStorageKey = storageNamespace
+    ? `${SIDEBAR_COLLAPSED_KEY}:${storageNamespace}`
+    : SIDEBAR_COLLAPSED_KEY;
+  const widthStorageKey = storageNamespace
+    ? `${SIDEBAR_WIDTH_KEY}:${storageNamespace}`
+    : SIDEBAR_WIDTH_KEY;
   const [collapsed, setCollapsed] = useState(() => {
-    const stored = sessionStorage.getItem(SIDEBAR_COLLAPSED_KEY);
+    const stored = sessionStorage.getItem(collapsedStorageKey);
     return stored !== null ? stored === "true" : false;
   });
   const [sidebarWidth, setSidebarWidth] = useState(() => {
-    const stored = sessionStorage.getItem(SIDEBAR_WIDTH_KEY);
+    const stored = sessionStorage.getItem(widthStorageKey);
     return stored !== null ? Number(stored) : DEFAULT_WIDTH;
   });
   const [isResizing, setIsResizing] = useState(false);
@@ -52,12 +62,12 @@ export function WorkspaceSidebar({
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    sessionStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(collapsed));
-  }, [collapsed]);
+    sessionStorage.setItem(collapsedStorageKey, String(collapsed));
+  }, [collapsed, collapsedStorageKey]);
 
   useEffect(() => {
-    sessionStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarWidth));
-  }, [sidebarWidth]);
+    sessionStorage.setItem(widthStorageKey, String(sidebarWidth));
+  }, [sidebarWidth, widthStorageKey]);
 
   const expandedSet = expandedWorkspaces;
 
@@ -75,13 +85,14 @@ export function WorkspaceSidebar({
   );
 
   const handleCreate = useCallback(async () => {
+    if (readOnly) return;
     try {
       const ws = await createWorkspace(t("new_project", "新项目"));
       onWorkspaceSelect(ws);
     } catch (e) {
       console.error("创建项目失败:", e);
     }
-  }, [onWorkspaceSelect]);
+  }, [onWorkspaceSelect, readOnly]);
 
   const handleSelect = useCallback(
     (workspace: Workspace) => {
@@ -91,14 +102,19 @@ export function WorkspaceSidebar({
     [onWorkspaceSelect, editingId],
   );
 
-  const handleStartEdit = useCallback((e: React.MouseEvent, ws: { id: number; name: string }) => {
-    e.stopPropagation();
-    setEditingId(ws.id);
-    setEditValue(ws.name);
-    setTimeout(() => inputRef.current?.focus(), 0);
-  }, []);
+  const handleStartEdit = useCallback(
+    (e: React.MouseEvent, ws: { id: number; name: string }) => {
+      if (readOnly) return;
+      e.stopPropagation();
+      setEditingId(ws.id);
+      setEditValue(ws.name);
+      setTimeout(() => inputRef.current?.focus(), 0);
+    },
+    [readOnly],
+  );
 
   const handleSaveEdit = useCallback(async () => {
+    if (readOnly) return;
     const id = editingId;
     if (id == null) return;
     const trimmed = editValue.trim();
@@ -113,7 +129,7 @@ export function WorkspaceSidebar({
     } catch (e) {
       console.error("修改项目名称失败:", e);
     }
-  }, [editingId, editValue, onRefresh]);
+  }, [editingId, editValue, onRefresh, readOnly]);
 
   const handleCancelEdit = useCallback(() => {
     setEditingId(null);
@@ -133,6 +149,7 @@ export function WorkspaceSidebar({
 
   const handleDelete = useCallback(
     async (e: React.MouseEvent, ws: Workspace) => {
+      if (readOnly) return;
       e.stopPropagation();
       setEditingId(null);
       const ok = await confirm({
@@ -156,11 +173,12 @@ export function WorkspaceSidebar({
         console.error("删除项目失败:", e);
       }
     },
-    [activeWorkspaceId, onRefresh, onWorkspaceSelect, workspaces],
+    [activeWorkspaceId, onRefresh, onWorkspaceSelect, readOnly, workspaces],
   );
 
   const handleWorkbookDeleteClick = useCallback(
     async (e: React.MouseEvent, wb: WorkbookMeta) => {
+      if (readOnly) return;
       e.stopPropagation();
       const ok = await confirm({
         title: "删除工作簿",
@@ -175,15 +193,16 @@ export function WorkspaceSidebar({
         console.error("删除工作簿失败:", e);
       }
     },
-    [onWorkbookDelete],
+    [onWorkbookDelete, readOnly],
   );
 
   const handleCreateWorkbook = useCallback(
     (e: React.MouseEvent, workspaceId: number) => {
+      if (readOnly) return;
       e.stopPropagation();
       void onWorkbookCreate(workspaceId);
     },
-    [onWorkbookCreate],
+    [onWorkbookCreate, readOnly],
   );
 
   const handleResizeMouseDown = useCallback(

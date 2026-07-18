@@ -248,6 +248,195 @@
   border-top: 1px solid var(--border-default);
 }
 
+.demosSection {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 56px 72px;
+}
+
+.demosIntro {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 18px;
+}
+
+.demosEyebrow {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.demosIntro h2 {
+  margin: 8px 0 7px;
+  font-size: 24px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.demosIntro p {
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.demoLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.demoLink span,
+.demoCta span {
+  font-size: 16px;
+}
+
+.demoPreview {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(260px, 0.85fr);
+  width: 100%;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-default);
+  border-radius: 12px;
+  background: var(--bg-surface);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.06);
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s,
+    transform 0.2s;
+}
+
+.demoPreview:hover {
+  border-color: #b9c7d4;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.09);
+  transform: translateY(-2px);
+}
+
+.demoPreviewSheet {
+  padding: 18px;
+  background: #f5f7f9;
+  border-right: 1px solid var(--border-default);
+}
+
+.previewSheetBar,
+.previewSheetHead,
+.previewSheetRow {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr 0.8fr 0.9fr;
+  gap: 10px;
+  align-items: center;
+}
+
+.previewSheetBar {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.previewSheetBar span:last-child {
+  color: #37714d;
+  font-weight: 500;
+}
+
+.previewSheetHead,
+.previewSheetRow {
+  min-height: 34px;
+  padding: 0 8px;
+  border: 1px solid var(--border-default);
+  border-bottom: 0;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-size: 10px;
+  text-align: left;
+}
+
+.previewSheetHead {
+  background: #eef1f4;
+  color: var(--text-hint);
+  font-weight: 650;
+}
+
+.previewSheetRow:last-child {
+  border-bottom: 1px solid var(--border-default);
+}
+
+.previewSheetRow b,
+.previewSheetRow em,
+.previewSheetRow i {
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 650;
+}
+
+.previewSheetRow b {
+  color: #37714d;
+}
+
+.previewSheetRow em {
+  color: #9a6a13;
+}
+
+.previewSheetRow i {
+  color: #7c5aa4;
+}
+
+.demoPreviewCopy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 30px 34px;
+}
+
+.demoTag {
+  padding: 5px 8px;
+  background: #edf4f8;
+  color: #2f6f9f;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.demoPreviewCopy h3 {
+  margin: 14px 0 8px;
+  font-size: 21px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.demoPreviewCopy p {
+  max-width: 330px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.demoCta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 20px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 650;
+}
+
 .sidebarLine {
   height: 12px;
   border-radius: 6px;
@@ -289,5 +478,45 @@
 
   .visual {
     display: none;
+  }
+
+  .demosSection {
+    padding: 0 32px 52px;
+  }
+
+  .demosIntro {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .demoPreview {
+    grid-template-columns: 1fr;
+  }
+
+  .demoPreviewSheet {
+    border-right: 0;
+    border-bottom: 1px solid var(--border-default);
+  }
+}
+
+@media (max-width: 560px) {
+  .demosSection {
+    padding: 0 20px 40px;
+  }
+
+  .demoPreviewSheet {
+    overflow: hidden;
+    padding: 12px;
+  }
+
+  .previewSheetBar,
+  .previewSheetHead,
+  .previewSheetRow {
+    min-width: 420px;
+  }
+
+  .demoPreviewCopy {
+    padding: 24px;
   }
 }

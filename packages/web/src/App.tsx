@@ -4,6 +4,7 @@ import { type CurrentUser, logout } from "@/api/auth";
 import type { WorkbenchRouteData } from "@/app/routeData";
 import { AuthScreen } from "@/features/auth/AuthScreen";
 import { useAuthState } from "@/features/auth/useAuthState";
+import { DemoReplay } from "@/features/demos/DemoReplay";
 import { SheetActivationProvider } from "@/features/workbook/editor/SheetActivationContext";
 import { t } from "@/lib/i18n";
 import { ConfirmDialog, Toast } from "@/shared/ui";
@@ -80,6 +81,7 @@ function AuthPage() {
       onLogin={auth.signIn}
       onRegister={auth.signUp}
       onSwitchMode={() => navigate(authMode === "login" ? "/register" : "/login")}
+      onOpenDemo={() => navigate("/demos/student-fee-reconciliation")}
     />
   );
 }
@@ -124,6 +126,10 @@ function WorkbenchPage() {
 
 export default function App() {
   const location = useLocation();
+
+  if (location.pathname === "/demos/student-fee-reconciliation") {
+    return <DemoReplay />;
+  }
 
   if (location.pathname === "/login" || location.pathname === "/register") {
     return <AuthPage />;

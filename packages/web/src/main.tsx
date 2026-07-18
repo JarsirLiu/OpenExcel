@@ -19,6 +19,10 @@ const router = createHashRouter([
     element: <App />,
   },
   {
+    path: "/demos/student-fee-reconciliation",
+    element: <App />,
+  },
+  {
     id: "protected",
     element: <Outlet />,
     errorElement: <RouteErrorBoundary />,
