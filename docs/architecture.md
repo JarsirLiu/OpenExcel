@@ -132,6 +132,12 @@ chart through ECharts or another renderer, but renderer options and instances ar
 as the source of truth. `packages/server` owns chart use cases and persistence, while the Excel
 format adapter owns OOXML chart and drawing import/export.
 
+Chart implementation follows one round-trip path: define and validate the core `ChartSpec`, write
+it to OOXML and verify that Excel can reopen the result, read existing OOXML charts back into the
+same model, then connect persistence, API, AI tools, and web rendering. Rendering is not considered
+complete until an imported or AI-created chart survives export without losing its chart, drawing,
+or relationship parts.
+
 The current FortuneSheet `chart` configuration field is a compatibility projection only. New
 features must not depend on its `any[]` shape. Charts use stable workbook and sheet identities,
 not sheet names, so same-named sheets in different workbooks remain unambiguous.
@@ -549,9 +555,13 @@ Workbook export has one explicit source:
 
 - The sidebar download uses the server export endpoint and persisted workbook data. The export
   adapter consumes the same stored FortuneSheet cell/config model used by the editor, including
-  imported worksheet view metadata, and writes a standard ZIP-compressed `.xlsx` with ExcelJS.
-  The `.xlsx` import adapter maps `sheetViews/selection` into that config before persistence, so
-  export does not need to guess or hardcode a starting cell.
+  imported worksheet view metadata, and writes a standard ZIP-compressed `.xlsx`. ExcelJS may be
+  used for cell values, styles, worksheet metadata, and other features it can represent, but it is
+  not the source of truth for charts. The OOXML format adapter writes chart XML, drawing XML, and
+  their relationship parts from the persisted chart domain model, and preserves required source
+  package parts for features not yet represented by the domain model. The `.xlsx` import adapter
+  maps worksheet view metadata and chart/drawing parts into the same persisted domain before
+  export, so export does not need to guess or hardcode workbook objects.
 
 Browser download mechanics are shared in `features`/`shared` helpers; Excel generation remains
 outside UI components.
