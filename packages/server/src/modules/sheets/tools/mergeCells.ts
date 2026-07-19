@@ -83,6 +83,10 @@ export const mergeCells = {
       const output = {
         success: true,
         mergedRanges,
+        changeSummary: {
+          changedCellCount: 0,
+          rangeOperationCount: operations.length,
+        },
         delta,
         preview: buildSheetChangePreview(updatedCelldata, sheet.name, sheetId, minRow, maxRow),
         sheetInfo: { sheetId: sheet.id, sheetNo: sheet.sheetNo, sheetName: sheet.name },

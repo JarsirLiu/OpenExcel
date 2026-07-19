@@ -16,6 +16,7 @@ describe("collectSheetPatchUpdates", () => {
             state: "output-available",
             output: {
               sheetInfo: { sheetId: 11, sheetNo: 2, sheetName: "Budget" },
+              changeSummary: { changedCellCount: 1, rangeOperationCount: 0 },
               delta: {
                 type: "write",
                 cells: [{ row: 1, col: 2, value: "123" }],
@@ -32,6 +33,7 @@ describe("collectSheetPatchUpdates", () => {
             state: "output-available",
             output: {
               sheetInfo: { sheetId: 12, sheetNo: 3, sheetName: "Plan" },
+              changeSummary: { changedCellCount: 0, rangeOperationCount: 0 },
               delta: null,
             },
           },
@@ -61,9 +63,10 @@ describe("collectSheetPatchUpdates", () => {
             state: "output-available",
             output: {
               sheetInfo: { sheetId: 13, sheetNo: 4, sheetName: "Invalid" },
+              changeSummary: { changedCellCount: 0, rangeOperationCount: 0 },
               delta: {
                 type: "write",
-                cells: [],
+                cells: [{ row: 0, col: 1, value: "invalid" }],
               },
             },
           },
@@ -86,6 +89,7 @@ describe("collectSheetPatchUpdates", () => {
             state: "output-available",
             output: {
               sheetInfo: { sheetId: 14, sheetNo: 5, sheetName: "Clear" },
+              changeSummary: { changedCellCount: 4, rangeOperationCount: 0 },
               delta: {
                 type: "clear",
                 operations: [
@@ -251,6 +255,7 @@ describe("collectWorkbookMutationToolCallIds", () => {
             state: "output-available",
             output: {
               sheetInfo: { sheetId: 31, sheetNo: 1, sheetName: "Sheet1" },
+              changeSummary: { changedCellCount: 1, rangeOperationCount: 0 },
               delta: {
                 type: "clear",
                 operations: [{ type: "cell", row: 1, col: 1 }],

@@ -12,7 +12,8 @@ type SheetChangeEntry = {
   sheetNo?: number;
   lastPreview: any;
   changedCells: Set<string>;
-  changeCount: number;
+  changedCellCount: number;
+  rangeOperationCount: number;
 };
 
 function collectSheetChanges(parts: any[]): SheetChangeEntry[] {
@@ -39,12 +40,22 @@ function collectSheetChanges(parts: any[]): SheetChangeEntry[] {
         sheetNo: output.sheetInfo.sheetNo,
         lastPreview: null,
         changedCells: new Set(),
-        changeCount: 0,
+        changedCellCount: 0,
+        rangeOperationCount: 0,
       });
     }
 
     const entry = map.get(sheetId)!;
     const delta = output.delta;
+    const changeSummary = output.changeSummary;
+    if (
+      isRecord(changeSummary) &&
+      typeof changeSummary.changedCellCount === "number" &&
+      typeof changeSummary.rangeOperationCount === "number"
+    ) {
+      entry.changedCellCount += changeSummary.changedCellCount;
+      entry.rangeOperationCount += changeSummary.rangeOperationCount;
+    }
 
     if (delta && typeof delta === "object") {
       const d = delta as Record<string, unknown>;
@@ -58,7 +69,6 @@ function collectSheetChanges(parts: any[]): SheetChangeEntry[] {
             typeof (c as any).col === "number"
           ) {
             entry.changedCells.add(`${(c as any).row},${(c as any).col}`);
-            entry.changeCount++;
           }
         }
       } else if (d.type === "clear" && Array.isArray(d.operations)) {
@@ -67,7 +77,6 @@ function collectSheetChanges(parts: any[]): SheetChangeEntry[] {
           const o = op as Record<string, unknown>;
           if (o.type === "cell" && typeof o.row === "number" && typeof o.col === "number") {
             entry.changedCells.add(`${o.row},${o.col}`);
-            entry.changeCount++;
           } else if (
             typeof o.startRow === "number" &&
             typeof o.startCol === "number" &&
@@ -77,7 +86,6 @@ function collectSheetChanges(parts: any[]): SheetChangeEntry[] {
             for (let r = o.startRow; r <= o.endRow; r++) {
               for (let c = o.startCol; c <= o.endCol; c++) {
                 entry.changedCells.add(`${r},${c}`);
-                entry.changeCount++;
               }
             }
           }
@@ -95,7 +103,6 @@ function collectSheetChanges(parts: any[]): SheetChangeEntry[] {
             for (let r = o.startRow; r <= o.endRow; r++) {
               for (let c = o.startCol; c <= o.endCol; c++) {
                 entry.changedCells.add(`${r},${c}`);
-                entry.changeCount++;
               }
             }
           }
@@ -108,7 +115,9 @@ function collectSheetChanges(parts: any[]): SheetChangeEntry[] {
     }
   }
 
-  return [...map.values()];
+  return [...map.values()].filter(
+    (entry) => entry.changedCellCount > 0 || entry.rangeOperationCount > 0,
+  );
 }
 
 export function SheetChangeSummary({
@@ -133,6 +142,13 @@ export function SheetChangeSummary({
     setExpandedSheets(next);
   };
 
+  const formatChangeSummary = (sheet: SheetChangeEntry) => {
+    const parts: string[] = [];
+    if (sheet.changedCellCount > 0) parts.push(`${sheet.changedCellCount} 个单元格`);
+    if (sheet.rangeOperationCount > 0) parts.push(`${sheet.rangeOperationCount} 个区域操作`);
+    return parts.length > 0 ? parts.join("，") : "无实际内容变化";
+  };
+
   return (
     <div className={styles.summary}>
       <div className={styles.heading}>修改了 {sheets.length} 个工作表</div>
@@ -148,7 +164,7 @@ export function SheetChangeSummary({
                 {sheet.sheetName}
                 {sheet.sheetNo != null ? ` (#${sheet.sheetNo})` : ""}
               </span>
-              <span className={styles.changeCount}>{sheet.changeCount} 处改动</span>
+              <span className={styles.changeCount}>{formatChangeSummary(sheet)}</span>
             </button>
             <button
               type="button"

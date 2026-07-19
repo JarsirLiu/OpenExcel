@@ -10,6 +10,31 @@ import {
   type ToolIndex,
 } from "@openexcel/core";
 
+export type SheetCellContentSnapshot = {
+  value: unknown;
+  display: string;
+  formula?: string;
+};
+
+export function snapshotCellContent(cell: FortuneCell | undefined): SheetCellContentSnapshot {
+  return {
+    value: cell?.v.v,
+    display: cell?.v.m ?? "",
+    formula: cell?.v.f,
+  };
+}
+
+export function cellContentEqual(
+  left: SheetCellContentSnapshot | undefined,
+  right: SheetCellContentSnapshot,
+): boolean {
+  return (
+    Object.is(left?.value, right.value) &&
+    left?.display === right.display &&
+    left?.formula === right.formula
+  );
+}
+
 export interface SheetChangePreviewMerge {
   startRow: number;
   startCol: number;
@@ -219,6 +244,10 @@ export function applyClearOperation(
     const key = `${row0},${col0}`;
     const cell = cellMap.get(key);
     if (!cell?.v) return;
+
+    const hasContent =
+      cell.v.v != null || (cell.v.m != null && cell.v.m !== "") || cell.v.f !== undefined;
+    if (!hasContent) return;
 
     const cleaned = stripCellContent(cell.v);
     if (cleaned) {

@@ -6,6 +6,7 @@ describe("sheetChangePatchOutputSchema", () => {
     const result = sheetChangePatchOutputSchema.safeParse({
       success: true,
       updatedCells: 1,
+      changeSummary: { changedCellCount: 1, rangeOperationCount: 0 },
       delta: {
         type: "write",
         cells: [{ row: 1, col: 2, value: "hello" }],
@@ -21,6 +22,7 @@ describe("sheetChangePatchOutputSchema", () => {
     const result = sheetChangePatchOutputSchema.safeParse({
       success: true,
       updatedCells: 1,
+      changeSummary: { changedCellCount: 1, rangeOperationCount: 0 },
       delta: {
         type: "write",
         cells: [{ row: 1, col: 2, value: 3, formula: "A1+B1" }],
@@ -32,9 +34,22 @@ describe("sheetChangePatchOutputSchema", () => {
     expect(result.success).toBe(true);
   });
 
+  it("accepts a write patch output with no actual cell changes", () => {
+    const result = sheetChangePatchOutputSchema.safeParse({
+      success: true,
+      updatedCells: 0,
+      changeSummary: { changedCellCount: 0, rangeOperationCount: 0 },
+      delta: { type: "write", cells: [] },
+      sheetInfo: { sheetId: 1, sheetName: "Sheet1" },
+    });
+
+    expect(result.success).toBe(true);
+  });
+
   it("accepts a valid clear patch output", () => {
     const result = sheetChangePatchOutputSchema.safeParse({
       success: true,
+      changeSummary: { changedCellCount: 0, rangeOperationCount: 0 },
       delta: {
         type: "clear",
         operations: [
@@ -51,6 +66,7 @@ describe("sheetChangePatchOutputSchema", () => {
   it("rejects invalid ranges", () => {
     const result = sheetChangePatchOutputSchema.safeParse({
       success: true,
+      changeSummary: { changedCellCount: 0, rangeOperationCount: 1 },
       delta: {
         type: "merge",
         operations: [{ type: "range", startRow: 2, startCol: 2, endRow: 1, endCol: 3 }],

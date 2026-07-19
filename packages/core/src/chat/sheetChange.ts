@@ -57,7 +57,7 @@ export const sheetChangeClearOperationSchema = z.union([
 export const sheetChangeDeltaSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("write"),
-    cells: z.array(sheetChangeCellSchema).min(1),
+    cells: z.array(sheetChangeCellSchema),
     merges: z.array(sheetChangeRangeSchema).optional(),
   }),
   z.object({
@@ -74,6 +74,11 @@ export const sheetChangeDeltaSchema = z.discriminatedUnion("type", [
   }),
 ]);
 
+export const sheetChangeSummarySchema = z.object({
+  changedCellCount: z.number().int().nonnegative(),
+  rangeOperationCount: z.number().int().nonnegative(),
+});
+
 export const sheetChangePatchOutputSchema = z
   .object({
     sheetInfo: z.object({
@@ -81,6 +86,7 @@ export const sheetChangePatchOutputSchema = z
       sheetNo: z.number().int().optional(),
       sheetName: z.string().min(1),
     }),
+    changeSummary: sheetChangeSummarySchema,
     delta: sheetChangeDeltaSchema.nullish(),
   })
   .passthrough();
@@ -92,4 +98,5 @@ export type SheetChangeClearRange = z.infer<typeof sheetChangeClearRangeSchema>;
 export type SheetChangeRangeOperation = z.infer<typeof sheetChangeRangeOperationSchema>;
 export type SheetChangeClearOperation = z.infer<typeof sheetChangeClearOperationSchema>;
 export type SheetChangeDelta = z.infer<typeof sheetChangeDeltaSchema>;
+export type SheetChangeSummary = z.infer<typeof sheetChangeSummarySchema>;
 export type SheetChangePatchOutput = z.infer<typeof sheetChangePatchOutputSchema>;

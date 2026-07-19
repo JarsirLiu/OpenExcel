@@ -68,6 +68,10 @@ export const clearCells = {
       const output = {
         success: true,
         clearedCells: touchedCellKeys.size,
+        changeSummary: {
+          changedCellCount: touchedCellKeys.size,
+          rangeOperationCount: 0,
+        },
         delta,
         preview: buildSheetChangePreview(updatedCelldata, sheet.name, sheetId, minRow, maxRow),
         sheetInfo: { sheetId: sheet.id, sheetNo: sheet.sheetNo, sheetName: sheet.name },

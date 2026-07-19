@@ -12,7 +12,9 @@ import { sheetRecordToCelldata } from "../../../shared/utils/sheetData.js";
 import {
   applyCellWrite,
   buildSheetChangePreview,
+  cellContentEqual,
   normalizeWriteOperations,
+  snapshotCellContent,
   type WriteCellsInput,
 } from "../domain/sheet.js";
 import * as sheetRepo from "../infrastructure/sheetRepository.js";
@@ -31,8 +33,10 @@ export const writeCells = {
       if (!Array.isArray(celldata)) throw new Error("celldata 格式错误");
 
       const cellMap = new Map<string, any>();
+      const initialContent = new Map<string, ReturnType<typeof snapshotCellContent>>();
       for (const cell of celldata) {
         cellMap.set(`${cell.r},${cell.c}`, cell);
+        initialContent.set(`${cell.r},${cell.c}`, snapshotCellContent(cell));
       }
 
       const touchedCells = new Map<
@@ -84,6 +88,12 @@ export const writeCells = {
       );
 
       const touchedValues = Array.from(touchedCells.values());
+      const changedValues = Array.from(touchedCells.entries())
+        .filter(([key]) => {
+          const cell = cellMap.get(key);
+          return !cellContentEqual(initialContent.get(key), snapshotCellContent(cell));
+        })
+        .map(([, cell]) => cell);
       const minRow = storageIndex(
         Math.min(...touchedValues.map((cell) => toolIndexToStorage(cell.row))),
       );
@@ -93,12 +103,16 @@ export const writeCells = {
 
       const delta: SheetChangeDelta = {
         type: "write",
-        cells: touchedValues,
+        cells: changedValues,
       };
 
       const output = {
         success: true,
-        updatedCells: touchedValues.length,
+        updatedCells: changedValues.length,
+        changeSummary: {
+          changedCellCount: changedValues.length,
+          rangeOperationCount: 0,
+        },
         delta,
         preview: buildSheetChangePreview(updatedCelldata, sheet.name, sheetId, minRow, maxRow),
         sheetInfo: { sheetId: sheet.id, sheetNo: sheet.sheetNo, sheetName: sheet.name },

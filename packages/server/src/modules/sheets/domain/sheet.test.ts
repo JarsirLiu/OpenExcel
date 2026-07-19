@@ -5,7 +5,9 @@ import {
   applyClearOperation,
   applyMergeOperation,
   buildSheetChangePreview,
+  cellContentEqual,
   normalizeWriteOperations,
+  snapshotCellContent,
 } from "./sheet.js";
 
 describe("sheet domain helpers", () => {
@@ -128,6 +130,22 @@ describe("sheet domain helpers", () => {
     expect(cellMap.has("3,3")).toBe(false);
   });
 
+  it("does not count style-only or merged placeholder cells as content changes", () => {
+    const cellMap = new Map<string, any>([["0,0", { r: 0, c: 0, v: { bg: "#FFFF00" } }]]);
+
+    expect(applyClearOperation(cellMap, { type: "cell", row: 0, col: 0 } as any)).toEqual([]);
+    expect(cellMap.get("0,0").v).toEqual({ bg: "#FFFF00" });
+
+    applyMergeOperation(cellMap, {
+      startRow: storageIndex(1),
+      startCol: storageIndex(1),
+      endRow: storageIndex(2),
+      endCol: storageIndex(2),
+    });
+
+    expect(applyClearOperation(cellMap, { type: "cell", row: 1, col: 2 } as any)).toEqual([]);
+  });
+
   it("writes formulas and clears old formulas when replacing values", () => {
     const cellMap = new Map<string, any>();
     const touchedCells = new Map<
@@ -140,5 +158,18 @@ describe("sheet domain helpers", () => {
 
     applyCellWrite(cellMap, touchedCells, storageIndex(0), storageIndex(0), "plain text");
     expect(cellMap.get("0,0").v).toEqual({ v: "plain text", m: "plain text" });
+  });
+
+  it("distinguishes real content changes from no-op writes", () => {
+    const cell = { r: 0, c: 0, v: { v: 3, m: "3" } } as any;
+    const before = snapshotCellContent(cell);
+    const cellMap = new Map([["0,0", cell]]);
+    const touchedCells = new Map<string, any>();
+
+    applyCellWrite(cellMap, touchedCells, storageIndex(0), storageIndex(0), 3);
+    expect(cellContentEqual(before, snapshotCellContent(cellMap.get("0,0")))).toBe(true);
+
+    applyCellWrite(cellMap, touchedCells, storageIndex(0), storageIndex(0), 4);
+    expect(cellContentEqual(before, snapshotCellContent(cellMap.get("0,0")))).toBe(false);
   });
 });

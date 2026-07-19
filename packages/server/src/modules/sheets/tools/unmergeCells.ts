@@ -86,6 +86,10 @@ export const unmergeCells = {
             endCol: toolIndex(operation.endCol),
           }),
         ),
+        changeSummary: {
+          changedCellCount: 0,
+          rangeOperationCount: operations.length,
+        },
         delta,
         preview: buildSheetChangePreview(celldata, sheet.name, sheetId, minRow, maxRow),
         sheetInfo: { sheetId: sheet.id, sheetNo: sheet.sheetNo, sheetName: sheet.name },
