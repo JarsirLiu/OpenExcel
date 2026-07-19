@@ -6,7 +6,7 @@ describe("DemoReplay", () => {
     const parts = [
       { type: "text", stepId: "inspect", text: "先读取收费台账。" },
       {
-        type: "tool-readSheet",
+        type: "tool-readSheetData",
         toolCallId: "demo-inspect",
         state: "output-available",
         input: { sheetName: "学生应收台账", range: "A1:G7" },

@@ -142,7 +142,7 @@ function buildPreview(sheet: DemoSheet | undefined, rangeValue?: string) {
     range,
     rows: rows.map((values, index) => ({
       row: range.startRow + index,
-      values: values.map((item: DemoCell) => ({ value: item.value })),
+      values: values.map((item: DemoCell) => String(item.value)),
     })),
     merges: [],
   };
@@ -174,7 +174,7 @@ function buildToolPart(
               sheetNo: studentFeeInitialSheets.findIndex((item) => item.name === sheetName) + 1,
             },
             message: step.toolOutput,
-            previewLabel: step.toolName === "readSheet" ? "读取区域" : "变更区域",
+            previewLabel: step.toolName === "readSheetData" ? "读取区域" : "变更区域",
             preview: buildPreview(sheet, step.highlight),
             delta:
               patches.length > 0

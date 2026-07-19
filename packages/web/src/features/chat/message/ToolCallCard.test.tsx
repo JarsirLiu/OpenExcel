@@ -3,24 +3,19 @@ import { describe, expect, it } from "vitest";
 import { ToolCallCard } from "./ToolCallCard";
 
 describe("ToolCallCard", () => {
-  it("shows workbook-local sheet numbers for readSheet results", () => {
+  it("shows workbook-local sheet numbers for readSheetData results", () => {
     render(
       <ToolCallCard
         part={{
-          type: "tool-readSheet",
-          toolName: "readSheet",
+          type: "tool-readSheetData",
+          toolName: "readSheetData",
           state: "output-available",
           toolCallId: "tool-call-1",
           input: { sheetId: 3 },
           output: {
-            sheetInfo: { sheetNo: 3, sheetName: "Budget" },
-            sheetName: "Budget",
-            sheetNo: 3,
-            rowCount: 2,
-            columnCount: 2,
-            headers: [],
-            data: [],
-            merges: [],
+            sheet: { sheetNo: 3, name: "Budget" },
+            range: "A1:B2",
+            values: [],
           },
         }}
       />,

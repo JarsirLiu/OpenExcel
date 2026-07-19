@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import {
   DEFAULT_MAX_CONVERSATION_TURNS,
   DEFAULT_MAX_USER_INPUT_TOKENS,
-  DEFAULT_READ_SHEET_BUDGET_TOKENS,
+  DEFAULT_READ_SHEET_DATA_BUDGET_TOKENS,
   DEFAULT_TOOL_RESULT_BUDGET_TOKENS,
   DEFAULT_TOOL_RESULT_MAX_TOKENS,
 } from "@openexcel/agent";
@@ -28,7 +28,7 @@ export interface ModelConfig {
   maxUserInputTokens: number;
   toolResultBudgetTokens: number;
   toolResultMaxTokens: number;
-  readSheetBudgetTokens: number;
+  readSheetDataBudgetTokens: number;
 }
 
 let cachedConfig: ModelConfig | null = null;
@@ -98,9 +98,9 @@ export function loadModelConfig(): ModelConfig {
       "MODEL_TOOL_RESULT_MAX_TOKENS",
       DEFAULT_TOOL_RESULT_MAX_TOKENS,
     ),
-    readSheetBudgetTokens: readPositiveInt(
-      "MODEL_READ_SHEET_BUDGET_TOKENS",
-      DEFAULT_READ_SHEET_BUDGET_TOKENS,
+    readSheetDataBudgetTokens: readPositiveInt(
+      "MODEL_READ_SHEET_DATA_BUDGET_TOKENS",
+      DEFAULT_READ_SHEET_DATA_BUDGET_TOKENS,
     ),
   };
   console.log(`[config] Loaded model config: ${modelName} @ ${baseUrl}`);

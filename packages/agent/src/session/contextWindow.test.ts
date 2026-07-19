@@ -42,9 +42,9 @@ describe("trimMessagesToContextWindow", () => {
   it("keeps complete recent turns instead of splitting tool messages", () => {
     const messages = [
       { role: "user", content: "第一轮" },
-      { role: "assistant", parts: [{ type: "tool-readSheet", state: "output" }] },
+      { role: "assistant", parts: [{ type: "tool-readSheetData", state: "output" }] },
       { role: "user", content: "第二轮" },
-      { role: "assistant", parts: [{ type: "tool-readSheet", state: "output" }] },
+      { role: "assistant", parts: [{ type: "tool-readSheetData", state: "output" }] },
       { role: "user", content: "第三轮" },
       { role: "assistant", content: "完成" },
     ];

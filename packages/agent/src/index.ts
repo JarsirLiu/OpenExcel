@@ -4,12 +4,14 @@ export { formatAIError } from "./runtime/formatAIError.js";
 export { type StreamChatInput, streamChat } from "./runtime/streamChat.js";
 export {
   type BudgetableToolSet,
-  DEFAULT_READ_SHEET_BUDGET_TOKENS,
+  DEFAULT_READ_SHEET_DATA_BUDGET_TOKENS,
   DEFAULT_TOOL_RESULT_BUDGET_TOKENS,
   DEFAULT_TOOL_RESULT_MAX_TOKENS,
+  type ToolExecutionBudget,
   ToolResultBudget,
   type ToolResultBudgetOptions,
   type ToolResultBudgetSnapshot,
+  type ToolResultPolicy,
   wrapToolSetWithResultBudget,
 } from "./runtime/toolResultBudget.js";
 export {

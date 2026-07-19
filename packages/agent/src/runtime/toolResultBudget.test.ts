@@ -5,7 +5,7 @@ import { ToolResultBudget, wrapToolSetWithResultBudget } from "./toolResultBudge
 describe("ToolResultBudget", () => {
   it("should compact an oversized result to the reserved result budget", () => {
     const budget = new ToolResultBudget({ totalTokens: 100, maxResultTokens: 30 });
-    const reservation = budget.reserve("readSheet");
+    const reservation = budget.reserve("readSheetData");
 
     expect("ok" in reservation).toBe(false);
     if ("ok" in reservation) return;
@@ -29,16 +29,16 @@ describe("ToolResultBudget", () => {
     }));
     const budget = new ToolResultBudget({ totalTokens: 8, maxResultTokens: 8 });
     const tools = wrapToolSetWithResultBudget(
-      { readSheet: { description: "read", execute } },
+      { readSheetData: { description: "read", execute } },
       budget,
     );
 
     for (;;) {
-      const reservation = budget.reserve("readSheet");
+      const reservation = budget.reserve("readSheetData");
       if ("ok" in reservation) break;
       budget.finish(reservation, "x".repeat(1_000));
     }
-    const result = await tools.readSheet.execute?.({}, {});
+    const result = await tools.readSheetData.execute?.({}, {});
 
     expect(execute).not.toHaveBeenCalled();
     expect(result).toMatchObject({
@@ -50,9 +50,9 @@ describe("ToolResultBudget", () => {
 
   it("should reserve the shared budget across concurrent calls", () => {
     const budget = new ToolResultBudget({ totalTokens: 20, maxResultTokens: 10 });
-    const first = budget.reserve("readSheet");
-    const second = budget.reserve("readSheet");
-    const third = budget.reserve("readSheet");
+    const first = budget.reserve("readSheetData");
+    const second = budget.reserve("readSheetData");
+    const third = budget.reserve("readSheetData");
 
     expect("ok" in first).toBe(false);
     expect("ok" in second).toBe(false);
@@ -67,15 +67,48 @@ describe("ToolResultBudget", () => {
     const budget = new ToolResultBudget({
       totalTokens: 100,
       maxResultTokens: 10,
-      toolBudgets: { readSheet: 10 },
+      toolBudgets: { readSheetData: 10 },
     });
-    const reservation = budget.reserve("readSheet");
+    const reservation = budget.reserve("readSheetData");
 
     expect("ok" in reservation).toBe(false);
     if ("ok" in reservation) return;
     budget.finish(reservation, "x".repeat(1_000));
 
-    expect(budget.isToolExhausted("readSheet")).toBe(true);
+    expect(budget.isToolExhausted("readSheetData")).toBe(true);
     expect(budget.isToolExhausted("writeCells")).toBe(false);
+  });
+
+  it("passes a structured result budget to paged tools", async () => {
+    const execute = vi.fn(async (_input?: unknown, options?: any) => ({
+      range: "A1:B2",
+      values: [
+        ["row-1", 1],
+        ["row-2", 2],
+      ],
+      continuation: null,
+      budget: options?.resultBudget,
+    }));
+    const budget = new ToolResultBudget({
+      totalTokens: 100,
+      maxResultTokens: 100,
+      toolPolicies: { readSheetData: { kind: "paged-structured" } },
+    });
+    const tools = wrapToolSetWithResultBudget({ readSheetData: { execute } }, budget);
+
+    const result = await tools.readSheetData.execute?.({}, {});
+
+    expect(execute).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({
+        resultBudget: { maxTokens: 100, policy: "paged-structured" },
+      }),
+    );
+    expect(result).toMatchObject({
+      values: [
+        ["row-1", 1],
+        ["row-2", 2],
+      ],
+    });
   });
 });

@@ -2,9 +2,16 @@ import { estimateTokens } from "../session/contextWindow.js";
 
 export const DEFAULT_TOOL_RESULT_BUDGET_TOKENS = 32_000;
 export const DEFAULT_TOOL_RESULT_MAX_TOKENS = 8_000;
-export const DEFAULT_READ_SHEET_BUDGET_TOKENS = 24_000;
+export const DEFAULT_READ_SHEET_DATA_BUDGET_TOKENS = 24_000;
 
 type ToolExecute = (input: unknown, options?: unknown) => unknown;
+
+export type ToolResultPolicy = { kind: "generic" } | { kind: "paged-structured" };
+
+export type ToolExecutionBudget = {
+  maxTokens: number;
+  policy: ToolResultPolicy["kind"];
+};
 
 export type BudgetableTool = Record<string, unknown> & {
   execute?: ToolExecute;
@@ -16,6 +23,7 @@ export interface ToolResultBudgetOptions {
   totalTokens?: number;
   maxResultTokens?: number;
   toolBudgets?: Record<string, number>;
+  toolPolicies?: Record<string, ToolResultPolicy>;
 }
 
 export interface ToolResultBudgetSnapshot {
@@ -31,12 +39,13 @@ interface Reservation {
   id: number;
   toolName: string;
   tokenLimit: number;
+  policy: ToolResultPolicy["kind"];
 }
 
 interface TruncatedToolResult {
   ok: true;
   truncated: true;
-  code: "TOOL_RESULT_TRUNCATED";
+  code: "TOOL_RESULT_TRUNCATED" | "TOOL_RESULT_TOO_LARGE";
   tool: string;
   message: string;
   budget: ToolResultBudgetSnapshot;
@@ -103,26 +112,16 @@ function compactValue(value: unknown, maxTokens: number): unknown {
 
   const record = value as Record<string, unknown>;
   const importantKeys = [
-    "mode",
-    "sheetInfo",
-    "sheetName",
-    "sheetNo",
-    "totalRowCount",
-    "totalColumnCount",
-    "startRow",
-    "endRow",
-    "startCol",
-    "endCol",
-    "hasMoreRows",
-    "hasMoreCols",
-    "hint",
-    "firstRowValues",
-    "columnTypes",
-    "columnStats",
-    "columnProfiles",
-    "sampleRows",
-    "data",
+    "sheet",
+    "range",
+    "values",
+    "formulaPatterns",
+    "formulaExceptions",
     "merges",
+    "continuation",
+    "objectType",
+    "objects",
+    "matches",
   ];
   const keys = [
     ...importantKeys.filter((key) => key in record),
@@ -167,6 +166,7 @@ export class ToolResultBudget {
   private readonly totalTokenLimit: number;
   private readonly maxResultTokenLimit: number;
   private readonly toolTokenLimits: Record<string, number>;
+  private readonly toolPolicies: Record<string, ToolResultPolicy["kind"]>;
   private readonly toolTokens = new Map<string, number>();
   private readonly reservations = new Map<number, Reservation>();
   private usedTokenCount = 0;
@@ -182,6 +182,9 @@ export class ToolResultBudget {
         name,
         positiveInt(limit, this.totalTokenLimit),
       ]),
+    );
+    this.toolPolicies = Object.fromEntries(
+      Object.entries(options.toolPolicies ?? {}).map(([name, policy]) => [name, policy.kind]),
     );
   }
 
@@ -225,6 +228,7 @@ export class ToolResultBudget {
       id: this.nextReservationId++,
       toolName,
       tokenLimit: Math.floor(available),
+      policy: this.toolPolicies[toolName] ?? "generic",
     };
     this.reservations.set(reservation.id, reservation);
     this.reservedTokenCount += reservation.tokenLimit;
@@ -234,6 +238,23 @@ export class ToolResultBudget {
   finish(reservation: Reservation, value: unknown): unknown {
     this.releaseReservation(reservation);
     const originalTokens = estimateTokens(value);
+    if (originalTokens > reservation.tokenLimit && reservation.policy === "paged-structured") {
+      const output = {
+        ok: true,
+        truncated: true,
+        code: "TOOL_RESULT_TOO_LARGE" as const,
+        tool: reservation.toolName,
+        message: "结构化分页结果仍超过本次预算；工具未删除二维数据，请缩小 range 后重试。",
+        budget: this.snapshot,
+      };
+      const outputTokens = Math.min(reservation.tokenLimit, estimateTokens(output));
+      this.usedTokenCount += outputTokens;
+      this.toolTokens.set(
+        reservation.toolName,
+        (this.toolTokens.get(reservation.toolName) ?? 0) + outputTokens,
+      );
+      return output;
+    }
     const output =
       originalTokens <= reservation.tokenLimit
         ? value
@@ -292,7 +313,22 @@ export function wrapToolSetWithResultBudget<T extends BudgetableToolSet>(
             if (isTruncatedToolResult(reservation)) return reservation;
 
             try {
-              const result = await execute(input, options);
+              const executionOptions =
+                options && typeof options === "object"
+                  ? {
+                      ...(options as Record<string, unknown>),
+                      resultBudget: {
+                        maxTokens: reservation.tokenLimit,
+                        policy: reservation.policy,
+                      } satisfies ToolExecutionBudget,
+                    }
+                  : {
+                      resultBudget: {
+                        maxTokens: reservation.tokenLimit,
+                        policy: reservation.policy,
+                      } satisfies ToolExecutionBudget,
+                    };
+              const result = await execute(input, executionOptions);
               return budget.finish(reservation, result);
             } catch (error) {
               budget.fail(reservation);

@@ -90,6 +90,7 @@ export {
 export {
   fortuneMergesToToolRanges,
   toolCellToA1Ref,
+  toolColumnToA1Ref,
   toolRangeToA1Ref,
 } from "./chat/sheetGeometry.js";
 export type { FortuneCell, FortuneCellValue } from "./excel/celldataUtils.js";
@@ -145,6 +146,7 @@ export { templateToExcel } from "./exporter/templateToExcel.js";
 export type { ExcelSheetInput } from "./exporter/xlsxExportTypes.js";
 export type { XlsxWorkbookInput } from "./exporter/xlsxWorkbookExporter.js";
 export { workbookToXlsx } from "./exporter/xlsxWorkbookExporter.js";
+export { formulaToR1C1 } from "./formula/formulaR1C1.js";
 export { jsonToTemplate } from "./importer/jsonAnalyzer.js";
 export {
   parseSpreadsheetFile,
@@ -164,6 +166,39 @@ export {
   XlsxSafetyLimitError,
   type XlsxSafetyLimits,
 } from "./importer/xlsxSafetyGuard.js";
+export type {
+  SheetCellMatch,
+  SheetCellQuery,
+  SheetCellQueryOptions,
+} from "./sheetTools/sheetCellQuery.js";
+export { findSheetCells } from "./sheetTools/sheetCellQuery.js";
+export type {
+  FormulaException,
+  FormulaPattern,
+  SheetDataProjection,
+  SheetDataProjectionOptions,
+  SheetDataValue,
+  SheetMerge,
+  SheetToolRange,
+} from "./sheetTools/sheetDataProjection.js";
+export {
+  parseSheetToolRange,
+  projectSheetData,
+  sheetUsedRange,
+} from "./sheetTools/sheetDataProjection.js";
+export type {
+  SheetObjectSource,
+  SheetObjectType,
+} from "./sheetTools/sheetObjectProjection.js";
+export {
+  projectSheetObjects,
+  UnsupportedSheetObjectTypeError,
+} from "./sheetTools/sheetObjectProjection.js";
+export type {
+  SheetReadContinuation,
+  SheetReadPage,
+} from "./sheetTools/sheetReadPager.js";
+export { planSheetReadPage, sheetToolRangeToA1 } from "./sheetTools/sheetReadPager.js";
 export type {
   ColumnDef,
   InitConfig,

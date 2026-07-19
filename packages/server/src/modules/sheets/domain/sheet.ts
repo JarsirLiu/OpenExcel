@@ -15,6 +15,7 @@ export interface SheetChangePreviewMerge {
   startCol: number;
   endRow: number;
   endCol: number;
+  clipped: boolean;
 }
 
 /**
@@ -80,9 +81,29 @@ export function buildSheetChangePreview(
     rows.push({ row: storageIndexToTool(row0), values: gridRow.slice(0, columnCount) });
   }
 
-  const merges: SheetChangePreviewMerge[] = fortuneMergesToToolRanges(celldata).filter(
-    (merge) => merge.startRow <= previewRange.endRow && merge.startRow >= previewRange.startRow,
-  );
+  const merges: SheetChangePreviewMerge[] = fortuneMergesToToolRanges(celldata).flatMap((merge) => {
+    // 只有锚点在当前预览中时才返回合并区域；否则预览没有锚点值，无法正确渲染。
+    if (
+      merge.startRow < previewRange.startRow ||
+      merge.startRow > previewRange.endRow ||
+      merge.startCol < previewRange.startCol ||
+      merge.startCol > previewRange.endCol
+    ) {
+      return [];
+    }
+
+    const endRow = Math.min(merge.endRow, previewRange.endRow);
+    const endCol = Math.min(merge.endCol, previewRange.endCol);
+    return [
+      {
+        startRow: merge.startRow,
+        startCol: merge.startCol,
+        endRow,
+        endCol,
+        clipped: endRow !== merge.endRow || endCol !== merge.endCol,
+      },
+    ];
+  });
 
   return {
     sheetId,

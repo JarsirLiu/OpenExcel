@@ -208,7 +208,7 @@ export const studentFeeSteps: DemoStep[] = [
     id: "inspect",
     phase: "分析",
     title: "读取收费台账",
-    toolName: "readSheet",
+    toolName: "readSheetData",
     toolInput: "读取学生收费台账 A1:L13，识别金额字段、到账字段和已有公式",
     toolOutput: "读取 12 名学生记录，识别 8 个金额字段；发现应收净额、待缴金额和状态列需要补齐公式",
     assistantText:
@@ -223,7 +223,7 @@ export const studentFeeSteps: DemoStep[] = [
     id: "match",
     phase: "匹配",
     title: "核对到账与异常",
-    toolName: "readSheet",
+    toolName: "readSheetData",
     toolInput: "读取学生收费台账 A2:H13，按学号核对银行到账，识别分次到账、重复到账和未到账",
     toolOutput: "已核对 12 人：7 人金额相符，3 人部分缴费，1 人重复/超额，1 人未到账",
     assistantText: "我按学号核对银行到账，保留分次到账和重复流水的异常，不把异常金额直接冲掉。",

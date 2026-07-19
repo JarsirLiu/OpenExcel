@@ -27,13 +27,19 @@ function redactSheetIds(value: unknown): unknown {
 function getSheetLabel(output: unknown): string | null {
   if (!isRecord(output)) return null;
 
-  const sheetInfo = isRecord(output.sheetInfo) ? output.sheetInfo : null;
+  const sheetInfo = isRecord(output.sheetInfo)
+    ? output.sheetInfo
+    : isRecord(output.sheet)
+      ? output.sheet
+      : null;
   const sheetName =
     typeof sheetInfo?.sheetName === "string"
       ? sheetInfo.sheetName
-      : typeof output.sheetName === "string"
-        ? output.sheetName
-        : null;
+      : typeof sheetInfo?.name === "string"
+        ? sheetInfo.name
+        : typeof output.sheetName === "string"
+          ? output.sheetName
+          : null;
   const sheetNo =
     typeof sheetInfo?.sheetNo === "number"
       ? sheetInfo.sheetNo
@@ -48,7 +54,9 @@ function getSheetLabel(output: unknown): string | null {
 
 function getToolSummary(toolName: string, output: unknown, input: unknown): string {
   const isSheetTool = [
-    "readSheet",
+    "readSheetData",
+    "findSheetCells",
+    "readSheetObjects",
     "writeCells",
     "clearCells",
     "mergeCells",
@@ -66,8 +74,12 @@ function getToolSummary(toolName: string, output: unknown, input: unknown): stri
       : "Sheet");
 
   switch (toolName) {
-    case "readSheet":
+    case "readSheetData":
       return `读取 ${sheetLabel}`;
+    case "findSheetCells":
+      return `定位 ${sheetLabel}`;
+    case "readSheetObjects":
+      return `读取对象 ${sheetLabel}`;
     case "writeCells":
       return `写入 ${sheetLabel}`;
     case "clearCells":
@@ -83,8 +95,12 @@ function getToolSummary(toolName: string, output: unknown, input: unknown): stri
 
 function getSheetActionLabel(toolName: string): string {
   switch (toolName) {
-    case "readSheet":
+    case "readSheetData":
       return "读取了 Sheet";
+    case "findSheetCells":
+      return "定位了 Sheet 单元格";
+    case "readSheetObjects":
+      return "读取了 Sheet 对象";
     case "writeCells":
       return "修改了 Sheet";
     case "clearCells":
@@ -151,7 +167,7 @@ export function ToolCallCard({ part }: { part: any }) {
   const output = isStaticToolPart(part) ? (part as any).output : undefined;
   const summary = getToolSummary(toolName, output, input);
   const preview = normalizePreviewData(output?.preview);
-  const sheetInfo = output?.sheetInfo ?? null;
+  const sheetInfo = output?.sheetInfo ?? output?.sheet ?? null;
   const changedCells = computeChangedCells(output?.delta);
   const stateClass = isComplete
     ? isError
@@ -192,7 +208,7 @@ export function ToolCallCard({ part }: { part: any }) {
       )}
       {isComplete && sheetInfo && (
         <div className={styles.detail}>
-          {getSheetActionLabel(toolName)}: {sheetInfo.sheetName}
+          {getSheetActionLabel(toolName)}: {sheetInfo.sheetName ?? sheetInfo.name}
           {sheetInfo.sheetNo != null ? ` (#${sheetInfo.sheetNo})` : ""}
         </div>
       )}

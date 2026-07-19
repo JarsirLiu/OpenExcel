@@ -16,8 +16,8 @@ describe("studentFeeReconciliation demo", () => {
 
   it("only scripts tools that are currently supported by this demo", () => {
     expect(studentFeeSteps.map((step) => step.toolName).filter(Boolean)).toEqual([
-      "readSheet",
-      "readSheet",
+      "readSheetData",
+      "readSheetData",
       "writeCells",
       "writeCells",
       "writeCells",

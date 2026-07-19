@@ -10,6 +10,14 @@ export async function findSheetForWorkspace(id: number, workspaceId: number) {
   return sheet;
 }
 
+export async function findSheetsForWorkbook(workbookId: number, workspaceId: number) {
+  return prisma.sheet.findMany({
+    where: { workbookId, workbook: { workspaceId } },
+    select: { id: true, name: true },
+    orderBy: { order: "asc" },
+  });
+}
+
 export async function updateSheetData(
   sheetId: number,
   data: { uploadedData: string; config?: string },

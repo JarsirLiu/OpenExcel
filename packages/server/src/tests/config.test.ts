@@ -25,7 +25,7 @@ describe("environment model config", () => {
       maxUserInputTokens: 16_000,
       toolResultBudgetTokens: 32_000,
       toolResultMaxTokens: 8_000,
-      readSheetBudgetTokens: 24_000,
+      readSheetDataBudgetTokens: 24_000,
     });
   }, 15_000);
 
@@ -50,7 +50,7 @@ describe("environment model config", () => {
       maxUserInputTokens: 16_000,
       toolResultBudgetTokens: 32_000,
       toolResultMaxTokens: 8_000,
-      readSheetBudgetTokens: 24_000,
+      readSheetDataBudgetTokens: 24_000,
     });
   });
 

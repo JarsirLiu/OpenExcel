@@ -419,8 +419,8 @@ Spreadsheet coordinates use one explicit boundary. FortuneSheet and persisted `u
 0-based coordinates (`r=0,c=0` is A1); agent tools and chat previews use Excel's 1-based visual
 coordinates. The core chat coordinate and geometry modules own conversion between these
 representations, including merge ranges and A1 references. Server tools must not infer or remove a
-header row, and `readSheet` reports the actual visual row numbers. `firstRowValues` is raw row-one
-data only and is never treated as an implicit table-header contract.
+header row. `readSheetData` reports the actual visual row numbers through its A1 range and does not
+infer a table header.
 
 ### 5.2 `packages/server`
 
@@ -705,9 +705,9 @@ workbook/Sheet metadata. The agent converts the resolved data part into model-fa
 while the persisted/UI message keeps the user-visible text separate from that hidden context. This
 keeps editor, resource authorization, and model prompt formatting in separate ownership boundaries.
 
-Tool results are processed at one run-scoped boundary before they are returned to the model. The default shared result budget is 32,000 tokens per run, each result is capped at 8,000 tokens, and `readSheet` has a 24,000-token sub-budget. A result larger than its remaining allowance is structurally compacted, retaining scalar metadata and representative array items. When no allowance remains, the wrapper returns a normal `truncated` result without executing the underlying tool; on the next model step, exhausted tools are removed from `activeTools`, allowing the model to finish without an error or an unbounded tool loop. These limits are configured with `MODEL_TOOL_RESULT_BUDGET_TOKENS`, `MODEL_TOOL_RESULT_MAX_TOKENS`, and `MODEL_READ_SHEET_BUDGET_TOKENS`.
+Tool results are processed at one run-scoped boundary before they are returned to the model. The default shared result budget is 32,000 tokens per run, each result is capped at 8,000 tokens, and `readSheetData` has a 24,000-token sub-budget. Generic tools may be structurally compacted, but `readSheetData` uses a paged-structured policy: the server sizes a complete rectangular page against the available result budget and the budget wrapper never samples or removes values from that page. When no allowance remains, the wrapper returns a normal `truncated` result without executing the underlying tool; on the next model step, exhausted tools are removed from `activeTools`, allowing the model to finish without an error or an unbounded tool loop. These limits are configured with `MODEL_TOOL_RESULT_BUDGET_TOKENS`, `MODEL_TOOL_RESULT_MAX_TOKENS`, and `MODEL_READ_SHEET_DATA_BUDGET_TOKENS`.
 
-Spreadsheet reads are bounded at the tool boundary. A default `readSheet` call returns an overview of the whole Sheet (dimensions, column profiles, numeric statistics, and representative samples) without returning all raw cells. Explicit `mode=range` calls return up to approximately 4,000 grid cells and expose the next row or column through `hasMoreRows`, `hasMoreCols`, and the range in the response. This lets the model understand a large Sheet before requesting a focused range and keeps repeated analysis from filling the context with an unbounded tool result.
+Spreadsheet read projections, formula compression, format lookup, cell queries, Excel object summaries, and their token-budget rules are defined in [`docs/ai-spreadsheet-tools.md`](ai-spreadsheet-tools.md). The architecture boundary is that core owns pure projections, server owns authorization and resource access, and agent owns model-facing tool contracts. The tools use bounded rectangular ranges and explicit continuation ranges; a generic result compressor must not randomly remove rows from a two-dimensional read.
 
 ### 7.3 Title flow
 

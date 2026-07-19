@@ -39,7 +39,7 @@ export function fortuneMergesToToolRanges(celldata: FortuneCell[]): ToolRange[] 
   return ranges;
 }
 
-function toolColumnToA1(column: ToolIndex): string {
+export function toolColumnToA1Ref(column: ToolIndex): string {
   let index: number = toolIndexToStorage(column);
   let result = "";
   while (index >= 0) {
@@ -50,7 +50,7 @@ function toolColumnToA1(column: ToolIndex): string {
 }
 
 export function toolCellToA1Ref(row: ToolIndex, col: ToolIndex): string {
-  return `${toolColumnToA1(col)}${row}`;
+  return `${toolColumnToA1Ref(col)}${row}`;
 }
 
 export function toolRangeToA1Ref(range: ToolRange): string {

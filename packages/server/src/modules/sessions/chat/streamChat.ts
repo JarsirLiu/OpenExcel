@@ -95,7 +95,8 @@ export async function streamChat(
   const toolResultBudget = new ToolResultBudget({
     totalTokens: config.toolResultBudgetTokens,
     maxResultTokens: config.toolResultMaxTokens,
-    toolBudgets: { readSheet: config.readSheetBudgetTokens },
+    toolBudgets: { readSheetData: config.readSheetDataBudgetTokens },
+    toolPolicies: { readSheetData: { kind: "paged-structured" } },
   });
   const tools = wrapToolSetWithResultBudget(
     { ...workbookTools, ...excelTools, ...chartTools } as any,

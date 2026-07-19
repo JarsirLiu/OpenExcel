@@ -7,6 +7,45 @@ const writeFormulaSchema = z
   .min(1)
   .describe("Excel 公式表达式，支持 A1 引用；可带或不带前导等号，系统会自动规范化");
 
+const sheetDataRangeSchema = z
+  .string()
+  .trim()
+  .regex(/^\$?[A-Za-z]+\$?\d+(?::\$?[A-Za-z]+\$?\d+)?$/, "必须是 A1 范围，例如 A1:D20");
+
+const sheetReadContinuationSchema = z.object({
+  requestedRange: sheetDataRangeSchema.describe("本次读取的完整目标范围"),
+  nextRow: z.coerce.number().int().positive().describe("下一页起始行号，从 1 开始"),
+  nextCol: z.coerce.number().int().positive().describe("下一页起始列号，从 1 开始"),
+});
+
+const sheetCellStyleSchema = z
+  .object({
+    fill: z.string().trim().min(1).optional(),
+    fontColor: z.string().trim().min(1).optional(),
+    bold: z.boolean().optional(),
+    numberFormat: z.string().trim().min(1).optional(),
+  })
+  .refine((style) => Object.values(style).some((value) => value !== undefined), {
+    message: "style 至少需要指定一个格式条件",
+  });
+
+const sheetCellQuerySchema = z
+  .object({
+    value: z.union([z.string(), z.number(), z.boolean(), z.null()]).optional(),
+    valueType: z.enum(["empty", "string", "number", "boolean", "formula"]).optional(),
+    formula: z
+      .union([
+        z.literal("exists"),
+        z.object({ exact: z.string().min(1) }),
+        z.object({ r1c1: z.string().min(1) }),
+      ])
+      .optional(),
+    style: sheetCellStyleSchema.optional(),
+  })
+  .refine((query) => Object.values(query).some((value) => value !== undefined), {
+    message: "至少指定一个值、公式或格式条件",
+  });
+
 const chartAnchorPointSchema = z.object({
   row: z.coerce.number().int().positive().describe("行号，从 1 开始"),
   col: z.coerce.number().int().positive().describe("列号，从 1 开始"),
@@ -199,43 +238,32 @@ export const excelToolSpecs = {
         .describe("可选的源 Sheet ID，用于复制初始结构"),
     }),
   },
-  readSheet: {
+  readSheetData: {
     description:
-      "读取指定 Sheet 的单元格数据和基础分析结果。首次或不传范围时返回 overview：整表规模、列画像、数值统计、空值情况、第一行原始值 firstRowValues，以及头部/中部/尾部的少量代表性样本；firstRowValues 仅表示实际 Excel 第 1 行，不代表系统推断出的表头。传入 startRow/endRow/startCol/endCol 或 mode=range 时返回指定范围的稀疏数据。单次范围最多返回约4000个网格单元。该工具不返回完整样式、公式表达式、图表、透视表、VBA 或其他 Excel 对象；行号和列号按 Excel 视觉顺序从 1 开始。",
+      "读取指定 Sheet 的矩形数据。返回 range 对应的二维 values、压缩后的公式模式、非统一公式和合并区域；null 是真实空单元格，数字 0 保持为 0，不推断表头，不返回样式或 Excel 对象。未传 range 时读取已使用区域；超过单次网格预算时返回 continuation，下一次原样传回 continuation 读取下一页。",
     inputSchema: z.object({
-      sheetId: z.coerce.number().describe("Sheet ID"),
-      mode: z
-        .enum(["overview", "range"])
+      sheetId: z.coerce.number().int().positive().describe("Sheet ID"),
+      range: sheetDataRangeSchema.optional().describe("A1 范围，例如 A1:D20；默认已使用区域"),
+      continuation: sheetReadContinuationSchema
         .optional()
-        .describe("读取模式；不传范围参数时默认 overview，传入范围参数时默认 range"),
-      startRow: z.coerce
-        .number()
-        .int()
-        .positive()
-        .optional()
-        .describe("起始行号（含），从 1 开始，默认 1"),
-      endRow: z.coerce
-        .number()
-        .int()
-        .positive()
-        .optional()
-        .describe("结束行号（含），从 1 开始，默认 30"),
-      startCol: z.coerce
-        .number()
-        .int()
-        .positive()
-        .optional()
-        .describe("起始列号（含），从 1 开始，默认 1"),
-      endCol: z.coerce
-        .number()
-        .int()
-        .positive()
-        .optional()
-        .describe("结束列号（含），从 1 开始，默认全部列"),
-      includeMetadata: z
-        .boolean()
-        .optional()
-        .describe("范围读取时是否重复返回列画像；默认 false，overview 模式始终返回"),
+        .describe("上一次读取返回的 continuation；传入后继续同一目标范围"),
+    }),
+  },
+  findSheetCells: {
+    description:
+      "在指定 Sheet 的范围内定位满足值、值类型、公式或直接格式条件的单元格。只返回合并后的 A1 区域、数量和查询原因，不返回完整数据矩阵；找到区域后再调用 readSheetData 读取内容。未传 range 时搜索已使用区域；查找空单元格时必须传入足够小的范围。颜色属于格式条件，不能写进 values。",
+    inputSchema: z.object({
+      sheetId: z.coerce.number().int().positive().describe("Sheet ID"),
+      range: sheetDataRangeSchema.optional().describe("搜索范围，例如 A1:Z100；默认已使用区域"),
+      query: sheetCellQuerySchema,
+    }),
+  },
+  readSheetObjects: {
+    description:
+      "读取指定 Sheet 的一种 Excel 对象摘要。必须指定 objectType：charts、filters、tables 或 pivotTables。返回模型决策所需的引用和范围，不返回 OOXML、ECharts option 或完整绘图缓存。",
+    inputSchema: z.object({
+      sheetId: z.coerce.number().int().positive().describe("Sheet ID"),
+      objectType: z.enum(["charts", "filters", "tables", "pivotTables"]),
     }),
   },
   writeCells: {

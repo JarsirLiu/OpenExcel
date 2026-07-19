@@ -65,7 +65,26 @@ describe("sheet domain helpers", () => {
       { row: 1, values: ["A", "", ""] },
       { row: 2, values: ["", "B", ""] },
     ]);
-    expect(preview.merges).toEqual([{ startRow: 2, startCol: 2, endRow: 3, endCol: 3 }]);
+    expect(preview.merges).toEqual([
+      { startRow: 2, startCol: 2, endRow: 2, endCol: 3, clipped: true },
+    ]);
+  });
+
+  it("clips preview merges to the visible range and omits merges without a visible anchor", () => {
+    const preview = buildSheetChangePreview(
+      [
+        { r: 1, c: 0, v: { v: "visible", mc: { r: 1, c: 0, rs: 3, cs: 1 } } },
+        { r: 0, c: 1, v: { v: "outside" } },
+      ] as any,
+      "Sheet1",
+      7,
+      storageIndex(1),
+      storageIndex(1),
+    );
+
+    expect(preview.merges).toEqual([
+      { startRow: 2, startCol: 1, endRow: 2, endCol: 1, clipped: true },
+    ]);
   });
 
   it("keeps explicit row numbers in preview when middle rows are empty", () => {

@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { toolIndex } from "./sheetCoordinates.js";
-import { fortuneMergesToToolRanges, toolCellToA1Ref, toolRangeToA1Ref } from "./sheetGeometry.js";
+import {
+  fortuneMergesToToolRanges,
+  toolCellToA1Ref,
+  toolColumnToA1Ref,
+  toolRangeToA1Ref,
+} from "./sheetGeometry.js";
 
 describe("sheet geometry conversions", () => {
   it("converts FortuneSheet merges and tool ranges at the core boundary", () => {
@@ -14,6 +19,7 @@ describe("sheet geometry conversions", () => {
         { r: 1, c: 2, v: { v: "", m: "", mc: { r: 0, c: 0, rs: 2, cs: 3 } } },
       ]),
     ).toEqual([{ startRow: 1, startCol: 1, endRow: 2, endCol: 3 }]);
+    expect(toolColumnToA1Ref(toolIndex(27))).toBe("AA");
     expect(toolCellToA1Ref(toolIndex(2), toolIndex(27))).toBe("AA2");
     expect(
       toolRangeToA1Ref({

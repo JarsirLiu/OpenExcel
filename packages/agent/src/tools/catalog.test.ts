@@ -13,9 +13,9 @@ describe("buildExcelToolCatalog", () => {
 
     expect(catalog).toContain("**createWorkbook**");
     expect(catalog).toContain("**createSheet**");
-    expect(catalog).toContain("**readSheet**");
+    expect(catalog).toContain("**readSheetData**");
     expect(catalog).toContain("**writeCells**");
-    expect(catalog).toContain(excelToolSpecs.readSheet.description);
+    expect(catalog).toContain(excelToolSpecs.readSheetData.description);
     expect(catalog).toContain("不支持：删除工作簿或 Sheet");
     expect(catalog).toContain("透视表、透视图表、数据透视筛选器、VBA/宏");
     expect(catalog).toContain("不要用写入单元格或其他近似操作强行模拟");
@@ -43,6 +43,22 @@ describe("buildExcelToolCatalog", () => {
 
     expect(result.success).toBe(true);
   });
+
+  it("requires at least one style condition when finding cells by style", () => {
+    expect(
+      excelToolSpecs.findSheetCells.inputSchema.safeParse({
+        sheetId: 1,
+        query: { style: {} },
+      }).success,
+    ).toBe(false);
+
+    expect(
+      excelToolSpecs.findSheetCells.inputSchema.safeParse({
+        sheetId: 1,
+        query: { style: { bold: false } },
+      }).success,
+    ).toBe(true);
+  });
 });
 
 describe("buildExcelToolContext", () => {
@@ -52,7 +68,9 @@ describe("buildExcelToolContext", () => {
     const mergedContext = buildExcelToolContext(7, 3);
 
     expect(workspaceContext).toEqual({
-      readSheet: { workspaceId: 3 },
+      readSheetData: { workspaceId: 3 },
+      findSheetCells: { workspaceId: 3 },
+      readSheetObjects: { workspaceId: 3 },
       listCharts: { workspaceId: 3 },
     });
 
@@ -69,7 +87,9 @@ describe("buildExcelToolContext", () => {
     });
 
     expect(mergedContext).toEqual({
-      readSheet: { workspaceId: 3 },
+      readSheetData: { workspaceId: 3 },
+      findSheetCells: { workspaceId: 3 },
+      readSheetObjects: { workspaceId: 3 },
       listCharts: { workspaceId: 3 },
       createWorkbook: { runId: 7, workspaceId: 3 },
       createSheet: { runId: 7, workspaceId: 3 },

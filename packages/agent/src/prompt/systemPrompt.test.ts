@@ -24,11 +24,11 @@ describe("system prompt", () => {
   });
 
   it("includes the prompt, catalog, and context in the final system prompt", () => {
-    const systemPrompt = buildSystemPrompt("workspace context", "- **readSheet**: read data");
+    const systemPrompt = buildSystemPrompt("workspace context", "- **readSheetData**: read data");
 
     expect(systemPrompt).toContain(DEFAULT_PROMPT);
     expect(systemPrompt).toContain("## 可用工具");
-    expect(systemPrompt).toContain("- **readSheet**: read data");
+    expect(systemPrompt).toContain("- **readSheetData**: read data");
     expect(systemPrompt).toContain("## 当前工作区目录");
     expect(systemPrompt).toContain("workspace context");
   });
