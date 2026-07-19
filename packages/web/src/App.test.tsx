@@ -58,14 +58,14 @@ describe("App", () => {
     vi.clearAllMocks();
   });
 
-  it("renders the workbench when authenticated", async () => {
+  it("renders the public homepage at the root route", async () => {
     const { container } = render(
       <HashRouter>
         <App />
       </HashRouter>,
     );
     await waitFor(() => {
-      expect(container.querySelector('[data-testid="workbench"]')).toBeTruthy();
+      expect(container.querySelector('[data-testid="auth-screen"]')).toBeTruthy();
     });
   });
 });

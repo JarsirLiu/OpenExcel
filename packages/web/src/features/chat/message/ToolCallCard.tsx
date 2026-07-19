@@ -183,7 +183,11 @@ export function ToolCallCard({ part }: { part: any }) {
       </div>
       {isComplete && !isError && preview && preview.rows.length > 0 && (
         <div className={styles.preview}>
-          <SheetPreview preview={preview} changedCells={changedCells} />
+          <SheetPreview
+            preview={preview}
+            changedCells={changedCells}
+            label={output?.previewLabel}
+          />
         </div>
       )}
       {isComplete && sheetInfo && (

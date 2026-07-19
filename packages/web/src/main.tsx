@@ -11,6 +11,10 @@ import App from "./App";
 
 const router = createHashRouter([
   {
+    path: "/",
+    element: <App />,
+  },
+  {
     path: "/login",
     element: <App />,
   },

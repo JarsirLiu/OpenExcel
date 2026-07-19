@@ -24,7 +24,7 @@ describe("protectedLoader", () => {
     fetchCurrentUser.mockResolvedValue(user);
   });
 
-  it("bootstraps the user workspace before redirecting from the root route", async () => {
+  it("bootstraps the user workspace when a protected route has no workspace", async () => {
     const workspace = { id: 11, publicId: "ws_test", name: "Test", order: 0 };
     bootstrapWorkspace.mockResolvedValue(workspace);
 

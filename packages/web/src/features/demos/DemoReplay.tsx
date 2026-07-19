@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import type { WorkbookFull } from "@/api/workbooks";
 import type { Workspace } from "@/api/workspaces";
 import workbenchStyles from "@/app/Workbench.module.css";
+import { Button } from "@/components/ui/Button/Button";
 import chatStyles from "@/features/chat/ChatSidebar.module.css";
 import { ChatComposer } from "@/features/chat/composer/ChatComposer";
 import chatPanelStyles from "@/features/chat/conversation/ChatPanel.module.css";
@@ -13,6 +14,7 @@ import { SheetActivationProvider } from "@/features/workbook/editor/SheetActivat
 import { WorkspaceSidebar } from "@/features/workspace/WorkspaceSidebar";
 import { WorkspaceView } from "@/features/workspace/WorkspaceView";
 import {
+  type DemoCell,
   type DemoPatch,
   type DemoSheet,
   type DemoStep,
@@ -23,10 +25,14 @@ import {
 
 type PlaybackPhase = "idle" | "text" | "tool" | "result" | "done";
 
-type AssistantHistoryItem = {
+type DemoTextPart = {
+  type: "text";
   stepId: string;
   text: string;
 };
+
+type DemoToolPart = ReturnType<typeof buildToolPart>;
+type DemoAssistantPart = DemoTextPart | DemoToolPart;
 
 const demoWorkspace: Workspace = {
   id: -100,
@@ -46,7 +52,7 @@ function cloneSheets(): DemoSheet[] {
   return studentFeeInitialSheets.map((sheet) => ({
     ...sheet,
     columns: [...sheet.columns],
-    rows: sheet.rows.map((row) => [...row]),
+    rows: sheet.rows.map((row) => row.map((item) => ({ ...item }))),
   }));
 }
 
@@ -67,7 +73,11 @@ function toWorkbook(sheets: DemoSheet[]): WorkbookFull {
         row.map((value, colIndex) => ({
           r: rowIndex,
           c: colIndex,
-          v: { v: value, m: value },
+          v: {
+            v: value.value,
+            m: String(value.value),
+            ...(value.formula ? { f: value.formula.replace(/^=/, "") } : {}),
+          },
         })),
       ),
       config: null,
@@ -88,33 +98,117 @@ function applyStepPatch(sheets: DemoSheet[], step: DemoStep): DemoSheet[] {
       const row = rows[patch.row - 1];
       if (!row) continue;
       patch.values.forEach((value, index) => {
-        row[index + 2] = value;
+        row[patch.startCol - 1 + index] = { ...value };
       });
     }
     return { ...sheet, rows };
   });
 }
 
-function buildToolPart(step: DemoStep, toolState: "input-streaming" | "output-available") {
+function columnNumber(value: string): number {
+  return value.split("").reduce((total, char) => total * 26 + char.charCodeAt(0) - 64, 0);
+}
+
+function parseRange(value: string | undefined, sheet: DemoSheet | undefined) {
+  const fallback = {
+    startRow: 1,
+    endRow: Math.min(sheet?.rows.length ?? 1, 8),
+    startCol: 1,
+    endCol: Math.min(sheet?.columns.length ?? 1, 8),
+  };
+  if (!value) return fallback;
+
+  const match = value.toUpperCase().match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/);
+  if (!match) return fallback;
+  return {
+    startRow: Number(match[2]),
+    endRow: Number(match[4]),
+    startCol: columnNumber(match[1]),
+    endCol: columnNumber(match[3]),
+  };
+}
+
+function buildPreview(sheet: DemoSheet | undefined, rangeValue?: string) {
+  if (!sheet) return undefined;
+
+  const range = parseRange(rangeValue, sheet);
+  const rows = sheet.rows
+    .slice(range.startRow - 1, range.endRow)
+    .map((row) => row.slice(range.startCol - 1, range.endCol));
+  const sheetIndex = studentFeeInitialSheets.findIndex((item) => item.name === sheet.name);
+  return {
+    sheetId: -200 - sheetIndex,
+    sheetName: sheet.name,
+    range,
+    rows: rows.map((values, index) => ({
+      row: range.startRow + index,
+      values: values.map((item: DemoCell) => ({ value: item.value })),
+    })),
+    merges: [],
+  };
+}
+
+function buildToolPart(
+  step: DemoStep,
+  toolState: "input-streaming" | "output-available",
+  sheets: DemoSheet[],
+) {
   const sheetName = step.activeSheet ?? "当前 Sheet";
+  const sheet = sheets.find((item) => item.name === sheetName);
+  const patches = step.patch ? (Array.isArray(step.patch) ? step.patch : [step.patch]) : [];
   return {
     type: `tool-${step.toolName}`,
     toolCallId: `demo-${step.id}`,
     state: toolState,
-    input: { sheetName, range: step.highlight ?? "A1:F20" },
+    input: {
+      sheetName,
+      range: step.highlight ?? "A1:F20",
+      instruction: step.toolInput,
+    },
     output:
       toolState === "output-available"
         ? {
-            sheetInfo: { sheetName, sheetNo: 1 },
-            delta: step.patch
-              ? {
-                  type: "write",
-                  cells: [{ row: 1, col: 1, value: "已更新" }],
-                }
-              : undefined,
+            sheetInfo: {
+              sheetId: -200 - studentFeeInitialSheets.findIndex((item) => item.name === sheetName),
+              sheetName,
+              sheetNo: studentFeeInitialSheets.findIndex((item) => item.name === sheetName) + 1,
+            },
+            message: step.toolOutput,
+            previewLabel: step.toolName === "readSheet" ? "读取区域" : "变更区域",
+            preview: buildPreview(sheet, step.highlight),
+            delta:
+              patches.length > 0
+                ? {
+                    type: "write",
+                    cells: patches.flatMap((patch) =>
+                      patch.values.map((value, index) => ({
+                        row: patch.row,
+                        col: patch.startCol + index,
+                        value: value.value,
+                        ...(value.formula ? { formula: value.formula } : {}),
+                      })),
+                    ),
+                  }
+                : undefined,
           }
         : undefined,
   };
+}
+
+export function buildDemoMessages(assistantParts: readonly DemoAssistantPart[]) {
+  const messages: any[] = [
+    { id: "demo-user", role: "user", parts: [{ type: "text", text: studentFeePrompt }] },
+  ];
+
+  if (assistantParts.length > 0) {
+    messages.push({
+      id: "demo-assistant",
+      role: "assistant",
+      parts: assistantParts,
+    });
+  }
+
+  return messages;
 }
 
 function DemoChatSidebar({
@@ -145,16 +239,15 @@ function DemoChatSidebar({
         />
         <div className={sessionStyles.bannerWrap}>
           <div className={sessionStyles.banner}>
-            <button
-              type="button"
-              className={`${sessionStyles.pillBtn} ${sessionStyles.plusBtnSolid}`}
+            <Button
+              variant={isStreaming ? "default" : "primary"}
               onClick={isStreaming ? onStop : onStart}
             >
               {isStreaming ? "暂停回放" : "播放 AI 回放"}
-            </button>
-            <button type="button" className={sessionStyles.pillBtn} onClick={onReset}>
+            </Button>
+            <Button variant="ghost" onClick={onReset}>
               重新开始
-            </button>
+            </Button>
           </div>
         </div>
         <div className={chatPanelStyles.container}>
@@ -182,8 +275,7 @@ export function DemoReplay() {
   const [phase, setPhase] = useState<PlaybackPhase>("idle");
   const [textOffset, setTextOffset] = useState(0);
   const [currentTool, setCurrentTool] = useState<"input" | "output" | null>(null);
-  const [history, setHistory] = useState<AssistantHistoryItem[]>([]);
-  const [currentText, setCurrentText] = useState("");
+  const [assistantParts, setAssistantParts] = useState<DemoAssistantPart[]>([]);
   const [isPlaying, setIsPlaying] = useState(false);
   const currentStep = stepIndex >= 0 ? studentFeeSteps[stepIndex] : null;
   const currentWorkbook = useMemo(() => toWorkbook(sheets), [sheets]);
@@ -196,51 +288,49 @@ export function DemoReplay() {
     setPhase("idle");
     setTextOffset(0);
     setCurrentTool(null);
-    setHistory([]);
-    setCurrentText("");
+    setAssistantParts([]);
     setIsPlaying(false);
+  }, []);
+
+  const beginStep = useCallback((index: number, clearParts = false) => {
+    const step = studentFeeSteps[index];
+    setStepIndex(index);
+    setCurrentSheetIndex(
+      Math.max(
+        0,
+        studentFeeInitialSheets.findIndex((sheet) => sheet.name === step.activeSheet),
+      ),
+    );
+    setTextOffset(0);
+    setCurrentTool(null);
+    setPhase("text");
+    setAssistantParts((parts) => [
+      ...(clearParts ? [] : parts),
+      { type: "text", stepId: step.id, text: "" },
+    ]);
+    setIsPlaying(true);
   }, []);
 
   const start = useCallback(() => {
     if (stepIndex === studentFeeSteps.length - 1 && phase === "done") {
       reset();
-      window.setTimeout(() => setIsPlaying(true), 20);
+      window.setTimeout(() => beginStep(0, true), 20);
       return;
     }
     if (stepIndex < 0) {
-      setStepIndex(0);
-      setCurrentSheetIndex(0);
-      setPhase("text");
-      setTextOffset(0);
+      beginStep(0, true);
+      return;
     }
     setIsPlaying(true);
-  }, [phase, reset, stepIndex]);
+  }, [beginStep, phase, reset, stepIndex]);
 
   const moveToNextStep = useCallback(() => {
     if (stepIndex >= studentFeeSteps.length - 1) {
       setIsPlaying(false);
       return;
     }
-    const nextIndex = stepIndex + 1;
-    setHistory((items) =>
-      currentText
-        ? [...items, { stepId: studentFeeSteps[stepIndex].id, text: currentText }]
-        : items,
-    );
-    setStepIndex(nextIndex);
-    setCurrentSheetIndex(
-      Math.max(
-        0,
-        studentFeeInitialSheets.findIndex(
-          (sheet) => sheet.name === studentFeeSteps[nextIndex].activeSheet,
-        ),
-      ),
-    );
-    setCurrentText("");
-    setCurrentTool(null);
-    setTextOffset(0);
-    setPhase("text");
-  }, [currentText, stepIndex]);
+    beginStep(stepIndex + 1);
+  }, [beginStep, stepIndex]);
 
   useEffect(() => {
     if (!isPlaying || !currentStep) return;
@@ -256,6 +346,10 @@ export function DemoReplay() {
 
     if (phase === "tool") {
       const timer = window.setTimeout(() => {
+        setAssistantParts((parts) => [
+          ...parts,
+          buildToolPart(currentStep, "input-streaming", sheets),
+        ]);
         setCurrentTool("input");
         setPhase("done");
       }, 380);
@@ -264,9 +358,18 @@ export function DemoReplay() {
 
     if (phase === "result") {
       const timer = window.setTimeout(() => {
-        setCurrentTool("output");
-        setSheets((value) => applyStepPatch(value, currentStep));
+        const nextSheets = applyStepPatch(sheets, currentStep);
+        const toolCallId = `demo-${currentStep.id}`;
+        setAssistantParts((parts) =>
+          parts.map((part) =>
+            "toolCallId" in part && part.toolCallId === toolCallId
+              ? buildToolPart(currentStep, "output-available", nextSheets)
+              : part,
+          ),
+        );
+        setSheets(nextSheets);
         setWorkbookRevision((revision) => revision + 1);
+        setCurrentTool("output");
         setPhase("done");
       }, 520);
       return () => window.clearTimeout(timer);
@@ -291,41 +394,21 @@ export function DemoReplay() {
     }
 
     return undefined;
-  }, [currentStep, currentTool, isPlaying, moveToNextStep, phase, stepIndex, textOffset]);
+  }, [currentStep, currentTool, isPlaying, moveToNextStep, phase, sheets, stepIndex, textOffset]);
 
   useEffect(() => {
-    if (currentStep) setCurrentText(currentStep.assistantText.slice(0, textOffset));
-  }, [currentStep, textOffset]);
+    if (!currentStep || phase !== "text") return;
+    const text = currentStep.assistantText.slice(0, textOffset);
+    setAssistantParts((parts) =>
+      parts.map((part) =>
+        part.type === "text" && "stepId" in part && part.stepId === currentStep.id
+          ? { ...part, text }
+          : part,
+      ),
+    );
+  }, [currentStep, phase, textOffset]);
 
-  const messages = useMemo(() => {
-    const result: any[] = [
-      { id: "demo-user", role: "user", parts: [{ type: "text", text: studentFeePrompt }] },
-      ...history.map((item) => ({
-        id: `demo-${item.stepId}`,
-        role: "assistant",
-        parts: [{ type: "text", text: item.text }],
-      })),
-    ];
-
-    if (currentStep && currentText) {
-      result.push({
-        id: `demo-current-${currentStep.id}`,
-        role: "assistant",
-        parts: [
-          { type: "text", text: currentText },
-          ...(currentStep.toolName && currentTool
-            ? [
-                buildToolPart(
-                  currentStep,
-                  currentTool === "output" ? "output-available" : "input-streaming",
-                ),
-              ]
-            : []),
-        ],
-      });
-    }
-    return result;
-  }, [currentStep, currentText, currentTool, history]);
+  const messages = useMemo(() => buildDemoMessages(assistantParts), [assistantParts]);
 
   const handleSheetIndexChange = useCallback((index: number) => setCurrentSheetIndex(index), []);
   const handleWorkbookImportNoop = useCallback(async () => false, []);

@@ -120,9 +120,11 @@ function buildMergeMap(merges: PreviewMerge[]): Map<string, { rs: number; cs: nu
 export function SheetPreview({
   preview: rawPreview,
   changedCells,
+  label = "变更区域",
 }: {
   preview: unknown;
   changedCells?: ReadonlySet<string>;
+  label?: string;
 }) {
   const preview = normalizePreviewData(rawPreview);
   if (!preview) return null;
@@ -136,7 +138,7 @@ export function SheetPreview({
       <div
         style={{ fontSize: 12, fontWeight: 600, color: "var(--muted-foreground)", marginBottom: 4 }}
       >
-        {preview.sheetName} — 变更区域
+        {preview.sheetName} — {label}
       </div>
       <div style={{ overflowX: "auto", maxHeight: 300, overflowY: "auto" }}>
         <table

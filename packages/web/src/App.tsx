@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect } from "react";
 import { useLocation, useNavigate, useRouteLoaderData } from "react-router-dom";
 import { type CurrentUser, logout } from "@/api/auth";
+import { bootstrapWorkspace } from "@/api/workspaces";
 import type { WorkbenchRouteData } from "@/app/routeData";
 import { AuthScreen } from "@/features/auth/AuthScreen";
 import { useAuthState } from "@/features/auth/useAuthState";
@@ -59,18 +60,33 @@ function LoadingScreen() {
   );
 }
 
-function AuthPage() {
+function AuthPage({ isHome = false }: { isHome?: boolean }) {
   const auth = useAuthState();
   const navigate = useNavigate();
   const location = useLocation();
 
   const authMode = location.pathname === "/register" ? "register" : "login";
 
+  async function enterWorkspace(userId: number) {
+    const workspace = await bootstrapWorkspace(userId);
+    navigate(`/workspaces/${workspace.publicId}`, { replace: true });
+  }
+
   useEffect(() => {
-    if (!auth.loading && auth.currentUser) {
-      navigate("/", { replace: true });
+    if (!isHome && !auth.loading && auth.currentUser) {
+      void enterWorkspace(auth.currentUser.id);
     }
-  }, [auth.currentUser, auth.loading, navigate]);
+  }, [auth.currentUser, auth.loading, isHome]);
+
+  async function handleLogin(input: { email: string; password: string }) {
+    const user = await auth.signIn(input);
+    if (isHome) await enterWorkspace(user.id);
+  }
+
+  async function handleRegister(input: { email: string; password: string; displayName?: string }) {
+    const user = await auth.signUp(input);
+    if (isHome) await enterWorkspace(user.id);
+  }
 
   if (auth.loading) return <LoadingScreen />;
   return (
@@ -78,8 +94,8 @@ function AuthPage() {
       mode={authMode}
       submitting={auth.submitting}
       error={auth.error}
-      onLogin={auth.signIn}
-      onRegister={auth.signUp}
+      onLogin={handleLogin}
+      onRegister={handleRegister}
       onSwitchMode={() => navigate(authMode === "login" ? "/register" : "/login")}
       onOpenDemo={() => navigate("/demos/student-fee-reconciliation")}
     />
@@ -126,6 +142,10 @@ function WorkbenchPage() {
 
 export default function App() {
   const location = useLocation();
+
+  if (location.pathname === "/") {
+    return <AuthPage isHome />;
+  }
 
   if (location.pathname === "/demos/student-fee-reconciliation") {
     return <DemoReplay />;
