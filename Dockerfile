@@ -6,6 +6,7 @@ WORKDIR /app
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY packages/core/package.json packages/core/
 COPY packages/agent/package.json packages/agent/
+COPY packages/chat-contracts/package.json packages/chat-contracts/
 COPY packages/server/package.json packages/server/
 COPY packages/web/package.json packages/web/
 
@@ -18,13 +19,13 @@ RUN pnpm --filter @openexcel/server exec prisma generate --schema prisma/mysql/s
 
 COPY packages/core/src ./packages/core/src
 COPY packages/agent/src ./packages/agent/src
+COPY packages/chat-contracts/src ./packages/chat-contracts/src
 COPY packages/server/src ./packages/server/src
 COPY packages/server/scripts ./packages/server/scripts
 COPY packages/web/src ./packages/web/src
 COPY packages/web/index.html ./packages/web/
 COPY packages/web/tsconfig.json ./packages/web/
 COPY packages/web/vite.config.ts ./packages/web/
-COPY packages/web/vitest.config.ts ./packages/web/
 COPY templates ./templates
 
 RUN pnpm --filter @openexcel/web build
@@ -38,15 +39,16 @@ COPY --from=build /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml
 COPY --from=build /app/packages/server/package.json ./packages/server/
 COPY --from=build /app/packages/core/package.json ./packages/core/
 COPY --from=build /app/packages/agent/package.json ./packages/agent/
-COPY --from=build /app/packages/web/package.json ./packages/web/
+COPY --from=build /app/packages/chat-contracts/package.json ./packages/chat-contracts/
 
-RUN pnpm install --prod --frozen-lockfile --ignore-scripts
+RUN pnpm install --prod --filter @openexcel/server... --frozen-lockfile --ignore-scripts
 
 COPY --from=build /app/packages/server/prisma ./packages/server/prisma
 COPY --from=build /app/packages/server/scripts ./packages/server/scripts
 COPY --from=build /app/packages/server/src ./packages/server/src
 COPY --from=build /app/packages/core/src ./packages/core/src
 COPY --from=build /app/packages/agent/src ./packages/agent/src
+COPY --from=build /app/packages/chat-contracts/src ./packages/chat-contracts/src
 COPY --from=build /app/packages/web/dist ./packages/web/dist
 COPY --from=build /app/templates ./templates
 
