@@ -10,6 +10,7 @@ import { init, use } from "echarts/core";
 import { CanvasRenderer } from "echarts/renderers";
 import { useEffect, useRef } from "react";
 import type { SheetSchema } from "@/api/workbooks";
+import styles from "./ChartRenderer.module.css";
 import { buildChartRenderData } from "./chartData";
 
 use([
@@ -50,5 +51,5 @@ export function ChartRenderer({ chart, sheets }: Props) {
     };
   }, [chart, sheets]);
 
-  return <div ref={rootRef} style={{ width: "100%", height: "280px" }} />;
+  return <div ref={rootRef} className={styles.renderer} />;
 }

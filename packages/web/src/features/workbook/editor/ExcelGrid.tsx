@@ -3,6 +3,7 @@ import "@fortune-sheet/react/dist/index.css";
 import { useRef } from "react";
 import type { WorkbookFull } from "@/api/workbooks";
 import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatchSync";
+import { ChartOverlay } from "@/features/workbook/charts/ChartOverlay";
 import { useChartInsertion } from "@/features/workbook/charts/useChartInsertion";
 import styles from "./ExcelGrid.module.css";
 import { useFortuneSheetFilterMenu } from "./fortuneSheetFilterMenu";
@@ -38,6 +39,7 @@ export function ExcelGrid({
     workbookRef,
     sheetData,
     sessionKey,
+    layoutBySheetId,
     handleChange,
     handleActivateSheet,
     handleBeforeAddSheet,
@@ -61,12 +63,16 @@ export function ExcelGrid({
   const { dialog, handleSelectionChange, toolbarItems } = useChartInsertion({
     workspaceId,
     workbook,
+    workbookRef,
     currentSheetIndex,
     onWorkbookRefresh,
     onWorkbookMutation,
   });
 
   if (!workbook) return null;
+
+  const currentSheet = workbook.sheets[currentSheetIndex];
+  const currentSheetLayout = currentSheet ? layoutBySheetId[String(currentSheet.id)] : undefined;
 
   return (
     <div ref={gridRootRef} className={styles.container}>
@@ -131,6 +137,17 @@ export function ExcelGrid({
           }}
         />
       </div>
+      {currentSheet && currentSheetLayout ? (
+        <ChartOverlay
+          containerRef={gridRootRef}
+          workspaceId={workspaceId}
+          workbook={workbook}
+          sheetId={String(currentSheet.id)}
+          layout={currentSheetLayout}
+          onWorkbookRefresh={onWorkbookRefresh}
+          onWorkbookMutation={onWorkbookMutation}
+        />
+      ) : null}
       {dialog}
     </div>
   );

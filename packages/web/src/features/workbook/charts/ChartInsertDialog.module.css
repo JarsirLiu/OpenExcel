@@ -9,7 +9,7 @@
 }
 
 .dialog {
-  width: min(380px, calc(100% - 32px));
+  width: min(520px, calc(100% - 32px));
   background: var(--bg-surface);
   border: 1px solid var(--border-default);
   border-radius: 8px;
@@ -20,14 +20,44 @@
 .footer {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   padding: 12px 16px;
   border-bottom: 1px solid var(--border-default);
 }
 
+.header {
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.headingIcon {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-accent) 12%, var(--bg-surface));
+  color: var(--color-accent);
+}
+
 .header h2 {
   margin: 0;
-  font-size: 15px;
+  color: var(--text-primary);
+  font-size: 16px;
+  font-weight: 650;
+}
+
+.heading p {
+  margin: 3px 0 0;
+  color: var(--text-secondary);
+  font-size: 12px;
 }
 
 .close {
@@ -41,12 +71,104 @@
 
 .body {
   display: grid;
-  gap: 14px;
-  padding: 16px;
+  gap: 18px;
+  padding: 18px 20px 20px;
 }
 
-.reference {
-  margin: 0;
+.selectionCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 35%, var(--border-default));
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--color-accent) 6%, var(--bg-surface));
+}
+
+.selectionEmpty {
+  border-color: var(--border-default);
+  background: var(--bg-muted);
+}
+
+.selectionIcon {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 3px;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  padding: 7px;
+  border-radius: 6px;
+  background: var(--bg-surface);
+  color: var(--color-accent);
+}
+
+.selectionIcon span {
+  width: 4px;
+  border-radius: 1px 1px 0 0;
+  background: currentColor;
+}
+
+.selectionIcon span:nth-child(1) {
+  height: 9px;
+  opacity: 0.55;
+}
+
+.selectionIcon span:nth-child(2) {
+  height: 14px;
+}
+
+.selectionIcon span:nth-child(3) {
+  height: 7px;
+  opacity: 0.75;
+}
+
+.selectionContent {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.selectionContent strong {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.selectionContent span {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selectionStatus {
+  margin-left: auto;
+  padding: 4px 7px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--color-accent) 12%, var(--bg-surface));
+  color: var(--color-accent);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.selectionEmpty .selectionStatus {
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+}
+
+.typeGroup {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+}
+
+.typeGroup legend {
+  margin-bottom: 8px;
   color: var(--text-secondary);
   font-size: 12px;
 }
@@ -58,7 +180,6 @@
   font-size: 12px;
 }
 
-.field select,
 .field input {
   min-height: 34px;
   padding: 0 10px;
@@ -66,6 +187,55 @@
   border-radius: 4px;
   background: var(--bg-surface);
   color: var(--text-primary);
+}
+
+.typeGrid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.typeOption {
+  display: grid;
+  min-width: 0;
+  min-height: 76px;
+  place-items: center;
+  gap: 7px;
+  padding: 8px 4px;
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 11px;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.typeOption:hover {
+  border-color: var(--color-accent);
+  color: var(--text-primary);
+}
+
+.typeOptionActive {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 8%, var(--bg-surface));
+  color: var(--color-accent);
+  box-shadow: 0 0 0 1px var(--color-accent);
+}
+
+.typeIcon {
+  display: grid;
+  width: 38px;
+  height: 30px;
+  place-items: center;
+}
+
+.typeIcon svg {
+  width: 32px;
+  height: 28px;
 }
 
 .error {
@@ -77,12 +247,18 @@
 .footer {
   justify-content: flex-end;
   gap: 8px;
+  padding: 12px 20px;
   border-top: 1px solid var(--border-default);
   border-bottom: 0;
 }
 
 .secondary,
 .primary {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
   min-height: 32px;
   padding: 0 12px;
   border-radius: 4px;
@@ -96,9 +272,15 @@
 }
 
 .primary {
-  border: 1px solid var(--accent-primary);
-  background: var(--accent-primary);
-  color: white;
+  border: 1px solid var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-surface);
+}
+
+@media (max-width: 560px) {
+  .typeGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 button:disabled {

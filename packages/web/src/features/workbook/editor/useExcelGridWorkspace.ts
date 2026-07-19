@@ -1,6 +1,6 @@
 import type { WorkbookInstance } from "@fortune-sheet/react";
 import { extractSheetConfig, matrixToCelldata } from "@openexcel/core";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { WorkbookFull } from "@/api/workbooks";
 import {
   createSheet,
@@ -11,6 +11,7 @@ import {
 } from "@/api/workbooks";
 import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatchSync";
 import { confirm } from "@/shared/lib";
+import { adaptFortuneSheetLayout, type SheetGridLayout } from "../layout/fortuneSheetLayout";
 import { toFortuneSheetData } from "./fortuneSheet";
 import { useSheetActivation } from "./SheetActivationContext";
 import { useWorkbookEditorSession } from "./useWorkbookEditorSession";
@@ -45,6 +46,20 @@ export function useExcelGridWorkspace({
   const workbookRef = useRef<WorkbookInstance>(null);
   const { sheetData, sessionKey } = useWorkbookEditorSession(workbook, workbookRevision);
   const { registerActivateSheet } = useSheetActivation();
+  const layoutSessionKey = `${workbook?.id ?? "none"}:${sessionKey}`;
+  const initialLayouts = useMemo(
+    () =>
+      Object.fromEntries(
+        sheetData.map((sheet) => [String(sheet.id), adaptFortuneSheetLayout(sheet)]),
+      ) as Record<string, SheetGridLayout>,
+    [sheetData],
+  );
+  const [layoutState, setLayoutState] = useState<{
+    sessionKey: string;
+    bySheetId: Record<string, SheetGridLayout>;
+  }>({ sessionKey: layoutSessionKey, bySheetId: initialLayouts });
+  const layoutBySheetId =
+    layoutState.sessionKey === layoutSessionKey ? layoutState.bySheetId : initialLayouts;
 
   const getSnapshot = useCallback((celldata: any[], config: any) => {
     return JSON.stringify({ celldata, config });
@@ -61,6 +76,10 @@ export function useExcelGridWorkspace({
 
     lastSavedSnapshotRef.current = nextSnapshots;
   }, [workbook, getSnapshot]);
+
+  useEffect(() => {
+    setLayoutState({ sessionKey: layoutSessionKey, bySheetId: initialLayouts });
+  }, [initialLayouts, layoutSessionKey]);
 
   useEffect(() => {
     if (!workbookRef.current) return;
@@ -122,6 +141,19 @@ export function useExcelGridWorkspace({
   const handleChange = useCallback(
     (data: any[]) => {
       if (!workbook || !Array.isArray(data)) return;
+
+      setLayoutState((current) => {
+        const bySheetId =
+          current.sessionKey === layoutSessionKey
+            ? { ...current.bySheetId }
+            : { ...initialLayouts };
+        for (const fortuneSheet of data) {
+          if (fortuneSheet?.id == null) continue;
+          bySheetId[String(fortuneSheet.id)] = adaptFortuneSheetLayout(fortuneSheet);
+        }
+        return { sessionKey: layoutSessionKey, bySheetId };
+      });
+
       const sheet = workbook.sheets[currentSheetIndex];
       if (!sheet) return;
       const fortuneSheet = data.find((s: any) => String(s.id) === String(sheet.id));
@@ -133,7 +165,7 @@ export function useExcelGridWorkspace({
       const config = extractSheetConfig(fortuneSheet);
       scheduleSave(celldata, config);
     },
-    [currentSheetIndex, scheduleSave, workbook],
+    [currentSheetIndex, initialLayouts, layoutSessionKey, scheduleSave, workbook],
   );
 
   const handleActivateSheet = useCallback(
@@ -242,6 +274,7 @@ export function useExcelGridWorkspace({
     workbookRef,
     sheetData,
     sessionKey,
+    layoutBySheetId,
     handleChange,
     handleActivateSheet,
     handleBeforeAddSheet,

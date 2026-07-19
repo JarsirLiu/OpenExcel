@@ -558,6 +558,14 @@ Workbook UI should also separate behavior from rendering:
 - `useExcelGridWorkspace` owns persistence, delete, and sheet activation sync
 - `ExcelGrid` should render the spreadsheet and toolbar, but not own workbook data fetching
 
+Chart positioning uses a single runtime layout boundary. `fortuneSheetLayout.ts` adapts the
+current FortuneSheet sheet shape, including nested persisted `config.config` layout metadata, into
+an immutable `SheetGridLayout`. `useExcelGridWorkspace` updates this derived layout from
+FortuneSheet's `onChange` payload, while `ChartOverlay` and `chartAnchorGeometry` consume only the
+standard layout model. The chart overlay must not parse `SheetSchema.config` or mutate FortuneSheet
+configuration objects; layout changes cancel an in-progress chart interaction before a new anchor
+is persisted.
+
 Sheet persistence has one canonical cell model. `uploadedData` contains every real visible cell,
 including table headers; `columns` contains column layout metadata such as widths and must not be
 converted into cells by the web editor. The editor is a pure view/interaction adapter: loading a

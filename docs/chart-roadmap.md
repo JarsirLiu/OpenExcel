@@ -52,7 +52,7 @@ XLSX chart/drawing/rels
 - 数据库已有独立的 Chart 持久化实体，`ChartSpec` 经过 core 校验后才写入；
 - 服务端真实导出已读取数据库中的 ChartSpec；
 - AI 工具已提供创建、修改、删除、查询图表的入口，并使用图表级撤销快照；
-- Web 已有独立的 ChartSpec -> ECharts 图表区域渲染；
+- Web 已提供基于 ChartSpec 的网格内图表覆盖层，支持 ECharts 渲染、选中、拖动、八方向缩放、删除、滚动跟随和锚点持久化；
 - Web 已提供基础的“插入图表”工具栏入口，可将当前二维选区转换为 ChartSpec 并持久化；
 - XLSX 导入已读取基础 chart、drawing 和关系部件，并把图表引用转换为导入批次内的 Sheet key；
 - XLSX 导入遇到当前模型不支持的图表类型或展示属性会拒绝导入，不静默丢失；
@@ -60,7 +60,7 @@ XLSX chart/drawing/rels
 - 生成的 OOXML 尚未通过 Excel 实际打开验证；
 - `Sheet.config.chart` 仍是旧格式字段，不能作为新功能的数据源。
 
-AI 或用户图表变更完成后，Web 会通过工作簿刷新契约重新读取 ChartSpec。当前用户创建和渲染位于独立图表区域，尚未接入网格内锚点定位、拖拽、缩放、选中和删除交互。
+AI 或用户图表变更完成后，Web 会通过工作簿刷新契约重新读取 ChartSpec。网格内覆盖层只维护当前交互状态，服务端 ChartSpec 仍是唯一事实来源。
 
 任何“生成一个独立样例文件”的代码都不属于产品能力，样例只能用于格式适配器测试。
 
@@ -358,7 +358,7 @@ WorkbookObject
 2. 建立 Chart 持久化和 Workbook 查询契约；
 3. 让真实导出读取持久化 Chart；
 4. 接入 `createChart/updateChart/deleteChart/listCharts` AI 工具；
-5. 完成 Web 图表的网格内锚点定位、选中、移动、缩放和删除交互；
+5. 验证 Web 图表覆盖层在真实导入、滚动、缩放和多图表场景下的交互；
 6. 实现 XLSX 图表导入 round-trip；
 7. 另行规划 Excel Table、Named Range、PivotTable 等对象。
 
