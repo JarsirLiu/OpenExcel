@@ -161,57 +161,69 @@ export function AuthScreen({
       </div>
 
       <section className={styles.demosSection}>
-        <div className={styles.demosIntro}>
-          <div>
-            <span className={styles.demosEyebrow}>AI Excel 案例</span>
-            <h2>先看看 AI 如何处理一张大学收费表</h2>
-            <p>完整展示用户消息、AI 执行步骤和 Excel 数据变化。</p>
-          </div>
-          <button type="button" className={styles.demoLink} onClick={onOpenDemo}>
-            查看完整演示
-            <span aria-hidden="true">→</span>
-          </button>
+        <div className={styles.demosHeader}>
+          <span className={styles.demosEyebrow}>AI Excel 案例</span>
+          <span className={styles.demosLink} onClick={onOpenDemo}>
+            查看全部 <span aria-hidden="true">{"\u2192"}</span>
+          </span>
         </div>
-        <button type="button" className={styles.demoPreview} onClick={onOpenDemo}>
-          <div className={styles.demoPreviewSheet} aria-hidden="true">
-            <div className={styles.previewSheetBar}>
-              <span>缴费对账结果</span>
-              <span>虚拟数据</span>
-            </div>
-            <div className={styles.previewSheetHead}>
-              <span>学号</span>
-              <span>学院</span>
-              <span>应收合计</span>
-              <span>缴费状态</span>
-            </div>
-            <div className={styles.previewSheetRow}>
-              <span>2023001001</span>
-              <span>经济学院</span>
-              <span>6,000</span>
-              <b>已缴清</b>
-            </div>
-            <div className={styles.previewSheetRow}>
-              <span>2023001002</span>
-              <span>信息学院</span>
-              <span>5,400</span>
-              <em>部分缴费</em>
-            </div>
-            <div className={styles.previewSheetRow}>
-              <span>2023001006</span>
-              <span>外国语学院</span>
-              <span>6,000</span>
-              <i>待核销</i>
+        <div className={styles.demoCard} onClick={onOpenDemo}>
+          <div className={styles.demoCardLeft}>
+            <div className={styles.previewSheet}>
+              <div className={styles.previewHead}>
+                <span>缴费对账结果</span>
+                <span className={styles.previewTag}>虚拟数据</span>
+              </div>
+              <div className={styles.previewTable}>
+                <div className={styles.previewTableHead}>
+                  <span>学号</span>
+                  <span>学院</span>
+                  <span>应收合计</span>
+                  <span>缴费状态</span>
+                </div>
+                <div className={styles.previewTableRow}>
+                  <span>2023001001</span>
+                  <span>经济学院</span>
+                  <span>6,000</span>
+                  <span className="status-paid">已缴清</span>
+                </div>
+                <div className={styles.previewTableRow}>
+                  <span>2023001002</span>
+                  <span>信息学院</span>
+                  <span>5,400</span>
+                  <span className="status-partial">部分缴费</span>
+                </div>
+                <div className={styles.previewTableRow}>
+                  <span>2023001006</span>
+                  <span>外国语学院</span>
+                  <span>6,000</span>
+                  <span className="status-pending">待核销</span>
+                </div>
+                <div className={styles.previewTableRow}>
+                  <span>2023001007</span>
+                  <span>商学院</span>
+                  <span>5,800</span>
+                  <span className="status-paid">已缴清</span>
+                </div>
+                <div className={styles.previewTableRow}>
+                  <span>2023001009</span>
+                  <span>法学院</span>
+                  <span>6,200</span>
+                  <span className="status-partial">部分缴费</span>
+                </div>
+              </div>
             </div>
           </div>
-          <div className={styles.demoPreviewCopy}>
+          <div className={styles.demoCardRight}>
             <span className={styles.demoTag}>大学财务</span>
             <h3>学生收费对账与欠费分析</h3>
             <p>从应收台账、银行流水和助学贷款信息，生成可核对的收费结果。</p>
-            <span className={styles.demoCta}>
-              播放 AI 回放 <span aria-hidden="true">↗</span>
-            </span>
+            <button className={styles.demoCta} type="button">
+              播放 AI 回放
+              <span aria-hidden="true">{"\u2197"}</span>
+            </button>
           </div>
-        </button>
+        </div>
       </section>
     </div>
   );
