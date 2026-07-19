@@ -9,7 +9,6 @@ import {
 import { excelAutoFilterRefToFortune } from "../excel/excelFilter.js";
 import { normalizeFortuneFormula } from "../excel/fortuneCellValue.js";
 import {
-  type ExcelColorInput,
   excelBorderStyleToFortune,
   excelColorToFortune,
   excelHorizontalToFortune,
@@ -23,6 +22,7 @@ import {
   type SheetConfig,
 } from "../excel/sheetConfig.js";
 import type { ImportedSheetInput, ImportedWorkbookInput } from "../excel/workbookImport.js";
+import { normalizeSheetJsStyle, type SheetJsBorderSide } from "./sheetJsStyle.js";
 import { parseXlsxCharts } from "./xlsxChartImporter.js";
 import { assertXlsxContainerSafe } from "./xlsxSafetyGuard.js";
 
@@ -140,31 +140,6 @@ function validateContainerSignature(input: SpreadsheetFileInput, bytes: Uint8Arr
   }
 }
 
-type SheetJsStyle = {
-  font?: {
-    name?: string;
-    sz?: number;
-    bold?: boolean;
-    italic?: boolean;
-    strike?: boolean;
-    underline?: boolean;
-    color?: ExcelColorInput;
-  };
-  fill?: { fgColor?: ExcelColorInput };
-  alignment?: { horizontal?: string; vertical?: string; wrapText?: boolean };
-  border?: {
-    top?: SheetJsBorderSide;
-    bottom?: SheetJsBorderSide;
-    left?: SheetJsBorderSide;
-    right?: SheetJsBorderSide;
-  };
-};
-
-type SheetJsBorderSide = {
-  style?: string | number;
-  color?: ExcelColorInput;
-};
-
 type MergeEntry = {
   range: XLSX.Range;
   config: { r: number; c: number; rs: number; cs: number };
@@ -192,7 +167,7 @@ function toFortuneValue(cell: XLSX.CellObject): FortuneCellValue {
   if (cell.f) value.f = normalizeFortuneFormula(cell.f);
   if (cell.z) value.ct = { fa: String(cell.z), t: cell.t };
 
-  const style = cell.s as SheetJsStyle | undefined;
+  const style = normalizeSheetJsStyle(cell.s);
   if (style?.font) {
     value.ff = style.font.name;
     value.fs = style.font.sz;

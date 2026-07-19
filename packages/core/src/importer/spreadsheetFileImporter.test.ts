@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import XLSX from "xlsx-js-style";
 import type { ChartSpec } from "../chart/chartModel.js";
 import { workbookToXlsx } from "../exporter/xlsxWorkbookExporter.js";
+import { normalizeSheetJsStyle } from "./sheetJsStyle.js";
 import { parseSpreadsheetFile } from "./spreadsheetFileImporter.js";
 import { parseXlsxCharts } from "./xlsxChartImporter.js";
 import {
@@ -168,6 +169,16 @@ describe("parseSpreadsheetFile", () => {
         ]),
       );
     }
+  });
+
+  it("normalizes the BIFF style shape returned by xlsx-js-style", () => {
+    expect(
+      normalizeSheetJsStyle({
+        patternType: "solid",
+        fgColor: { rgb: "00CCFF" },
+        bgColor: { rgb: "FFFFFF" },
+      }),
+    ).toEqual({ fill: { fgColor: { rgb: "00CCFF" } } });
   });
 
   it("rejects invalid workbook bytes", async () => {
