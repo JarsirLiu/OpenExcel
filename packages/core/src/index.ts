@@ -28,6 +28,16 @@ export {
   parseChartSpec,
 } from "./chart/chartModel.js";
 export { cellAddressToA1, rangeReferenceToA1 } from "./chart/chartReference.js";
+export type {
+  ChartComboSeriesType,
+  ChartSourceRange,
+  ChartSourceRangeKind,
+} from "./chart/chartSource.js";
+export {
+  ChartSourceRangeError,
+  chartSeriesFromSourceRange,
+  chartSourceRangeKind,
+} from "./chart/chartSource.js";
 export {
   type ImportedChartMappingContext,
   ImportedChartMappingError,

@@ -132,10 +132,13 @@ chart through ECharts or another renderer, but renderer options and instances ar
 as the source of truth. `packages/server` owns chart use cases and persistence, while the Excel
 format adapter owns OOXML chart and drawing import/export.
 
-Chart domain rules are closed in `core`: a series reference is one-dimensional, category and value
-references have equal lengths, all series share one category reference, and unsupported chart
-combinations are rejected during `ChartSpec` validation. `chartDependencySheetIds` and
-`resolveChartData` are the only shared interpretations of chart dependencies and cell ranges.
+Chart domain rules are closed in `core`: a persisted series reference is one-dimensional, category and
+value references have equal lengths, all series share one category reference, and unsupported chart
+combinations are rejected during `ChartSpec` validation. A rectangular user or AI source range is
+normalized by `chartSeriesFromSourceRange` into multiple one-dimensional series before it becomes a
+`ChartSpec`; therefore the one-dimensional series invariant does not limit chart creation to one row
+or one column. `chartDependencySheetIds` and `resolveChartData` are the only shared interpretations
+of chart dependencies and cell ranges.
 Server chart writes go through one `ChartMutationService`, which owns persistence coordination and
 undo snapshots for API, AI, and future UI callers. Tool adapters and routes do not calculate chart
 dependencies or write snapshots themselves.

@@ -1,4 +1,4 @@
-import type { ChartSeriesSpec, ChartSpec, RangeReference } from "@openexcel/core";
+import { type ChartSourceRange, type ChartSpec, chartSeriesFromSourceRange } from "@openexcel/core";
 
 export type FortuneSelection = {
   row: number[];
@@ -60,87 +60,6 @@ export function chartSelectionError(
   return null;
 }
 
-function verticalRange(
-  sheetId: string,
-  startRow: number,
-  endRow: number,
-  col: number,
-): RangeReference {
-  return {
-    sheetId,
-    start: { row: startRow, col },
-    end: { row: endRow, col },
-  };
-}
-
-function horizontalRange(
-  sheetId: string,
-  row: number,
-  startCol: number,
-  endCol: number,
-): RangeReference {
-  return {
-    sheetId,
-    start: { row, col: startCol },
-    end: { row, col: endCol },
-  };
-}
-
-function singleCellReference(sheetId: string, row: number, col: number): RangeReference {
-  return verticalRange(sheetId, row, row, col);
-}
-
-function buildSeries(
-  sheetId: string,
-  selection: ChartSelection,
-  type: ChartSpec["type"],
-): ChartSeriesSpec[] {
-  const kind = chartSelectionKind(selection);
-  if (kind === "row") {
-    return [
-      {
-        id: "series-1",
-        valueRef: horizontalRange(
-          sheetId,
-          selection.startRow,
-          selection.startCol,
-          selection.endCol,
-        ),
-        ...(type === "combo" ? { chartType: "bar" as const } : {}),
-      },
-    ];
-  }
-  if (kind === "column") {
-    return [
-      {
-        id: "series-1",
-        valueRef: verticalRange(sheetId, selection.startRow, selection.endRow, selection.startCol),
-        ...(type === "combo" ? { chartType: "bar" as const } : {}),
-      },
-    ];
-  }
-
-  const categories = verticalRange(
-    sheetId,
-    selection.startRow + 1,
-    selection.endRow,
-    selection.startCol,
-  );
-  const series: ChartSeriesSpec[] = [];
-
-  for (let col = selection.startCol + 1; col <= selection.endCol; col += 1) {
-    series.push({
-      id: `series-${col - selection.startCol}`,
-      name: singleCellReference(sheetId, selection.startRow, col),
-      categoryRef: categories,
-      valueRef: verticalRange(sheetId, selection.startRow + 1, selection.endRow, col),
-      ...(type === "combo" ? { chartType: "bar" as const } : {}),
-    });
-  }
-
-  return type === "pie" ? series.slice(0, 1) : series;
-}
-
 export function buildChartDraft(input: {
   workbookId: number;
   sheetId: number;
@@ -152,8 +71,13 @@ export function buildChartDraft(input: {
   const selectionError = chartSelectionError(selection, input.type);
   if (selectionError) throw new Error(selectionError);
 
-  const sheetId = String(input.sheetId);
-  const series = buildSeries(sheetId, selection, input.type);
+  const sourceRange: ChartSourceRange = {
+    sheetId: String(input.sheetId),
+    start: { row: selection.startRow, col: selection.startCol },
+    end: { row: selection.endRow, col: selection.endCol },
+  };
+  const sheetId = sourceRange.sheetId;
+  const series = chartSeriesFromSourceRange(sourceRange, input.type);
 
   return {
     workbookId: String(input.workbookId),

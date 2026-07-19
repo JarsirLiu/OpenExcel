@@ -1,4 +1,12 @@
-import type { ChartAnchor, ChartSeriesSpec, ChartSpec, RangeReference } from "@openexcel/core";
+import {
+  type ChartAnchor,
+  type ChartComboSeriesType,
+  type ChartSeriesSpec,
+  type ChartSourceRange,
+  type ChartSpec,
+  chartSeriesFromSourceRange,
+  type RangeReference,
+} from "@openexcel/core";
 import type { CreateChartInput, UpdateChartInput } from "../application/chartService.js";
 
 type ToolCell = { row: number; col: number };
@@ -31,6 +39,8 @@ type ToolSeries = {
   valueRef: ToolRange;
   chartType?: NonNullable<ChartSeriesSpec["chartType"]>;
 };
+
+type ToolSourceRange = ToolRange;
 
 function cell(cell: ToolCell) {
   return { row: cell.row - 1, col: cell.col - 1 };
@@ -69,10 +79,17 @@ export function toCreateChartSpec(
     type: ChartSpec["type"];
     title?: string;
     anchor: ToolAnchor;
-    series: ToolSeries[];
+    sourceRange: ToolSourceRange;
+    seriesTypes?: ChartComboSeriesType[];
   },
   id?: string,
 ): CreateChartInput {
+  const sourceRange: ChartSourceRange = {
+    sheetId: String(input.sourceRange.sheetId),
+    start: { row: input.sourceRange.startRow - 1, col: input.sourceRange.startCol - 1 },
+    end: { row: input.sourceRange.endRow - 1, col: input.sourceRange.endCol - 1 },
+  };
+
   return {
     id,
     workbookId: String(input.workbookId),
@@ -80,7 +97,7 @@ export function toCreateChartSpec(
     type: input.type,
     title: input.title,
     anchor: anchor(input.anchor),
-    series: input.series.map(series),
+    series: chartSeriesFromSourceRange(sourceRange, input.type, input.seriesTypes),
   };
 }
 

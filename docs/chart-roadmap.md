@@ -200,7 +200,7 @@ server export use case
 
 工具规则：
 
-- 参数使用 Excel 视觉坐标，行列从 1 开始；
+- 参数使用 Excel 视觉坐标，行列从 1 开始；`createChart` 接收连续的矩形 `sourceRange`，首行作为系列标题、首列作为分类，单行和单列也直接支持；组合图可通过 `seriesTypes` 指定每个系列的柱形、折线或面积类型，但不传具体数据值；
 - server 工具边界统一转换为 core 的 0-based 坐标；
 - 数据区域必须引用真实 Sheet ID；
 - 创建前校验范围存在、类型匹配、系列长度一致；

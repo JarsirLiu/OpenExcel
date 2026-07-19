@@ -53,6 +53,28 @@ const chartRangeSchema = z
     }
   });
 
+const chartSourceRangeSchema = z
+  .object({
+    sheetId: z.coerce.number().int().positive().describe("数据所在 Sheet ID"),
+    startRow: z.coerce.number().int().positive().describe("数据起始行号，从 1 开始"),
+    startCol: z.coerce.number().int().positive().describe("数据起始列号，从 1 开始"),
+    endRow: z.coerce.number().int().positive().describe("数据结束行号，从 1 开始"),
+    endCol: z.coerce.number().int().positive().describe("数据结束列号，从 1 开始"),
+  })
+  .superRefine((range, ctx) => {
+    if (range.endRow < range.startRow || range.endCol < range.startCol) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Invalid chart source range" });
+    }
+    if (range.endRow === range.startRow && range.endCol === range.startCol) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Chart source ranges must contain at least two cells",
+      });
+    }
+  });
+
+const chartComboSeriesTypeSchema = z.enum(["bar", "line", "area"]);
+
 function chartRangeLength(range: z.infer<typeof chartRangeSchema>): number {
   return Math.max(range.endRow - range.startRow, range.endCol - range.startCol) + 1;
 }
@@ -85,32 +107,48 @@ const chartCreateSchema = z
     type: z.enum(["bar", "line", "pie", "area", "scatter", "combo"]),
     title: z.string().optional(),
     anchor: chartAnchorSchema,
-    series: z.array(chartSeriesSchema).min(1),
+    sourceRange: chartSourceRangeSchema,
+    seriesTypes: z
+      .array(chartComboSeriesTypeSchema)
+      .min(1)
+      .optional()
+      .describe("组合图中各数据系列的类型，顺序对应数据源生成的系列"),
   })
   .superRefine((chart, ctx) => {
-    chart.series.forEach((series, index) => {
-      if (["pie", "scatter"].includes(chart.type) && !series.categoryRef) {
+    const rows = chart.sourceRange.endRow - chart.sourceRange.startRow + 1;
+    const columns = chart.sourceRange.endCol - chart.sourceRange.startCol + 1;
+    const isTable = rows >= 2 && columns >= 2;
+    if (chart.type === "pie" && (!isTable || columns !== 2)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["sourceRange"],
+        message: "Pie charts require a two-column table: category and value",
+      });
+    }
+    if (chart.type === "scatter" && !isTable) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["sourceRange"],
+        message: "Scatter charts require a table with an X column",
+      });
+    }
+    if (chart.seriesTypes && chart.type !== "combo") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["seriesTypes"],
+        message: "Series types are only valid for combo charts",
+      });
+    }
+    if (chart.type === "combo" && chart.seriesTypes) {
+      const expectedSeriesCount = isTable ? columns - 1 : 1;
+      if (chart.seriesTypes.length !== expectedSeriesCount) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          path: ["series", index, "categoryRef"],
-          message: `${chart.type} charts require category references`,
+          path: ["seriesTypes"],
+          message: `Combo charts require ${expectedSeriesCount} series types for this source range`,
         });
       }
-      if (chart.type === "combo" && !["bar", "line", "area"].includes(series.chartType ?? "")) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["series", index, "chartType"],
-          message: "Combo charts require bar, line, or area series types",
-        });
-      }
-      if (chart.type !== "combo" && series.chartType != null) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["series", index, "chartType"],
-          message: "Series chart types are only valid for combo charts",
-        });
-      }
-    });
+    }
   });
 
 export type ExcelToolSpec = {
@@ -311,7 +349,7 @@ export const excelToolSpecs = {
   },
   createChart: {
     description:
-      "在工作簿中创建真实 Excel 图表。图表、系列和引用会作为独立对象保存，并可随工作簿导出为 XLSX；范围行列号从 1 开始，引用必须使用真实 Sheet ID。",
+      "在工作簿中创建真实 Excel 图表。传入一个连续数据源矩形范围即可，系统会按 Excel 规则将首行作为系列标题、首列作为分类并生成多个系列；单行和单列范围也支持。创建组合图时可额外传入 seriesTypes 指定每个系列为 bar、line 或 area，但不需要传入具体数据值。图表、系列和引用会作为独立对象保存，并可随工作簿导出为 XLSX；行列号从 1 开始，Sheet ID 必须是真实 ID。",
     needsRunContext: true,
     inputSchema: chartCreateSchema,
   },
