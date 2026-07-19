@@ -97,7 +97,7 @@ function AuthPage({ isHome = false }: { isHome?: boolean }) {
       onLogin={handleLogin}
       onRegister={handleRegister}
       onSwitchMode={() => navigate(authMode === "login" ? "/register" : "/login")}
-      onOpenDemo={() => navigate("/demos/student-fee-reconciliation")}
+      onOpenDemo={() => navigate("/demos/inventory-reconciliation")}
     />
   );
 }
@@ -147,7 +147,10 @@ export default function App() {
     return <AuthPage isHome />;
   }
 
-  if (location.pathname === "/demos/student-fee-reconciliation") {
+  if (
+    location.pathname === "/demos/inventory-reconciliation" ||
+    location.pathname === "/demos/student-fee-reconciliation"
+  ) {
     return <DemoReplay />;
   }
 
