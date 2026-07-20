@@ -59,7 +59,7 @@ export function useDemoReplay(scenario: DemoDefinition) {
       setPhase("text");
       setAssistantParts((parts) => [
         ...(clearParts ? [] : parts),
-        { type: "text", stepId: step.id, text: "" },
+        { type: "text", partId: `demo-text-${step.id}`, stepId: step.id, text: "" },
       ]);
       setIsPlaying(true);
     },

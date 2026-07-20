@@ -61,6 +61,10 @@ describe("replay chat projection", () => {
 
     const part = buildToolPart(step, "output-available", workbooks);
 
+    expect(part).toMatchObject({
+      partId: "demo-tool-read-sheet",
+      toolCallId: "demo-read-sheet",
+    });
     expect(part.output).not.toHaveProperty("preview");
     expect(part.output).not.toHaveProperty("previewLabel");
     expect(part.output).toMatchObject({

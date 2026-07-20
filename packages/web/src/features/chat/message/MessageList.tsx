@@ -32,9 +32,13 @@ export function MessageList({
 
   useEffect(() => {
     const el = messagesEndRef.current;
-    if (el && typeof el.scrollIntoView === "function") {
-      el.scrollIntoView({ behavior: "smooth" });
-    }
+    if (!el || typeof el.scrollIntoView !== "function") return;
+
+    const hasNewMessage = messages.length !== prevMessageCount.current;
+    prevMessageCount.current = messages.length;
+    if (!isStreaming && !hasNewMessage) return;
+
+    el.scrollIntoView({ behavior: isStreaming ? "auto" : "smooth" });
   }, [messages, isStreaming]);
 
   const handleScroll = useCallback(() => {
@@ -122,7 +126,7 @@ export function MessageList({
         </div>
       )}
       {messages.map((msg: any, idx: number) => (
-        <MessageRenderBoundary key={`${msg?.id || idx}:${msg?.parts?.length ?? 0}`}>
+        <MessageRenderBoundary key={msg?.id ?? idx}>
           <MessageItem
             msg={msg}
             isMessageStreaming={msg.id != null && msg.id === activeAssistantMessageId}

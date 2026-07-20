@@ -2,6 +2,7 @@ import type { DemoCell, DemoSheet, DemoStep, DemoWorkbook } from "./replayTypes"
 
 export type DemoTextPart = {
   type: "text";
+  partId: string;
   stepId: string;
   text: string;
 };
@@ -73,6 +74,7 @@ export function buildToolPart(
 
   return {
     type: `tool-${step.toolName}`,
+    partId: `demo-tool-${step.id}`,
     toolCallId: `demo-${step.id}`,
     state: toolState,
     input: {

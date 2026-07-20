@@ -3,6 +3,40 @@ import { describe, expect, it, vi } from "vitest";
 import { MessageItem } from "./MessageItem";
 
 describe("MessageItem", () => {
+  it("keeps completed text mounted when a tool part is appended", () => {
+    const initialMessage = {
+      id: "assistant-tool-transition",
+      role: "assistant",
+      parts: [{ type: "text", text: "先读取数据。" }],
+    };
+    const { container, rerender } = render(
+      <MessageItem msg={initialMessage} isMessageStreaming isLastAssistantMessage={false} />,
+    );
+    const markdownElement = container.querySelector('[class*="markdown"]');
+
+    rerender(
+      <MessageItem
+        msg={{
+          ...initialMessage,
+          parts: [
+            ...initialMessage.parts,
+            {
+              type: "tool-readSheetData",
+              toolCallId: "tool-read-1",
+              state: "output-available",
+              input: {},
+              output: {},
+            },
+          ],
+        }}
+        isMessageStreaming
+        isLastAssistantMessage={false}
+      />,
+    );
+
+    expect(container.querySelector('[class*="markdown"]')).toBe(markdownElement);
+  });
+
   it("renders the text from an AI SDK reasoning part", () => {
     render(
       <MessageItem

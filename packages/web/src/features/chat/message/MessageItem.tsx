@@ -107,6 +107,19 @@ const UndoIcon = ({ size = 14 }: { size?: number }) => (
   </svg>
 );
 
+function getPartKey(part: any, index: number): string {
+  if (typeof part.partId === "string" && part.partId.length > 0) {
+    return `part-${part.partId}`;
+  }
+  if (typeof part.toolCallId === "string" && part.toolCallId.length > 0) {
+    return `tool-${part.toolCallId}`;
+  }
+  if (typeof part.id === "string" && part.id.length > 0) {
+    return `part-${part.id}`;
+  }
+  return `${part.type}-${index}`;
+}
+
 function renderAssistantParts(msg: any, isMessageStreaming: boolean) {
   if (!msg.parts || msg.parts.length === 0) {
     return <MessageMarkdown content={msg.content || ""} isStreaming={isMessageStreaming} />;
@@ -114,12 +127,18 @@ function renderAssistantParts(msg: any, isMessageStreaming: boolean) {
 
   const result: JSX.Element[] = [];
   let textParts: string[] = [];
-  const flushText = (key: string) => {
+  let textKey: string | null = null;
+  const flushText = () => {
     if (textParts.length > 0) {
       result.push(
-        <MessageMarkdown key={key} content={textParts.join("")} isStreaming={isMessageStreaming} />,
+        <MessageMarkdown
+          key={textKey}
+          content={textParts.join("")}
+          isStreaming={isMessageStreaming}
+        />,
       );
       textParts = [];
+      textKey = null;
     }
   };
 
@@ -127,12 +146,13 @@ function renderAssistantParts(msg: any, isMessageStreaming: boolean) {
     const part = msg.parts[i];
     switch (part.type) {
       case "text":
+        if (textParts.length === 0) textKey = `text-${i}`;
         textParts.push(part.text);
         break;
       case "reasoning": {
-        flushText(`reasoning-${i}-flush`);
+        flushText();
         result.push(
-          <div key={`reasoning-${i}`}>
+          <div key={getPartKey(part, i)}>
             <ReasoningCard
               reasoning={typeof part.text === "string" ? part.text : ""}
               isStreaming={isMessageStreaming}
@@ -142,14 +162,14 @@ function renderAssistantParts(msg: any, isMessageStreaming: boolean) {
         break;
       }
       case "step-start":
-        flushText(`step-${i}-flush`);
-        result.push(<div key={`step-${i}`} className={styles.stepDivider} />);
+        flushText();
+        result.push(<div key={getPartKey(part, i)} className={styles.stepDivider} />);
         break;
       default:
         if (part.type.startsWith("tool-")) {
-          flushText(`tool-${i}-flush`);
+          flushText();
           result.push(
-            <div key={`tool-${i}`} className={styles.toolWrap}>
+            <div key={getPartKey(part, i)} className={styles.toolWrap}>
               <ToolCallCard part={part} />
             </div>,
           );
@@ -157,7 +177,7 @@ function renderAssistantParts(msg: any, isMessageStreaming: boolean) {
         break;
     }
   }
-  flushText("final-flush");
+  flushText();
 
   return <>{result}</>;
 }

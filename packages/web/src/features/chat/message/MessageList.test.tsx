@@ -3,6 +3,30 @@ import { describe, expect, it } from "vitest";
 import { MessageList } from "./MessageList";
 
 describe("MessageList", () => {
+  it("keeps a streaming assistant message mounted as new parts arrive", () => {
+    const initialMessage = {
+      id: "assistant-active",
+      role: "assistant",
+      parts: [{ type: "text", text: "先读取数据。" }],
+    };
+    const { container, rerender } = render(<MessageList messages={[initialMessage]} isStreaming />);
+    const assistantElement = container.querySelector('[class*="assistantMsg"]');
+
+    rerender(
+      <MessageList
+        messages={[
+          {
+            ...initialMessage,
+            parts: [...initialMessage.parts, { type: "text", text: "现在开始整理结果。" }],
+          },
+        ]}
+        isStreaming
+      />,
+    );
+
+    expect(container.querySelector('[class*="assistantMsg"]')).toBe(assistantElement);
+  });
+
   it("streams only the active assistant message", () => {
     render(
       <MessageList

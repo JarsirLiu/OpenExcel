@@ -1,4 +1,4 @@
-import type { ComponentPropsWithoutRef, ReactNode } from "react";
+import { type ComponentPropsWithoutRef, memo, type ReactNode } from "react";
 import { Streamdown } from "streamdown";
 import "streamdown/styles.css";
 import remarkGfm from "remark-gfm";
@@ -67,7 +67,7 @@ function MarkdownTable({ children, ...props }: Record<string, unknown> & { child
   );
 }
 
-export function MessageMarkdown({
+export const MessageMarkdown = memo(function MessageMarkdown({
   content,
   isStreaming = false,
 }: {
@@ -92,4 +92,4 @@ export function MessageMarkdown({
       </Streamdown>
     </div>
   );
-}
+});
