@@ -9,7 +9,8 @@ COPY packages/agent/package.json packages/agent/
 COPY packages/server/package.json packages/server/
 COPY packages/web/package.json packages/web/
 
-RUN pnpm install --frozen-lockfile --ignore-scripts
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile --ignore-scripts
 
 COPY packages/server/prisma ./packages/server/prisma
 RUN pnpm --filter @openexcel/server exec prisma generate --schema prisma/schema.prisma
@@ -41,7 +42,8 @@ COPY --from=build /app/packages/core/package.json ./packages/core/
 COPY --from=build /app/packages/agent/package.json ./packages/agent/
 COPY --from=build /app/packages/web/package.json ./packages/web/
 
-RUN pnpm install --prod --frozen-lockfile --ignore-scripts
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
+    pnpm install --prod --frozen-lockfile --ignore-scripts
 
 COPY --from=build /app/packages/server/prisma ./packages/server/prisma
 COPY --from=build /app/packages/server/scripts ./packages/server/scripts
