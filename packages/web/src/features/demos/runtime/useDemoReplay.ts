@@ -1,16 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  buildDemoMessages,
-  buildToolPart,
-  cloneWorkbooks,
-  type DemoAssistantPart,
-} from "./demoReplayModel";
-import type { DemoScenario, DemoWorkbook } from "./demoTypes";
-import { commitDemoWorkbook, stageDemoWorkbookStep } from "./demoWorkbookReplay";
+import { buildDemoMessages, buildToolPart, type DemoAssistantPart } from "./replayChat";
+import type { DemoDefinition, DemoWorkbook, PlaybackPhase } from "./replayTypes";
+import { commitDemoWorkbook, stageDemoWorkbookStep } from "./replayWorkbook";
+import { cloneWorkbooks } from "./replayWorkbookProjection";
 
-type PlaybackPhase = "idle" | "text" | "tool" | "result" | "done";
-
-export function useDemoReplay(scenario: DemoScenario) {
+export function useDemoReplay(scenario: DemoDefinition) {
   const [workbooks, setWorkbooks] = useState<DemoWorkbook[]>(() =>
     cloneWorkbooks(scenario.initialWorkbooks),
   );
@@ -23,7 +17,7 @@ export function useDemoReplay(scenario: DemoScenario) {
   const [currentTool, setCurrentTool] = useState<"input" | "output" | null>(null);
   const [assistantParts, setAssistantParts] = useState<DemoAssistantPart[]>([]);
   const [isPlaying, setIsPlaying] = useState(false);
-  const steps = scenario.steps;
+  const steps = scenario.timeline;
   const currentStep = stepIndex >= 0 ? steps[stepIndex] : null;
 
   const reset = useCallback(() => {

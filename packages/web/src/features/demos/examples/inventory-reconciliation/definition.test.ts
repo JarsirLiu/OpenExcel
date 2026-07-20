@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   inventoryInitialWorkbooks,
   inventoryReconciliationPrompt,
-  inventorySteps,
-} from "./inventoryReconciliation";
+  inventoryTimeline,
+} from "./fixtures";
 
 describe("inventoryReconciliation demo", () => {
   it("uses the three source and target sheets from the supermarket example", () => {
@@ -38,7 +38,7 @@ describe("inventoryReconciliation demo", () => {
   });
 
   it("replays reads before writes and finishes with a verification read", () => {
-    expect(inventorySteps.map((step) => step.toolName).filter(Boolean)).toEqual([
+    expect(inventoryTimeline.map((step) => step.toolName).filter(Boolean)).toEqual([
       "readSheetData",
       "readSheetData",
       "readSheetData",
@@ -46,7 +46,7 @@ describe("inventoryReconciliation demo", () => {
       "writeCells",
       "readSheetData",
     ]);
-    expect(inventorySteps.at(-1)?.id).toBe("finish");
-    expect(inventorySteps.find((step) => step.id === "write-prices")?.patch).toHaveLength(10);
+    expect(inventoryTimeline.at(-1)?.id).toBe("finish");
+    expect(inventoryTimeline.find((step) => step.id === "write-prices")?.patch).toHaveLength(10);
   });
 });

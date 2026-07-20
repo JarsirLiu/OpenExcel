@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { commitDemoWorkbook, stageDemoWorkbookStep } from "./demoWorkbookReplay";
-import type { DemoStep, DemoWorkbook } from "./inventoryReconciliation";
+import type { DemoStep, DemoWorkbook } from "./replayTypes";
+import { commitDemoWorkbook, stageDemoWorkbookStep } from "./replayWorkbook";
 
 function workbook(): DemoWorkbook {
   return {

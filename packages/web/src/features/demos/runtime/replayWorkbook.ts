@@ -1,4 +1,4 @@
-import type { DemoStep, DemoWorkbook } from "./demoTypes";
+import type { DemoStep, DemoWorkbook } from "./replayTypes";
 
 export type DemoWorkbookReplayState = {
   visible: DemoWorkbook[];

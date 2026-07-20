@@ -39,8 +39,9 @@ export type DemoStep = {
   patch?: DemoPatch | DemoPatch[];
 };
 
-export type DemoScenario = {
+export type DemoDefinition = {
   id: string;
+  route: string;
   workspace: {
     id: number;
     publicId: string;
@@ -50,5 +51,7 @@ export type DemoScenario = {
   sessionName: string;
   prompt: string;
   initialWorkbooks: DemoWorkbook[];
-  steps: DemoStep[];
+  timeline: readonly DemoStep[];
 };
+
+export type PlaybackPhase = "idle" | "text" | "tool" | "result" | "done";

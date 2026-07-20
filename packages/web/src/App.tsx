@@ -5,8 +5,8 @@ import { bootstrapWorkspace } from "@/api/workspaces";
 import type { WorkbenchRouteData } from "@/app/routeData";
 import { AuthScreen } from "@/features/auth/AuthScreen";
 import { useAuthState } from "@/features/auth/useAuthState";
-import { DemoReplay } from "@/features/demos/DemoReplay";
-import { getDemoScenario } from "@/features/demos/demoScenarios";
+import { getDemoDefinition } from "@/features/demos/registry";
+import { DemoPage } from "@/features/demos/shell/DemoPage";
 import { SheetActivationProvider } from "@/features/workbook/editor/SheetActivationContext";
 import { t } from "@/lib/i18n";
 import { ConfirmDialog, Toast } from "@/shared/ui";
@@ -148,11 +148,9 @@ export default function App() {
     return <AuthPage isHome />;
   }
 
-  if (
-    location.pathname === "/demos/inventory-reconciliation" ||
-    location.pathname === "/demos/student-fee-reconciliation"
-  ) {
-    return <DemoReplay scenario={getDemoScenario(location.pathname)} />;
+  if (location.pathname.startsWith("/demos/")) {
+    const demo = getDemoDefinition(location.pathname);
+    return demo ? <DemoPage scenario={demo} /> : <LoadingScreen />;
   }
 
   if (location.pathname === "/login" || location.pathname === "/register") {

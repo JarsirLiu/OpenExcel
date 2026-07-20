@@ -5,11 +5,11 @@ import workbenchStyles from "@/app/Workbench.module.css";
 import { SheetActivationProvider } from "@/features/workbook/editor/SheetActivationContext";
 import { WorkspaceSidebar } from "@/features/workspace/WorkspaceSidebar";
 import { WorkspaceView } from "@/features/workspace/WorkspaceView";
-import { toWorkbook } from "./demoReplayModel";
-import type { DemoScenario, DemoWorkbook } from "./demoTypes";
+import type { DemoDefinition, DemoWorkbook } from "../runtime/replayTypes";
+import { toWorkbook } from "../runtime/replayWorkbookProjection";
 
 type Props = {
-  scenario: DemoScenario;
+  scenario: DemoDefinition;
   workbooks: DemoWorkbook[];
   workbookRevision: number;
 };

@@ -1,5 +1,3 @@
-import { useNavigate } from "react-router-dom";
-import workbenchStyles from "@/app/Workbench.module.css";
 import { Button } from "@/components/ui/Button/Button";
 import chatStyles from "@/features/chat/ChatSidebar.module.css";
 import { ChatComposer } from "@/features/chat/composer/ChatComposer";
@@ -7,14 +5,10 @@ import chatPanelStyles from "@/features/chat/conversation/ChatPanel.module.css";
 import { MessageList } from "@/features/chat/message/MessageList";
 import { SessionHeader } from "@/features/session/components/SessionHeader";
 import sessionStyles from "@/features/session/SessionShell.module.css";
-import { DemoWorkspacePane } from "./DemoWorkspacePane";
-import type { buildDemoMessages } from "./demoReplayModel";
-import type { DemoScenario } from "./demoTypes";
-import { useDemoReplay } from "./useDemoReplay";
+import type { buildDemoMessages } from "../runtime/replayChat";
+import type { DemoDefinition } from "../runtime/replayTypes";
 
-export { buildDemoMessages } from "./demoReplayModel";
-
-function DemoChatSidebar({
+export function DemoChatSidebar({
   scenario,
   messages,
   isStreaming,
@@ -23,7 +17,7 @@ function DemoChatSidebar({
   onReset,
   onLogout,
 }: {
-  scenario: DemoScenario;
+  scenario: DemoDefinition;
   messages: ReturnType<typeof buildDemoMessages>;
   isStreaming: boolean;
   onStart: () => void;
@@ -67,30 +61,6 @@ function DemoChatSidebar({
           />
         </div>
       </div>
-    </div>
-  );
-}
-
-export function DemoReplay({ scenario }: { scenario: DemoScenario }) {
-  const navigate = useNavigate();
-  const replay = useDemoReplay(scenario);
-
-  return (
-    <div className={workbenchStyles.layout}>
-      <DemoWorkspacePane
-        scenario={scenario}
-        workbooks={replay.workbooks}
-        workbookRevision={replay.workbookRevision}
-      />
-      <DemoChatSidebar
-        scenario={scenario}
-        messages={replay.messages}
-        isStreaming={replay.isPlaying}
-        onStart={replay.start}
-        onStop={replay.stop}
-        onReset={replay.reset}
-        onLogout={() => navigate("/login")}
-      />
     </div>
   );
 }

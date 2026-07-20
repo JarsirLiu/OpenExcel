@@ -1,26 +1,25 @@
 import { describe, expect, it } from "vitest";
-import { buildDemoMessages } from "./DemoReplay";
-import { buildToolPart } from "./demoReplayModel";
-import type { DemoStep, DemoWorkbook } from "./demoTypes";
+import { buildDemoMessages, buildToolPart } from "./replayChat";
+import type { DemoStep, DemoWorkbook } from "./replayTypes";
 
-describe("DemoReplay", () => {
+describe("replay chat projection", () => {
   it("keeps all streamed text and tool calls in one assistant turn", () => {
     const parts = [
-      { type: "text", stepId: "inspect", text: "先读取收费台账。" },
+      { type: "text", stepId: "inspect", text: "先读取库存表。" },
       {
         type: "tool-readSheetData",
         toolCallId: "demo-inspect",
         state: "output-available",
-        input: { sheetName: "学生应收台账", range: "A1:G7" },
-        output: { sheetInfo: { sheetName: "学生应收台账", sheetNo: 1 } },
+        input: { sheetName: "库存查询", range: "A1:G7" },
+        output: { sheetInfo: { sheetName: "库存查询", sheetNo: 1 } },
       },
-      { type: "text", stepId: "write", text: "现在写入核对结果。" },
+      { type: "text", stepId: "write", text: "现在写入核查结果。" },
       {
         type: "tool-writeCells",
         toolCallId: "demo-write",
         state: "output-available",
-        input: { sheetName: "缴费对账结果", range: "C1:F7" },
-        output: { sheetInfo: { sheetName: "缴费对账结果", sheetNo: 4 } },
+        input: { sheetName: "4月", range: "C1:F7" },
+        output: { sheetInfo: { sheetName: "4月", sheetNo: 1 } },
       },
     ] as any;
 
