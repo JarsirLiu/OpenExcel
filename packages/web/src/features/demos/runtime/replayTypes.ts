@@ -39,6 +39,16 @@ export type DemoStep = {
   patch?: DemoPatch | DemoPatch[];
 };
 
+export type DemoPlayback = {
+  textTokenDelay: number;
+  textCompletionDelay: number;
+  toolStartDelay: number;
+  toolResultDelay: number;
+  stepDelay: number;
+  toolStepDelay: number;
+  restartDelay: number;
+};
+
 export type DemoDefinition = {
   id: string;
   route: string;
@@ -52,6 +62,7 @@ export type DemoDefinition = {
   prompt: string;
   initialWorkbooks: DemoWorkbook[];
   timeline: readonly DemoStep[];
+  playback?: Partial<DemoPlayback>;
 };
 
 export type PlaybackPhase = "idle" | "text" | "tool" | "result" | "done";

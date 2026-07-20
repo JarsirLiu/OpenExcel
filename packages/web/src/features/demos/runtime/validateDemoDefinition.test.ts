@@ -83,4 +83,17 @@ describe("validateDemoDefinition", () => {
       "patch out of bounds in step same",
     ]);
   });
+
+  it("reports invalid playback settings", () => {
+    expect(
+      validateDemoDefinition(
+        definition({
+          playback: { textTokenDelay: -1, toolStartDelay: Number.NaN },
+        }),
+      ),
+    ).toEqual([
+      "invalid playback setting: textTokenDelay",
+      "invalid playback setting: toolStartDelay",
+    ]);
+  });
 });

@@ -18,4 +18,13 @@ export const inventoryReconciliationDemo: DemoDefinition = {
   prompt: inventoryReconciliationPrompt,
   initialWorkbooks: inventoryInitialWorkbooks,
   timeline: inventoryTimeline,
+  playback: {
+    textTokenDelay: 24,
+    textCompletionDelay: 220,
+    toolStartDelay: 380,
+    toolResultDelay: 520,
+    stepDelay: 260,
+    toolStepDelay: 420,
+    restartDelay: 20,
+  },
 };

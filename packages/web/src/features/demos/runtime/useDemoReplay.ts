@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildDemoMessages, buildToolPart, type DemoAssistantPart } from "./replayChat";
+import { resolveDemoPlayback } from "./replayPlayback";
 import type { DemoDefinition, DemoWorkbook, PlaybackPhase } from "./replayTypes";
 import { commitDemoWorkbook, stageDemoWorkbookStep } from "./replayWorkbook";
 import { cloneWorkbooks } from "./replayWorkbookProjection";
@@ -18,6 +19,7 @@ export function useDemoReplay(scenario: DemoDefinition) {
   const [assistantParts, setAssistantParts] = useState<DemoAssistantPart[]>([]);
   const [isPlaying, setIsPlaying] = useState(false);
   const steps = scenario.timeline;
+  const playback = useMemo(() => resolveDemoPlayback(scenario.playback), [scenario.playback]);
   const currentStep = stepIndex >= 0 ? steps[stepIndex] : null;
 
   const reset = useCallback(() => {
@@ -67,7 +69,7 @@ export function useDemoReplay(scenario: DemoDefinition) {
   const start = useCallback(() => {
     if (stepIndex === steps.length - 1 && phase === "done") {
       reset();
-      window.setTimeout(() => beginStep(0, true), 20);
+      window.setTimeout(() => beginStep(0, true), playback.restartDelay);
       return;
     }
     if (stepIndex < 0) {
@@ -75,7 +77,7 @@ export function useDemoReplay(scenario: DemoDefinition) {
       return;
     }
     setIsPlaying(true);
-  }, [beginStep, phase, reset, stepIndex, steps.length]);
+  }, [beginStep, phase, playback, reset, stepIndex, steps.length]);
 
   const moveToNextStep = useCallback(() => {
     if (stepIndex >= steps.length - 1) {
@@ -90,10 +92,16 @@ export function useDemoReplay(scenario: DemoDefinition) {
 
     if (phase === "text") {
       if (textOffset < currentStep.assistantText.length) {
-        const timer = window.setTimeout(() => setTextOffset((value) => value + 1), 24);
+        const timer = window.setTimeout(
+          () => setTextOffset((value) => value + 1),
+          playback.textTokenDelay,
+        );
         return () => window.clearTimeout(timer);
       }
-      const timer = window.setTimeout(() => setPhase(currentStep.toolName ? "tool" : "done"), 220);
+      const timer = window.setTimeout(
+        () => setPhase(currentStep.toolName ? "tool" : "done"),
+        playback.textCompletionDelay,
+      );
       return () => window.clearTimeout(timer);
     }
 
@@ -105,7 +113,7 @@ export function useDemoReplay(scenario: DemoDefinition) {
         ]);
         setCurrentTool("input");
         setPhase("done");
-      }, 380);
+      }, playback.toolStartDelay);
       return () => window.clearTimeout(timer);
     }
 
@@ -132,7 +140,7 @@ export function useDemoReplay(scenario: DemoDefinition) {
         );
         setCurrentTool("output");
         setPhase("done");
-      }, 520);
+      }, playback.toolResultDelay);
       return () => window.clearTimeout(timer);
     }
 
@@ -150,7 +158,9 @@ export function useDemoReplay(scenario: DemoDefinition) {
           }
           moveToNextStep();
         },
-        currentStep.toolName && currentTool === "output" ? 420 : 260,
+        currentStep.toolName && currentTool === "output"
+          ? playback.toolStepDelay
+          : playback.stepDelay,
       );
       return () => window.clearTimeout(timer);
     }
@@ -163,6 +173,7 @@ export function useDemoReplay(scenario: DemoDefinition) {
     isPlaying,
     moveToNextStep,
     phase,
+    playback,
     stepIndex,
     steps.length,
     textOffset,

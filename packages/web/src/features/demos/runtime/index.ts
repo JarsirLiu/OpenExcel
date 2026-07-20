@@ -1,8 +1,10 @@
 export { buildDemoMessages, buildToolPart } from "./replayChat";
+export { defaultDemoPlayback, resolveDemoPlayback } from "./replayPlayback";
 export type {
   DemoCell,
   DemoDefinition,
   DemoPatch,
+  DemoPlayback,
   DemoSheet,
   DemoStep,
   DemoWorkbook,

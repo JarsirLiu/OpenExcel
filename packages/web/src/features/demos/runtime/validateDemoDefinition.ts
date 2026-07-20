@@ -1,4 +1,7 @@
+import { defaultDemoPlayback } from "./replayPlayback";
 import type { DemoDefinition, DemoPatch, DemoStep } from "./replayTypes";
+
+const playbackSettingNames = new Set(Object.keys(defaultDemoPlayback));
 
 function patchesOf(step: DemoStep): DemoPatch[] {
   if (!step.patch) return [];
@@ -9,6 +12,14 @@ export function validateDemoDefinition(definition: DemoDefinition): string[] {
   const errors: string[] = [];
   const workbookNames = new Set(definition.initialWorkbooks.map((workbook) => workbook.name));
   const stepIds = new Set<string>();
+
+  for (const [name, value] of Object.entries(definition.playback ?? {})) {
+    if (!playbackSettingNames.has(name)) {
+      errors.push(`unknown playback setting: ${name}`);
+    } else if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+      errors.push(`invalid playback setting: ${name}`);
+    }
+  }
 
   for (const step of definition.timeline) {
     if (stepIds.has(step.id)) errors.push(`duplicate step id: ${step.id}`);
