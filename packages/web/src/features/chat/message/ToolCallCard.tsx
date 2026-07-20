@@ -1,6 +1,8 @@
 import { normalizePreviewData, SheetPreview } from "./SheetPreview";
 import styles from "./ToolCallCard.module.css";
 
+const READ_ONLY_TOOLS = new Set(["readSheetData", "findSheetCells", "readSheetObjects"]);
+
 function isStaticToolPart(part: any): boolean {
   return part.args === undefined && part.input !== undefined;
 }
@@ -167,6 +169,7 @@ export function ToolCallCard({ part }: { part: any }) {
   const output = isStaticToolPart(part) ? (part as any).output : undefined;
   const summary = getToolSummary(toolName, output, input);
   const preview = normalizePreviewData(output?.preview);
+  const isReadOnlyTool = READ_ONLY_TOOLS.has(toolName);
   const sheetInfo = output?.sheetInfo ?? output?.sheet ?? null;
   const changedCells = computeChangedCells(output?.delta);
   const stateClass = isComplete
@@ -197,7 +200,7 @@ export function ToolCallCard({ part }: { part: any }) {
           {isComplete ? (isError ? "失败" : "已完成") : "运行中..."}
         </span>
       </div>
-      {isComplete && !isError && preview && preview.rows.length > 0 && (
+      {isComplete && !isError && !isReadOnlyTool && preview && preview.rows.length > 0 && (
         <div className={styles.preview}>
           <SheetPreview
             preview={preview}
