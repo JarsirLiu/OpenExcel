@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  type ComponentProps,
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useNavigate } from "react-router-dom";
 import type { WorkbookFull } from "@/api/workbooks";
 import type { Workspace } from "@/api/workspaces";
@@ -13,9 +21,9 @@ import sessionStyles from "@/features/session/SessionShell.module.css";
 import { SheetActivationProvider } from "@/features/workbook/editor/SheetActivationContext";
 import { WorkspaceSidebar } from "@/features/workspace/WorkspaceSidebar";
 import { WorkspaceView } from "@/features/workspace/WorkspaceView";
+import { commitDemoWorkbook, stageDemoWorkbookStep } from "./demoWorkbookReplay";
 import {
   type DemoCell,
-  type DemoPatch,
   type DemoSheet,
   type DemoStep,
   type DemoWorkbook,
@@ -23,6 +31,16 @@ import {
   inventoryReconciliationPrompt,
   inventorySteps,
 } from "./inventoryReconciliation";
+
+const DemoWorkspaceView = memo(function DemoWorkspaceView(
+  props: ComponentProps<typeof WorkspaceView>,
+) {
+  return (
+    <SheetActivationProvider>
+      <WorkspaceView {...props} />
+    </SheetActivationProvider>
+  );
+});
 
 type PlaybackPhase = "idle" | "text" | "tool" | "result" | "done";
 
@@ -88,34 +106,6 @@ function toWorkbook(workbook: DemoWorkbook, workbookIndex: number): WorkbookFull
       config: null,
     })),
   };
-}
-
-function applyStepPatch(workbooks: DemoWorkbook[], step: DemoStep): DemoWorkbook[] {
-  if (!step.patch) return workbooks;
-  const patches: DemoPatch[] = Array.isArray(step.patch) ? step.patch : [step.patch];
-
-  return workbooks.map((workbook) => {
-    const workbookPatches = patches.filter((patch) => patch.workbook === workbook.name);
-    if (workbookPatches.length === 0) return workbook;
-
-    return {
-      ...workbook,
-      sheets: workbook.sheets.map((sheet) => {
-        const sheetPatches = workbookPatches.filter((patch) => patch.sheet === sheet.name);
-        if (sheetPatches.length === 0) return sheet;
-
-        const rows = sheet.rows.map((row) => [...row]);
-        for (const patch of sheetPatches) {
-          const row = rows[patch.row - 1];
-          if (!row) continue;
-          patch.values.forEach((value, index) => {
-            row[patch.startCol - 1 + index] = { ...value };
-          });
-        }
-        return { ...sheet, rows };
-      }),
-    };
-  });
 }
 
 function columnNumber(value: string): number {
@@ -298,6 +288,8 @@ export function DemoReplay() {
   const navigate = useNavigate();
   const [workbooks, setWorkbooks] = useState<DemoWorkbook[]>(cloneWorkbooks);
   const [workbookRevision, setWorkbookRevision] = useState(0);
+  const stagedWorkbooksRef = useRef<DemoWorkbook[] | null>(null);
+  const hasStagedWorkbookChangesRef = useRef(false);
   const [currentWorkbookIndex, setCurrentWorkbookIndex] = useState(2);
   const [currentSheetIndex, setCurrentSheetIndex] = useState(0);
   const [stepIndex, setStepIndex] = useState(-1);
@@ -313,6 +305,8 @@ export function DemoReplay() {
   }, [currentWorkbookIndex, workbooks]);
 
   const reset = useCallback(() => {
+    stagedWorkbooksRef.current = null;
+    hasStagedWorkbookChangesRef.current = false;
     setWorkbooks(cloneWorkbooks());
     setWorkbookRevision((revision) => revision + 1);
     setCurrentWorkbookIndex(2);
@@ -325,16 +319,23 @@ export function DemoReplay() {
     setIsPlaying(false);
   }, []);
 
+  const commitStagedWorkbook = useCallback(() => {
+    const replayState = commitDemoWorkbook({
+      visible: workbooks,
+      staged: stagedWorkbooksRef.current,
+      hasChanges: hasStagedWorkbookChangesRef.current,
+    });
+    if (replayState.visible === workbooks) return;
+
+    setWorkbooks(replayState.visible);
+    setWorkbookRevision((revision) => revision + 1);
+    stagedWorkbooksRef.current = replayState.staged;
+    hasStagedWorkbookChangesRef.current = replayState.hasChanges;
+  }, [workbooks]);
+
   const beginStep = useCallback((index: number, clearParts = false) => {
     const step = inventorySteps[index];
     setStepIndex(index);
-    setCurrentWorkbookIndex(
-      Math.max(
-        0,
-        inventoryInitialWorkbooks.findIndex((workbook) => workbook.name === step.activeWorkbook),
-      ),
-    );
-    setCurrentSheetIndex(0);
     setTextOffset(0);
     setCurrentTool(null);
     setPhase("text");
@@ -392,7 +393,17 @@ export function DemoReplay() {
 
     if (phase === "result") {
       const timer = window.setTimeout(() => {
-        const nextWorkbooks = applyStepPatch(workbooks, currentStep);
+        const replayState = stageDemoWorkbookStep(
+          {
+            visible: workbooks,
+            staged: stagedWorkbooksRef.current,
+            hasChanges: hasStagedWorkbookChangesRef.current,
+          },
+          currentStep,
+        );
+        stagedWorkbooksRef.current = replayState.staged;
+        hasStagedWorkbookChangesRef.current = replayState.hasChanges;
+        const nextWorkbooks = replayState.staged ?? replayState.visible;
         const toolCallId = `demo-${currentStep.id}`;
         setAssistantParts((parts) =>
           parts.map((part) =>
@@ -401,8 +412,6 @@ export function DemoReplay() {
               : part,
           ),
         );
-        setWorkbooks(nextWorkbooks);
-        setWorkbookRevision((revision) => revision + 1);
         setCurrentTool("output");
         setPhase("done");
       }, 520);
@@ -417,6 +426,7 @@ export function DemoReplay() {
             return;
           }
           if (stepIndex >= inventorySteps.length - 1) {
+            commitStagedWorkbook();
             setIsPlaying(false);
             return;
           }
@@ -431,6 +441,7 @@ export function DemoReplay() {
   }, [
     currentStep,
     currentTool,
+    commitStagedWorkbook,
     isPlaying,
     moveToNextStep,
     phase,
@@ -455,54 +466,53 @@ export function DemoReplay() {
   const currentMeta = demoWorkbookMetas[currentWorkbookIndex];
   const handleWorkbookSwitch = useCallback((index: number) => setCurrentWorkbookIndex(index), []);
   const handleWorkbookImportNoop = useCallback(async () => false, []);
+  const handleWorkbookDeleteNoop = useCallback(() => undefined, []);
   const handleWorkbookNoop = useCallback(async () => undefined, []);
   const handleStructureNoop = useCallback(() => undefined, []);
 
   return (
-    <SheetActivationProvider>
-      <div className={workbenchStyles.layout}>
-        <WorkspaceSidebar
-          activeWorkspaceId={demoWorkspace.id}
-          onWorkspaceSelect={() => undefined}
-          workspaces={[demoWorkspace]}
-          onRefresh={() => undefined}
-          workbooksMap={new Map([[demoWorkspace.id, demoWorkbookMetas]])}
-          activeWorkbookId={currentMeta?.id ?? demoWorkbookMetas[0].id}
-          onWorkbookSelect={handleWorkbookSwitch}
-          onWorkbookDelete={async () => undefined}
-          onWorkbookCreate={async () => undefined}
-          readOnly
-          storageNamespace="demo"
+    <div className={workbenchStyles.layout}>
+      <WorkspaceSidebar
+        activeWorkspaceId={demoWorkspace.id}
+        onWorkspaceSelect={() => undefined}
+        workspaces={[demoWorkspace]}
+        onRefresh={() => undefined}
+        workbooksMap={new Map([[demoWorkspace.id, demoWorkbookMetas]])}
+        activeWorkbookId={currentMeta?.id ?? demoWorkbookMetas[0].id}
+        onWorkbookSelect={handleWorkbookSwitch}
+        onWorkbookDelete={async () => undefined}
+        onWorkbookCreate={async () => undefined}
+        readOnly
+        storageNamespace="demo"
+      />
+      <div className={workbenchStyles.main}>
+        <DemoWorkspaceView
+          workspaceId={null}
+          workbooks={demoWorkbookMetas}
+          workbookIdx={currentWorkbookIndex}
+          currentWorkbook={currentWorkbook}
+          workbookRevision={workbookRevision}
+          loading={false}
+          currentSheetIndex={currentSheetIndex}
+          setCurrentSheetIndex={setCurrentSheetIndex}
+          handleSwitchWorkbook={handleWorkbookSwitch}
+          handleNewWorkbookFileChange={handleWorkbookImportNoop}
+          handleWorkbookDelete={handleWorkbookDeleteNoop}
+          handleWorkbookRename={handleWorkbookNoop}
+          handleWorkbookStructureChanged={handleStructureNoop}
+          handleWorkbookRefresh={handleWorkbookNoop}
+          onWorkbookMutation={handleWorkbookNoop}
         />
-        <div className={workbenchStyles.main}>
-          <WorkspaceView
-            workspaceId={null}
-            workbooks={demoWorkbookMetas}
-            workbookIdx={currentWorkbookIndex}
-            currentWorkbook={currentWorkbook}
-            workbookRevision={workbookRevision}
-            loading={false}
-            currentSheetIndex={currentSheetIndex}
-            setCurrentSheetIndex={setCurrentSheetIndex}
-            handleSwitchWorkbook={handleWorkbookSwitch}
-            handleNewWorkbookFileChange={handleWorkbookImportNoop}
-            handleWorkbookDelete={() => undefined}
-            handleWorkbookRename={handleWorkbookNoop}
-            handleWorkbookStructureChanged={handleStructureNoop}
-            handleWorkbookRefresh={handleWorkbookNoop}
-            onWorkbookMutation={handleWorkbookNoop}
-          />
-          <div className={workbenchStyles.resizeHandle} />
-        </div>
-        <DemoChatSidebar
-          messages={messages}
-          isStreaming={isPlaying}
-          onStart={start}
-          onStop={() => setIsPlaying(false)}
-          onReset={reset}
-          onLogout={() => navigate("/login")}
-        />
+        <div className={workbenchStyles.resizeHandle} />
       </div>
-    </SheetActivationProvider>
+      <DemoChatSidebar
+        messages={messages}
+        isStreaming={isPlaying}
+        onStart={start}
+        onStop={() => setIsPlaying(false)}
+        onReset={reset}
+        onLogout={() => navigate("/login")}
+      />
+    </div>
   );
 }
