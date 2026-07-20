@@ -1,4 +1,4 @@
-import type { DemoStep, DemoWorkbook } from "./inventoryReconciliation";
+import type { DemoStep, DemoWorkbook } from "./demoTypes";
 
 export type DemoWorkbookReplayState = {
   visible: DemoWorkbook[];
@@ -16,7 +16,9 @@ function applyStepPatch(workbooks: DemoWorkbook[], step: DemoStep): DemoWorkbook
   const patches = Array.isArray(step.patch) ? step.patch : [step.patch];
 
   return workbooks.map((workbook) => {
-    const workbookPatches = patches.filter((patch) => patch.workbook === workbook.name);
+    const workbookPatches = patches.filter(
+      (patch) => patch.workbook == null || patch.workbook === workbook.name,
+    );
     if (workbookPatches.length === 0) return workbook;
 
     return {

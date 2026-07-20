@@ -6,6 +6,7 @@ import type { WorkbenchRouteData } from "@/app/routeData";
 import { AuthScreen } from "@/features/auth/AuthScreen";
 import { useAuthState } from "@/features/auth/useAuthState";
 import { DemoReplay } from "@/features/demos/DemoReplay";
+import { getDemoScenario } from "@/features/demos/demoScenarios";
 import { SheetActivationProvider } from "@/features/workbook/editor/SheetActivationContext";
 import { t } from "@/lib/i18n";
 import { ConfirmDialog, Toast } from "@/shared/ui";
@@ -151,7 +152,7 @@ export default function App() {
     location.pathname === "/demos/inventory-reconciliation" ||
     location.pathname === "/demos/student-fee-reconciliation"
   ) {
-    return <DemoReplay />;
+    return <DemoReplay scenario={getDemoScenario(location.pathname)} />;
   }
 
   if (location.pathname === "/login" || location.pathname === "/register") {
