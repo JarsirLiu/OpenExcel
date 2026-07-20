@@ -27,6 +27,10 @@ const router = createHashRouter([
     element: <App />,
   },
   {
+    path: "/demos/bank-transaction-audit",
+    element: <App />,
+  },
+  {
     id: "protected",
     element: <Outlet />,
     errorElement: <RouteErrorBoundary />,

@@ -311,6 +311,11 @@
     transform 0.25s;
 }
 
+.demosGrid {
+  display: grid;
+  gap: 20px;
+}
+
 .demoCard:hover {
   border-color: #c5d2de;
   box-shadow:

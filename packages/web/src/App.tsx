@@ -99,6 +99,7 @@ function AuthPage({ isHome = false }: { isHome?: boolean }) {
       onRegister={handleRegister}
       onSwitchMode={() => navigate(authMode === "login" ? "/register" : "/login")}
       onOpenDemo={() => navigate("/demos/inventory-reconciliation")}
+      onOpenBankDemo={() => navigate("/demos/bank-transaction-audit")}
     />
   );
 }
