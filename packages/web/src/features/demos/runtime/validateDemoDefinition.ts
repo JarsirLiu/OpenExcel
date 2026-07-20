@@ -25,6 +25,15 @@ export function validateDemoDefinition(definition: DemoDefinition): string[] {
     if (stepIds.has(step.id)) errors.push(`duplicate step id: ${step.id}`);
     stepIds.add(step.id);
 
+    if (
+      step.toolExecutionDuration !== undefined &&
+      (typeof step.toolExecutionDuration !== "number" ||
+        !Number.isFinite(step.toolExecutionDuration) ||
+        step.toolExecutionDuration < 0)
+    ) {
+      errors.push(`invalid tool execution duration in step ${step.id}`);
+    }
+
     if (step.activeWorkbook && !workbookNames.has(step.activeWorkbook)) {
       errors.push(`unknown workbook in step ${step.id}: ${step.activeWorkbook}`);
       continue;

@@ -96,4 +96,24 @@ describe("validateDemoDefinition", () => {
       "invalid playback setting: toolStartDelay",
     ]);
   });
+
+  it("reports an invalid step-specific tool execution duration", () => {
+    expect(
+      validateDemoDefinition(
+        definition({
+          timeline: [
+            {
+              id: "write",
+              phase: "写入",
+              title: "写入",
+              assistantText: "写入",
+              tokens: ["写入"],
+              toolName: "writeCells",
+              toolExecutionDuration: -1,
+            },
+          ],
+        }),
+      ),
+    ).toEqual(["invalid tool execution duration in step write"]);
+  });
 });

@@ -48,5 +48,8 @@ describe("inventoryReconciliation demo", () => {
     ]);
     expect(inventoryTimeline.at(-1)?.id).toBe("finish");
     expect(inventoryTimeline.find((step) => step.id === "write-prices")?.patch).toHaveLength(10);
+    expect(
+      inventoryTimeline.find((step) => step.id === "write-quantities")?.toolExecutionDuration,
+    ).toBe(1320);
   });
 });

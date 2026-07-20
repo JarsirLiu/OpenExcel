@@ -615,6 +615,7 @@ export const inventoryTimeline: DemoStep[] = [
     activeWorkbook: targetWorkbookName,
     activeSheet: targetSheetName,
     highlight: "D2:N12",
+    toolExecutionDuration: 780,
     patch: pricePatches,
   },
   {
@@ -631,6 +632,7 @@ export const inventoryTimeline: DemoStep[] = [
     activeWorkbook: targetWorkbookName,
     activeSheet: targetSheetName,
     highlight: "E2:R13",
+    toolExecutionDuration: 1320,
     patch: [
       ...quantityPatches,
       {

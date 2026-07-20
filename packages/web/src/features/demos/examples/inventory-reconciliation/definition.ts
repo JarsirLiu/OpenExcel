@@ -22,7 +22,7 @@ export const inventoryReconciliationDemo: DemoDefinition = {
     textTokenDelay: 24,
     textCompletionDelay: 220,
     toolStartDelay: 380,
-    toolResultDelay: 520,
+    toolExecutionDuration: 780,
     stepDelay: 260,
     toolStepDelay: 420,
     restartDelay: 20,

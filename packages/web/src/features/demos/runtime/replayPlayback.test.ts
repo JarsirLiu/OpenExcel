@@ -6,11 +6,11 @@ describe("resolveDemoPlayback", () => {
     expect(resolveDemoPlayback()).toEqual(defaultDemoPlayback);
   });
 
-  it("overrides only the configured delays", () => {
-    expect(resolveDemoPlayback({ textTokenDelay: 8, toolResultDelay: 40 })).toEqual({
+  it("overrides only the configured playback values", () => {
+    expect(resolveDemoPlayback({ textTokenDelay: 8, toolExecutionDuration: 840 })).toEqual({
       ...defaultDemoPlayback,
       textTokenDelay: 8,
-      toolResultDelay: 40,
+      toolExecutionDuration: 840,
     });
   });
 });

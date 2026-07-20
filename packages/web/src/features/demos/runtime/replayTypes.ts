@@ -36,6 +36,7 @@ export type DemoStep = {
   activeWorkbook?: string;
   activeSheet?: string;
   highlight?: string;
+  toolExecutionDuration?: number;
   patch?: DemoPatch | DemoPatch[];
 };
 
@@ -43,7 +44,7 @@ export type DemoPlayback = {
   textTokenDelay: number;
   textCompletionDelay: number;
   toolStartDelay: number;
-  toolResultDelay: number;
+  toolExecutionDuration: number;
   stepDelay: number;
   toolStepDelay: number;
   restartDelay: number;

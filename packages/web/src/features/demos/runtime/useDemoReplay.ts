@@ -112,7 +112,7 @@ export function useDemoReplay(scenario: DemoDefinition) {
           buildToolPart(currentStep, "input-streaming", workbooks),
         ]);
         setCurrentTool("input");
-        setPhase("done");
+        setPhase("result");
       }, playback.toolStartDelay);
       return () => window.clearTimeout(timer);
     }
@@ -140,7 +140,7 @@ export function useDemoReplay(scenario: DemoDefinition) {
         );
         setCurrentTool("output");
         setPhase("done");
-      }, playback.toolResultDelay);
+      }, currentStep.toolExecutionDuration ?? playback.toolExecutionDuration);
       return () => window.clearTimeout(timer);
     }
 
