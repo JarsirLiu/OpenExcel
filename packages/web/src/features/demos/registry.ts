@@ -4,6 +4,7 @@ import { financialHealthAnalysisDemo } from "./examples/financial-health-analysi
 import { inventoryReconciliationDemo } from "./examples/inventory-reconciliation";
 import { investmentBudgetReviewDemo } from "./examples/investment-budget-review";
 import { orderFulfillmentAnalysisDemo } from "./examples/order-fulfillment-analysis";
+import { salesPerformanceAnalysisDemo } from "./examples/sales-performance-analysis";
 import { shareholderChangeAnalysisDemo } from "./examples/shareholder-change-analysis";
 import type { DemoDefinition } from "./runtime/replayTypes";
 
@@ -14,6 +15,7 @@ export const demoRegistry: Record<string, DemoDefinition> = {
   [investmentBudgetReviewDemo.route]: investmentBudgetReviewDemo,
   [inventoryReconciliationDemo.route]: inventoryReconciliationDemo,
   [orderFulfillmentAnalysisDemo.route]: orderFulfillmentAnalysisDemo,
+  [salesPerformanceAnalysisDemo.route]: salesPerformanceAnalysisDemo,
   [shareholderChangeAnalysisDemo.route]: shareholderChangeAnalysisDemo,
 };
 
