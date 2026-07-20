@@ -4,6 +4,8 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+packageExtensionsChecksum: sha256-97uo/j9lFH1cHRvCu9L+5/3M4HidZoHdinCCUsgAPT4=
+
 importers:
 
   .:
@@ -4619,6 +4621,8 @@ snapshots:
       exceljs: 4.4.0
       file-saver: 2.0.5
       jszip: 3.10.1
+      lodash: 4.18.1
+      react: 18.3.1
 
   '@csstools/color-helpers@6.1.0': {}
 

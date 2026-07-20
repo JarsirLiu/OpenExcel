@@ -1,5 +1,10 @@
 packages:
   - "packages/*"
+packageExtensions:
+  '@corbe30/fortune-excel':
+    dependencies:
+      lodash: ^4.0.0
+      react: ^18.3.1
 allowBuilds:
   '@fortawesome/fontawesome-common-types': true
   '@fortawesome/fontawesome-free': true

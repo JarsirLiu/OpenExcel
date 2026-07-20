@@ -40,8 +40,9 @@ COPY --from=build /app/packages/server/package.json ./packages/server/
 COPY --from=build /app/packages/core/package.json ./packages/core/
 COPY --from=build /app/packages/agent/package.json ./packages/agent/
 COPY --from=build /app/packages/chat-contracts/package.json ./packages/chat-contracts/
+COPY --from=build /app/packages/web/package.json ./packages/web/
 
-RUN pnpm install --prod --filter @openexcel/server... --frozen-lockfile --ignore-scripts
+RUN pnpm install --prod --frozen-lockfile --ignore-scripts
 
 COPY --from=build /app/packages/server/prisma ./packages/server/prisma
 COPY --from=build /app/packages/server/scripts ./packages/server/scripts
@@ -52,8 +53,9 @@ COPY --from=build /app/packages/chat-contracts/src ./packages/chat-contracts/src
 COPY --from=build /app/packages/web/dist ./packages/web/dist
 COPY --from=build /app/templates ./templates
 
-RUN mkdir -p /app/.data
-RUN chmod +x /app/packages/server/scripts/docker-entrypoint.sh
+RUN mkdir -p /app/.data \
+  && sed -i 's/\r$//' /app/packages/server/scripts/docker-entrypoint.sh \
+  && chmod +x /app/packages/server/scripts/docker-entrypoint.sh
 
 EXPOSE 4000
 
