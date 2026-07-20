@@ -19,6 +19,7 @@ type Props = {
   onSwitchMode: () => void;
   onOpenDemo: () => void;
   onOpenBankDemo: () => void;
+  onOpenDemoCatalog: () => void;
 };
 
 export function AuthScreen({
@@ -30,6 +31,7 @@ export function AuthScreen({
   onSwitchMode,
   onOpenDemo,
   onOpenBankDemo,
+  onOpenDemoCatalog,
 }: Props) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -165,9 +167,9 @@ export function AuthScreen({
       <section className={styles.demosSection}>
         <div className={styles.demosHeader}>
           <span className={styles.demosEyebrow}>AI Excel 案例</span>
-          <span className={styles.demosLink}>
+          <button className={styles.demosLink} type="button" onClick={onOpenDemoCatalog}>
             选择案例 <span aria-hidden="true">{"\u2193"}</span>
-          </span>
+          </button>
         </div>
         <div className={styles.demosGrid}>
           <div className={styles.demoCard} onClick={onOpenBankDemo}>
