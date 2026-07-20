@@ -23,11 +23,7 @@ const router = createHashRouter([
     element: <App />,
   },
   {
-    path: "/demos/inventory-reconciliation",
-    element: <App />,
-  },
-  {
-    path: "/demos/bank-transaction-audit",
+    path: "/demos/*",
     element: <App />,
   },
   {
