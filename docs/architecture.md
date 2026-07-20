@@ -710,7 +710,7 @@ If a bug affects two panes at once, treat it as a boundary bug and add a regress
 5. Server persists the complete transcript, run, and step data; compaction only affects the model request and does not remove history from the session.
 6. Web renders streaming messages and tool output.
 
-Sheet and workbook mentions use the lightweight `@openexcel/chat-contracts` protocol and an AI SDK `data-chat-reference` message part. The web editor only
+Sheet and workbook mentions use an AI SDK `data-chat-reference` message part. The web editor only
 extracts stable workbook or Sheet IDs; it does not serialize TipTap nodes or rely on display names.
 The server resolves those IDs against the current workspace and replaces the payload with authoritative
 workbook/Sheet metadata. The agent converts the resolved data part into model-facing identity text,

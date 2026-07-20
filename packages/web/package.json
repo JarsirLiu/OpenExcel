@@ -14,7 +14,6 @@
   "dependencies": {
     "@ai-sdk/react": "^4.0.5",
     "@fortune-sheet/react": "^1.0.4",
-    "@openexcel/chat-contracts": "workspace:*",
     "@openexcel/core": "workspace:*",
     "@tiptap/extension-mention": "^3.27.1",
     "@tiptap/react": "^3.27.1",

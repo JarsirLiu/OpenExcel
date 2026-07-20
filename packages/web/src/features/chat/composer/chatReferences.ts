@@ -1,4 +1,6 @@
-import { type ChatReferenceTarget, chatReferenceTargetSchema } from "@openexcel/chat-contracts";
+export type ChatReferenceTarget =
+  | { kind: "workbook"; workbookId: number }
+  | { kind: "sheet"; sheetId: number };
 
 function parseMentionTarget(id: unknown): ChatReferenceTarget | null {
   if (typeof id !== "string") return null;
@@ -16,8 +18,8 @@ function parseMentionTarget(id: unknown): ChatReferenceTarget | null {
         : null;
   if (!candidate) return null;
 
-  const parsed = chatReferenceTargetSchema.safeParse(candidate);
-  return parsed.success ? parsed.data : null;
+  if (!Number.isSafeInteger(numericId) || numericId <= 0) return null;
+  return candidate;
 }
 
 export function extractChatReferences(document: unknown): ChatReferenceTarget[] {

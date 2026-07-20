@@ -22,7 +22,6 @@
     "@fastify/multipart": "^9.4.0",
     "@fastify/static": "^9.1.3",
     "@openexcel/agent": "workspace:*",
-    "@openexcel/chat-contracts": "workspace:*",
     "@openexcel/core": "workspace:*",
     "@prisma/client": "6.19.3",
     "ai": "^7.0.4",

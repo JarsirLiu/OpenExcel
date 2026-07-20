@@ -1,5 +1,4 @@
 import { useChat } from "@ai-sdk/react";
-import type { ChatReferenceTarget } from "@openexcel/chat-contracts";
 import { DefaultChatTransport } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -7,6 +6,7 @@ import {
   fetchUndoAvailability,
   undoLatestRun,
 } from "@/api/chat";
+import type { ChatReferenceTarget } from "../composer/chatReferences";
 import { useDraftSessionTransition } from "./useDraftSessionTransition";
 import { collectWorkbookMutationToolCallIds } from "./useSheetPatchSync";
 

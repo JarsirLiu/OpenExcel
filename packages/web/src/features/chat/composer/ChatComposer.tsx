@@ -1,4 +1,3 @@
-import type { ChatReferenceTarget } from "@openexcel/chat-contracts";
 import { EditorContent } from "@tiptap/react";
 import {
   type ChangeEvent,
@@ -11,6 +10,7 @@ import {
 } from "react";
 import { t } from "@/lib/i18n";
 import styles from "./ChatComposer.module.css";
+import type { ChatReferenceTarget } from "./chatReferences";
 import { useChatComposer } from "./useChatComposer";
 
 export type ChatComposerHandle = {

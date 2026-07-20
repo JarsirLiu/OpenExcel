@@ -1,10 +1,33 @@
 import type { WorkspaceWorkbookSummary } from "@openexcel/agent";
-import {
-  type ChatReference,
-  type ChatReferenceTarget,
-  chatReferenceDataSchema,
-  chatReferenceSchema,
-} from "@openexcel/chat-contracts";
+import { z } from "zod";
+
+const positiveIdSchema = z.number().int().positive();
+const chatReferenceTargetSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("workbook"), workbookId: positiveIdSchema }),
+  z.object({ kind: z.literal("sheet"), sheetId: positiveIdSchema }),
+]);
+const chatReferenceSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("workbook"),
+    workbookId: positiveIdSchema,
+    workbookName: z.string().min(1),
+  }),
+  z.object({
+    kind: z.literal("sheet"),
+    workbookId: positiveIdSchema,
+    workbookName: z.string().min(1),
+    sheetId: positiveIdSchema,
+    sheetName: z.string().min(1),
+    sheetNo: positiveIdSchema.optional(),
+  }),
+]);
+const chatReferenceDataSchema = z.object({
+  reference: z.union([chatReferenceSchema, chatReferenceTargetSchema]),
+  status: z.enum(["resolved", "unavailable"]).optional(),
+});
+
+type ChatReferenceTarget = z.infer<typeof chatReferenceTargetSchema>;
+type ChatReference = z.infer<typeof chatReferenceSchema>;
 
 function resolveReference(
   target: ChatReferenceTarget,

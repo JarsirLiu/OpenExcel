@@ -1,10 +1,9 @@
-import type { ChatReferenceTarget } from "@openexcel/chat-contracts";
 import Mention from "@tiptap/extension-mention";
 import { useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchWorkbookReferenceCandidates } from "@/api/workbooks";
-import { extractChatReferences } from "./chatReferences";
+import { type ChatReferenceTarget, extractChatReferences } from "./chatReferences";
 import { createMentionSuggestion, type WorkbookSource } from "./SheetMentionList";
 
 export function useChatComposer({
