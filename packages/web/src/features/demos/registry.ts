@@ -3,6 +3,7 @@ import { campusRecruitmentAnalysisDemo } from "./examples/campus-recruitment-ana
 import { financialHealthAnalysisDemo } from "./examples/financial-health-analysis";
 import { inventoryReconciliationDemo } from "./examples/inventory-reconciliation";
 import { investmentBudgetReviewDemo } from "./examples/investment-budget-review";
+import { orderFulfillmentAnalysisDemo } from "./examples/order-fulfillment-analysis";
 import { shareholderChangeAnalysisDemo } from "./examples/shareholder-change-analysis";
 import type { DemoDefinition } from "./runtime/replayTypes";
 
@@ -12,6 +13,7 @@ export const demoRegistry: Record<string, DemoDefinition> = {
   [financialHealthAnalysisDemo.route]: financialHealthAnalysisDemo,
   [investmentBudgetReviewDemo.route]: investmentBudgetReviewDemo,
   [inventoryReconciliationDemo.route]: inventoryReconciliationDemo,
+  [orderFulfillmentAnalysisDemo.route]: orderFulfillmentAnalysisDemo,
   [shareholderChangeAnalysisDemo.route]: shareholderChangeAnalysisDemo,
 };
 
