@@ -1,0 +1,151 @@
+import { createAnalysisScenario, demoCell, demoRow, resultCell } from "../scenarioFactory";
+
+const score = (value: number) => demoCell(value, { numberFormat: "0.0" });
+
+export const examScoreAnalysisDemo = createAnalysisScenario({
+  id: "exam-score-analysis",
+  workspaceId: -190,
+  workspaceName: "教育分析演示",
+  sessionName: "多次考试成绩分析 Demo",
+  prompt:
+    "请对比高二年级三次考试的语文、数学、英语成绩，分析每位学生的趋势、优势科目和薄弱科目，识别持续进步与明显下滑，并生成个性化学习建议。",
+  workbookName: "高二三次考试成绩",
+  sourceSheets: [
+    {
+      name: "第一次月考",
+      columns: ["学号", "姓名", "语文", "数学", "英语", "总分", "年级排名"],
+      rows: [
+        demoRow("S001", "陈晓雨", 112, 128, 119, 359, 18),
+        demoRow("S002", "李明哲", 105, 136, 108, 349, 27),
+        demoRow("S003", "周诗涵", 124, 102, 132, 358, 20),
+        demoRow("S004", "王浩然", 98, 118, 101, 317, 58),
+        demoRow("S005", "赵一诺", 116, 109, 115, 340, 34),
+        demoRow("S006", "孙嘉诚", 103, 125, 112, 340, 36),
+      ],
+    },
+    {
+      name: "期中考试",
+      columns: ["学号", "姓名", "语文", "数学", "英语", "总分", "年级排名"],
+      rows: [
+        demoRow("S001", "陈晓雨", 115, 132, 123, 370, 12),
+        demoRow("S002", "李明哲", 108, 139, 106, 353, 25),
+        demoRow("S003", "周诗涵", 126, 108, 134, 368, 14),
+        demoRow("S004", "王浩然", 102, 121, 106, 329, 49),
+        demoRow("S005", "赵一诺", 114, 105, 112, 331, 43),
+        demoRow("S006", "孙嘉诚", 106, 127, 116, 349, 29),
+      ],
+    },
+    {
+      name: "期末考试",
+      columns: ["学号", "姓名", "语文", "数学", "英语", "总分", "年级排名"],
+      rows: [
+        demoRow("S001", "陈晓雨", 118, 137, 126, 381, 8),
+        demoRow("S002", "李明哲", 110, 141, 104, 355, 24),
+        demoRow("S003", "周诗涵", 128, 115, 136, 379, 9),
+        demoRow("S004", "王浩然", 106, 126, 110, 342, 38),
+        demoRow("S005", "赵一诺", 111, 98, 108, 317, 59),
+        demoRow("S006", "孙嘉诚", 109, 130, 121, 360, 21),
+      ],
+    },
+  ],
+  resultSheet: {
+    name: "个性化诊断",
+    columns: ["学号", "姓名", "总分变化", "排名变化", "趋势诊断", "薄弱科目", "学习建议"],
+    rows: [
+      demoRow(
+        "S001",
+        "陈晓雨",
+        score(22),
+        10,
+        resultCell("持续进步"),
+        "语文",
+        "保持数学优势，加强语文阅读表达",
+      ),
+      demoRow(
+        "S002",
+        "李明哲",
+        score(6),
+        3,
+        resultCell("小幅进步"),
+        "英语",
+        "专项训练英语完形和写作",
+      ),
+      demoRow(
+        "S003",
+        "周诗涵",
+        score(21),
+        11,
+        resultCell("持续进步"),
+        "数学",
+        "保持文科优势，巩固函数与几何",
+      ),
+      demoRow(
+        "S004",
+        "王浩然",
+        score(25),
+        20,
+        resultCell("进步最快"),
+        "语文",
+        "延续错题复盘并提升语文基础",
+      ),
+      demoRow(
+        "S005",
+        "赵一诺",
+        score(-23),
+        -25,
+        resultCell("明显下滑", "danger"),
+        "数学",
+        "立即制定数学补弱计划并周度跟踪",
+      ),
+      demoRow(
+        "S006",
+        "孙嘉诚",
+        score(20),
+        15,
+        resultCell("稳定进步"),
+        "语文",
+        "提升语文得分稳定性，冲击前20",
+      ),
+    ],
+  },
+  analysisSteps: [
+    {
+      id: "read-first-exam",
+      title: "读取首次考试",
+      assistantText: "我先读取第一次月考，建立每位学生的三科成绩、总分和年级排名基线。",
+      toolInput: "读取「第一次月考」A1:G7，建立学生成绩基线",
+      toolOutput: "读取 6 名学生；总分区间 317-359，排名区间 18-58",
+      activeSheet: "第一次月考",
+      highlight: "A1:G7",
+    },
+    {
+      id: "compare-three-exams",
+      title: "对比三次考试",
+      assistantText:
+        "按学号匹配三次考试后，5 名学生总分提升，赵一诺连续下滑；王浩然总分提升 25 分、排名上升 20 位，进步最快。",
+      toolInput: "关联「期中考试」和「期末考试」，计算总分及排名变化",
+      toolOutput: "进步 5 人、下滑 1 人；王浩然总分 +25、排名 +20；赵一诺总分 -23、排名 -25",
+      activeSheet: "期末考试",
+      highlight: "A1:G7",
+    },
+    {
+      id: "diagnose-subjects",
+      title: "诊断学科强弱",
+      assistantText:
+        "逐科对比显示，赵一诺的主要风险来自数学持续下降；陈晓雨和孙嘉诚需要提升语文，周诗涵应继续补强数学。",
+      toolInput: "比较每位学生三科成绩趋势，识别优势科目和薄弱科目",
+      toolOutput: "数学持续下降 1 人；语文为薄弱科目 3 人；英语薄弱 1 人；数学薄弱 2 人",
+      activeSheet: "期末考试",
+      highlight: "C2:E7",
+      toolExecutionDuration: 820,
+    },
+  ],
+  writeTitle: "生成个性化诊断",
+  writeAssistantText: "我已为每位学生生成总分和排名趋势、薄弱科目以及可执行的个性化学习建议。",
+  writeToolInput: "将 6 名学生的趋势诊断写入「个性化诊断」A2:G7",
+  writeToolOutput: "写入 6 条学生诊断；持续进步 5 人、明显下滑 1 人",
+  verifyAssistantText: "复核完成，所有总分变化、排名变化和薄弱科目都与三次考试原始记录一致。",
+  verifyToolOutput: "6 名学生跨表匹配成功；总分及排名差额复核一致",
+  finalText:
+    "多次考试分析完成：整体学习趋势向好，应重点关注赵一诺的数学下滑，同时为其余学生按薄弱科目安排差异化训练。",
+});

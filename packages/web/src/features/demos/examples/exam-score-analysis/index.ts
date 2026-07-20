@@ -1,0 +1,1 @@
+export { examScoreAnalysisDemo } from "./definition";
