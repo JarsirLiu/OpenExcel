@@ -60,7 +60,11 @@ export async function createApp() {
     wildcard: false,
   });
 
-  app.setNotFoundHandler((_req, reply) => {
+  app.setNotFoundHandler((req, reply) => {
+    const pathname = new URL(req.url, "http://localhost").pathname;
+    if (pathname === "/api" || pathname.startsWith("/api/")) {
+      return reply.status(404).send({ error: "Not found" });
+    }
     reply.sendFile("index.html");
   });
 

@@ -1,45 +1,54 @@
+import type { LoaderFunctionArgs } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { bootstrapWorkspace, fetchCurrentUser } = vi.hoisted(() => ({
-  bootstrapWorkspace: vi.fn(),
+const { fetchCurrentUser } = vi.hoisted(() => ({
   fetchCurrentUser: vi.fn(),
 }));
 
 vi.mock("@/api/auth", () => ({ fetchCurrentUser }));
-vi.mock("@/api/workspaces", () => ({ bootstrapWorkspace }));
 
-import { authPageLoader, publicHomeLoader } from "./publicLoader";
+import { ApiError } from "@/api/http";
+import { authPageLoader } from "./publicLoader";
 
 const user = { id: 7, email: "user@example.com", displayName: "User" };
+
+function loaderArgs(url: string): LoaderFunctionArgs {
+  return { request: new Request(url) } as LoaderFunctionArgs;
+}
 
 describe("public route loaders", () => {
   beforeEach(() => {
     fetchCurrentUser.mockReset();
-    bootstrapWorkspace.mockReset();
   });
 
-  it("keeps unauthenticated users on the public home page", async () => {
-    fetchCurrentUser.mockRejectedValue(new Error("unauthenticated"));
+  it("keeps unauthenticated users on the auth page", async () => {
+    fetchCurrentUser.mockRejectedValue(new ApiError("unauthenticated", 401));
 
-    await expect(publicHomeLoader()).resolves.toBeNull();
-    expect(bootstrapWorkspace).not.toHaveBeenCalled();
+    await expect(authPageLoader(loaderArgs("http://localhost/login"))).resolves.toBeNull();
   });
 
-  it("redirects authenticated users to their default workspace", async () => {
+  it("returns authenticated users from the auth page to the public home route", async () => {
     fetchCurrentUser.mockResolvedValue(user);
-    bootstrapWorkspace.mockResolvedValue({ publicId: "ws_test" });
 
-    const redirectResponse = await publicHomeLoader().catch((error: unknown) => error);
+    const redirectResponse = await authPageLoader(loaderArgs("http://localhost/login")).catch(
+      (error: unknown) => error,
+    );
     expect(redirectResponse).toBeInstanceOf(Response);
     const response = redirectResponse as Response;
     expect(response.status).toBe(302);
-    expect(response.headers.get("location")).toBe("/workspaces/ws_test");
-    expect(bootstrapWorkspace).toHaveBeenCalledWith(user.id);
+    expect(response.headers.get("location")).toBe("/");
   });
 
-  it("uses the same redirect policy for login and register routes", async () => {
-    fetchCurrentUser.mockRejectedValue(new Error("unauthenticated"));
+  it("returns an authenticated user to the requested internal route", async () => {
+    fetchCurrentUser.mockResolvedValue(user);
 
-    await expect(authPageLoader()).resolves.toBeNull();
+    const redirectResponse = await authPageLoader(
+      loaderArgs("http://localhost/login?returnTo=%2Fworkspaces%2Fws_existing%3Ftab%3Dchat"),
+    ).catch((error: unknown) => error);
+
+    expect(redirectResponse).toBeInstanceOf(Response);
+    expect((redirectResponse as Response).headers.get("location")).toBe(
+      "/workspaces/ws_existing?tab=chat",
+    );
   });
 });

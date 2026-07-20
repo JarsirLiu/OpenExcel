@@ -1,5 +1,15 @@
 export const API_BASE = "/api";
 
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 type ApiErrorResponse = {
   error?: unknown;
 };

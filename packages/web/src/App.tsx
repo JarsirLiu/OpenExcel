@@ -1,11 +1,11 @@
 import { lazy, Suspense } from "react";
-import { Link, Outlet, useNavigate, useRouteLoaderData } from "react-router-dom";
+import { Link, Outlet, useLocation, useNavigate, useRouteLoaderData } from "react-router-dom";
 import { type CurrentUser, logout } from "@/api/auth";
 import { bootstrapWorkspace } from "@/api/workspaces";
 import type { WorkbenchRouteData } from "@/app/routeData";
-import { routePaths } from "@/app/routePaths";
+import { getInternalReturnTo, routePaths } from "@/app/routePaths";
 import { AuthScreen } from "@/features/auth/AuthScreen";
-import { useAuthState } from "@/features/auth/useAuthState";
+import { useAuthActions } from "@/features/auth/useAuthActions";
 import { SheetActivationProvider } from "@/features/workbook/editor/SheetActivationContext";
 import { t } from "@/lib/i18n";
 import { ConfirmDialog, Toast } from "@/shared/ui";
@@ -62,24 +62,31 @@ function LoadingScreen() {
 
 export function AuthPage({ mode }: { mode: "login" | "register" }) {
   const navigate = useNavigate();
-  const auth = useAuthState();
+  const location = useLocation();
+  const auth = useAuthActions();
+  const returnTo = new URLSearchParams(location.search).get("returnTo");
+  const internalReturnTo = getInternalReturnTo(returnTo);
 
-  async function enterWorkspace(userId: number) {
-    const workspace = await bootstrapWorkspace(userId);
-    navigate(routePaths.workspace(workspace.publicId), { replace: true });
+  async function enterWorkspace() {
+    if (internalReturnTo) {
+      navigate(internalReturnTo, { replace: true });
+      return;
+    }
+
+    const workspace = await bootstrapWorkspace();
+    navigate(routePaths.workspace(workspace.publicId));
   }
 
   async function handleLogin(input: { email: string; password: string }) {
-    const user = await auth.signIn(input);
-    await enterWorkspace(user.id);
+    await auth.signIn(input);
+    await enterWorkspace();
   }
 
   async function handleRegister(input: { email: string; password: string; displayName?: string }) {
-    const user = await auth.signUp(input);
-    await enterWorkspace(user.id);
+    await auth.signUp(input);
+    await enterWorkspace();
   }
 
-  if (auth.loading) return <LoadingScreen />;
   return (
     <AuthScreen
       mode={mode}
@@ -87,7 +94,16 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
       error={auth.error}
       onLogin={handleLogin}
       onRegister={handleRegister}
-      onSwitchMode={() => navigate(mode === "login" ? routePaths.register : routePaths.login)}
+      onSwitchMode={() => {
+        const nextPath = mode === "login" ? routePaths.register : routePaths.login;
+        navigate(
+          internalReturnTo
+            ? mode === "login"
+              ? routePaths.registerWithReturnTo(internalReturnTo)
+              : routePaths.loginWithReturnTo(internalReturnTo)
+            : nextPath,
+        );
+      }}
       onOpenDemo={() => navigate(routePaths.demo("inventory-reconciliation"))}
     />
   );

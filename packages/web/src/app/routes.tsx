@@ -2,7 +2,7 @@ import { createBrowserRouter, Outlet, useLoaderData } from "react-router-dom";
 import { AppShell, AuthPage, NotFoundPage, WorkbenchPage } from "@/App";
 import { demoLoader } from "@/app/loaders/demoLoader";
 import { protectedLoader } from "@/app/loaders/protectedLoader";
-import { authPageLoader, publicHomeLoader } from "@/app/loaders/publicLoader";
+import { authPageLoader } from "@/app/loaders/publicLoader";
 import { workspaceLoader } from "@/app/loaders/workspaceLoader";
 import type { DemoDefinition } from "@/features/demos/runtime/replayTypes";
 import { DemoPage } from "@/features/demos/shell/DemoPage";
@@ -20,7 +20,6 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
-        loader: publicHomeLoader,
         element: <AuthPage mode="login" />,
       },
       {

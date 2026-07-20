@@ -1,4 +1,4 @@
-import { apiFetch, readErrorMessage } from "./http";
+import { ApiError, apiFetch, readErrorMessage } from "./http";
 
 export interface CurrentUser {
   id: number;
@@ -9,7 +9,7 @@ export interface CurrentUser {
 export async function fetchCurrentUser(): Promise<CurrentUser> {
   const res = await apiFetch("/auth/me");
   if (!res.ok) {
-    throw new Error(await readErrorMessage(res, "未登录"));
+    throw new ApiError(await readErrorMessage(res, "未登录"), res.status);
   }
   const data = await res.json();
   return data.user ?? data;
