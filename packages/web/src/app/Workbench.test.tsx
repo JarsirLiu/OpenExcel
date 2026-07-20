@@ -1,5 +1,5 @@
 import { act, render } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   refreshWorkbooks: vi.fn(),
@@ -70,6 +70,11 @@ vi.mock("@/features/chat/ChatSidebar", () => ({
 import { Workbench } from "./Workbench";
 
 describe("Workbench", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
   beforeEach(() => {
     mocks.refreshWorkbooks.mockReset();
     mocks.refreshSessions.mockReset();
@@ -97,5 +102,44 @@ describe("Workbench", () => {
     expect(mocks.refreshWorkbooks).toHaveBeenCalledWith([
       { id: 1, publicId: "workspace-1", name: "Workspace", order: 0 },
     ]);
+  });
+
+  it("does not dispatch workbook resize while dragging the chat sidebar", () => {
+    const animationFrames: FrameRequestCallback[] = [];
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+      animationFrames.push(callback);
+      return animationFrames.length;
+    });
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
+    const dispatchEvent = vi.spyOn(window, "dispatchEvent");
+    const { container } = render(
+      <Workbench
+        currentUser={{ email: "user@example.com", displayName: "User" }}
+        onLogout={vi.fn()}
+      />,
+    );
+    const handle = container.querySelector("[class*='resizeHandle']");
+    expect(handle).not.toBeNull();
+
+    act(() => {
+      handle?.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, clientX: 500 }));
+      document.dispatchEvent(new MouseEvent("mousemove", { clientX: 440 }));
+    });
+
+    expect(dispatchEvent).not.toHaveBeenCalled();
+
+    act(() => {
+      document.dispatchEvent(new MouseEvent("mouseup"));
+    });
+
+    expect(dispatchEvent).not.toHaveBeenCalled();
+    expect(animationFrames).toHaveLength(1);
+
+    act(() => {
+      animationFrames[0](0);
+    });
+
+    const resizeEvents = dispatchEvent.mock.calls.filter(([event]) => event.type === "resize");
+    expect(resizeEvents).toHaveLength(1);
   });
 });

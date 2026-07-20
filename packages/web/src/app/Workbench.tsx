@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ChatSidebar } from "@/features/chat/ChatSidebar";
 import { useSessionWorkspace } from "@/features/session/useSessionWorkspace";
@@ -7,6 +7,7 @@ import { useWorkspaceState } from "@/features/workspace/useWorkspaceState";
 import { useWorkspaceView } from "@/features/workspace/useWorkspaceView";
 import { WorkspaceSidebar } from "@/features/workspace/WorkspaceSidebar";
 import { WorkspaceView } from "@/features/workspace/WorkspaceView";
+import { usePanelResize } from "@/shared/hooks/usePanelResize";
 import type { WorkbenchRouteData } from "./routeData";
 import styles from "./Workbench.module.css";
 
@@ -31,8 +32,7 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
     workbooksMap,
     refreshWorkbooks,
   } = useWorkspaceState(routeData?.workspaces, routeData?.workspace.id);
-  const [sidebarWidth, setSidebarWidth] = useState(MIN_SIDEBAR_WIDTH);
-  const rafRef = useRef<number | null>(null);
+  const layoutRef = useRef<HTMLDivElement>(null);
 
   const routeWorkspaceId = routeData?.workspace.id ?? null;
   const selectedWorkspaceId = routeWorkspaceId ?? activeWorkspaceId;
@@ -175,47 +175,24 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
     [workbook.currentWorkbook, workbook.setCurrentSheetIndex, activateSheetByIndex],
   );
 
-  const handleResizeMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      const startX = e.clientX;
-      const startWidth = sidebarWidth;
-
-      const onMouseMove = (e: MouseEvent) => {
-        const newWidth = startWidth + (startX - e.clientX);
-        setSidebarWidth(Math.max(MIN_SIDEBAR_WIDTH, newWidth));
-        if (rafRef.current == null) {
-          rafRef.current = requestAnimationFrame(() => {
-            rafRef.current = null;
-            window.dispatchEvent(new Event("resize"));
-          });
-        }
-      };
-
-      const onMouseUp = () => {
-        document.removeEventListener("mousemove", onMouseMove);
-        document.removeEventListener("mouseup", onMouseUp);
-        document.body.style.cursor = "";
-        document.body.style.userSelect = "";
-        if (rafRef.current != null) {
-          cancelAnimationFrame(rafRef.current);
-          rafRef.current = null;
-        }
-        window.dispatchEvent(new Event("resize"));
-      };
-
-      document.addEventListener("mousemove", onMouseMove);
-      document.addEventListener("mouseup", onMouseUp);
-      document.body.style.cursor = "col-resize";
-      document.body.style.userSelect = "none";
-    },
-    [sidebarWidth],
-  );
+  const applyChatSidebarWidth = useCallback((width: number) => {
+    layoutRef.current?.style.setProperty("--chat-sidebar-width", `${width}px`);
+  }, []);
+  const notifyWorkbookResize = useCallback(() => {
+    window.dispatchEvent(new Event("resize"));
+  }, []);
+  const { handleMouseDown: handleResizeMouseDown } = usePanelResize({
+    initialWidth: MIN_SIDEBAR_WIDTH,
+    minWidth: MIN_SIDEBAR_WIDTH,
+    edge: "left",
+    applyWidth: applyChatSidebarWidth,
+    onResizeSettled: notifyWorkbookResize,
+  });
 
   const loading = workbook.loading || workspaceLoading;
 
   return (
-    <div className={styles.layout}>
+    <div ref={layoutRef} className={styles.layout}>
       <WorkspaceSidebar
         activeWorkspaceId={selectedWorkspaceId}
         onWorkspaceSelect={handleWorkspaceSelect}
@@ -256,7 +233,7 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
         referenceCacheRevision={workbook.referenceCacheRevision}
         currentUser={currentUser}
         onLogout={onLogout}
-        style={{ width: sidebarWidth }}
+        style={{ width: "var(--chat-sidebar-width)" }}
         sessionWorkspace={session}
         onNavigateSheet={handleNavigateSheet}
         initialMessages={domainInitial.session?.messages}

@@ -4,6 +4,7 @@ import { downloadWorkbook } from "@/api/workbooks";
 import type { Workspace } from "@/api/workspaces";
 import { createWorkspace, deleteWorkspace, renameWorkspace } from "@/api/workspaces";
 import { t } from "@/lib/i18n";
+import { usePanelResize } from "@/shared/hooks/usePanelResize";
 import { confirm } from "@/shared/lib";
 import styles from "./WorkspaceSidebar.module.css";
 
@@ -50,20 +51,39 @@ export function WorkspaceSidebar({
     const stored = sessionStorage.getItem(collapsedStorageKey);
     return stored !== null ? stored === "true" : false;
   });
-  const [sidebarWidth, setSidebarWidth] = useState(() => {
+  const [initialSidebarWidth] = useState(() => {
     const stored = sessionStorage.getItem(widthStorageKey);
     return stored !== null ? Number(stored) : DEFAULT_WIDTH;
   });
-  const [isResizing, setIsResizing] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editValue, setEditValue] = useState("");
   const [expandedWorkspaces, setExpandedWorkspaces] = useState<Set<number>>(new Set());
-  const rafRef = useRef<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const innerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     sessionStorage.setItem(collapsedStorageKey, String(collapsed));
   }, [collapsed, collapsedStorageKey]);
+
+  const applySidebarWidth = useCallback((width: number) => {
+    sidebarRef.current?.style.setProperty("width", `${width}px`);
+    innerRef.current?.style.setProperty("width", `${width}px`);
+  }, []);
+  const notifyWorkbookResize = useCallback(() => {
+    window.dispatchEvent(new Event("resize"));
+  }, []);
+  const {
+    width: sidebarWidth,
+    isResizing,
+    handleMouseDown: handleResizeMouseDown,
+  } = usePanelResize({
+    initialWidth: initialSidebarWidth,
+    minWidth: MIN_WIDTH,
+    edge: "right",
+    applyWidth: applySidebarWidth,
+    onResizeSettled: notifyWorkbookResize,
+  });
 
   useEffect(() => {
     sessionStorage.setItem(widthStorageKey, String(sidebarWidth));
@@ -205,45 +225,6 @@ export function WorkspaceSidebar({
     [onWorkbookCreate, readOnly],
   );
 
-  const handleResizeMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      setIsResizing(true);
-      const startX = e.clientX;
-      const startWidth = sidebarWidth;
-
-      const onMouseMove = (e: MouseEvent) => {
-        const newWidth = startWidth + (e.clientX - startX);
-        setSidebarWidth(Math.max(MIN_WIDTH, newWidth));
-        if (rafRef.current == null) {
-          rafRef.current = requestAnimationFrame(() => {
-            rafRef.current = null;
-            window.dispatchEvent(new Event("resize"));
-          });
-        }
-      };
-
-      const onMouseUp = () => {
-        document.removeEventListener("mousemove", onMouseMove);
-        document.removeEventListener("mouseup", onMouseUp);
-        document.body.style.cursor = "";
-        document.body.style.userSelect = "";
-        setIsResizing(false);
-        if (rafRef.current != null) {
-          cancelAnimationFrame(rafRef.current);
-          rafRef.current = null;
-        }
-        window.dispatchEvent(new Event("resize"));
-      };
-
-      document.addEventListener("mousemove", onMouseMove);
-      document.addEventListener("mouseup", onMouseUp);
-      document.body.style.cursor = "col-resize";
-      document.body.style.userSelect = "none";
-    },
-    [sidebarWidth],
-  );
-
   const width = collapsed ? COLLAPSED_WIDTH : sidebarWidth;
   const transitionStyle = isResizing ? { transition: "none" as const } : undefined;
   return collapsed ? (
@@ -265,8 +246,8 @@ export function WorkspaceSidebar({
       </button>
     </div>
   ) : (
-    <div className={styles.sidebar} style={{ width, ...transitionStyle }}>
-      <div className={styles.inner} style={{ width }}>
+    <div ref={sidebarRef} className={styles.sidebar} style={{ width, ...transitionStyle }}>
+      <div ref={innerRef} className={styles.inner} style={{ width }}>
         <div className={styles.header}>
           <span className={styles.serif}>{t("workspaces", "工作区")}</span>
           <button
