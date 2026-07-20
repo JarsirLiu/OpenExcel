@@ -512,10 +512,22 @@ These files should be split by feature boundaries rather than by “one big page
 The web app should be structured as:
 
 - `App` owns only the top-level shell
+- `app/routes.tsx` owns the Browser History route tree and route-level error boundary
+- `app/loaders/*` owns authentication, workspace, and demo route data loading
+- `app/routePaths.ts` is the single source for application navigation paths
 - `Workbench` owns layout composition
 - `features/chat` owns chat workflow and message rendering
 - `features/workbook` owns workbook editing and import/export UI
 - `features/session` owns session list and title display
+
+The web app uses `createBrowserRouter`, not hash-based routing. Public routes resolve the current
+authentication state in a loader: the root, login, and register routes render the public auth page
+for anonymous users and redirect authenticated users to the default workspace. The protected route
+loader only authenticates the request; the workspace child loader owns workspace-specific data.
+Workspace changes and browser back/forward navigation are therefore URL transitions, not component
+state synchronization. Production static hosting must serve `index.html` as the fallback for deep
+frontend paths such as `/workspaces/:workspacePublicId`; this is a deployment requirement and is
+separate from workbook or chat behavior.
 
 ### 6.1.1 Recommended web directory layout
 

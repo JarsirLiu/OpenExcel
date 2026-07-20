@@ -37,7 +37,7 @@ vi.mock("./api/chat.js", () => ({
   fetchMessages: vi.fn().mockResolvedValue({ messages: [], total: 0 }),
 }));
 
-// Mock useRouteLoaderData for protected route (createHashRouter not compatible with jsdom)
+// Mock route loader data for the standalone page test.
 vi.mock("react-router-dom", async (importOriginal) => {
   const actual = await importOriginal<typeof import("react-router-dom")>();
   return {
@@ -51,7 +51,7 @@ vi.mock("react-router-dom", async (importOriginal) => {
   };
 });
 
-import App from "./App";
+import { AuthPage } from "./App";
 
 describe("App", () => {
   beforeEach(() => {
@@ -61,7 +61,7 @@ describe("App", () => {
   it("renders the public homepage at the root route", async () => {
     const { container } = render(
       <HashRouter>
-        <App />
+        <AuthPage mode="login" />
       </HashRouter>,
     );
     await waitFor(() => {

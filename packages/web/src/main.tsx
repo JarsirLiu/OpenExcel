@@ -1,52 +1,10 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { createHashRouter, Outlet, RouterProvider } from "react-router-dom";
-import { protectedLoader } from "./app/loaders/protectedLoader";
-import { workspaceLoader } from "./app/loaders/workspaceLoader";
-import { RouteErrorBoundary } from "./app/RouteErrorBoundary";
+import { RouterProvider } from "react-router-dom";
+import { router } from "./app/routes";
 import "./styles/tokens.css";
 import "./styles/theme.css";
 import "./index.css";
-import App from "./App";
-
-const router = createHashRouter([
-  {
-    path: "/",
-    element: <App />,
-  },
-  {
-    path: "/login",
-    element: <App />,
-  },
-  {
-    path: "/register",
-    element: <App />,
-  },
-  {
-    path: "/demos/inventory-reconciliation",
-    element: <App />,
-  },
-  {
-    id: "protected",
-    element: <Outlet />,
-    errorElement: <RouteErrorBoundary />,
-    loader: protectedLoader,
-    hydrateFallbackElement: null,
-    children: [
-      {
-        id: "workspace-route",
-        path: "workspaces/:workspacePublicId",
-        element: <App />,
-        loader: workspaceLoader,
-        hydrateFallbackElement: null,
-      },
-      {
-        path: "*",
-        element: <App />,
-      },
-    ],
-  },
-]);
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

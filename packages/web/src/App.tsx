@@ -1,12 +1,11 @@
-import { lazy, Suspense, useEffect } from "react";
-import { useLocation, useNavigate, useRouteLoaderData } from "react-router-dom";
+import { lazy, Suspense } from "react";
+import { Link, Outlet, useNavigate, useRouteLoaderData } from "react-router-dom";
 import { type CurrentUser, logout } from "@/api/auth";
 import { bootstrapWorkspace } from "@/api/workspaces";
 import type { WorkbenchRouteData } from "@/app/routeData";
+import { routePaths } from "@/app/routePaths";
 import { AuthScreen } from "@/features/auth/AuthScreen";
 import { useAuthState } from "@/features/auth/useAuthState";
-import { getDemoDefinition } from "@/features/demos/registry";
-import { DemoPage } from "@/features/demos/shell/DemoPage";
 import { SheetActivationProvider } from "@/features/workbook/editor/SheetActivationContext";
 import { t } from "@/lib/i18n";
 import { ConfirmDialog, Toast } from "@/shared/ui";
@@ -61,44 +60,35 @@ function LoadingScreen() {
   );
 }
 
-function AuthPage({ isHome = false }: { isHome?: boolean }) {
-  const auth = useAuthState();
+export function AuthPage({ mode }: { mode: "login" | "register" }) {
   const navigate = useNavigate();
-  const location = useLocation();
-
-  const authMode = location.pathname === "/register" ? "register" : "login";
+  const auth = useAuthState();
 
   async function enterWorkspace(userId: number) {
     const workspace = await bootstrapWorkspace(userId);
-    navigate(`/workspaces/${workspace.publicId}`, { replace: true });
+    navigate(routePaths.workspace(workspace.publicId), { replace: true });
   }
-
-  useEffect(() => {
-    if (!isHome && !auth.loading && auth.currentUser) {
-      void enterWorkspace(auth.currentUser.id);
-    }
-  }, [auth.currentUser, auth.loading, isHome]);
 
   async function handleLogin(input: { email: string; password: string }) {
     const user = await auth.signIn(input);
-    if (isHome) await enterWorkspace(user.id);
+    await enterWorkspace(user.id);
   }
 
   async function handleRegister(input: { email: string; password: string; displayName?: string }) {
     const user = await auth.signUp(input);
-    if (isHome) await enterWorkspace(user.id);
+    await enterWorkspace(user.id);
   }
 
   if (auth.loading) return <LoadingScreen />;
   return (
     <AuthScreen
-      mode={authMode}
+      mode={mode}
       submitting={auth.submitting}
       error={auth.error}
       onLogin={handleLogin}
       onRegister={handleRegister}
-      onSwitchMode={() => navigate(authMode === "login" ? "/register" : "/login")}
-      onOpenDemo={() => navigate("/demos/inventory-reconciliation")}
+      onSwitchMode={() => navigate(mode === "login" ? routePaths.register : routePaths.login)}
+      onOpenDemo={() => navigate(routePaths.demo("inventory-reconciliation"))}
     />
   );
 }
@@ -107,7 +97,7 @@ function useWorkbenchRouteData() {
   return useRouteLoaderData("workspace-route") as WorkbenchRouteData | undefined;
 }
 
-function WorkbenchPage() {
+export function WorkbenchPage() {
   const navigate = useNavigate();
   const protectedData = useRouteLoaderData("protected") as { currentUser: CurrentUser } | undefined;
 
@@ -121,7 +111,7 @@ function WorkbenchPage() {
   const handleLogout = async () => {
     await logout();
     clearSessionStorage();
-    navigate("/login", { replace: true });
+    navigate(routePaths.login, { replace: true });
   };
 
   return (
@@ -141,21 +131,28 @@ function WorkbenchPage() {
   );
 }
 
-export default function App() {
-  const location = useLocation();
-
-  if (location.pathname === "/") {
-    return <AuthPage isHome />;
-  }
-
-  if (location.pathname.startsWith("/demos/")) {
-    const demo = getDemoDefinition(location.pathname);
-    return demo ? <DemoPage scenario={demo} /> : <LoadingScreen />;
-  }
-
-  if (location.pathname === "/login" || location.pathname === "/register") {
-    return <AuthPage />;
-  }
-
-  return <WorkbenchPage />;
+export function AppShell() {
+  return <Outlet />;
 }
+
+export function NotFoundPage() {
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "grid",
+        placeItems: "center",
+        background: "var(--bg-page)",
+        color: "var(--text-primary)",
+      }}
+    >
+      <div style={{ textAlign: "center" }}>
+        <h1>404</h1>
+        <p>{t("page_not_found", "页面不存在")}</p>
+        <Link to={routePaths.home}>{t("back_home", "返回首页")}</Link>
+      </div>
+    </div>
+  );
+}
+
+export default AppShell;

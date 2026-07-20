@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { routePaths } from "@/app/routePaths";
 import workbenchStyles from "@/app/Workbench.module.css";
 import type { DemoDefinition } from "../runtime/replayTypes";
 import { useDemoReplay } from "../runtime/useDemoReplay";
@@ -25,7 +26,7 @@ export function DemoPage({ scenario }: { scenario: DemoDefinition }) {
         onStart={replay.start}
         onStop={replay.stop}
         onReset={replay.reset}
-        onLogout={() => navigate("/login")}
+        onLogout={() => navigate(routePaths.login)}
       />
     </div>
   );
