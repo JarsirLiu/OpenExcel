@@ -16,6 +16,8 @@ services:
       - PORT=4000
       - NODE_ENV=production
       - DATABASE_PROVIDER=sqlite
+      - DATABASE_URL=file:/app/.data/openexcel.db
+      - OPENEXCEL_STORAGE_ROOT=/app/.data/storage
     volumes:
       - openexcel-data:/app/.data
 

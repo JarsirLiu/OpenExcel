@@ -1,10 +1,9 @@
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
 import fastifyStatic from "@fastify/static";
 import Fastify from "fastify";
 import { pinoStream } from "./infra/observability/logger.js";
+import { webDistRoot } from "./infra/runtimePaths.js";
 import { localAssetStorage, MAX_UPLOAD_FILE_BYTES } from "./infra/storage/localFileStorage.js";
 import { responseLoggerHook, startTimerHook } from "./middleware/requestLogger.js";
 import { resolveUserHook } from "./middleware/resolveUser.js";
@@ -16,8 +15,6 @@ import { sessionRoutes } from "./modules/sessions/api/routes.js";
 import { sheetRoutes } from "./modules/sheets/api/routes.js";
 import { workbookRoutes } from "./modules/workbooks/api/routes.js";
 import { workspaceRoutes } from "./modules/workspaces/api/routes.js";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export async function createApp() {
   const app = Fastify({ logger: { stream: pinoStream, level: "info" } });
@@ -53,9 +50,8 @@ export async function createApp() {
   app.get("/api/health", async () => ({ status: "ok" }));
 
   // 生产环境：server 自 serve 前端静态文件
-  const webDist = resolve(__dirname, "../../web/dist");
   await app.register(fastifyStatic, {
-    root: webDist,
+    root: webDistRoot,
     prefix: "/",
     wildcard: false,
   });

@@ -2,22 +2,20 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { serverPackageRoot } from "../runtimePaths.js";
 import {
   type DatabaseProvider,
   getDefaultDatabaseUrl,
   loadDatabaseConfig,
 } from "./databaseConfig.js";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const packageRoot = resolve(__dirname, "../../..");
 const require = createRequire(import.meta.url);
 const prismaCliPath = require.resolve("prisma/build/index.js");
 
 const schemaByProvider: Record<DatabaseProvider, string> = {
-  sqlite: resolve(packageRoot, "prisma/schema.prisma"),
-  postgresql: resolve(packageRoot, "prisma/postgresql/schema.prisma"),
-  mysql: resolve(packageRoot, "prisma/mysql/schema.prisma"),
+  sqlite: resolve(serverPackageRoot, "prisma/schema.prisma"),
+  postgresql: resolve(serverPackageRoot, "prisma/postgresql/schema.prisma"),
+  mysql: resolve(serverPackageRoot, "prisma/mysql/schema.prisma"),
 };
 
 function ensureSqliteDatabaseFile(schemaPath: string, databaseUrl: string): void {
@@ -35,7 +33,7 @@ function ensureSqliteDatabaseFile(schemaPath: string, databaseUrl: string): void
 
 function runPrisma(args: string[], databaseUrl: string): void {
   const result = spawnSync(process.execPath, [prismaCliPath, ...args], {
-    cwd: packageRoot,
+    cwd: serverPackageRoot,
     stdio: "inherit",
     env: {
       ...process.env,

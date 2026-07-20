@@ -32,6 +32,8 @@ FROM node:22-alpine
 
 RUN corepack enable && corepack prepare pnpm@10.20.0 --activate
 WORKDIR /app
+ENV OPENEXCEL_STORAGE_ROOT=/app/.data/storage \
+    DATABASE_URL=file:/app/.data/openexcel.db
 
 COPY --from=build /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml ./
 COPY --from=build /app/packages/server/package.json ./packages/server/

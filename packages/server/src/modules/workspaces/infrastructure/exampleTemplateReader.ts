@@ -1,10 +1,9 @@
 import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import type { InitConfig } from "@openexcel/core";
+import { templatesRoot } from "../../../infra/runtimePaths.js";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const exampleTemplatePath = resolve(__dirname, "../../../../../../templates/init.json");
+const exampleTemplatePath = join(templatesRoot, "init.json");
 
 export function loadExampleTemplate(): InitConfig {
   const raw = readFileSync(exampleTemplatePath, "utf-8");

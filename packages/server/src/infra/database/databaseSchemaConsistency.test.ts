@@ -1,29 +1,26 @@
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const packageRoot = resolve(__dirname, "../../..");
+import { serverPackageRoot } from "../runtimePaths.js";
 
 const schemaFiles = [
   {
     provider: "sqlite",
-    schemaPath: resolve(packageRoot, "prisma/schema.prisma"),
+    schemaPath: resolve(serverPackageRoot, "prisma/schema.prisma"),
     outputPath: "./generated/sqlite/client",
-    migrationsPath: resolve(packageRoot, "prisma/migrations"),
+    migrationsPath: resolve(serverPackageRoot, "prisma/migrations"),
   },
   {
     provider: "postgresql",
-    schemaPath: resolve(packageRoot, "prisma/postgresql/schema.prisma"),
+    schemaPath: resolve(serverPackageRoot, "prisma/postgresql/schema.prisma"),
     outputPath: "../generated/postgresql/client",
-    migrationsPath: resolve(packageRoot, "prisma/postgresql/migrations"),
+    migrationsPath: resolve(serverPackageRoot, "prisma/postgresql/migrations"),
   },
   {
     provider: "mysql",
-    schemaPath: resolve(packageRoot, "prisma/mysql/schema.prisma"),
+    schemaPath: resolve(serverPackageRoot, "prisma/mysql/schema.prisma"),
     outputPath: "../generated/mysql/client",
-    migrationsPath: resolve(packageRoot, "prisma/mysql/migrations"),
+    migrationsPath: resolve(serverPackageRoot, "prisma/mysql/migrations"),
   },
 ] as const;
 

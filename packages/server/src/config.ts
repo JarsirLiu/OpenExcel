@@ -1,5 +1,3 @@
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import {
   DEFAULT_MAX_CONVERSATION_TURNS,
   DEFAULT_MAX_USER_INPUT_TOKENS,
@@ -8,11 +6,12 @@ import {
   DEFAULT_TOOL_RESULT_MAX_TOKENS,
 } from "@openexcel/agent";
 import { config as loadDotenv } from "dotenv";
+import { environmentFile } from "./infra/runtimePaths.js";
 
 export { loadStorageConfig } from "./infra/storage/storageConfig.js";
 
 loadDotenv({
-  path: resolve(dirname(fileURLToPath(import.meta.url)), "../../../.env"),
+  path: environmentFile,
 });
 
 export interface ModelConfig {

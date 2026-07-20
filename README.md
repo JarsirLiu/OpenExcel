@@ -102,7 +102,8 @@ docker build -t openexcel:local .
 docker compose up -d
 ```
 
-镜像构建阶段会生成 Prisma Client，容器启动阶段会自动执行数据库迁移；不需要在服务器上手动运行迁移命令。
+镜像构建阶段会生成 Prisma Client，容器启动阶段会自动执行数据库迁移；不需要在服务器上手动运行迁移命令。容器内的数据路径固定为
+`/app/.data/openexcel.db` 和 `/app/.data/storage`，两者都由 `openexcel-data` volume 持久化，不依赖容器启动时的工作目录。
 
 查看状态和日志：
 
