@@ -40,9 +40,11 @@ describe("inventoryReconciliation demo", () => {
   it("replays reads before writes and finishes with a verification read", () => {
     expect(inventoryTimeline.map((step) => step.toolName).filter(Boolean)).toEqual([
       "readSheetData",
-      "readSheetData",
+      "findSheetCells",
+      "findSheetCells",
       "readSheetData",
       "writeCells",
+      "readSheetData",
       "writeCells",
       "readSheetData",
     ]);
@@ -51,5 +53,9 @@ describe("inventoryReconciliation demo", () => {
     expect(
       inventoryTimeline.find((step) => step.id === "write-quantities")?.toolExecutionDuration,
     ).toBe(1320);
+
+    const reportRead = inventoryTimeline.find((step) => step.id === "read-report");
+    expect(reportRead?.toolOutput).toContain("O、P 列为 0");
+    expect(reportRead?.toolOutput).not.toContain("Q 列为空");
   });
 });

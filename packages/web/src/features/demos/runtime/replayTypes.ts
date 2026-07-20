@@ -2,6 +2,7 @@ export type DemoCell = {
   value: string | number;
   formula?: string;
   background?: string;
+  numberFormat?: string;
 };
 
 export type DemoSheet = {

@@ -4,11 +4,19 @@ const blue = "#00B0F0";
 const green = "#92D050";
 const yellow = "#FFFF00";
 
-const cell = (value: string | number, formula?: string, background?: string): DemoCell => ({
+const cell = (
+  value: string | number,
+  formula?: string,
+  background?: string,
+  numberFormat?: string,
+): DemoCell => ({
   value,
   ...(formula ? { formula } : {}),
   ...(background ? { background } : {}),
+  ...(numberFormat ? { numberFormat } : {}),
 });
+
+const moneyResult = (value: number) => Number(value.toFixed(2));
 
 type Product = {
   code: string;
@@ -282,7 +290,7 @@ const reportColumns = [
 ];
 
 const priceHeaderRow = priceColumns.map((value, index) =>
-  cell(value, undefined, [7, 10].includes(index + 1) ? blue : undefined),
+  cell(value, undefined, [8, 10].includes(index + 1) ? blue : undefined),
 );
 
 const priceRows: DemoCell[][] = [
@@ -411,7 +419,8 @@ const reportFormulaRow = (product: Product, rowNumber: number, filled = false): 
   const purchaseReturn = filled ? product.purchaseReturn : "";
   const retailReturn = filled ? product.retailReturn : "";
   const end = filled ? product.end : "";
-  const formulaValue = (value: number | string, formula: string) => cell(value, formula);
+  const formulaValue = (value: number | string, formula: string) =>
+    cell(value, formula, undefined, "0.00");
   return [
     cell(product.category),
     cell(product.name),
@@ -444,9 +453,11 @@ const reportFormulaRow = (product: Product, rowNumber: number, filled = false): 
     ),
     cell(0, undefined, green),
     cell(0, undefined, green),
-    formulaValue(
+    cell(
       filled ? end : "",
       `=E${rowNumber}-H${rowNumber}-J${rowNumber}+L${rowNumber}-O${rowNumber}`,
+      green,
+      "0.000",
     ),
     formulaValue(filled ? Number(product.cost) * product.end : "", `=D${rowNumber}*Q${rowNumber}`),
     cell(""),
@@ -471,7 +482,8 @@ const reportTotalRow = (filled = false): DemoCell[] => {
     18: ["=SUM(R3:R12)", filled ? 737.92 : ""],
   };
   for (const [column, [formula, value]] of Object.entries(totals)) {
-    values[Number(column) - 1] = cell(value, formula, yellow);
+    const numberFormat = column === "17" ? "0.000" : "0.00";
+    values[Number(column) - 1] = cell(value, formula, yellow, numberFormat);
   }
   return values;
 };
@@ -482,7 +494,7 @@ const quantityWorkbookName = "2.单品进销存20260516202238";
 const targetSheetName = "4月";
 
 export const inventoryReconciliationPrompt =
-  "请核对文件《3.超市产品进货、出货统计表-5.18》。以表3 B列产品名称为匹配键：从文件《1.系统单价表》中补齐表3的进货单价和销售单价，再从文件《2.单品进销存20260516202238》中补齐进货数量、退货数量、销售数量、零售退货入库数量和期末存量。保留金额、利润和期末金额公式，并检查匹配结果。";
+  '要求：1.根据表3《超市产品进货、出货统计表》中B列产品名称，在表1《系统单价表》中找到对应商品，将"成本价"和"售价"（表中蓝色部分），匹配到表3的"进货单价"和"销售单价"单元格中。\n2.根据表3《超市产品进货、出货统计表》中B列产品名称，在表2《单品进销存表》中找到对应商品，将"采购进货数量、退货数量、销售数量、退货入库数量、期末数量"，匹配到表3的"进货数量"等单元格中(详见表中绿色部分）。';
 
 export const inventoryInitialWorkbooks: DemoWorkbook[] = [
   {
@@ -522,15 +534,20 @@ const pricePatches: DemoPatch[] = products.map((product, index) => ({
   values: [
     cell(product.cost, undefined, blue),
     cell("", undefined, green),
-    cell("", `=D${index + 3}*E${index + 3}`),
+    cell("", `=D${index + 3}*E${index + 3}`, undefined, "0.00"),
     cell(product.sale, undefined, blue),
     cell("", undefined, green),
-    cell("", `=G${index + 3}*H${index + 3}`),
+    cell("", `=G${index + 3}*H${index + 3}`, undefined, "0.00"),
     cell("", undefined, green),
-    cell("", `=D${index + 3}*J${index + 3}`),
+    cell("", `=D${index + 3}*J${index + 3}`, undefined, "0.00"),
     cell("", undefined, green),
-    cell("", `=D${index + 3}*L${index + 3}`),
-    cell(Number(product.sale) - Number(product.cost), `=G${index + 3}-D${index + 3}`),
+    cell("", `=D${index + 3}*L${index + 3}`, undefined, "0.00"),
+    cell(
+      moneyResult(Number(product.sale) - Number(product.cost)),
+      `=G${index + 3}-D${index + 3}`,
+      undefined,
+      "0.00",
+    ),
   ],
 }));
 
@@ -543,18 +560,54 @@ const quantityPatches: DemoPatch[] = products.map((product, index) => {
     startCol: 5,
     values: [
       cell(product.purchase, undefined, green),
-      cell(Number(product.cost) * product.purchase, `=D${rowNumber}*E${rowNumber}`),
+      cell(
+        moneyResult(Number(product.cost) * product.purchase),
+        `=D${rowNumber}*E${rowNumber}`,
+        undefined,
+        "0.00",
+      ),
       cell(product.sale, undefined, blue),
       cell(product.sales, undefined, green),
-      cell(Number(product.sale) * product.sales, `=G${rowNumber}*H${rowNumber}`),
+      cell(
+        moneyResult(Number(product.sale) * product.sales),
+        `=G${rowNumber}*H${rowNumber}`,
+        undefined,
+        "0.00",
+      ),
       cell(product.purchaseReturn, undefined, green),
-      cell(Number(product.cost) * product.purchaseReturn, `=D${rowNumber}*J${rowNumber}`),
+      cell(
+        moneyResult(Number(product.cost) * product.purchaseReturn),
+        `=D${rowNumber}*J${rowNumber}`,
+        undefined,
+        "0.00",
+      ),
       cell(product.retailReturn, undefined, green),
-      cell(Number(product.cost) * product.retailReturn, `=D${rowNumber}*L${rowNumber}`),
-      cell(Number(product.sale) - Number(product.cost), `=G${rowNumber}-D${rowNumber}`),
+      cell(
+        moneyResult(Number(product.cost) * product.retailReturn),
+        `=D${rowNumber}*L${rowNumber}`,
+        undefined,
+        "0.00",
+      ),
+      cell(
+        moneyResult(Number(product.sale) - Number(product.cost)),
+        `=G${rowNumber}-D${rowNumber}`,
+        undefined,
+        "0.00",
+      ),
       cell(0, undefined, green),
       cell(0, undefined, green),
-      cell(product.end, `=E${rowNumber}-H${rowNumber}-J${rowNumber}+L${rowNumber}-O${rowNumber}`),
+      cell(
+        product.end,
+        `=E${rowNumber}-H${rowNumber}-J${rowNumber}+L${rowNumber}-O${rowNumber}`,
+        green,
+        "0.000",
+      ),
+      cell(
+        moneyResult(Number(product.cost) * product.end),
+        `=D${rowNumber}*Q${rowNumber}`,
+        undefined,
+        "0.00",
+      ),
     ],
   };
 });
@@ -563,16 +616,53 @@ export const inventoryTimeline: DemoStep[] = [
   {
     id: "read-report",
     phase: "分析",
-    title: "读取表3核对表",
+    title: "读取表3结构",
     toolName: "readSheetData",
-    toolInput: `读取文件《${targetWorkbookName}》的 Sheet「${targetSheetName}」A1:S14，识别产品名称和待补齐列`,
+    toolInput: `读取文件《${targetWorkbookName}》的 Sheet「${targetSheetName}」A1:S14，识别产品名称列与待补齐列`,
     toolOutput:
-      "读取 10 条商品记录；表3的价格列和 5 个数量匹配列为空，金额、利润和期末金额公式已保留",
-    assistantText: "我先读取表3核对表，确认产品名称在 B 列，并标记蓝色价格列和绿色数量列。",
-    tokens: ["我先读取表3核对表，确认产品名称在 B 列，并标记蓝色价格列和绿色数量列。"],
+      "读取 10 条商品记录；B 列为产品名称；D、E、G、H、J、L 列为空，O、P 列为 0，F、I、K、M、N、Q、R 列保留金额/利润/期末公式",
+    assistantText:
+      "我先读取表3《超市产品进货、出货统计表》的结构，确认 B 列是产品名称，并识别哪些列当前为空、哪些列已经带公式。",
+    tokens: [
+      "我先读取表3《超市产品进货、出货统计表》的结构，确认 B 列是产品名称，并识别哪些列当前为空、哪些列已经带公式。",
+    ],
     activeWorkbook: targetWorkbookName,
     activeSheet: targetSheetName,
     highlight: "A1:S14",
+  },
+  {
+    id: "find-blue-cells",
+    phase: "分析",
+    title: "定位表3蓝色单价列",
+    toolName: "findSheetCells",
+    toolInput: "在表3 A1:S14 中查找 style.fill 为蓝色的单元格，定位用户提到的「蓝色部分」单价列",
+    toolOutput: "命中 2 片区域：D2:D12（进货单价）和 G2:G12（销售单价），共 22 个蓝色单元格",
+    assistantText:
+      "用户在需求里提到「蓝色部分」对应单价列。readSheetData 不返回样式，我用 findSheetCells 按填充色定位到 D 列进货单价和 G 列销售单价是蓝色。",
+    tokens: [
+      "用户在需求里提到「蓝色部分」对应单价列。readSheetData 不返回样式，我用 findSheetCells 按填充色定位到 D 列进货单价和 G 列销售单价是蓝色。",
+    ],
+    activeWorkbook: targetWorkbookName,
+    activeSheet: targetSheetName,
+    highlight: "D2:G12",
+    toolExecutionDuration: 560,
+  },
+  {
+    id: "find-green-cells",
+    phase: "分析",
+    title: "定位表3绿色数量列",
+    toolName: "findSheetCells",
+    toolInput: "在表3 A1:S14 中查找 style.fill 为绿色的单元格，定位用户提到的「绿色部分」数量列",
+    toolOutput: "命中 7 片区域：E2:E12、H2:H12、J2:J12、L2:L12、O2:O12、P2:P12、Q2:Q12",
+    assistantText:
+      "同样用 findSheetCells 定位绿色单元格：E(进货)、H(销售)、J(退货)、L(零售退货入库)、O(成本调整数量)、P(成本调整金额)、Q(期末存量) 共 7 列为绿色数量区域。",
+    tokens: [
+      "同样用 findSheetCells 定位绿色单元格：E(进货)、H(销售)、J(退货)、L(零售退货入库)、O(成本调整数量)、P(成本调整金额)、Q(期末存量) 共 7 列为绿色数量区域。",
+    ],
+    activeWorkbook: targetWorkbookName,
+    activeSheet: targetSheetName,
+    highlight: "E2:Q12",
+    toolExecutionDuration: 560,
   },
   {
     id: "read-prices",
@@ -580,38 +670,28 @@ export const inventoryTimeline: DemoStep[] = [
     title: "读取表1系统单价",
     toolName: "readSheetData",
     toolInput: `读取文件《${priceWorkbookName}》的 Sheet「库存查询」A1:R13，按商品名称建立成本价和售价索引`,
-    toolOutput: "读取原始系统单价表的 10 条商品记录，成本价位于 H 列，售价位于 J 列",
-    assistantText: "再读取独立的表1系统单价文件，按商品名称提取 H 列成本价和 J 列售价。",
-    tokens: ["再读取独立的表1系统单价文件，按商品名称提取 H 列成本价和 J 列售价。"],
+    toolOutput: "读取 10 条商品记录；D 列为商品名称，H 列为成本价，J 列为售价",
+    assistantText:
+      "读取表1《系统单价表》，按 D 列商品名称建立索引：H 列成本价对应表3 D 列进货单价；J 列售价对应表3 G 列销售单价。",
+    tokens: [
+      "读取表1《系统单价表》，按 D 列商品名称建立索引：H 列成本价对应表3 D 列进货单价；J 列售价对应表3 G 列销售单价。",
+    ],
     activeWorkbook: priceWorkbookName,
     activeSheet: "库存查询",
     highlight: "A1:R13",
-  },
-  {
-    id: "read-quantities",
-    phase: "分析",
-    title: "读取表2单品进销存",
-    toolName: "readSheetData",
-    toolInput: `读取文件《${quantityWorkbookName}》的 Sheet「单品进销存」A1:AS12，提取 M、O、AG、AI、AR 列`,
-    toolOutput: "读取原始单品进销存文件的 10 条商品记录，数量字段均可按商品名称匹配",
-    assistantText:
-      "最后读取独立的表2单品进销存文件，提取采购进货、采购退货、零售退货入库、零售销售和期末数量。",
-    tokens: [
-      "最后读取独立的表2单品进销存文件，提取采购进货、采购退货、零售退货入库、零售销售和期末数量。",
-    ],
-    activeWorkbook: quantityWorkbookName,
-    activeSheet: "单品进销存",
-    highlight: "A1:AS12",
   },
   {
     id: "write-prices",
     phase: "写入",
     title: "写入表3价格",
     toolName: "writeCells",
-    toolInput: "以表3 B列商品名称匹配表1，写入表3 D3:D12 进货单价和 G3:G12 销售单价",
-    toolOutput: "已匹配 10 个商品的成本价和售价；利润公式随价格写入后立即更新",
-    assistantText: "价格索引已建立。我先把表1的成本价和售价写回表3，保留原有利润公式。",
-    tokens: ["价格索引已建立。我先把表1的成本价和售价写回表3，保留原有利润公式。"],
+    toolInput: "以表3 B列商品名称匹配表1 D列，写入表3 D3:D12 进货单价和 G3:G12 销售单价",
+    toolOutput: "已匹配 10 个商品的成本价和售价；F、I、N 列金额和利润公式随价格写入后自动重算",
+    assistantText:
+      "匹配完成。将表1 成本价写入 D3:D12，售价写入 G3:G12。蓝色单价列补齐后，F、I、N 列的金额和利润公式同步刷新。",
+    tokens: [
+      "匹配完成。将表1 成本价写入 D3:D12，售价写入 G3:G12。蓝色单价列补齐后，F、I、N 列的金额和利润公式同步刷新。",
+    ],
     activeWorkbook: targetWorkbookName,
     activeSheet: targetSheetName,
     highlight: "D2:N12",
@@ -619,16 +699,35 @@ export const inventoryTimeline: DemoStep[] = [
     patch: pricePatches,
   },
   {
+    id: "read-quantities",
+    phase: "分析",
+    title: "读取表2单品进销存",
+    toolName: "readSheetData",
+    toolInput: `读取文件《${quantityWorkbookName}》的 Sheet「单品进销存」A1:AS12，提取 M、O、AG、AI、AR 列`,
+    toolOutput:
+      "读取 10 条商品记录；C 列为商品名称；M(采购进货)、O(采购退货)、AG(零售退货入库)、AI(零售销售出库)、AR(期末数量) 五列均可按商品名称匹配",
+    assistantText:
+      "读取表2《单品进销存表》，按 C 列商品名称匹配。需要提取 M(采购进货)、O(采购退货)、AG(零售退货入库)、AI(零售销售出库)、AR(期末数量) 五个数量列。",
+    tokens: [
+      "读取表2《单品进销存表》，按 C 列商品名称匹配。需要提取 M(采购进货)、O(采购退货)、AG(零售退货入库)、AI(零售销售出库)、AR(期末数量) 五个数量列。",
+    ],
+    activeWorkbook: quantityWorkbookName,
+    activeSheet: "单品进销存",
+    highlight: "A1:AS12",
+  },
+  {
     id: "write-quantities",
     phase: "写入",
     title: "写入表3数量",
     toolName: "writeCells",
-    toolInput: "以表3 B列商品名称匹配表2，写入表3 E、H、J、L、Q 列，并更新金额和期末存量公式",
+    toolInput: "以表3 B列商品名称匹配表2 C列，写入表3 E、H、J、L、Q 列，并刷新金额和期末存量公式",
     toolOutput:
-      "已写入 50 个数量字段；进货金额、销售金额、退货金额、零售退货金额、期末存量和期末金额已同步计算",
+      "已写入 50 个数量字段；进货/销售/退货/零售退货/期末金额公式同步刷新；合计行 SUM 公式重算",
     assistantText:
-      "价格核对完成。现在把表2的五类数量写入表3，让金额、利润、期末存量和合计公式落地。",
-    tokens: ["价格核对完成。现在把表2的五类数量写入表3，让金额、利润、期末存量和合计公式落地。"],
+      "将表2 五类数量写入表3 绿色区域：E(进货)、H(销售)、J(退货)、L(零售退货入库)、Q(期末存量)。O、P 列保留为 0。金额、利润、期末金额、合计行公式落地。",
+    tokens: [
+      "将表2 五类数量写入表3 绿色区域：E(进货)、H(销售)、J(退货)、L(零售退货入库)、Q(期末存量)。O、P 列保留为 0。金额、利润、期末金额、合计行公式落地。",
+    ],
     activeWorkbook: targetWorkbookName,
     activeSheet: targetSheetName,
     highlight: "E2:R13",
@@ -650,11 +749,12 @@ export const inventoryTimeline: DemoStep[] = [
     title: "复核表3结果",
     toolName: "readSheetData",
     toolInput: `重新读取文件《${targetWorkbookName}》的 Sheet「${targetSheetName}」D2:R13，检查匹配列和公式列`,
-    toolOutput: "10 个商品均完成匹配；天利肉松面包、沙琪玛的采购退货已保留，期末存量按公式为 0",
+    toolOutput:
+      "10 个商品价格与数量全部匹配；天利肉松面包、沙琪玛因采购退货造成期末存量为 0，公式计算正确",
     assistantText:
-      "我重新读取表3结果区域，确认三个独立文件之间的商品名称全部匹配，并保留采购退货造成的库存变化。",
+      "重新读取表3 D2:R13 复核：10 个商品价格与数量全部匹配；天利肉松面包、沙琪玛因采购退货造成期末存量为 0，公式计算正确。",
     tokens: [
-      "我重新读取表3结果区域，确认三个独立文件之间的商品名称全部匹配，并保留采购退货造成的库存变化。",
+      "重新读取表3 D2:R13 复核：10 个商品价格与数量全部匹配；天利肉松面包、沙琪玛因采购退货造成期末存量为 0，公式计算正确。",
     ],
     activeWorkbook: targetWorkbookName,
     activeSheet: targetSheetName,
@@ -665,9 +765,9 @@ export const inventoryTimeline: DemoStep[] = [
     phase: "完成",
     title: "完成三表核对",
     assistantText:
-      "三表核对完成。表1和表2保持独立文件，表3已按商品名称写入价格与数量，金额、利润、期末存量和合计继续使用公式。",
+      "三表核对完成：表1 提供 D、G 列单价（蓝）；表2 提供 E、H、J、L、Q 列数量（绿）；表3 金额、利润、期末金额与合计行均保留公式。",
     tokens: [
-      "三表核对完成。表1和表2保持独立文件，表3已按商品名称写入价格与数量，金额、利润、期末存量和合计继续使用公式。",
+      "三表核对完成：表1 提供 D、G 列单价（蓝）；表2 提供 E、H、J、L、Q 列数量（绿）；表3 金额、利润、期末金额与合计行均保留公式。",
     ],
     activeWorkbook: targetWorkbookName,
     activeSheet: targetSheetName,
