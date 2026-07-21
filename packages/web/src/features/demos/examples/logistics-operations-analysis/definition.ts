@@ -5,6 +5,16 @@ const percent = (value: number) => demoCell(value, { numberFormat: "0.0%" });
 
 export const logisticsOperationsAnalysisDemo = createAnalysisScenario({
   id: "logistics-operations-analysis",
+  marketing: {
+    category: "运营",
+    marketingTitle: "物流运营分析",
+    summary: "分析线路时效、运输成本和异常签收，在同一张表里发现需要优先治理的路线。",
+    coverImage: "/demo-covers/logistics-operations.webp",
+    coverAlt: "物流园区中排列整齐的货运卡车",
+    proofMetric: "6 条线路 · 准时率诊断",
+    featuredOrder: 6,
+    theme: "slate",
+  },
   workspaceId: -200,
   workspaceName: "物流分析演示",
   sessionName: "物流运营分析 Demo",

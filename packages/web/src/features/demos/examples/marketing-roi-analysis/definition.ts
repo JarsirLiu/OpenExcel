@@ -5,6 +5,16 @@ const percent = (value: number) => demoCell(value, { numberFormat: "0.0%" });
 
 export const marketingRoiAnalysisDemo = createAnalysisScenario({
   id: "marketing-roi-analysis",
+  marketing: {
+    category: "销售",
+    marketingTitle: "营销 ROI 分析",
+    summary: "贯通投放、线索、订单和收入，判断哪些渠道真正带来回报，哪些预算应该收缩。",
+    coverImage: "/demo-covers/marketing-roi.webp",
+    coverAlt: "桌面上的营销图表、笔记本和分析工具",
+    proofMetric: "5 个渠道 · ROI 4.22",
+    featuredOrder: 4,
+    theme: "sage",
+  },
   workspaceId: -180,
   workspaceName: "营销分析演示",
   sessionName: "多渠道广告投放 ROI 分析 Demo",

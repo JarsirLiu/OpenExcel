@@ -4,6 +4,16 @@ const money = (value: number) => demoCell(value, { numberFormat: "#,##0.00" });
 
 export const investmentBudgetReviewDemo = createAnalysisScenario({
   id: "investment-budget-review",
+  marketing: {
+    category: "财务",
+    marketingTitle: "投资预算审查",
+    summary: "逐项重算工程预算和资金来源，识别超预算项目、账面差异与资金缺口。",
+    coverImage: "/demo-covers/investment-budget.webp",
+    coverAlt: "工程人员在施工现场讨论项目计划",
+    proofMetric: "6 个项目 · 逐项重算",
+    featuredOrder: 7,
+    theme: "sand",
+  },
   workspaceId: -120,
   workspaceName: "投资分析演示",
   sessionName: "投资核算审核 Demo",

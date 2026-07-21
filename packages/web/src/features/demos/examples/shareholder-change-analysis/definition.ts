@@ -5,6 +5,16 @@ const percent = (value: number) => demoCell(value, { numberFormat: "0.00%" });
 
 export const shareholderChangeAnalysisDemo = createAnalysisScenario({
   id: "shareholder-change-analysis",
+  marketing: {
+    category: "财务",
+    marketingTitle: "股东变更分析",
+    summary: "自动匹配两期股东名册，还原新进、退出、增持和减持，以及股权集中度变化。",
+    coverImage: "/demo-covers/shareholder-change.webp",
+    coverAlt: "商务团队在会议桌旁分析企业资料",
+    proofMetric: "两期名册 · 4 类变动",
+    featuredOrder: 8,
+    theme: "slate",
+  },
   workspaceId: -140,
   workspaceName: "股权分析演示",
   sessionName: "股东名单变动分析 Demo",

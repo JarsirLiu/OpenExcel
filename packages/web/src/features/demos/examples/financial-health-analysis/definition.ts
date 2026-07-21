@@ -5,6 +5,16 @@ const percent = (value: number) => demoCell(value, { numberFormat: "0.0%" });
 
 export const financialHealthAnalysisDemo = createAnalysisScenario({
   id: "financial-health-analysis",
+  marketing: {
+    category: "财务",
+    marketingTitle: "企业财务健康分析",
+    summary: "快速发现现金流、利润与偿债风险，把分散报表变成一张可执行的经营诊断。",
+    coverImage: "/demo-covers/financial-health.webp",
+    coverAlt: "团队在桌面上讨论财务图表和经营数据",
+    proofMetric: "5 类核心指标 · 2 项风险",
+    featuredOrder: 1,
+    theme: "sage",
+  },
   workspaceId: -130,
   workspaceName: "财务分析演示",
   sessionName: "公司财务状况分析 Demo",

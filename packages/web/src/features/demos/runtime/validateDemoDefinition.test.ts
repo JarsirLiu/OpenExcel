@@ -6,6 +6,16 @@ function definition(overrides: Partial<DemoDefinition> = {}): DemoDefinition {
   return {
     id: "demo",
     route: "/demos/demo",
+    marketing: {
+      category: "财务",
+      marketingTitle: "演示案例",
+      summary: "用于测试演示定义。",
+      coverImage: "/demo-covers/test.webp",
+      coverAlt: "测试封面",
+      proofMetric: "1 项测试",
+      featuredOrder: 1,
+      theme: "sage",
+    },
     workspace: { id: 1, publicId: "demo", name: "Demo", order: 0 },
     sessionName: "Demo",
     prompt: "核查数据",

@@ -4,6 +4,16 @@ const score = (value: number) => demoCell(value, { numberFormat: "0.0" });
 
 export const examScoreAnalysisDemo = createAnalysisScenario({
   id: "exam-score-analysis",
+  marketing: {
+    category: "教育",
+    marketingTitle: "考试成绩分析",
+    summary: "对比多次考试趋势，找出持续进步、明显下滑和每位学生最需要补强的科目。",
+    coverImage: "/demo-covers/exam-score.webp",
+    coverAlt: "学生在自然光照射的教室中专注参加考试",
+    proofMetric: "3 次考试 · 个性化建议",
+    featuredOrder: 10,
+    theme: "sand",
+  },
   workspaceId: -190,
   workspaceName: "教育分析演示",
   sessionName: "多次考试成绩分析 Demo",

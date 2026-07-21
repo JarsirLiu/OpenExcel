@@ -4,6 +4,16 @@ const money = (value: number) => demoCell(value, { numberFormat: "#,##0.00" });
 
 export const orderFulfillmentAnalysisDemo = createAnalysisScenario({
   id: "order-fulfillment-analysis",
+  marketing: {
+    category: "运营",
+    marketingTitle: "订单履约分析",
+    summary: "沿着创建、发货、交付和回款全流程，定位延期、缺货、未回款与低毛利订单。",
+    coverImage: "/demo-covers/order-fulfillment.webp",
+    coverAlt: "整齐排列货物与纸箱的仓库通道",
+    proofMetric: "全流程追踪 · 4 类预警",
+    featuredOrder: 5,
+    theme: "sand",
+  },
   workspaceId: -160,
   workspaceName: "订单管理演示",
   sessionName: "订单履约风险分析 Demo",

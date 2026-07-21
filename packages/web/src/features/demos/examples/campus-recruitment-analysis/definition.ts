@@ -4,6 +4,16 @@ const percent = (value: number) => demoCell(value, { numberFormat: "0.0%" });
 
 export const campusRecruitmentAnalysisDemo = createAnalysisScenario({
   id: "campus-recruitment-analysis",
+  marketing: {
+    category: "人力",
+    marketingTitle: "校园招聘分析",
+    summary: "比较渠道、岗位和候选人漏斗，找到高效来源与简历、笔试、面试中的流失环节。",
+    coverImage: "/demo-covers/campus-recruitment.webp",
+    coverAlt: "招聘人员与候选人在办公室进行面试",
+    proofMetric: "5 个渠道 · 6 层漏斗",
+    featuredOrder: 9,
+    theme: "sage",
+  },
   workspaceId: -150,
   workspaceName: "人力分析演示",
   sessionName: "校招简历投递综合分析 Demo",

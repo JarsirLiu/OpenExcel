@@ -1,6 +1,7 @@
 import type {
   DemoCell,
   DemoDefinition,
+  DemoMarketing,
   DemoPatch,
   DemoSheet,
   DemoStep,
@@ -48,6 +49,7 @@ type AnalysisStep = {
 
 type AnalysisScenarioConfig = {
   id: string;
+  marketing: DemoMarketing;
   workspaceId: number;
   workspaceName: string;
   sessionName: string;
@@ -150,6 +152,7 @@ export function createAnalysisScenario(config: AnalysisScenarioConfig): DemoDefi
   return {
     id: config.id,
     route: `/demos/${config.id}`,
+    marketing: config.marketing,
     workspace: {
       id: config.workspaceId,
       publicId: `demo-${config.id}`,

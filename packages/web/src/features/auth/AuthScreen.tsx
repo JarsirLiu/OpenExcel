@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/Button/Button";
 import { Input } from "@/components/ui/Input/Input";
 import { t } from "@/lib/i18n";
 import styles from "./AuthScreen.module.css";
+import { MarketingShowcase } from "./MarketingShowcase";
 
 export type AuthMode = "login" | "register";
 
@@ -17,9 +18,7 @@ type Props = {
     displayName?: string;
   }) => Promise<unknown>;
   onSwitchMode: () => void;
-  onOpenDemo: () => void;
-  onOpenBankDemo: () => void;
-  onOpenDemoCatalog: () => void;
+  showMarketing?: boolean;
 };
 
 export function AuthScreen({
@@ -29,9 +28,7 @@ export function AuthScreen({
   onLogin,
   onRegister,
   onSwitchMode,
-  onOpenDemo,
-  onOpenBankDemo,
-  onOpenDemoCatalog,
+  showMarketing = false,
 }: Props) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -82,7 +79,7 @@ export function AuthScreen({
             {mode === "register" && (
               <Input
                 value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
+                onChange={(event) => setDisplayName(event.target.value)}
                 placeholder={t("display_name", "显示名称")}
                 autoComplete="name"
               />
@@ -90,7 +87,7 @@ export function AuthScreen({
 
             <Input
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(event) => setEmail(event.target.value)}
               placeholder={t("email", "邮箱地址")}
               type="email"
               autoComplete="email"
@@ -99,7 +96,7 @@ export function AuthScreen({
 
             <Input
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(event) => setPassword(event.target.value)}
               placeholder={t("password", "密码")}
               type="password"
               autoComplete={mode === "login" ? "current-password" : "new-password"}
@@ -164,130 +161,7 @@ export function AuthScreen({
         </div>
       </div>
 
-      <section className={styles.demosSection}>
-        <div className={styles.demosHeader}>
-          <span className={styles.demosEyebrow}>AI Excel 案例</span>
-          <button className={styles.demosLink} type="button" onClick={onOpenDemoCatalog}>
-            选择案例 <span aria-hidden="true">{"\u2193"}</span>
-          </button>
-        </div>
-        <div className={styles.demosGrid}>
-          <div className={styles.demoCard} onClick={onOpenBankDemo}>
-            <div className={styles.demoCardLeft}>
-              <div className={styles.previewSheet}>
-                <div className={styles.previewHead}>
-                  <span>银行流水核查表</span>
-                  <span className={styles.previewTag}>审计示例</span>
-                </div>
-                <div className={styles.previewTable}>
-                  <div className={styles.previewTableHead}>
-                    <span>流水号</span>
-                    <span>交易摘要</span>
-                    <span>金额</span>
-                    <span>核查状态</span>
-                  </div>
-                  <div className={styles.previewTableRow}>
-                    <span>...003</span>
-                    <span>项目回款</span>
-                    <span>560,000</span>
-                    <span className="status-pending">大额</span>
-                  </div>
-                  <div className={styles.previewTableRow}>
-                    <span>...005</span>
-                    <span>咨询服务费</span>
-                    <span>25,000</span>
-                    <span className="status-partial">重复</span>
-                  </div>
-                  <div className={styles.previewTableRow}>
-                    <span>...009</span>
-                    <span>物流费用</span>
-                    <span>42,000</span>
-                    <span className="status-pending">余额异常</span>
-                  </div>
-                  <div className={styles.previewTableRow}>
-                    <span>...010</span>
-                    <span>临时借款</span>
-                    <span>300,000</span>
-                    <span className="status-pending">高风险</span>
-                  </div>
-                  <div className={styles.previewTableRow}>
-                    <span>...001</span>
-                    <span>销售货款</span>
-                    <span>180,000</span>
-                    <span className="status-paid">正常</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className={styles.demoCardRight}>
-              <span className={styles.demoTag}>财务审计</span>
-              <h3>银行流水智能核查</h3>
-              <p>自动检查重复流水、字段缺失、收支逻辑、余额连续性和大额异常交易。</p>
-              <button className={styles.demoCta} type="button">
-                播放 AI 回放
-                <span aria-hidden="true">{"\u2197"}</span>
-              </button>
-            </div>
-          </div>
-          <div className={styles.demoCard} onClick={onOpenDemo}>
-            <div className={styles.demoCardLeft}>
-              <div className={styles.previewSheet}>
-                <div className={styles.previewHead}>
-                  <span>进销存核对表</span>
-                  <span className={styles.previewTag}>示例数据</span>
-                </div>
-                <div className={styles.previewTable}>
-                  <div className={styles.previewTableHead}>
-                    <span>产品名称</span>
-                    <span>进货单价</span>
-                    <span>销售数量</span>
-                    <span>期末存量</span>
-                  </div>
-                  <div className={styles.previewTableRow}>
-                    <span>雪碧碳酸饮料</span>
-                    <span>2.42</span>
-                    <span>8</span>
-                    <span className="status-paid">40</span>
-                  </div>
-                  <div className={styles.previewTableRow}>
-                    <span>蒙牛纯牛奶</span>
-                    <span>2.30</span>
-                    <span>6</span>
-                    <span className="status-paid">66</span>
-                  </div>
-                  <div className={styles.previewTableRow}>
-                    <span>天利肉松面包</span>
-                    <span>1.50</span>
-                    <span>1</span>
-                    <span className="status-pending">0</span>
-                  </div>
-                  <div className={styles.previewTableRow}>
-                    <span>沙琪玛</span>
-                    <span>8.00</span>
-                    <span>2</span>
-                    <span className="status-pending">0</span>
-                  </div>
-                  <div className={styles.previewTableRow}>
-                    <span>粉丝馆够味酸辣粉</span>
-                    <span>3.98</span>
-                    <span>8</span>
-                    <span className="status-paid">40</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className={styles.demoCardRight}>
-              <span className={styles.demoTag}>进销存核对</span>
-              <h3>超市进货、出货数据核对</h3>
-              <p>从系统单价表和单品进销存表匹配价格与数量，自动补齐核对表并保留公式。</p>
-              <button className={styles.demoCta} type="button">
-                播放 AI 回放
-                <span aria-hidden="true">{"\u2197"}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
+      {showMarketing && <MarketingShowcase />}
     </div>
   );
 }

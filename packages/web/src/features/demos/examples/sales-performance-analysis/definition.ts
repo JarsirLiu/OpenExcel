@@ -5,6 +5,16 @@ const percent = (value: number) => demoCell(value, { numberFormat: "0.0%" });
 
 export const salesPerformanceAnalysisDemo = createAnalysisScenario({
   id: "sales-performance-analysis",
+  marketing: {
+    category: "销售",
+    marketingTitle: "销售业绩分析",
+    summary: "对比区域、人员和产品表现，找出增长机会、业绩短板与下一步跟进动作。",
+    coverImage: "/demo-covers/sales-performance.webp",
+    coverAlt: "销售团队围桌讨论本月业绩",
+    proofMetric: "5 个区域 · 6 条行动建议",
+    featuredOrder: 3,
+    theme: "slate",
+  },
   workspaceId: -170,
   workspaceName: "销售分析演示",
   sessionName: "销售经营分析 Demo",

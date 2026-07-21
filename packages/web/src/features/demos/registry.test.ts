@@ -22,4 +22,18 @@ describe("demo registry", () => {
   it("does not fall back to another demo for an unknown route", () => {
     expect(getDemoDefinition("/demos/student-fee-reconciliation")).toBeNull();
   });
+
+  it("provides complete, uniquely ordered marketing metadata", () => {
+    const demos = Object.values(demoRegistry);
+    expect(demos).toHaveLength(11);
+    expect(new Set(demos.map((demo) => demo.marketing.featuredOrder)).size).toBe(demos.length);
+
+    for (const demo of demos) {
+      expect(demo.marketing.marketingTitle.length).toBeGreaterThan(0);
+      expect(demo.marketing.summary.length).toBeGreaterThan(0);
+      expect(demo.marketing.coverImage).toMatch(/^\/demo-covers\/.+\.webp$/);
+      expect(demo.marketing.coverAlt.length).toBeGreaterThan(0);
+      expect(demo.marketing.proofMetric.length).toBeGreaterThan(0);
+    }
+  });
 });
