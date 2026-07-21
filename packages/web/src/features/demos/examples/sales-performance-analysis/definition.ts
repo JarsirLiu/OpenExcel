@@ -12,7 +12,7 @@ export const salesPerformanceAnalysisDemo = createAnalysisScenario({
     coverImage: "/demo-covers/sales-performance.webp",
     coverAlt: "销售团队围桌讨论本月业绩",
     proofMetric: "5 个区域 · 6 条行动建议",
-    featuredOrder: 6,
+    featuredOrder: 7,
     theme: "slate",
   },
   workspaceId: -170,

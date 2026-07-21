@@ -11,7 +11,7 @@ export const orderFulfillmentAnalysisDemo = createAnalysisScenario({
     coverImage: "/demo-covers/order-fulfillment.webp",
     coverAlt: "整齐排列货物与纸箱的仓库通道",
     proofMetric: "全流程追踪 · 4 类预警",
-    featuredOrder: 8,
+    featuredOrder: 9,
     theme: "sand",
   },
   workspaceId: -160,

@@ -22,6 +22,9 @@ describe("demo registry", () => {
     expect(getDemoDefinition("/demos/school-procurement-audit")).toBe(
       demoRegistry["/demos/school-procurement-audit"],
     );
+    expect(getDemoDefinition("/demos/department-budget-monitoring")).toBe(
+      demoRegistry["/demos/department-budget-monitoring"],
+    );
     for (const [route, demo] of Object.entries(demoRegistry)) {
       expect(demo.route).toBe(route);
       expect(validateDemoDefinition(demo)).toEqual([]);
@@ -34,7 +37,7 @@ describe("demo registry", () => {
 
   it("provides complete, uniquely ordered marketing metadata", () => {
     const demos = Object.values(demoRegistry);
-    expect(demos).toHaveLength(14);
+    expect(demos).toHaveLength(15);
     expect(new Set(demos.map((demo) => demo.marketing.featuredOrder)).size).toBe(demos.length);
 
     for (const demo of demos) {

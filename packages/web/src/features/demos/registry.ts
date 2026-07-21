@@ -1,5 +1,6 @@
 import { bankTransactionAuditDemo } from "./examples/bank-transaction-audit";
 import { campusRecruitmentAnalysisDemo } from "./examples/campus-recruitment-analysis";
+import { departmentBudgetMonitoringDemo } from "./examples/department-budget-monitoring";
 import { examScoreAnalysisDemo } from "./examples/exam-score-analysis";
 import { financialHealthAnalysisDemo } from "./examples/financial-health-analysis";
 import { inventoryReconciliationDemo } from "./examples/inventory-reconciliation";
@@ -17,6 +18,7 @@ import type { DemoDefinition } from "./runtime/replayTypes";
 export const demoRegistry: Record<string, DemoDefinition> = {
   [bankTransactionAuditDemo.route]: bankTransactionAuditDemo,
   [campusRecruitmentAnalysisDemo.route]: campusRecruitmentAnalysisDemo,
+  [departmentBudgetMonitoringDemo.route]: departmentBudgetMonitoringDemo,
   [examScoreAnalysisDemo.route]: examScoreAnalysisDemo,
   [financialHealthAnalysisDemo.route]: financialHealthAnalysisDemo,
   [investmentBudgetReviewDemo.route]: investmentBudgetReviewDemo,

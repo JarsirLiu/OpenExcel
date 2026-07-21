@@ -11,7 +11,7 @@ export const investmentBudgetReviewDemo = createAnalysisScenario({
     coverImage: "/demo-covers/investment-budget.webp",
     coverAlt: "工程人员在施工现场讨论项目计划",
     proofMetric: "6 个项目 · 逐项重算",
-    featuredOrder: 10,
+    featuredOrder: 11,
     theme: "sand",
   },
   workspaceId: -120,

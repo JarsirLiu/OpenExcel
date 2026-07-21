@@ -21,7 +21,7 @@ describe("MarketingShowcase", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getAllByLabelText(/^观看.+完整回放$/)).toHaveLength(14);
+    expect(screen.getAllByLabelText(/^观看.+完整回放$/)).toHaveLength(15);
     expect(screen.getByRole("link", { name: "观看学费住宿费欠费核查完整回放" })).toHaveAttribute(
       "href",
       "/demos/student-fee-reconciliation",
@@ -33,6 +33,9 @@ describe("MarketingShowcase", () => {
     expect(
       screen.getByRole("link", { name: "观看采购合同与付款进度核查完整回放" }),
     ).toHaveAttribute("href", "/demos/school-procurement-audit");
+    expect(
+      screen.getByRole("link", { name: "观看学校预算执行与部门经费预警完整回放" }),
+    ).toHaveAttribute("href", "/demos/department-budget-monitoring");
     expect(screen.getByRole("link", { name: "观看企业财务健康分析完整回放" })).toHaveAttribute(
       "href",
       "/demos/financial-health-analysis",

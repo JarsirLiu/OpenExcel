@@ -11,7 +11,7 @@ export const bankTransactionAuditDemo: DemoDefinition = {
     coverImage: "/demo-covers/bank-audit.webp",
     coverAlt: "财务人员使用计算器核对账单和现金记录",
     proofMetric: "4 类异常 · 自动复核",
-    featuredOrder: 5,
+    featuredOrder: 6,
     theme: "sand",
   },
   workspace: {
