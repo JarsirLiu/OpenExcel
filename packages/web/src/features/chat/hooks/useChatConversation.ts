@@ -1,4 +1,5 @@
 import { useChat } from "@ai-sdk/react";
+import type { SheetChangeDelta } from "@openexcel/core";
 import { DefaultChatTransport } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -8,7 +9,10 @@ import {
 } from "@/api/chat";
 import type { ChatReferenceTarget } from "../composer/chatReferences";
 import { useDraftSessionTransition } from "./useDraftSessionTransition";
-import { collectWorkbookMutationToolCallIds } from "./useSheetPatchSync";
+import {
+  collectWorkbookMutationToolCallIds,
+  collectWorkbookRefreshToolCallIds,
+} from "./useSheetPatchSync";
 
 const PAGE_SIZE = 40;
 
@@ -17,6 +21,11 @@ type ChatMessageLike = {
   content?: unknown;
   parts?: ReadonlyArray<unknown> | null;
 };
+
+type SheetChangedHandler = (
+  sheetId: number,
+  delta: SheetChangeDelta | null,
+) => void | Promise<void>;
 
 function extractMessageText(message: ChatMessageLike): string {
   if (typeof message.content === "string") {
@@ -67,6 +76,7 @@ export function useChatConversation({
   initialMessages,
   onRunSettled,
   onWorkspaceRefresh,
+  onSheetChanged,
   onStreamingChange,
 }: {
   sessionId: number | null;
@@ -75,6 +85,7 @@ export function useChatConversation({
   initialMessages?: any[];
   onRunSettled?: (messages: any[]) => Promise<void> | void;
   onWorkspaceRefresh?: () => Promise<void> | void;
+  onSheetChanged?: SheetChangedHandler;
   onStreamingChange?: (isStreaming: boolean) => void;
 }) {
   const messagesRef = useRef<any[]>(initialMessages ?? []);
@@ -82,7 +93,13 @@ export function useChatConversation({
   const [hasOlder, setHasOlder] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
   const [initialLoaded, setInitialLoaded] = useState(!!initialMessages);
-  const seenWorkbookMutationToolCallIdsRef = useRef<Set<string>>(new Set());
+  const [historicalToolCallIds] = useState<Set<string>>(
+    () =>
+      new Set(
+        initialMessages ? collectWorkbookMutationToolCallIds(initialMessages, new Set()) : [],
+      ),
+  );
+  const seenWorkbookRefreshToolCallIdsRef = useRef<Set<string>>(new Set());
   const hasPrimedWorkbookMutationHistoryRef = useRef(false);
   const pendingWorkspaceRefreshRef = useRef(false);
   const wasStreamingRef = useRef(false);
@@ -190,6 +207,14 @@ export function useChatConversation({
             { signal: controller.signal },
           );
           if (mountedRef.current && generation === requestGenerationRef.current) {
+            const currentToolCallIds = new Set(
+              collectWorkbookMutationToolCallIds(messagesRef.current, new Set()),
+            );
+            for (const toolCallId of collectWorkbookMutationToolCallIds(msgs, new Set())) {
+              if (!currentToolCallIds.has(toolCallId)) {
+                historicalToolCallIds.add(toolCallId);
+              }
+            }
             // A newly created session can start streaming before its first history
             // request completes. Do not let the stale empty response erase the
             // optimistic user message already held by useChat.
@@ -239,17 +264,18 @@ export function useChatConversation({
   }, [error, setMessages]);
 
   useEffect(() => {
-    const toolCallIds = collectWorkbookMutationToolCallIds(
-      messages,
-      seenWorkbookMutationToolCallIdsRef.current,
-    );
+    const toolCallIds = onSheetChanged
+      ? collectWorkbookRefreshToolCallIds(messages, seenWorkbookRefreshToolCallIdsRef.current, {
+          sheetDeltasHandled: true,
+        })
+      : collectWorkbookMutationToolCallIds(messages, seenWorkbookRefreshToolCallIdsRef.current);
     if (toolCallIds.length === 0) {
       hasPrimedWorkbookMutationHistoryRef.current = true;
       return;
     }
 
     for (const toolCallId of toolCallIds) {
-      seenWorkbookMutationToolCallIdsRef.current.add(toolCallId);
+      seenWorkbookRefreshToolCallIdsRef.current.add(toolCallId);
     }
 
     if (!hasPrimedWorkbookMutationHistoryRef.current) {
@@ -262,7 +288,7 @@ export function useChatConversation({
     }
 
     pendingWorkspaceRefreshRef.current = true;
-  }, [isStreaming, messages]);
+  }, [isStreaming, messages, onSheetChanged]);
 
   const flushPendingWorkspaceRefresh = useCallback(async () => {
     if (!pendingWorkspaceRefreshRef.current) return;
@@ -323,6 +349,9 @@ export function useChatConversation({
         setHasOlder(false);
         return;
       }
+      for (const toolCallId of collectWorkbookMutationToolCallIds(olderMsgs, new Set())) {
+        historicalToolCallIds.add(toolCallId);
+      }
       setMessages([...olderMsgs, ...messagesRef.current]);
       loadedOffsetRef.current += olderMsgs.length;
       setHasOlder(loadedOffsetRef.current < total);
@@ -351,6 +380,7 @@ export function useChatConversation({
 
   return {
     messages,
+    historicalToolCallIds,
     error,
     canUndo,
     isStreaming,

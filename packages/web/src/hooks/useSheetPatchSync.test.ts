@@ -1,8 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { renderHook, waitFor } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import {
   collectSheetPatchUpdates,
   collectWorkbookMutationToolCallIds,
+  collectWorkbookRefreshToolCallIds,
   collectWorkbookStructureUpdates,
+  useSheetPatchSync,
 } from "../features/chat/hooks/useSheetPatchSync";
 
 describe("collectSheetPatchUpdates", () => {
@@ -306,5 +309,189 @@ describe("collectWorkbookMutationToolCallIds", () => {
     ];
 
     expect(collectWorkbookMutationToolCallIds(messages, new Set(["tool-12"]))).toEqual([]);
+  });
+});
+
+describe("collectWorkbookRefreshToolCallIds", () => {
+  it("does not request a full refresh for handled sheet deltas", () => {
+    const messages = [
+      {
+        role: "assistant",
+        parts: [
+          {
+            toolCallId: "tool-sheet",
+            state: "output-available",
+            output: {
+              sheetInfo: { sheetId: 31, sheetNo: 1, sheetName: "Sheet1" },
+              changeSummary: { changedCellCount: 1, rangeOperationCount: 0 },
+              delta: { type: "write", cells: [{ row: 1, col: 1, value: "x" }] },
+            },
+          },
+          {
+            toolCallId: "tool-chart",
+            type: "tool-updateChart",
+            state: "output-available",
+            output: { success: true },
+          },
+        ],
+      },
+    ];
+
+    expect(
+      collectWorkbookRefreshToolCallIds(messages, new Set(), { sheetDeltasHandled: true }),
+    ).toEqual(["tool-chart"]);
+  });
+});
+
+describe("useSheetPatchSync", () => {
+  it("skips hydrated history and applies later sheet deltas once", async () => {
+    const onSheetChanged = vi.fn();
+    const history = [
+      {
+        role: "assistant",
+        parts: [
+          {
+            toolCallId: "historical-tool",
+            state: "output-available",
+            output: {
+              sheetInfo: { sheetId: 31, sheetNo: 1, sheetName: "Sheet1" },
+              changeSummary: { changedCellCount: 1, rangeOperationCount: 0 },
+              delta: { type: "write", cells: [{ row: 1, col: 1, value: "old" }] },
+            },
+          },
+        ],
+      },
+    ];
+    const nextMessages = [
+      ...history,
+      {
+        role: "assistant",
+        parts: [
+          {
+            toolCallId: "new-tool",
+            state: "output-available",
+            output: {
+              sheetInfo: { sheetId: 31, sheetNo: 1, sheetName: "Sheet1" },
+              changeSummary: { changedCellCount: 1, rangeOperationCount: 0 },
+              delta: { type: "write", cells: [{ row: 2, col: 2, value: "new" }] },
+            },
+          },
+        ],
+      },
+    ];
+
+    const { rerender } = renderHook(
+      ({ messages, historyReady }: { messages: typeof history; historyReady: boolean }) =>
+        useSheetPatchSync(messages, onSheetChanged, undefined, historyReady),
+      { initialProps: { messages: history, historyReady: true } },
+    );
+
+    expect(onSheetChanged).not.toHaveBeenCalled();
+
+    rerender({ messages: nextMessages, historyReady: true });
+    await waitFor(() => expect(onSheetChanged).toHaveBeenCalledOnce());
+    expect(onSheetChanged).toHaveBeenCalledWith(31, {
+      type: "write",
+      cells: [{ row: 2, col: 2, value: "new" }],
+    });
+
+    rerender({ messages: nextMessages, historyReady: true });
+    expect(onSheetChanged).toHaveBeenCalledOnce();
+  });
+
+  it("applies live deltas that arrive before history becomes ready", async () => {
+    const onSheetChanged = vi.fn();
+    const history = [
+      {
+        role: "assistant",
+        parts: [
+          {
+            toolCallId: "historical-tool",
+            state: "output-available",
+            output: {
+              sheetInfo: { sheetId: 31, sheetNo: 1, sheetName: "Sheet1" },
+              changeSummary: { changedCellCount: 1, rangeOperationCount: 0 },
+              delta: { type: "write", cells: [{ row: 1, col: 1, value: "old" }] },
+            },
+          },
+        ],
+      },
+    ];
+    const liveMessages = [
+      ...history,
+      {
+        role: "assistant",
+        parts: [
+          {
+            toolCallId: "live-tool",
+            state: "output-available",
+            output: {
+              sheetInfo: { sheetId: 31, sheetNo: 1, sheetName: "Sheet1" },
+              changeSummary: { changedCellCount: 1, rangeOperationCount: 0 },
+              delta: { type: "write", cells: [{ row: 2, col: 2, value: "new" }] },
+            },
+          },
+        ],
+      },
+    ];
+    const historicalToolCallIds = new Set(["historical-tool"]);
+
+    const { rerender } = renderHook(
+      ({ messages, historyReady }: { messages: typeof liveMessages; historyReady: boolean }) =>
+        useSheetPatchSync(messages, onSheetChanged, undefined, historyReady, historicalToolCallIds),
+      { initialProps: { messages: liveMessages, historyReady: false } },
+    );
+
+    rerender({ messages: liveMessages, historyReady: true });
+    await waitFor(() => expect(onSheetChanged).toHaveBeenCalledOnce());
+    expect(onSheetChanged).toHaveBeenCalledWith(31, {
+      type: "write",
+      cells: [{ row: 2, col: 2, value: "new" }],
+    });
+  });
+
+  it("does not replay historical deltas added by pagination", async () => {
+    const onSheetChanged = vi.fn();
+    const currentMessages = [
+      {
+        role: "assistant",
+        parts: [
+          {
+            toolCallId: "current-tool",
+            state: "output-available",
+            output: {
+              sheetInfo: { sheetId: 31, sheetNo: 1, sheetName: "Sheet1" },
+              changeSummary: { changedCellCount: 1, rangeOperationCount: 0 },
+              delta: { type: "write", cells: [{ row: 1, col: 1, value: "current" }] },
+            },
+          },
+        ],
+      },
+    ];
+    const olderMessage = {
+      role: "assistant",
+      parts: [
+        {
+          toolCallId: "older-tool",
+          state: "output-available",
+          output: {
+            sheetInfo: { sheetId: 31, sheetNo: 1, sheetName: "Sheet1" },
+            changeSummary: { changedCellCount: 1, rangeOperationCount: 0 },
+            delta: { type: "write", cells: [{ row: 1, col: 1, value: "old" }] },
+          },
+        },
+      ],
+    };
+    const historicalToolCallIds = new Set(["current-tool"]);
+
+    const { rerender } = renderHook(
+      ({ messages }: { messages: typeof currentMessages }) =>
+        useSheetPatchSync(messages, onSheetChanged, undefined, true, historicalToolCallIds),
+      { initialProps: { messages: currentMessages } },
+    );
+
+    historicalToolCallIds.add("older-tool");
+    rerender({ messages: [olderMessage, ...currentMessages] });
+    await waitFor(() => expect(onSheetChanged).not.toHaveBeenCalled());
   });
 });

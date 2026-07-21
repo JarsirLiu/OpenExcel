@@ -1,10 +1,17 @@
+import type { SheetChangeDelta } from "@openexcel/core";
 import { createContext, useContext } from "react";
+
+type SheetChangedHandler = (
+  sheetId: number,
+  delta: SheetChangeDelta | null,
+) => void | Promise<void>;
 
 type SessionInfra = {
   workspaceId: number;
   onAttachExcel: (files: File[]) => Promise<void> | void;
   referenceCacheRevision: number;
   onWorkspaceRefresh?: () => Promise<void> | void;
+  onSheetChanged?: SheetChangedHandler;
   onUndoComplete?: () => Promise<void> | void;
   onNavigateSheet?: (sheetId: number) => void;
   initialMessages?: unknown[];

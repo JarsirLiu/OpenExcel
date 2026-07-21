@@ -229,6 +229,7 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
         key={selectedWorkspaceId ?? "no-workspace"}
         workspaceId={selectedWorkspaceId}
         onWorkspaceRefresh={workbook.handleWorkspaceRefresh}
+        onSheetChanged={workbook.handleSheetChanged}
         onAttachExcel={handleAttachExcel}
         referenceCacheRevision={workbook.referenceCacheRevision}
         currentUser={currentUser}

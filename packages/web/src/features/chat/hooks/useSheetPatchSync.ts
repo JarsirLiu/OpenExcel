@@ -209,15 +209,26 @@ export function collectWorkbookMutationToolCallIds(
   messages: ReadonlyArray<SheetPatchMessageLike>,
   seenToolCallIds: ReadonlySet<string>,
 ): string[] {
+  return collectWorkbookRefreshToolCallIds(messages, seenToolCallIds, {
+    sheetDeltasHandled: false,
+  });
+}
+
+export function collectWorkbookRefreshToolCallIds(
+  messages: ReadonlyArray<SheetPatchMessageLike>,
+  seenToolCallIds: ReadonlySet<string>,
+  options: { sheetDeltasHandled?: boolean } = {},
+): string[] {
   const toolCallIds = new Set<string>();
   const patchUpdates = collectSheetPatchUpdates(messages, seenToolCallIds);
-  for (const update of patchUpdates) {
-    toolCallIds.add(update.toolCallId);
-  }
-
   const seenAfterPatchUpdates = new Set(seenToolCallIds);
-  for (const toolCallId of toolCallIds) {
-    seenAfterPatchUpdates.add(toolCallId);
+  if (!options.sheetDeltasHandled) {
+    for (const update of patchUpdates) {
+      toolCallIds.add(update.toolCallId);
+    }
+  }
+  for (const update of patchUpdates) {
+    seenAfterPatchUpdates.add(update.toolCallId);
   }
 
   const structureUpdates = collectWorkbookStructureUpdates(messages, seenAfterPatchUpdates);
@@ -225,10 +236,15 @@ export function collectWorkbookMutationToolCallIds(
     toolCallIds.add(update.toolCallId);
   }
 
+  const seenAfterStructureUpdates = new Set(seenAfterPatchUpdates);
+  for (const update of structureUpdates) {
+    seenAfterStructureUpdates.add(update.toolCallId);
+  }
+
   for (const message of messages) {
     if (message.role !== "assistant" || !Array.isArray(message.parts)) continue;
     for (const part of message.parts) {
-      if (!isCompletedToolPart(part) || seenAfterPatchUpdates.has(part.toolCallId)) continue;
+      if (!isCompletedToolPart(part) || seenAfterStructureUpdates.has(part.toolCallId)) continue;
       if (["createChart", "updateChart", "deleteChart"].includes(getToolName(part))) {
         toolCallIds.add(part.toolCallId);
       }
@@ -242,24 +258,60 @@ export function useSheetPatchSync(
   messages: ReadonlyArray<SheetPatchMessageLike>,
   onSheetChanged?: (sheetId: number, delta: SheetChangeDelta | null) => void,
   onWorkbookStructureChanged?: (update: WorkbookStructureUpdate) => void,
+  historyReady = true,
+  historicalToolCallIds?: ReadonlySet<string>,
 ) {
   const appliedToolCallIdsRef = useRef<Set<string>>(new Set());
+  const historyPrimedRef = useRef(false);
 
   useEffect(() => {
-    const patchUpdates = onSheetChanged
-      ? collectSheetPatchUpdates(messages, appliedToolCallIdsRef.current)
-      : [];
+    if (!historyReady) return;
+
+    if (!historyPrimedRef.current) {
+      const initialPatchUpdates = collectSheetPatchUpdates(messages, new Set());
+      for (const update of initialPatchUpdates) {
+        if (historicalToolCallIds?.has(update.toolCallId) ?? true) {
+          appliedToolCallIdsRef.current.add(update.toolCallId);
+          continue;
+        }
+        onSheetChanged?.(update.sheetId, update.delta);
+      }
+
+      const initialStructureUpdates = collectWorkbookStructureUpdates(messages, new Set());
+      for (const update of initialStructureUpdates) {
+        if (historicalToolCallIds?.has(update.toolCallId) ?? true) {
+          appliedToolCallIdsRef.current.add(update.toolCallId);
+          continue;
+        }
+        onWorkbookStructureChanged?.(update);
+      }
+
+      historyPrimedRef.current = true;
+      return;
+    }
+
+    const seenToolCallIds = new Set(appliedToolCallIdsRef.current);
+    for (const toolCallId of historicalToolCallIds ?? []) {
+      seenToolCallIds.add(toolCallId);
+    }
+
+    const patchUpdates = onSheetChanged ? collectSheetPatchUpdates(messages, seenToolCallIds) : [];
     for (const update of patchUpdates) {
       appliedToolCallIdsRef.current.add(update.toolCallId);
       onSheetChanged?.(update.sheetId, update.delta);
     }
 
+    const seenAfterPatchUpdates = new Set(seenToolCallIds);
+    for (const update of patchUpdates) {
+      seenAfterPatchUpdates.add(update.toolCallId);
+    }
+
     const structureUpdates = onWorkbookStructureChanged
-      ? collectWorkbookStructureUpdates(messages, appliedToolCallIdsRef.current)
+      ? collectWorkbookStructureUpdates(messages, seenAfterPatchUpdates)
       : [];
     for (const update of structureUpdates) {
       appliedToolCallIdsRef.current.add(update.toolCallId);
       onWorkbookStructureChanged?.(update);
     }
-  }, [messages, onSheetChanged, onWorkbookStructureChanged]);
+  }, [historyReady, historicalToolCallIds, messages, onSheetChanged, onWorkbookStructureChanged]);
 }

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert } from "@/components/ui/Alert/Alert";
 import { ChatComposer, type ChatComposerHandle } from "@/features/chat/composer/ChatComposer";
 import { useChatConversation } from "@/features/chat/hooks/useChatConversation";
+import { useSheetPatchSync } from "@/features/chat/hooks/useSheetPatchSync";
 import { MessageList } from "@/features/chat/message/MessageList";
 import msgStyles from "@/features/chat/message/MessageList.module.css";
 import { useSessionInfra } from "@/features/session/SessionShellContext";
@@ -25,6 +26,7 @@ export function ChatPanel({
     workspaceId,
     initialMessages,
     onWorkspaceRefresh,
+    onSheetChanged,
     onUndoComplete,
     onAttachExcel,
     referenceCacheRevision,
@@ -37,6 +39,8 @@ export function ChatPanel({
     canUndo,
     isStreaming,
     isDraftSessionTransitioning,
+    initialLoaded,
+    historicalToolCallIds,
     loadingOlder,
     hasOlder,
     sendMessage,
@@ -53,7 +57,10 @@ export function ChatPanel({
       return onRunSettled?.(sessionId, finishedMessages);
     },
     onWorkspaceRefresh,
+    onSheetChanged,
   });
+
+  useSheetPatchSync(messages, onSheetChanged, undefined, initialLoaded, historicalToolCallIds);
 
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [isUndoing, setIsUndoing] = useState(false);
