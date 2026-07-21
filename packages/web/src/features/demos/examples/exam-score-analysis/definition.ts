@@ -11,7 +11,7 @@ export const examScoreAnalysisDemo = createAnalysisScenario({
     coverImage: "/demo-covers/exam-score.webp",
     coverAlt: "学生在自然光照射的教室中专注参加考试",
     proofMetric: "3 次考试 · 个性化建议",
-    featuredOrder: 12,
+    featuredOrder: 13,
     theme: "sand",
   },
   workspaceId: -190,

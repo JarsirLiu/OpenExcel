@@ -15,7 +15,7 @@ export const inventoryReconciliationDemo: DemoDefinition = {
     coverImage: "/demo-covers/inventory.webp",
     coverAlt: "仓储人员在工业货架之间进行库存盘点",
     proofMetric: "三表匹配 · 公式可追溯",
-    featuredOrder: 13,
+    featuredOrder: 14,
     theme: "slate",
   },
   workspace: {

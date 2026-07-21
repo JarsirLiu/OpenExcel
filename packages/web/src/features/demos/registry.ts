@@ -9,6 +9,7 @@ import { marketingRoiAnalysisDemo } from "./examples/marketing-roi-analysis";
 import { orderFulfillmentAnalysisDemo } from "./examples/order-fulfillment-analysis";
 import { researchFundExecutionDemo } from "./examples/research-fund-execution";
 import { salesPerformanceAnalysisDemo } from "./examples/sales-performance-analysis";
+import { schoolProcurementAuditDemo } from "./examples/school-procurement-audit";
 import { shareholderChangeAnalysisDemo } from "./examples/shareholder-change-analysis";
 import { studentFeeReconciliationDemo } from "./examples/student-fee-reconciliation";
 import type { DemoDefinition } from "./runtime/replayTypes";
@@ -25,6 +26,7 @@ export const demoRegistry: Record<string, DemoDefinition> = {
   [orderFulfillmentAnalysisDemo.route]: orderFulfillmentAnalysisDemo,
   [researchFundExecutionDemo.route]: researchFundExecutionDemo,
   [salesPerformanceAnalysisDemo.route]: salesPerformanceAnalysisDemo,
+  [schoolProcurementAuditDemo.route]: schoolProcurementAuditDemo,
   [shareholderChangeAnalysisDemo.route]: shareholderChangeAnalysisDemo,
   [studentFeeReconciliationDemo.route]: studentFeeReconciliationDemo,
 };

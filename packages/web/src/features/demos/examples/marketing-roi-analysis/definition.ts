@@ -12,7 +12,7 @@ export const marketingRoiAnalysisDemo = createAnalysisScenario({
     coverImage: "/demo-covers/marketing-roi.webp",
     coverAlt: "桌面上的营销图表、笔记本和分析工具",
     proofMetric: "5 个渠道 · ROI 4.22",
-    featuredOrder: 6,
+    featuredOrder: 7,
     theme: "sage",
   },
   workspaceId: -180,
