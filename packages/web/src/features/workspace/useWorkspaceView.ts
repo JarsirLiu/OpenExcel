@@ -10,6 +10,7 @@ import {
   updateWorkbookName,
 } from "@/api/workbooks";
 import type { WorkbookStructureUpdate } from "@/features/sync/types";
+import { isWorkbookSnapshotStale } from "@/features/sync/workbookRevision";
 import { toast } from "@/shared/lib";
 import { patchWorkbookWithDelta } from "../workbook/utils/patchWorkbook";
 import { useWorkbookCatalog, type WorkbookInitial } from "./useWorkbookCatalog";
@@ -80,8 +81,19 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
   const handleSheetRevisionChanged = useCallback((sheetId: number, revision: number) => {
     const workbook = currentWorkbookRef.current;
     const sheet = workbook?.sheets.find((item) => item.id === sheetId);
-    if (sheet) sheet.revision = revision;
+    if (sheet && revision > sheet.revision) sheet.revision = revision;
   }, []);
+
+  const replaceWorkbookIfFresh = useCallback(
+    (nextWorkbook: NonNullable<typeof currentWorkbook>) => {
+      const current = currentWorkbookRef.current;
+      if (current && isWorkbookSnapshotStale(current, nextWorkbook)) return false;
+      currentWorkbookRef.current = nextWorkbook;
+      replaceCurrentWorkbook(nextWorkbook);
+      return true;
+    },
+    [replaceCurrentWorkbook],
+  );
 
   useEffect(() => {
     try {
@@ -99,14 +111,13 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
         signal: controller.signal,
       });
       if (!isCurrentRequest(generation, controller.signal)) return;
-      currentWorkbookRef.current = full;
-      replaceCurrentWorkbook(full);
+      replaceWorkbookIfFresh(full);
     } catch (error) {
       if (!controller.signal.aborted) {
         console.error("[workbook] Failed to refresh current workbook:", error);
       }
     }
-  }, [beginRequest, currentWorkbook, isCurrentRequest, replaceCurrentWorkbook, workspaceId]);
+  }, [beginRequest, currentWorkbook, isCurrentRequest, replaceWorkbookIfFresh, workspaceId]);
 
   const refreshWorkspace = useCallback(async () => {
     if (workspaceId == null) return;
@@ -141,8 +152,7 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
         signal: controller.signal,
       });
       if (!isCurrentRequest(generation, controller.signal)) return;
-      currentWorkbookRef.current = nextWorkbook;
-      replaceCurrentWorkbook(nextWorkbook);
+      replaceWorkbookIfFresh(nextWorkbook);
       const nextIndex = safeList.findIndex((workbook) => workbook.id === nextWorkbookId);
       setWorkbookIdx(nextIndex >= 0 ? nextIndex : 0);
 
@@ -162,7 +172,7 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
     currentWorkbook,
     invalidateReferenceCache,
     isCurrentRequest,
-    replaceCurrentWorkbook,
+    replaceWorkbookIfFresh,
     setCurrentSheetIndex,
     setWorkbookIdx,
     setWorkbooks,
@@ -192,13 +202,12 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
           signal: controller.signal,
         });
         if (!isCurrentRequest(generation, controller.signal)) return;
-        currentWorkbookRef.current = full;
-        replaceCurrentWorkbook(full);
+        replaceWorkbookIfFresh(full);
       } catch (error) {
         console.error("[workbook] Failed to refresh after sheet change:", error);
       }
     },
-    [beginRequest, isCurrentRequest, replaceCurrentWorkbook, workspaceId],
+    [beginRequest, isCurrentRequest, replaceWorkbookIfFresh, workspaceId],
   );
 
   const handleWorkbookStructureChanged = useCallback(
@@ -228,7 +237,7 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
             signal: controller.signal,
           });
           if (!isCurrentRequest(generation, controller.signal)) return;
-          replaceCurrentWorkbook(nextWorkbook);
+          replaceWorkbookIfFresh(nextWorkbook);
           const nextIndex = nextWorkbook.sheets.findIndex((sheet) => sheet.id === update.sheetId);
           const fallbackIndex = Math.min(update.order, nextWorkbook.sheets.length - 1);
           setCurrentSheetIndex(nextIndex >= 0 ? nextIndex : fallbackIndex);
@@ -243,7 +252,7 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
           signal: controller.signal,
         });
         if (!isCurrentRequest(generation, controller.signal)) return;
-        replaceCurrentWorkbook(nextWorkbook);
+        replaceWorkbookIfFresh(nextWorkbook);
         const nextIndex = nextWorkbook.sheets.findIndex((sheet) => sheet.id === update.sheetId);
         setCurrentSheetIndex(
           nextIndex >= 0 ? nextIndex : Math.min(update.order, nextWorkbook.sheets.length - 1),
@@ -257,7 +266,7 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
       beginRequest,
       invalidateReferenceCache,
       isCurrentRequest,
-      replaceCurrentWorkbook,
+      replaceWorkbookIfFresh,
       setCurrentSheetIndex,
       setWorkbookIdx,
       setWorkbooks,

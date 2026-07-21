@@ -9,7 +9,7 @@ import {
   updateSheetData,
   updateSheetName,
 } from "@/api/workbooks";
-import { SheetSaveQueue } from "@/features/sync/sheetSaveQueue";
+import { SheetSaveScheduler } from "@/features/sync/sheetSaveScheduler";
 import type { WorkbookStructureUpdate } from "@/features/sync/types";
 import { confirm } from "@/shared/lib";
 import { adaptFortuneSheetLayout, type SheetGridLayout } from "../layout/fortuneSheetLayout";
@@ -43,13 +43,10 @@ export function useExcelGridWorkspace({
   onSheetRevisionChanged,
 }: UseExcelGridWorkspaceProps) {
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
-  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingSaveRef = useRef<{ sheetId: number; token: number; baseRevision: number } | null>(
-    null,
-  );
   const saveStatusResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedSnapshotRef = useRef<Record<number, string>>({});
-  const saveQueueRef = useRef(new SheetSaveQueue());
+  const saveSchedulerRef = useRef<SheetSaveScheduler | null>(null);
+  if (!saveSchedulerRef.current) saveSchedulerRef.current = new SheetSaveScheduler();
   const workbookRef = useRef<WorkbookInstance>(null);
   const { sheetData, sessionKey } = useWorkbookEditorSession(workbook, workbookRevision);
   const { registerActivateSheet } = useSheetActivation();
@@ -83,7 +80,7 @@ export function useExcelGridWorkspace({
 
     lastSavedSnapshotRef.current = nextSnapshots;
     for (const sheet of workbook.sheets) {
-      saveQueueRef.current.setRevision(sheet.id, sheet.revision);
+      saveSchedulerRef.current?.setRevision(sheet.id, sheet.revision);
     }
   }, [workbook, getSnapshot]);
 
@@ -101,15 +98,7 @@ export function useExcelGridWorkspace({
 
   useEffect(() => {
     return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-      if (pendingSaveRef.current) {
-        saveQueueRef.current.cancelPendingSave(
-          pendingSaveRef.current.sheetId,
-          pendingSaveRef.current.token,
-        );
-      }
+      saveSchedulerRef.current?.dispose();
       if (saveStatusResetRef.current) {
         clearTimeout(saveStatusResetRef.current);
       }
@@ -149,30 +138,9 @@ export function useExcelGridWorkspace({
       const snapshot = getSnapshot(celldata, config);
       if (lastSavedSnapshotRef.current[sheet.id] === snapshot) return;
 
-      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-      if (pendingSaveRef.current) {
-        saveQueueRef.current.cancelPendingSave(
-          pendingSaveRef.current.sheetId,
-          pendingSaveRef.current.token,
-        );
-      }
-      const pendingSave = {
-        sheetId: sheet.id,
-        token: saveQueueRef.current.registerPendingSave(sheet.id, sheet.revision),
-        baseRevision: sheet.revision,
-      };
-      pendingSaveRef.current = pendingSave;
-      saveTimeoutRef.current = setTimeout(() => {
-        if (!saveQueueRef.current.consumePendingSave(pendingSave.sheetId, pendingSave.token)) {
-          return;
-        }
-        if (pendingSaveRef.current?.token === pendingSave.token) pendingSaveRef.current = null;
-        void saveQueueRef.current
-          .enqueue(sheet.id, pendingSave.baseRevision, (baseRevision) =>
-            syncSheetToServer(sheet.id, celldata, config, baseRevision),
-          )
-          .catch(() => undefined);
-      }, 500);
+      saveSchedulerRef.current?.schedule(sheet.id, sheet.revision, (baseRevision) =>
+        syncSheetToServer(sheet.id, celldata, config, baseRevision),
+      );
     },
     [currentSheetIndex, getSnapshot, syncSheetToServer, workbook],
   );

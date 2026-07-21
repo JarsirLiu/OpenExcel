@@ -12,8 +12,9 @@ export class SheetSaveInvalidatedError extends Error {
 export class SheetSaveQueue {
   private readonly tails = new Map<number, Promise<void>>();
   private readonly revisions = new Map<number, number>();
-  private readonly invalidated = new Set<number>();
+  private readonly invalidatedThrough = new Map<number, number>();
   private readonly pending = new Map<number, { baseRevision: number; token: number }>();
+  private nextEnqueueId = 1;
   private nextPendingToken = 1;
 
   registerPendingSave(sheetId: number, baseRevision: number): number {
@@ -38,20 +39,25 @@ export class SheetSaveQueue {
       this.pending.delete(sheetId);
     }
     if (this.tails.has(sheetId) && this.revisions.get(sheetId) !== revision) {
-      this.invalidated.add(sheetId);
+      this.invalidatedThrough.set(sheetId, this.nextEnqueueId - 1);
     }
-    this.revisions.set(sheetId, revision);
+    this.revisions.set(sheetId, Math.max(this.revisions.get(sheetId) ?? revision, revision));
   }
 
   enqueue(sheetId: number, baseRevision: number, task: SheetSaveTask): Promise<SheetSaveResult> {
     const previous = this.tails.get(sheetId) ?? Promise.resolve();
+    const enqueueId = this.nextEnqueueId++;
     const run = previous.then(async () => {
-      if (this.invalidated.delete(sheetId)) {
+      const invalidatedThrough = this.invalidatedThrough.get(sheetId) ?? 0;
+      if (enqueueId <= invalidatedThrough) {
         throw new SheetSaveInvalidatedError(sheetId);
       }
       const effectiveBaseRevision = this.revisions.get(sheetId) ?? baseRevision;
       const result = await task(effectiveBaseRevision);
-      this.revisions.set(sheetId, result.revision);
+      this.revisions.set(
+        sheetId,
+        Math.max(this.revisions.get(sheetId) ?? result.revision, result.revision),
+      );
       return result;
     });
 
