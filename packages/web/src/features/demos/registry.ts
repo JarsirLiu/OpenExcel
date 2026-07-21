@@ -12,6 +12,7 @@ import { researchFundExecutionDemo } from "./examples/research-fund-execution";
 import { salesPerformanceAnalysisDemo } from "./examples/sales-performance-analysis";
 import { schoolProcurementAuditDemo } from "./examples/school-procurement-audit";
 import { shareholderChangeAnalysisDemo } from "./examples/shareholder-change-analysis";
+import { studentAidDisbursementDemo } from "./examples/student-aid-disbursement";
 import { studentFeeReconciliationDemo } from "./examples/student-fee-reconciliation";
 import type { DemoDefinition } from "./runtime/replayTypes";
 
@@ -30,6 +31,7 @@ export const demoRegistry: Record<string, DemoDefinition> = {
   [salesPerformanceAnalysisDemo.route]: salesPerformanceAnalysisDemo,
   [schoolProcurementAuditDemo.route]: schoolProcurementAuditDemo,
   [shareholderChangeAnalysisDemo.route]: shareholderChangeAnalysisDemo,
+  [studentAidDisbursementDemo.route]: studentAidDisbursementDemo,
   [studentFeeReconciliationDemo.route]: studentFeeReconciliationDemo,
 };
 
