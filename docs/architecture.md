@@ -707,6 +707,17 @@ If a bug affects two panes at once, treat it as a boundary bug and add a regress
 3. Server persists the change.
 4. Web refreshes only the affected workbook or sheet.
 
+The current implementation has the unified Sheet command path in place, but the FortuneSheet
+adapter still submits manual `onChange` results as `replaceSnapshot`. AI cell operations already
+use `mutation` commands. Manual editing must move to mutation only after the editor exposes a
+reliable operation-level event for values, formulas, and clears; until then, complex or ambiguous
+operations must use the same `replaceSnapshot` command as the permanent correctness fallback.
+
+The known sync risks and their remediation order are tracked in
+[Spreadsheet Sync and Calculation Boundaries, section 9](spreadsheet-sync-boundaries.md#9-当前实现状态与已知风险).
+The incremental protocol remains the target architecture: it must not become a second independent
+save system beside full snapshots.
+
 ### 7.1.1 Authentication and workspace bootstrap flow
 
 1. Registration or login validates credentials and atomically creates the user and `AuthSession`.
