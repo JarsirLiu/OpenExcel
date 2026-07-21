@@ -9,6 +9,7 @@ import { marketingRoiAnalysisDemo } from "./examples/marketing-roi-analysis";
 import { orderFulfillmentAnalysisDemo } from "./examples/order-fulfillment-analysis";
 import { salesPerformanceAnalysisDemo } from "./examples/sales-performance-analysis";
 import { shareholderChangeAnalysisDemo } from "./examples/shareholder-change-analysis";
+import { studentFeeReconciliationDemo } from "./examples/student-fee-reconciliation";
 import type { DemoDefinition } from "./runtime/replayTypes";
 
 export const demoRegistry: Record<string, DemoDefinition> = {
@@ -23,6 +24,7 @@ export const demoRegistry: Record<string, DemoDefinition> = {
   [orderFulfillmentAnalysisDemo.route]: orderFulfillmentAnalysisDemo,
   [salesPerformanceAnalysisDemo.route]: salesPerformanceAnalysisDemo,
   [shareholderChangeAnalysisDemo.route]: shareholderChangeAnalysisDemo,
+  [studentFeeReconciliationDemo.route]: studentFeeReconciliationDemo,
 };
 
 export function getDemoDefinition(pathname: string): DemoDefinition | null {

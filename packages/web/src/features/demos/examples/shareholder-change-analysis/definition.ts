@@ -12,7 +12,7 @@ export const shareholderChangeAnalysisDemo = createAnalysisScenario({
     coverImage: "/demo-covers/shareholder-change.webp",
     coverAlt: "商务团队在会议桌旁分析企业资料",
     proofMetric: "两期名册 · 4 类变动",
-    featuredOrder: 8,
+    featuredOrder: 9,
     theme: "slate",
   },
   workspaceId: -140,

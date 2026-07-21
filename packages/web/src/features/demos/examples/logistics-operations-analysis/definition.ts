@@ -12,7 +12,7 @@ export const logisticsOperationsAnalysisDemo = createAnalysisScenario({
     coverImage: "/demo-covers/logistics-operations.webp",
     coverAlt: "物流园区中排列整齐的货运卡车",
     proofMetric: "6 条线路 · 准时率诊断",
-    featuredOrder: 6,
+    featuredOrder: 7,
     theme: "slate",
   },
   workspaceId: -200,
