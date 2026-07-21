@@ -3,7 +3,7 @@
 本文档用于记录当前项目 Agent 系统的实现基线和后续演进方案。文档不是接口契约；实际行为以
 `packages/agent`、`packages/server/src/modules/sessions` 和 Prisma schema 为准。
 
-> **文档状态（2026-07-16）**：AgentRun、AgentStep、工具调用、流式中断、会话消息持久化和
+> **当前基线（2026-07-21）**：AgentRun、AgentStep、工具调用、流式中断、会话消息持久化和
 > workbook undo 已经落地。本文档中标记为“已实现”的内容是当前基线；“规划”部分是尚未完成的
 > 演进方向。不要按旧的 Phase 1 重新创建已经存在的模型或接口。
 
@@ -15,6 +15,7 @@
    - `AgentRun` 记录运行状态、模型、输入、输出、错误和时间。
    - `AgentStep` 记录模型步骤、工具名、输入、输出和顺序。
    - `AgentRunSheetSnapshot` 支持工具修改工作簿后的撤销。
+   - `AgentRunChartSnapshot` 支持图表变更的撤销和关联 Sheet 恢复。
 
 2. **消息仍以 JSON transcript 为主**
    - `Session.chatMessages` 保存 AI SDK UI message transcript。
@@ -122,6 +123,8 @@ model AgentRun {
   startedAt        DateTime @default(now())
   endedAt          DateTime?
   steps            AgentStep[]
+  snapshots        AgentRunSheetSnapshot[]
+  chartSnapshots   AgentRunChartSnapshot[]
 }
 ```
 
@@ -367,17 +370,18 @@ interface AgentTool {
 
 ## 13. 数据库落库原则
 
-每次 Agent Run 至少需要记录：
+当前每次 Agent Run 的持久化边界是：
 
 - `AgentRun`
-- `UserMessage`
 - `AgentStep[]`
-- `AssistantFinalMessage` 或 final step
+- `Session.chatMessages` 中的用户和 assistant transcript
+- 工作簿修改对应的 `AgentRunSheetSnapshot` 或 `AgentRunChartSnapshot`
 - `status`
 - `timestamps`
-- `error` 或 `abort reason`
+- `errorMessage` 或 `aborted` 状态
 
-当前 `Message` 表如果继续保留，建议作为兼容层，而不是唯一来源。
+当前没有独立的 `UserMessage`、`AssistantFinalMessage` 或 `ChatMessage` 表。只有在需要按
+message/part 查询、事件回放或精细审计时，才重新评估是否引入独立消息模型。
 
 ---
 
@@ -387,7 +391,7 @@ interface AgentTool {
 
 目标：
 
-- `AgentRun`、`AgentStep` 和 `AgentRunSheetSnapshot` 已存在。
+- `AgentRun`、`AgentStep`、`AgentRunSheetSnapshot` 和 `AgentRunChartSnapshot` 已存在。
 - `Session.chatMessages` 保留 AI SDK transcript。
 - 运行状态、步骤和撤销状态已有服务端持久化路径。
 
@@ -403,11 +407,7 @@ interface AgentTool {
 - 工作簿工具调用完成后会触发工作区刷新。
 - 运行列表 API 已可读取持久化 steps，但前端尚未完整展示独立的 run/step 时间线。
 
-改动范围：
-
-- `ChatInterface.tsx`。
-- 消息渲染组件拆分。
-- 增加 step renderer。
+剩余工作主要是让前端展示持久化的 run/step 时间线，并为跨包状态增加更严格的类型边界。
 
 ### Phase 3：abort / stop（已完成请求级中断）
 
@@ -417,11 +417,7 @@ interface AgentTool {
 - 服务端使用请求连接生命周期的 `AbortController` 取消执行。
 - `AgentRun` 会记录 `aborted` 状态。
 
-改动范围：
-
-- `useChat` 或自定义 transport。
-- `AbortController`。
-- `streamText({ abortSignal })`。
+请求级中断已经是当前实现，不再作为待实施改造项。
 
 ### Phase 4：完善 tool calling 与事件回放（基础能力已完成，增强项待规划）
 
@@ -431,12 +427,8 @@ interface AgentTool {
 - `packages/agent` 已提供工具 catalog、运行上下文和结果预算。
 - 尚未实现独立事件总线、断线重连后的运行事件回放和强类型 step 状态协议。
 
-改动范围：
-
-- `AgentExecutor`。
-- Tool registry。
-- event bus。
-- step persistence。
+后续是否引入独立事件总线，应由断线恢复、监控或审计需求驱动；不为抽象本身新增
+`AgentExecutor` 或 event bus。
 
 ---
 
@@ -450,6 +442,7 @@ interface AgentTool {
 - `AgentRun`
 - `AgentStep`
 - `AgentRunSheetSnapshot`
+- `AgentRunChartSnapshot`
 
 ### 消息类型
 

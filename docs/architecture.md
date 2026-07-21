@@ -175,7 +175,7 @@ Responsibilities:
 - Session, run, and step records
 - Workbook and sheet persistence
 - Session title generation
-- Authentication, if needed
+- Authentication and workspace authorization
 
 Uploaded workbook files are stored as immutable source assets. In local development the default
 root is `.data/storage`; production may replace the local storage adapter with S3, MinIO, or
@@ -277,7 +277,7 @@ packages/server/src/
 ```
 
 This tree is intentionally more explicit than the current codebase.
-It is meant to support future multi-user, workspace scoping, auth, and role checks without forcing a redesign later.
+It is meant to support workspace scoping and role checks without forcing a redesign later.
 
 The important long-term rule is:
 
@@ -286,7 +286,7 @@ The important long-term rule is:
 - `infra/*` own technical integrations
 - `shared/*` only contains cross-cutting helpers that do not belong to a specific module
 
-For multi-user support, the ownership chain should become:
+For ownership and authorization, the ownership chain is:
 
 - user
 - workspace or tenant
@@ -294,7 +294,8 @@ For multi-user support, the ownership chain should become:
 - run
 - step
 
-That means the server should eventually treat `workspaceId` and `ownerUserId` as first-class scoping fields on session/workbook records, not as ad hoc filters added later.
+The server treats `workspaceId` and `ownerUserId` as first-class scoping fields on workspace-owned
+records, not as ad hoc filters added later.
 
 The current implementation follows that direction with a cookie-backed email/password session identity:
 
@@ -488,22 +489,20 @@ only after the user sends the first message; opening a workspace, creating a wor
 
 ### 5.3 `packages/web`
 
-Current UI files:
+The web package is organized around stable feature ownership rather than individual component
+locations:
 
-- `src/components/Workbench.tsx`
-- `src/components/ChatInterface.tsx`
-- `src/components/ExcelWorkspace.tsx`
-- `src/components/ChatSidebar.tsx`
-- `src/hooks/useWorkbench.ts`
-- `src/hooks/useSheetPatchSync.ts`
-- `src/features/workbook/WorkbookWorkspace.tsx`
-- `src/features/workbook/useWorkbookWorkspace.ts`
-- `src/features/workbook/ExcelGrid.tsx`
-- `src/features/workbook/useExcelGridWorkspace.ts`
+- `app` owns routing, loaders, and top-level shell composition;
+- `features/auth` owns public authentication screens and auth-specific state;
+- `features/workspace` owns workspace and workbook directory state;
+- `features/session` owns conversation selection, session metadata, and session-scoped state;
+- `features/chat` owns message rendering, composer interactions, streaming, and chat references;
+- `features/workbook` owns workbook UI, sheet editing, chart interaction, and workbook-local state;
+- shared UI and API helpers provide reusable presentation and transport primitives without owning
+  workbook or session business rules.
 
-show the current coupling pressure.
-
-These files should be split by feature boundaries rather than by “one big page component”.
+Workbook state and conversation state must remain independently refreshable. A chat refresh must not
+reset the active workbook, and a workbook refresh must not replace the selected conversation.
 
 ## 6. Web Architecture Rules
 
@@ -550,9 +549,9 @@ packages/web/src/
 The current `components/` folder is acceptable as a transitional state,
 but feature boundaries should be the long-term structure.
 
-### 6.2 Recommended component split
+### 6.2 Component boundaries
 
-Chat UI should eventually be split into:
+Chat UI separates:
 
 - `MessageList`
 - `MessageItem`
@@ -560,26 +559,21 @@ Chat UI should eventually be split into:
 - `StreamingIndicator`
 - `InputEditor`
 
-Workbook UI should eventually be split into:
+Workbook UI separates:
 
 - `WorkbookSwitcher`
 - `ExcelWorkspace`
 - `ExcelGrid`
 - `ImportPreviewDialog`
 
-Workbook UI should also separate behavior from rendering:
+Workbook behavior and rendering remain separate. Feature hooks own fetching, persistence, deletion,
+selection, and activation synchronization; visual components render the current state and dispatch
+user actions. Workbook data fetching must not be hidden inside the grid renderer.
 
-- `useWorkbookWorkspace` owns workbook list, switching, import preview, and sheet list derivation
-- `useExcelGridWorkspace` owns persistence, delete, and sheet activation sync
-- `ExcelGrid` should render the spreadsheet and toolbar, but not own workbook data fetching
-
-Chart positioning uses a single runtime layout boundary. `fortuneSheetLayout.ts` adapts the
-current FortuneSheet sheet shape, including nested persisted `config.config` layout metadata, into
-an immutable `SheetGridLayout`. `useExcelGridWorkspace` updates this derived layout from
-FortuneSheet's `onChange` payload, while `ChartOverlay` and `chartAnchorGeometry` consume only the
-standard layout model. The chart overlay must not parse `SheetSchema.config` or mutate FortuneSheet
-configuration objects; layout changes cancel an in-progress chart interaction before a new anchor
-is persisted.
+Chart positioning uses a single runtime layout boundary. A workbook adapter translates the
+FortuneSheet view shape into an immutable layout model, while chart rendering and interaction
+consume only that model. The chart overlay must not parse raw sheet configuration or mutate
+FortuneSheet configuration objects.
 
 Sheet persistence has one canonical cell model. `uploadedData` contains every real visible cell,
 including table headers; `columns` contains column layout metadata such as widths and must not be
@@ -895,37 +889,7 @@ undo checkpoint. Starting a new turn clears that Session's checkpoint; a
 mutation from elsewhere invalidates a checkpoint candidate only when it
 touches one of its captured Sheets, even if that Run has not finished yet.
 
-## 12. Migration Plan
-
-The architecture should evolve in steps.
-
-### Phase 1: Split web features
-
-- Break `ChatInterface` into smaller components
-- Isolate session list/title UI
-- Separate workbook UI from chat UI state
-- Introduce a clear client-state boundary for session-scoped and workbook-scoped data
-- Add focused tests for title refresh, session switching, and sheet patch sync
-
-### Phase 2: Extract agent layer
-
-- Move session context, tool registry, and compaction into `packages/agent`
-- Keep session title generation in `packages/server` as a dedicated session service
-- Keep server as an adapter over the agent layer
-
-### Phase 3: Harden state boundaries
-
-- Treat server state and UI state separately
-- Use cache refresh or optimistic updates instead of deep prop chains
-- Reduce parent-container refreshes that reset unrelated child state
-- Ensure title updates only revalidate session data, not the entire workbench
-
-### Phase 4: Expand runtime support
-
-- Add runtime abstractions for alternate execution environments
-- Keep the web app unchanged while the execution backend evolves
-
-## 13. Definition of Done
+## 12. Architectural Invariants
 
 The architecture is considered aligned when:
 
@@ -941,7 +905,7 @@ The architecture is considered aligned when:
 - an Excel patch failure does not break the chat panel
 - local UI state cannot corrupt persisted session or workbook state
 
-## 14. Summary
+## 13. Summary
 
 OpenExcel should grow into a layered system:
 

@@ -2,10 +2,11 @@
 
 ## 1. Framework
 
-All packages use **Vitest** as the test runner. Vitest is configured per package or uses its defaults.
+All packages use **Vitest** as the test runner. Each package owns its Vitest configuration:
 
-- **`packages/server`**: own `vitest.config.ts` with `globals: true`, `environment: "node"`, `testTimeout: 30000`
-- **Other packages**: Vitest defaults
+- **`packages/server`** and **`packages/core`**: `globals: true`, `environment: "node"`;
+- **`packages/web`**: `globals: true`, `environment: "jsdom"`, React test setup, and TypeScript/TSX test inclusion;
+- **`packages/agent`**: package defaults unless its local configuration changes.
 
 ## 2. File naming and placement
 
@@ -245,7 +246,7 @@ pnpm test
 pnpm test:server       # packages/server
 pnpm test:web          # packages/web
 pnpm test:core         # packages/core
-pnpm test:agent        # packages/agent (if script exists)
+pnpm --filter @openexcel/agent test
 
 # Filter tests by pattern
 pnpm --filter @openexcel/server exec vitest run -- title

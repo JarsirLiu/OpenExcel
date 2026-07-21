@@ -32,8 +32,8 @@ docker push ccr.ccs.tencentyun.com/openexcel/openexcel:v1.0.0
 后续发布新版本时，使用新的标签重复构建、打标签和推送，例如：
 
 ```powershell
-docker build -t ccr.ccs.tencentyun.com/openexcel/openexcel:v1.0.0 .
-docker push ccr.ccs.tencentyun.com/openexcel/openexcel:v1.0.0
+docker build -t ccr.ccs.tencentyun.com/openexcel/openexcel:v1.0.1 .
+docker push ccr.ccs.tencentyun.com/openexcel/openexcel:v1.0.1
 ```
 
 ## 服务器拉取并启动

@@ -36,29 +36,27 @@ XLSX chart/drawing/rels
 
 ## 2. 当前状态
 
-### 已有
+### 已完成
 
 `packages/core` 已经有以下基础：
 
 - `ChartSpec`、数据区域引用和图表锚点模型；
 - 图表新增、修改、删除命令模型；
 - 工作簿级 XLSX 导出入口 `workbookToXlsx`；
-- 图表、drawing 和 relationship XML 的初步生成器。
 
-### 未完成
+- 图表、drawing 和 relationship XML 的生成器；
+- 独立的 Chart 持久化实体和工作簿级真实导出；
+- `createChart`、`updateChart`、`deleteChart`、`listCharts` AI 工具及图表撤销快照；
+- 基于 `ChartSpec` 的 Web 网格覆盖层、插入入口和锚点交互；
+- 基础 XLSX chart、drawing 和 relationship 导入，以及导入批次内的 Sheet key 映射；
+- 对当前模型不支持的图表类型和展示属性的显式拒绝；
+- core 阶段的图表数量和系列数量限制。
 
-当前还不能称为完整的图表功能：
+### 当前限制与剩余验证
 
-- 数据库已有独立的 Chart 持久化实体，`ChartSpec` 经过 core 校验后才写入；
-- 服务端真实导出已读取数据库中的 ChartSpec；
-- AI 工具已提供创建、修改、删除、查询图表的入口，并使用图表级撤销快照；
-- Web 已提供基于 ChartSpec 的网格内图表覆盖层，支持 ECharts 渲染、选中、拖动、八方向缩放、删除、滚动跟随和锚点持久化；
-- Web 已提供基础的“插入图表”工具栏入口，可将当前二维选区转换为 ChartSpec 并持久化；
-- XLSX 导入已读取基础 chart、drawing 和关系部件，并把图表引用转换为导入批次内的 Sheet key；
-- XLSX 导入遇到当前模型不支持的图表类型或展示属性会拒绝导入，不静默丢失；
-- XLSX 图表数量和系列数量在 core 解析阶段受限，避免先构造超大对象再由 server 拒绝；
-- 生成的 OOXML 尚未通过 Excel 实际打开验证；
-- `Sheet.config.chart` 仍是旧格式字段，不能作为新功能的数据源。
+- 生成的 OOXML 尚未通过 Excel 和 LibreOffice 实际打开验证；
+- `Sheet.config.chart` 仍是旧格式字段，不能作为新功能的数据源；
+- 导入只覆盖 `ChartSpec` 已建模的图表类型和展示属性，不支持的内容必须继续拒绝导入。
 
 AI 或用户图表变更完成后，Web 会通过工作簿刷新契约重新读取 ChartSpec。网格内覆盖层只维护当前交互状态，服务端 ChartSpec 仍是唯一事实来源。
 
@@ -115,130 +113,18 @@ agent
 - 为导入、AI 创建和用户创建分别设计三套图表结构；
 - 用 Sheet 名称替代 Workbook/Sheet ID。
 
-## 4. 交付顺序
+## 4. 当前交付边界
 
-必须按以下顺序推进，不跨阶段堆叠临时入口。
+图表已经沿着同一条领域路径接入：`ChartSpec` 是唯一事实模型，server 负责持久化和授权，
+AI 与 Web 都通过图表用例读写，core 负责 OOXML 导入导出。ECharts option、DOM 状态和
+`Sheet.config.chart` 都不是持久化来源。
 
-### 阶段 A：完成 OOXML 导出闭环
+当前仍需保持的边界：
 
-目标：`ChartSpec -> XLSX` 可被真实 Excel 打开。
-
-工作内容：
-
-1. 修正 chart XML 的必需元素和元素顺序；
-2. 为柱状、折线、面积、饼图、散点图和组合图分别建立最小合法 XML 模板；
-3. 正确生成 worksheet、drawing、chart 三层 relationships；
-4. 正确更新 `[Content_Types].xml`；
-5. 处理多个 Sheet、多个图表和已有 worksheet relationships；
-6. 明确锚点的 0-based 网格坐标和 EMU 偏移规则；
-7. 增加真实文件回归测试，而不是只检查字符串存在。
-
-验收：
-
-- Excel 能打开文件且不出现“发现不可读取内容”；
-- LibreOffice 能打开文件；
-- 图表位置、标题、类型和数据引用正确；
-- 没有图表的工作簿导出行为不改变。
-
-### 阶段 B：建立 Chart 持久化
-
-目标：图表成为 Workbook 下的独立持久化对象。
-
-建议数据边界：
-
-```text
-Chart
-  id / publicId
-  workbookId
-  sheetId
-  order
-  spec JSON
-  createdAt / updatedAt
-```
-
-`spec` 写入前必须通过 core 的 `parseChartSpec`。数据库只负责保存经过校验的领域数据，不能保存未经约束的前端对象。
-
-必须提供：
-
-- 按 Workbook 查询图表；
-- 按 Chart ID 查询并校验工作区归属；
-- 新增、更新、删除图表；
-- 删除 Workbook 时级联删除图表；
-- 删除 Sheet 时拒绝或按明确规则处理仍引用该 Sheet 的图表；
-- Chart 与 Sheet 的索引。
-
-所有写入都必须进入 Workbook/Sheet 现有事务边界，不能由前端直接写数据库结构。
-
-### 阶段 C：接入真实导出
-
-目标：导出使用数据库中的真实图表。
-
-导出流程：
-
-```text
-server export use case
-  -> 查询 Workbook、Sheet、Chart
-  -> 组装 core XlsxWorkbookInput
-  -> workbookToXlsx
-  -> 返回下载流
-```
-
-必须移除固定的 `charts: []`。server 只负责把持久化领域对象转换为 core 输入，不能处理 XML。
-
-导出器要继续保留未建模但必须保留的 package 部件，避免为了写入图表而丢失其他 Excel 对象。
-
-### 阶段 D：接入 AI 图表工具
-
-目标：AI 通过正式工具创建图表，而不是输出一段 JSON 或修改 Sheet 配置。
-
-第一批工具：
-
-- `createChart`：根据 Workbook/Sheet 和数据区域创建图表；
-- `updateChart`：更新标题、类型、系列或锚点；
-- `deleteChart`：删除指定图表；
-- `listCharts`：读取当前 Workbook/Sheet 的图表摘要。
-
-工具规则：
-
-- 参数使用 Excel 视觉坐标，行列从 1 开始；`createChart` 接收连续的矩形 `sourceRange`，首行作为系列标题、首列作为分类，单行和单列也直接支持；组合图可通过 `seriesTypes` 指定每个系列的柱形、折线或面积类型，但不传具体数据值；
-- server 工具边界统一转换为 core 的 0-based 坐标；
-- 数据区域必须引用真实 Sheet ID；
-- 创建前校验范围存在、类型匹配、系列长度一致；
-- 写入返回 Chart ID、图表摘要和可用于前端刷新的变更信息；
-- 图表变更纳入现有 AI run 快照和一次性撤销规则。
-
-AI 工具只负责请求图表用例，不能自己生成 OOXML，也不能直接操作 ECharts。
-
-### 阶段 E：接入 Web 渲染
-
-目标：前端能在工作表上看到并操作服务端保存的图表。
-
-建议状态流：
-
-```text
-GET workbook
-  -> sheets + charts
-  -> workbook workspace state
-  -> chart overlay renderer
-```
-
-Web 负责：
-
-- 根据 `ChartSpec` 创建 ECharts 实例；
-- 将单元格范围解析为当前数据快照；
-- 计算图表在网格中的视觉位置；
-- 处理选中、移动、缩放和删除交互；
-- 通过 API/AI 变更服务端状态；
-- 工作簿刷新后销毁旧实例并重建投影。
-
-Web 不负责：
-
-- 持久化 ECharts option；
-- 生成 OOXML；
-- 通过 Sheet 配置伪造图表；
-- 让本地渲染实例成为数据源。
-
-第一版渲染只覆盖 `ChartSpec` 已支持的基本图表类型。主题、动画和 tooltip 属于派生渲染配置，不写入 Chart 事实模型。
+- 生成的 XLSX 必须通过 Excel 和 LibreOffice 实际打开验证；
+- 不支持的 OOXML 图表特性必须显式拒绝，不能静默丢失；
+- 图表引用始终使用稳定的 Workbook/Sheet 身份和 `ChartSpec` 引用模型；
+- Excel Table、Named Range、PivotTable、图片等对象按独立对象域处理，不能并入 `ChartSpec`。
 
 ## 5. XLSX 图表导入
 
@@ -349,17 +235,3 @@ WorkbookObject
 - 不在没有验证 Excel 打开的情况下宣布导出完成；
 - 不把透视表、Excel Table 和图表混成一个通用 JSON 补丁对象；
 - 不静默丢弃尚未支持的 OOXML 部件。
-
-## 9. 当前执行顺序
-
-当前只按以下顺序推进：
-
-1. 修正并验证 `ChartSpec -> XLSX`，直到 Excel 可打开；
-2. 建立 Chart 持久化和 Workbook 查询契约；
-3. 让真实导出读取持久化 Chart；
-4. 接入 `createChart/updateChart/deleteChart/listCharts` AI 工具；
-5. 验证 Web 图表覆盖层在真实导入、滚动、缩放和多图表场景下的交互；
-6. 实现 XLSX 图表导入 round-trip；
-7. 另行规划 Excel Table、Named Range、PivotTable 等对象。
-
-没有完成前一阶段的验收，不进入下一阶段。
