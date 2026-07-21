@@ -99,6 +99,7 @@ export const DemoWorkspacePane = memo(function DemoWorkspacePane({
           handleWorkbookStructureChanged={handleStructureNoop}
           handleWorkbookRefresh={handleWorkbookNoop}
           onWorkbookMutation={handleWorkbookNoop}
+          presentationMode
         />
         <div className={workbenchStyles.resizeHandle} />
       </div>

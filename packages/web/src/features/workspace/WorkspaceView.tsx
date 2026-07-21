@@ -28,6 +28,7 @@ type Props = {
   handleWorkbookStructureChanged: (update: WorkbookStructureUpdate) => void;
   handleWorkbookRefresh: () => Promise<void>;
   onWorkbookMutation?: () => Promise<void> | void;
+  presentationMode?: boolean;
 };
 
 export function WorkspaceView({
@@ -46,6 +47,7 @@ export function WorkspaceView({
   handleWorkbookStructureChanged,
   handleWorkbookRefresh,
   onWorkbookMutation,
+  presentationMode = false,
 }: Props) {
   const newWbInputRef = useRef<HTMLInputElement>(null);
 
@@ -61,6 +63,7 @@ export function WorkspaceView({
         onSwitchWorkbook={handleSwitchWorkbook}
         onUploadNewWorkbookClick={() => newWbInputRef.current?.click()}
         onWorkbookRename={handleWorkbookRename}
+        presentationMode={presentationMode}
       />
 
       <input

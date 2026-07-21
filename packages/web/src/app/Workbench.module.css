@@ -1,11 +1,9 @@
 .layout {
   --chat-sidebar-width: 300px;
-  height: 100vh;
+  height: 100dvh;
   display: flex;
   overflow: hidden;
-  background:
-    radial-gradient(ellipse at top left, rgba(253, 246, 240, 0.65) 0%, transparent 55%),
-    radial-gradient(ellipse at bottom right, rgba(245, 240, 255, 0.55) 0%, transparent 60%), #faf8f6;
+  background: #f4f2ed;
 }
 
 .main {
