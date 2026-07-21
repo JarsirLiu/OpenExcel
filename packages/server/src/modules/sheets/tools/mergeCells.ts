@@ -1,105 +1,66 @@
 import { excelToolSpecs, runToolContextSchema } from "@openexcel/agent";
 import {
-  type SheetChangeDelta,
   type SheetChangeRangeOperation,
+  type SheetMutation,
   sheetChangePatchOutputSchema,
   sheetChangeRangeToZeroBased,
   storageIndex,
-  toolCellToA1Ref,
   toolIndex,
   toolRangeToA1Ref,
 } from "@openexcel/core";
-import { sheetRecordToCelldata } from "../../../shared/utils/sheetData.js";
-import { saveSheetSnapshot } from "../application/saveSheetSnapshot.js";
-import { applyMergeOperation } from "../domain/sheet.js";
+import { executeSheetCommand } from "../application/executeSheetCommand.js";
 import { buildSheetChangePreview } from "../domain/sheetPreview.js";
 import { runSheetMutation } from "./runSheetMutation.js";
+import { createSheetToolMutationId } from "./sheetToolCommand.js";
+import { toSheetToolPatchResult } from "./sheetToolResult.js";
 
 export const mergeCells = {
   ...excelToolSpecs.mergeCells,
   contextSchema: runToolContextSchema,
   execute: async (
-    { sheetId, operations }: { sheetId: number; operations: SheetChangeRangeOperation[] },
-    { context }: { context: { runId: number; workspaceId: number } },
+    input: { sheetId: number; operations: SheetChangeRangeOperation[] },
+    options: { context: { runId: number; workspaceId: number }; toolCallId?: string },
   ) => {
-    return runSheetMutation(context, sheetId, async (sheet) => {
-      const celldata: any[] = sheetRecordToCelldata(sheet);
-      if (!Array.isArray(celldata)) throw new Error("celldata 格式错误");
-
-      const cellMap = new Map<string, any>();
-      for (const cell of celldata) {
-        cellMap.set(`${cell.r},${cell.c}`, cell);
-      }
-
-      const mergedRanges: string[] = [];
-      let minRow = storageIndex(Number.MAX_SAFE_INTEGER);
-      let maxRow = storageIndex(0);
-      let minCol = storageIndex(Number.MAX_SAFE_INTEGER);
-      let maxCol = storageIndex(0);
-
-      for (const operation of operations) {
-        const storageRange = sheetChangeRangeToZeroBased(operation);
-        applyMergeOperation(cellMap, storageRange);
-        mergedRanges.push(
+    return runSheetMutation(options.context, input.sheetId, async (sheet) => {
+      const mutation: SheetMutation = { type: "merge", operations: input.operations };
+      const result = await executeSheetCommand(options.context.workspaceId, {
+        kind: "mutation",
+        mutationId: createSheetToolMutationId(
+          options.context.runId,
+          "mergeCells",
+          options.toolCallId,
+        ),
+        sheetId: input.sheetId,
+        baseRevision: sheet.revision,
+        mutation,
+      });
+      const ranges = input.operations.map(sheetChangeRangeToZeroBased);
+      const { snapshot } = result;
+      const commandResult = toSheetToolPatchResult(result);
+      const output = {
+        success: true,
+        mergedRanges: input.operations.map((operation) =>
           toolRangeToA1Ref({
             startRow: toolIndex(operation.startRow),
             startCol: toolIndex(operation.startCol),
             endRow: toolIndex(operation.endRow),
             endCol: toolIndex(operation.endCol),
           }),
-        );
-        minRow = storageIndex(Math.min(minRow, storageRange.startRow));
-        maxRow = storageIndex(Math.max(maxRow, storageRange.endRow));
-        minCol = storageIndex(Math.min(minCol, storageRange.startCol));
-        maxCol = storageIndex(Math.max(maxCol, storageRange.endCol));
-      }
-
-      const updatedCelldata = Array.from(cellMap.values());
-      const config = sheet.config ? JSON.parse(sheet.config) : {};
-      config.merge = { ...(config.merge ?? {}) };
-      for (const operation of operations) {
-        const storageRange = sheetChangeRangeToZeroBased(operation);
-        const cellRef = toolCellToA1Ref(
-          toolIndex(operation.startRow),
-          toolIndex(operation.startCol),
-        );
-        config.merge[cellRef] = {
-          r: storageRange.startRow,
-          c: storageRange.startCol,
-          rs: storageRange.endRow - storageRange.startRow + 1,
-          cs: storageRange.endCol - storageRange.startCol + 1,
-        };
-      }
-
-      const mutation = await saveSheetSnapshot({
-        sheetId,
-        workspaceId: context.workspaceId,
-        baseRevision: sheet.revision,
-        uploadedData: JSON.stringify(updatedCelldata),
-        config: JSON.stringify(config),
-      });
-
-      const delta: SheetChangeDelta = {
-        type: "merge",
-        operations,
-      };
-
-      const output = {
-        success: true,
-        mergedRanges,
-        changeSummary: {
-          changedCellCount: 0,
-          rangeOperationCount: operations.length,
-        },
-        delta,
-        ...mutation,
-        preview: buildSheetChangePreview(updatedCelldata, sheet.name, sheetId, minRow, maxRow, {
-          startCol: minCol,
-          endCol: maxCol,
-        }),
+        ),
+        ...commandResult,
+        preview: buildSheetChangePreview(
+          snapshot.celldata,
+          sheet.name,
+          input.sheetId,
+          storageIndex(Math.min(...ranges.map((range) => range.startRow))),
+          storageIndex(Math.max(...ranges.map((range) => range.endRow))),
+          {
+            startCol: storageIndex(Math.min(...ranges.map((range) => range.startCol))),
+            endCol: storageIndex(Math.max(...ranges.map((range) => range.endCol))),
+          },
+        ),
         sheetInfo: { sheetId: sheet.id, sheetNo: sheet.sheetNo, sheetName: sheet.name },
       };
-
       sheetChangePatchOutputSchema.parse(output);
       return output;
     });

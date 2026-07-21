@@ -96,11 +96,26 @@ model Sheet {
   sessions     Session[]
   runSnapshots AgentRunSheetSnapshot[]
   charts       Chart[]
+  mutationReceipts SheetMutationReceipt[]
   createdAt    DateTime                @default(now())
   updatedAt    DateTime                @updatedAt
 
   @@unique([workbookId, sheetNo])
   @@index([workbookId, order])
+}
+
+model SheetMutationReceipt {
+  id           Int      @id @default(autoincrement())
+  mutationId   String   @unique
+  commandHash  String
+  sheetId      Int
+  baseRevision Int
+  revision     Int
+  result       String   @db.LongText
+  createdAt    DateTime @default(now())
+  sheet        Sheet    @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+
+  @@index([sheetId, createdAt])
 }
 
 model Chart {

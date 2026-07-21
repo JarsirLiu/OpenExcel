@@ -5,10 +5,10 @@ import {
   createSheet,
   deleteSheet,
   downloadTemplateUrl,
+  executeSheetCommand,
   fetchWorkbook,
   fetchWorkbookReferenceCandidates,
   fetchWorkbooks,
-  updateSheetData,
 } from "./workbooks";
 import { bootstrapWorkspace } from "./workspaces";
 
@@ -115,20 +115,23 @@ describe("fetchWorkbookReferenceCandidates", () => {
   });
 });
 
-describe("updateSheetData", () => {
-  it("sends PATCH with celldata and base revision", async () => {
+describe("executeSheetCommand", () => {
+  it("sends the unified replaceSnapshot command", async () => {
     mockFetch.mockResolvedValue(new Response(JSON.stringify({ revision: 1 }), { status: 200 }));
 
-    const data = [
-      ["a", "b"],
-      ["c", "d"],
-    ];
-    await updateSheetData(9, 5, data, 0);
+    const command = {
+      kind: "replaceSnapshot" as const,
+      mutationId: "web-test-1",
+      sheetId: 5,
+      baseRevision: 0,
+      snapshot: { celldata: [], config: null },
+    };
+    await executeSheetCommand(9, command);
 
     expect(mockFetch).toHaveBeenCalledWith("/api/workspaces/9/sheets/5", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ celldata: data, baseRevision: 0 }),
+      body: JSON.stringify(command),
     });
   });
 });

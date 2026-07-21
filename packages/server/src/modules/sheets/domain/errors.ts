@@ -14,3 +14,13 @@ export class SheetRevisionConflictError extends Error {
     this.sheetId = sheetId;
   }
 }
+
+export class SheetMutationIdConflictError extends Error {
+  readonly mutationId: string;
+
+  constructor(mutationId: string) {
+    super(`Mutation ${mutationId} 已用于其他命令`);
+    this.name = "SheetMutationIdConflictError";
+    this.mutationId = mutationId;
+  }
+}

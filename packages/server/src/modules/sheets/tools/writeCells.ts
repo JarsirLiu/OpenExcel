@@ -1,134 +1,97 @@
 import { excelToolSpecs, runToolContextSchema } from "@openexcel/agent";
 import {
-  type SheetChangeDelta,
-  sheetChangeCellToZeroBased,
+  type SheetChangeCell,
+  type SheetMutation,
   sheetChangePatchOutputSchema,
-  sheetChangeRangeToZeroBased,
   storageIndex,
-  type ToolIndex,
-  toolIndexToStorage,
 } from "@openexcel/core";
-import { sheetRecordToCelldata } from "../../../shared/utils/sheetData.js";
-import { saveSheetSnapshot } from "../application/saveSheetSnapshot.js";
-import {
-  applyCellWrite,
-  cellContentEqual,
-  normalizeWriteOperations,
-  snapshotCellContent,
-  type WriteCellsInput,
-} from "../domain/sheet.js";
+import { executeSheetCommand } from "../application/executeSheetCommand.js";
 import { buildSheetChangePreview } from "../domain/sheetPreview.js";
 import { runSheetMutation } from "./runSheetMutation.js";
+import { createSheetToolMutationId } from "./sheetToolCommand.js";
+import { toSheetToolPatchResult } from "./sheetToolResult.js";
+
+type CellWriteValue = string | number | boolean;
+type WriteOperation =
+  | { type: "cell"; row: number; col: number; value: CellWriteValue; formula?: string }
+  | {
+      type: "range";
+      startRow: number;
+      startCol: number;
+      endRow: number;
+      endCol: number;
+      value: CellWriteValue;
+      formula?: string;
+    };
+
+function expandOperations(operations: WriteOperation[]): SheetChangeCell[] {
+  const cells: SheetChangeCell[] = [];
+  for (const operation of operations) {
+    if (operation.type === "cell") {
+      cells.push(operation);
+      continue;
+    }
+    for (let row = operation.startRow; row <= operation.endRow; row++) {
+      for (let col = operation.startCol; col <= operation.endCol; col++) {
+        cells.push({ row, col, value: operation.value, formula: operation.formula });
+      }
+    }
+  }
+  return cells;
+}
+
+function affectedRange(cells: SheetChangeCell) {
+  return {
+    startRow: storageIndex(cells.row - 1),
+    endRow: storageIndex(cells.row - 1),
+    startCol: storageIndex(cells.col - 1),
+    endCol: storageIndex(cells.col - 1),
+  };
+}
 
 export const writeCells = {
   ...excelToolSpecs.writeCells,
   contextSchema: runToolContextSchema,
   execute: async (
-    input: WriteCellsInput,
-    { context }: { context: { runId: number; workspaceId: number } },
+    input: { sheetId: number; operations: WriteOperation[] },
+    options: { context: { runId: number; workspaceId: number }; toolCallId?: string },
   ) => {
-    const { sheetId, operations } = normalizeWriteOperations(input);
-    return runSheetMutation(context, sheetId, async (sheet) => {
-      const celldata: any[] = sheetRecordToCelldata(sheet);
-      if (!Array.isArray(celldata)) throw new Error("celldata 格式错误");
-
-      const cellMap = new Map<string, any>();
-      const initialContent = new Map<string, ReturnType<typeof snapshotCellContent>>();
-      for (const cell of celldata) {
-        cellMap.set(`${cell.r},${cell.c}`, cell);
-        initialContent.set(`${cell.r},${cell.c}`, snapshotCellContent(cell));
-      }
-
-      const touchedCells = new Map<
-        string,
-        { row: ToolIndex; col: ToolIndex; value: string | number | boolean; formula?: string }
-      >();
-      for (const operation of operations) {
-        if (operation.type === "cell") {
-          const storageCell = sheetChangeCellToZeroBased(operation);
-          applyCellWrite(
-            cellMap,
-            touchedCells,
-            storageCell.row,
-            storageCell.col,
-            storageCell.value,
-            storageCell.formula,
-          );
-          continue;
-        }
-
-        const storageRange = sheetChangeRangeToZeroBased({
-          startRow: operation.startRow,
-          startCol: operation.startCol,
-          endRow: operation.endRow,
-          endCol: operation.endCol,
-        });
-
-        for (
-          let row = storageRange.startRow;
-          row <= storageRange.endRow;
-          row = storageIndex(row + 1)
-        ) {
-          for (
-            let col = storageRange.startCol;
-            col <= storageRange.endCol;
-            col = storageIndex(col + 1)
-          ) {
-            applyCellWrite(cellMap, touchedCells, row, col, operation.value, operation.formula);
-          }
-        }
-      }
-
-      const updatedCelldata = Array.from(cellMap.values());
-
-      const mutation = await saveSheetSnapshot({
+    const { sheetId, operations } = input;
+    return runSheetMutation(options.context, sheetId, async (sheet) => {
+      const cells = expandOperations(operations);
+      const mutation: SheetMutation = { type: "write", cells };
+      const result = await executeSheetCommand(options.context.workspaceId, {
+        kind: "mutation",
+        mutationId: createSheetToolMutationId(
+          options.context.runId,
+          "writeCells",
+          options.toolCallId,
+        ),
         sheetId,
-        workspaceId: context.workspaceId,
         baseRevision: sheet.revision,
-        uploadedData: JSON.stringify(updatedCelldata),
+        mutation,
       });
-
-      const touchedValues = Array.from(touchedCells.values());
-      const changedValues = Array.from(touchedCells.entries())
-        .filter(([key]) => {
-          const cell = cellMap.get(key);
-          return !cellContentEqual(initialContent.get(key), snapshotCellContent(cell));
-        })
-        .map(([, cell]) => cell);
-      const minRow = storageIndex(
-        Math.min(...touchedValues.map((cell) => toolIndexToStorage(cell.row))),
-      );
-      const maxRow = storageIndex(
-        Math.max(...touchedValues.map((cell) => toolIndexToStorage(cell.row))),
-      );
-      const minCol = storageIndex(
-        Math.min(...touchedValues.map((cell) => toolIndexToStorage(cell.col))),
-      );
-      const maxCol = storageIndex(
-        Math.max(...touchedValues.map((cell) => toolIndexToStorage(cell.col))),
-      );
-
-      const delta: SheetChangeDelta = {
-        type: "write",
-        cells: changedValues,
-      };
-
+      const ranges = cells.map(affectedRange);
+      const minRow = Math.min(...ranges.map((range) => range.startRow));
+      const maxRow = Math.max(...ranges.map((range) => range.endRow));
+      const minCol = Math.min(...ranges.map((range) => range.startCol));
+      const maxCol = Math.max(...ranges.map((range) => range.endCol));
+      const { snapshot } = result;
+      const commandResult = toSheetToolPatchResult(result);
       const output = {
         success: true,
-        updatedCells: changedValues.length,
-        changeSummary: {
-          changedCellCount: changedValues.length,
-          rangeOperationCount: 0,
-        },
-        delta,
-        ...mutation,
-        preview: buildSheetChangePreview(updatedCelldata, sheet.name, sheetId, minRow, maxRow, {
-          startCol: minCol,
-          endCol: maxCol,
-        }),
+        updatedCells: result.changeSummary.changedCellCount,
+        ...commandResult,
+        preview: buildSheetChangePreview(
+          snapshot.celldata,
+          sheet.name,
+          sheetId,
+          storageIndex(minRow),
+          storageIndex(maxRow),
+          { startCol: storageIndex(minCol), endCol: storageIndex(maxCol) },
+        ),
         sheetInfo: { sheetId: sheet.id, sheetNo: sheet.sheetNo, sheetName: sheet.name },
       };
-
       sheetChangePatchOutputSchema.parse(output);
       return output;
     });

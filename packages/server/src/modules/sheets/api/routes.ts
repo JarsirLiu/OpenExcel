@@ -1,14 +1,43 @@
+import type { SheetCommand } from "@openexcel/core";
 import type { FastifyInstance } from "fastify";
+import { ZodError } from "zod";
 import { resolveWorkspaceIdForRequest } from "../../../middleware/resourceAccess.js";
 import { WORKBOOK_IMPORT_LIMITS } from "../../workbooks/api/importLimits.js";
 import { decompressImportPayload } from "../../workbooks/api/importPayload.js";
 import * as application from "../application/index.js";
-import { SheetRevisionConflictError } from "../domain/errors.js";
+import {
+  SheetMutationIdConflictError,
+  SheetNotFoundError,
+  SheetRevisionConflictError,
+} from "../domain/errors.js";
+
+function sendSheetCommandError(
+  reply: { status: (code: number) => { send: (body: unknown) => unknown } },
+  error: unknown,
+) {
+  if (error instanceof ZodError) {
+    return reply.status(400).send({
+      error: "Sheet 命令参数无效",
+      code: "INVALID_SHEET_COMMAND",
+      details: error.issues.slice(0, 10),
+    });
+  }
+  if (error instanceof SheetNotFoundError) {
+    return reply.status(404).send({ error: "Sheet not found" });
+  }
+  if (error instanceof SheetMutationIdConflictError) {
+    return reply.status(409).send({ error: "mutationId 已用于其他命令" });
+  }
+  if (error instanceof SheetRevisionConflictError) {
+    return reply.status(409).send({ error: "Sheet 已被其他操作修改" });
+  }
+  return undefined;
+}
 
 export async function sheetRoutes(app: FastifyInstance) {
   app.patch<{
     Params: { workspacePublicId: string; sheetId: string };
-    Body: { celldata: any[]; baseRevision: number; config?: any };
+    Body: SheetCommand;
   }>(
     "/api/workspaces/:workspacePublicId/sheets/:sheetId",
     {
@@ -23,19 +52,15 @@ export async function sheetRoutes(app: FastifyInstance) {
       );
       if (workspaceId == null) return;
       try {
-        const result = await application.updateSheetData(
-          workspaceId,
-          Number(req.params.sheetId),
-          req.body.celldata,
-          req.body.baseRevision,
-          req.body.config,
-        );
-        if ("error" in result) return reply.status(400).send(result);
-        return result;
-      } catch (error) {
-        if (error instanceof SheetRevisionConflictError) {
-          return reply.status(409).send({ error: "Sheet 已被其他操作修改" });
+        if (req.body?.sheetId !== Number(req.params.sheetId)) {
+          return reply.status(400).send({ error: "Sheet ID 不匹配" });
         }
+        const result = await application.executeSheetCommand(workspaceId, req.body);
+        const { snapshot: _snapshot, ...response } = result;
+        return response;
+      } catch (error) {
+        const response = sendSheetCommandError(reply, error);
+        if (response !== undefined) return response;
         throw error;
       }
     },

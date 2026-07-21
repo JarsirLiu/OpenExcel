@@ -170,6 +170,16 @@ export {
   XlsxSafetyLimitError,
   type XlsxSafetyLimits,
 } from "./importer/xlsxSafetyGuard.js";
+export { applySheetMutation } from "./sheet-sync/applySheetMutation.js";
+export type {
+  SheetCommand,
+  SheetCommandBase,
+  SheetCommandResult,
+} from "./sheet-sync/sheetCommand.js";
+export type { SheetMutation } from "./sheet-sync/sheetMutation.js";
+export { sheetCommandSchema, sheetMutationSchema } from "./sheet-sync/sheetMutationSchema.js";
+export type { SheetSnapshot } from "./sheet-sync/sheetSnapshot.js";
+export { cloneSheetSnapshot } from "./sheet-sync/sheetSnapshot.js";
 export type {
   SheetCellMatch,
   SheetCellQuery,

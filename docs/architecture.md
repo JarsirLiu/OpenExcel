@@ -202,6 +202,30 @@ Schema changes must land through explicit Prisma migrations, not runtime `db pus
 
 Server code may depend on `agent`, but should not duplicate agent logic.
 
+#### 3.3.2 Sheet command boundary
+
+所有 Sheet 内容写入都必须经过同一个 `SheetCommand` 应用服务：
+
+```text
+Web / AI tool
+  -> SheetCommand
+  -> sheets/application/executeSheetCommand.ts
+  -> core.applySheetMutation (mutation command)
+  -> conditional Sheet snapshot update + mutation receipt
+```
+
+命令只有两种正式形态：`mutation` 表达调用方已经确定的局部变化，`replaceSnapshot` 表达完整
+稀疏快照替换，用于复杂编辑和状态不完整时的正式兜底。两者共享 `mutationId`、`sheetId` 和
+`baseRevision`，共享同一条件写入和冲突处理逻辑。
+
+`SheetMutationReceipt` 只保存命令指纹、结果摘要和 revision，不保存第二份 Sheet 快照；命令指纹只由
+`mutationId`、`sheetId`、命令类型和操作 payload 组成，不包含 `baseRevision`。`baseRevision` 是首次
+执行时的并发控制前置条件，不是命令身份的一部分。因此响应丢失后，即使重试请求携带了已经推进的
+新 revision，只要操作 payload 相同也必须返回原始 receipt；不同 payload 仍返回幂等冲突。Repository
+只负责 Sheet/receipt 的 Prisma 读写，AI
+工具只负责输入转换和输出预览，Web hook 只负责编辑器组合与同步调度。Server 不重建 Excel
+计算引擎，也不根据 mutation 推导筛选、排序或公式依赖。
+
 #### 3.3.1 Recommended server directory layout
 
 ```text

@@ -1,4 +1,4 @@
-import type { ChartSpec } from "@openexcel/core";
+import type { ChartSpec, SheetCommand } from "@openexcel/core";
 import { downloadBlob, XLSX_MIME_TYPE } from "@/shared/lib";
 import { API_BASE, apiFetch, readErrorMessage } from "./http";
 
@@ -167,17 +167,12 @@ export async function downloadWorkbook(
   downloadBlob(new Blob([blob], { type: XLSX_MIME_TYPE }), `${fileName}.xlsx`);
 }
 
-export async function updateSheetData(
+export async function executeSheetCommand(
   workspaceId: number,
-  sheetId: number,
-  celldata: any[],
-  baseRevision: number,
-  config?: any,
+  command: SheetCommand,
 ): Promise<{ revision: number }> {
-  const body: any = { celldata, baseRevision };
-  if (config !== undefined) body.config = config;
-  const encoded = await encodeJsonBody(JSON.stringify(body));
-  const res = await apiFetch(`/workspaces/${workspaceId}/sheets/${sheetId}`, {
+  const encoded = await encodeJsonBody(JSON.stringify(command));
+  const res = await apiFetch(`/workspaces/${workspaceId}/sheets/${command.sheetId}`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",

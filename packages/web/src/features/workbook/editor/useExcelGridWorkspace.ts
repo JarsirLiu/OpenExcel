@@ -1,12 +1,12 @@
 import type { WorkbookInstance } from "@fortune-sheet/react";
-import { extractSheetConfig, matrixToCelldata } from "@openexcel/core";
+import { extractSheetConfig, matrixToCelldata, type SheetCommand } from "@openexcel/core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { WorkbookFull } from "@/api/workbooks";
 import {
   createSheet,
   deleteSheet,
   deleteWorkbook,
-  updateSheetData,
+  executeSheetCommand,
   updateSheetName,
 } from "@/api/workbooks";
 import { SheetSaveScheduler } from "@/features/sync/sheetSaveScheduler";
@@ -29,6 +29,12 @@ type UseExcelGridWorkspaceProps = {
   onWorkbookMutation?: () => Promise<void> | void;
   onSheetRevisionChanged?: (sheetId: number, revision: number) => void;
 };
+
+function createMutationId(): string {
+  return (
+    globalThis.crypto?.randomUUID?.() ?? `web-${Date.now()}-${Math.random().toString(36).slice(2)}`
+  );
+}
 
 export function useExcelGridWorkspace({
   workspaceId,
@@ -106,12 +112,28 @@ export function useExcelGridWorkspace({
   }, []);
 
   const syncSheetToServer = useCallback(
-    async (sheetId: number, celldata: any[], config: any, baseRevision: number) => {
+    async (
+      sheetId: number,
+      celldata: any[],
+      config: any,
+      baseRevision: number,
+      mutationId: string,
+    ) => {
       if (workspaceId == null) return { revision: baseRevision };
 
       setSaveStatus("saving");
       try {
-        const result = await updateSheetData(workspaceId, sheetId, celldata, baseRevision, config);
+        const command: SheetCommand = {
+          kind: "replaceSnapshot",
+          mutationId,
+          sheetId,
+          baseRevision,
+          snapshot: {
+            celldata,
+            config: config && typeof config === "object" && !Array.isArray(config) ? config : null,
+          },
+        };
+        const result = await executeSheetCommand(workspaceId, command);
         await onWorkbookMutation?.();
         setSaveStatus("saved");
         lastSavedSnapshotRef.current[sheetId] = getSnapshot(celldata, config);
@@ -138,8 +160,9 @@ export function useExcelGridWorkspace({
       const snapshot = getSnapshot(celldata, config);
       if (lastSavedSnapshotRef.current[sheet.id] === snapshot) return;
 
+      const mutationId = createMutationId();
       saveSchedulerRef.current?.schedule(sheet.id, sheet.revision, (baseRevision) =>
-        syncSheetToServer(sheet.id, celldata, config, baseRevision),
+        syncSheetToServer(sheet.id, celldata, config, baseRevision, mutationId),
       );
     },
     [currentSheetIndex, getSnapshot, syncSheetToServer, workbook],
