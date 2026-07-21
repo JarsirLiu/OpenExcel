@@ -116,19 +116,19 @@ describe("fetchWorkbookReferenceCandidates", () => {
 });
 
 describe("updateSheetData", () => {
-  it("sends PATCH with celldata", async () => {
-    mockFetch.mockResolvedValue(new Response(null, { status: 200 }));
+  it("sends PATCH with celldata and base revision", async () => {
+    mockFetch.mockResolvedValue(new Response(JSON.stringify({ revision: 1 }), { status: 200 }));
 
     const data = [
       ["a", "b"],
       ["c", "d"],
     ];
-    await updateSheetData(9, 5, data);
+    await updateSheetData(9, 5, data, 0);
 
     expect(mockFetch).toHaveBeenCalledWith("/api/workspaces/9/sheets/5", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ celldata: data }),
+      body: JSON.stringify({ celldata: data, baseRevision: 0 }),
     });
   });
 });

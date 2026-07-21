@@ -50,6 +50,7 @@ export interface SheetSchema {
   merges: { row: [number, number]; col: [number, number] }[];
   uploadedData: any[] | null;
   config: any | null;
+  revision: number;
 }
 
 export interface WorkbookFull {
@@ -170,9 +171,10 @@ export async function updateSheetData(
   workspaceId: number,
   sheetId: number,
   celldata: any[],
+  baseRevision: number,
   config?: any,
-): Promise<void> {
-  const body: any = { celldata };
+): Promise<{ revision: number }> {
+  const body: any = { celldata, baseRevision };
   if (config !== undefined) body.config = config;
   const encoded = await encodeJsonBody(JSON.stringify(body));
   const res = await apiFetch(`/workspaces/${workspaceId}/sheets/${sheetId}`, {
@@ -183,7 +185,9 @@ export async function updateSheetData(
     },
     body: encoded.body,
   });
+  if (res.status === 409) throw new Error("Sheet 已被其他操作修改，请刷新后重试");
   if (!res.ok) throw new Error("保存失败");
+  return res.json();
 }
 
 export async function updateSheetName(

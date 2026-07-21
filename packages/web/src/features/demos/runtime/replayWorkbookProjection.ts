@@ -57,6 +57,7 @@ export function toWorkbook(workbook: DemoWorkbook, workbookIndex: number): Workb
       order: sheetIndex,
       columns: sheet.columns.map((label) => ({ label, width: 120 })),
       merges: [],
+      revision: 0,
       uploadedData: sheet.rows.flatMap((row, rowIndex) =>
         row.map((value, colIndex) => ({
           r: rowIndex,

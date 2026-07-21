@@ -1,4 +1,4 @@
-import type { SheetChangeDelta } from "@openexcel/core";
+import type { SheetChangeDelta, SheetChangeVersion } from "@openexcel/core";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { WorkbookMeta } from "@/api/workbooks";
 import {
@@ -9,7 +9,7 @@ import {
   importWorkbooks,
   updateWorkbookName,
 } from "@/api/workbooks";
-import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatchSync";
+import type { WorkbookStructureUpdate } from "@/features/sync/types";
 import { toast } from "@/shared/lib";
 import { patchWorkbookWithDelta } from "../workbook/utils/patchWorkbook";
 import { useWorkbookCatalog, type WorkbookInitial } from "./useWorkbookCatalog";
@@ -75,6 +75,12 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
 
   const invalidateReferenceCache = useCallback(() => {
     setReferenceCacheRevision((revision) => revision + 1);
+  }, []);
+
+  const handleSheetRevisionChanged = useCallback((sheetId: number, revision: number) => {
+    const workbook = currentWorkbookRef.current;
+    const sheet = workbook?.sheets.find((item) => item.id === sheetId);
+    if (sheet) sheet.revision = revision;
   }, []);
 
   useEffect(() => {
@@ -165,14 +171,14 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
   ]);
 
   const handleSheetChanged = useCallback(
-    async (sheetId: number, delta: SheetChangeDelta | null) => {
+    async (sheetId: number, delta: SheetChangeDelta | null, version?: SheetChangeVersion) => {
       const workbook = currentWorkbookRef.current;
       if (!workbook || workspaceId == null) return;
       const hasSheet = workbook.sheets.some((sheet) => sheet.id === sheetId);
       if (!hasSheet) return;
 
       if (delta) {
-        const patched = patchWorkbookWithDelta(workbook, sheetId, delta);
+        const patched = patchWorkbookWithDelta(workbook, sheetId, delta, version);
         if (patched) {
           currentWorkbookRef.current = patched;
           replaceCurrentWorkbook(patched);
@@ -463,6 +469,7 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
     currentSheetIndex,
     setCurrentSheetIndex,
     handleSheetChanged,
+    handleSheetRevisionChanged,
     handleWorkbookStructureChanged,
     handleWorkbookRefresh: refreshCurrentWorkbook,
     handleWorkspaceRefresh: refreshWorkspace,

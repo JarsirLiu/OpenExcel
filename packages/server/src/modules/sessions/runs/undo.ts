@@ -187,6 +187,7 @@ async function restoreSheetSnapshots(
       data: {
         uploadedData: snapshot.uploadedData,
         config: snapshot.config,
+        revision: { increment: 1 },
       },
     });
   }

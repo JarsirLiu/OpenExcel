@@ -53,6 +53,7 @@ export type {
   SheetChangeRange,
   SheetChangeRangeOperation,
   SheetChangeSummary,
+  SheetChangeVersion,
 } from "./chat/sheetChange.js";
 export {
   sheetChangeCellSchema,
@@ -64,6 +65,7 @@ export {
   sheetChangeRangeOperationSchema,
   sheetChangeRangeSchema,
   sheetChangeSummarySchema,
+  sheetChangeVersionSchema,
 } from "./chat/sheetChange.js";
 export type {
   StorageIndex,

@@ -9,7 +9,8 @@ import {
   updateSheetData,
   updateSheetName,
 } from "@/api/workbooks";
-import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatchSync";
+import { SheetSaveQueue } from "@/features/sync/sheetSaveQueue";
+import type { WorkbookStructureUpdate } from "@/features/sync/types";
 import { confirm } from "@/shared/lib";
 import { adaptFortuneSheetLayout, type SheetGridLayout } from "../layout/fortuneSheetLayout";
 import { toFortuneSheetData } from "./fortuneSheet";
@@ -26,6 +27,7 @@ type UseExcelGridWorkspaceProps = {
   onWorkbookStructureChanged?: (update: WorkbookStructureUpdate) => void;
   onWorkbookRefresh?: () => Promise<void> | void;
   onWorkbookMutation?: () => Promise<void> | void;
+  onSheetRevisionChanged?: (sheetId: number, revision: number) => void;
 };
 
 export function useExcelGridWorkspace({
@@ -38,11 +40,16 @@ export function useExcelGridWorkspace({
   onWorkbookStructureChanged,
   onWorkbookRefresh,
   onWorkbookMutation,
+  onSheetRevisionChanged,
 }: UseExcelGridWorkspaceProps) {
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingSaveRef = useRef<{ sheetId: number; token: number; baseRevision: number } | null>(
+    null,
+  );
   const saveStatusResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedSnapshotRef = useRef<Record<number, string>>({});
+  const saveQueueRef = useRef(new SheetSaveQueue());
   const workbookRef = useRef<WorkbookInstance>(null);
   const { sheetData, sessionKey } = useWorkbookEditorSession(workbook, workbookRevision);
   const { registerActivateSheet } = useSheetActivation();
@@ -75,6 +82,9 @@ export function useExcelGridWorkspace({
     });
 
     lastSavedSnapshotRef.current = nextSnapshots;
+    for (const sheet of workbook.sheets) {
+      saveQueueRef.current.setRevision(sheet.id, sheet.revision);
+    }
   }, [workbook, getSnapshot]);
 
   useEffect(() => {
@@ -94,6 +104,12 @@ export function useExcelGridWorkspace({
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
       }
+      if (pendingSaveRef.current) {
+        saveQueueRef.current.cancelPendingSave(
+          pendingSaveRef.current.sheetId,
+          pendingSaveRef.current.token,
+        );
+      }
       if (saveStatusResetRef.current) {
         clearTimeout(saveStatusResetRef.current);
       }
@@ -101,24 +117,27 @@ export function useExcelGridWorkspace({
   }, []);
 
   const syncSheetToServer = useCallback(
-    async (celldata: any[], config: any) => {
-      if (!workbook?.sheets[currentSheetIndex] || workspaceId == null) return;
+    async (sheetId: number, celldata: any[], config: any, baseRevision: number) => {
+      if (workspaceId == null) return { revision: baseRevision };
 
       setSaveStatus("saving");
       try {
-        const sheet = workbook.sheets[currentSheetIndex];
-        await updateSheetData(workspaceId, sheet.id, celldata, config);
+        const result = await updateSheetData(workspaceId, sheetId, celldata, baseRevision, config);
         await onWorkbookMutation?.();
         setSaveStatus("saved");
-        lastSavedSnapshotRef.current[sheet.id] = getSnapshot(celldata, config);
+        lastSavedSnapshotRef.current[sheetId] = getSnapshot(celldata, config);
+        onSheetRevisionChanged?.(sheetId, result.revision);
         if (saveStatusResetRef.current) clearTimeout(saveStatusResetRef.current);
         saveStatusResetRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
+        return result;
       } catch (error) {
         setSaveStatus("idle");
         console.error("保存失败:", error);
+        await onWorkbookRefresh?.();
+        throw error;
       }
     },
-    [currentSheetIndex, getSnapshot, onWorkbookMutation, workbook, workspaceId],
+    [getSnapshot, onSheetRevisionChanged, onWorkbookMutation, onWorkbookRefresh, workspaceId],
   );
 
   const scheduleSave = useCallback(
@@ -131,8 +150,28 @@ export function useExcelGridWorkspace({
       if (lastSavedSnapshotRef.current[sheet.id] === snapshot) return;
 
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      if (pendingSaveRef.current) {
+        saveQueueRef.current.cancelPendingSave(
+          pendingSaveRef.current.sheetId,
+          pendingSaveRef.current.token,
+        );
+      }
+      const pendingSave = {
+        sheetId: sheet.id,
+        token: saveQueueRef.current.registerPendingSave(sheet.id, sheet.revision),
+        baseRevision: sheet.revision,
+      };
+      pendingSaveRef.current = pendingSave;
       saveTimeoutRef.current = setTimeout(() => {
-        void syncSheetToServer(celldata, config);
+        if (!saveQueueRef.current.consumePendingSave(pendingSave.sheetId, pendingSave.token)) {
+          return;
+        }
+        if (pendingSaveRef.current?.token === pendingSave.token) pendingSaveRef.current = null;
+        void saveQueueRef.current
+          .enqueue(sheet.id, pendingSave.baseRevision, (baseRevision) =>
+            syncSheetToServer(sheet.id, celldata, config, baseRevision),
+          )
+          .catch(() => undefined);
       }, 500);
     },
     [currentSheetIndex, getSnapshot, syncSheetToServer, workbook],

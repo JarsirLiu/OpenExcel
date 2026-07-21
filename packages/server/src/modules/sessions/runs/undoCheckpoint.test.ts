@@ -53,6 +53,7 @@ import {
   completeRunAndUpdateUndoCheckpoint,
   invalidateUndoCheckpointsForSheets,
   withUndoTrackedSheetMutation,
+  withUndoTrackedSheetMutationAfterSuccess,
 } from "./undoCheckpoint.js";
 
 describe("undo checkpoint", () => {
@@ -138,6 +139,16 @@ describe("undo checkpoint", () => {
     expect(mocks.transaction.mock.invocationCallOrder[0]).toBeLessThan(
       mutation.mock.invocationCallOrder[0],
     );
+  });
+
+  it("does not invalidate checkpoints when a revision-checked mutation fails", async () => {
+    const mutation = vi.fn().mockRejectedValueOnce(new Error("conflict"));
+
+    await expect(withUndoTrackedSheetMutationAfterSuccess(3, [7], mutation)).rejects.toThrow(
+      "conflict",
+    );
+
+    expect(mocks.findRunsWithSnapshotsForSheets).not.toHaveBeenCalled();
   });
 
   it("does not arm an invalidated run after it settles", async () => {

@@ -9,15 +9,15 @@ import {
   toolIndexToStorage,
 } from "@openexcel/core";
 import { sheetRecordToCelldata } from "../../../shared/utils/sheetData.js";
+import { saveSheetSnapshot } from "../application/saveSheetSnapshot.js";
 import {
   applyCellWrite,
-  buildSheetChangePreview,
   cellContentEqual,
   normalizeWriteOperations,
   snapshotCellContent,
   type WriteCellsInput,
 } from "../domain/sheet.js";
-import * as sheetRepo from "../infrastructure/sheetRepository.js";
+import { buildSheetChangePreview } from "../domain/sheetPreview.js";
 import { runSheetMutation } from "./runSheetMutation.js";
 
 export const writeCells = {
@@ -81,11 +81,12 @@ export const writeCells = {
 
       const updatedCelldata = Array.from(cellMap.values());
 
-      await sheetRepo.updateSheetContent(
+      const mutation = await saveSheetSnapshot({
         sheetId,
-        JSON.stringify(updatedCelldata),
-        context.workspaceId,
-      );
+        workspaceId: context.workspaceId,
+        baseRevision: sheet.revision,
+        uploadedData: JSON.stringify(updatedCelldata),
+      });
 
       const touchedValues = Array.from(touchedCells.values());
       const changedValues = Array.from(touchedCells.entries())
@@ -99,6 +100,12 @@ export const writeCells = {
       );
       const maxRow = storageIndex(
         Math.max(...touchedValues.map((cell) => toolIndexToStorage(cell.row))),
+      );
+      const minCol = storageIndex(
+        Math.min(...touchedValues.map((cell) => toolIndexToStorage(cell.col))),
+      );
+      const maxCol = storageIndex(
+        Math.max(...touchedValues.map((cell) => toolIndexToStorage(cell.col))),
       );
 
       const delta: SheetChangeDelta = {
@@ -114,7 +121,11 @@ export const writeCells = {
           rangeOperationCount: 0,
         },
         delta,
-        preview: buildSheetChangePreview(updatedCelldata, sheet.name, sheetId, minRow, maxRow),
+        ...mutation,
+        preview: buildSheetChangePreview(updatedCelldata, sheet.name, sheetId, minRow, maxRow, {
+          startCol: minCol,
+          endCol: maxCol,
+        }),
         sheetInfo: { sheetId: sheet.id, sheetNo: sheet.sheetNo, sheetName: sheet.name },
       };
 

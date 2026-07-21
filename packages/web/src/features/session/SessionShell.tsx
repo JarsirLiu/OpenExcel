@@ -1,4 +1,4 @@
-import type { SheetChangeDelta } from "@openexcel/core";
+import type { SheetChangeDelta, SheetChangeVersion } from "@openexcel/core";
 import { useEffect, useRef } from "react";
 import type { Session } from "@/api/sessions";
 import { ChatPanel } from "@/features/chat/conversation/ChatPanel";
@@ -27,7 +27,11 @@ type Props = {
   handleUndoComplete: () => Promise<void>;
   onAttachExcel: (files: File[]) => Promise<void> | void;
   onWorkspaceRefresh?: () => Promise<void> | void;
-  onSheetChanged?: (sheetId: number, delta: SheetChangeDelta | null) => void | Promise<void>;
+  onSheetChanged?: (
+    sheetId: number,
+    delta: SheetChangeDelta | null,
+    version?: SheetChangeVersion,
+  ) => void | Promise<void>;
   referenceCacheRevision: number;
   currentUser: CurrentUser;
   onLogout: () => void;

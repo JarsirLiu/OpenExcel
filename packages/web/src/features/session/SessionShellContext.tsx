@@ -1,9 +1,10 @@
-import type { SheetChangeDelta } from "@openexcel/core";
+import type { SheetChangeDelta, SheetChangeVersion } from "@openexcel/core";
 import { createContext, useContext } from "react";
 
 type SheetChangedHandler = (
   sheetId: number,
   delta: SheetChangeDelta | null,
+  version?: SheetChangeVersion,
 ) => void | Promise<void>;
 
 type SessionInfra = {

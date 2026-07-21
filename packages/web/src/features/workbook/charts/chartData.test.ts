@@ -35,6 +35,7 @@ describe("buildChartRenderData", () => {
           columns: [],
           merges: [],
           config: null,
+          revision: 0,
           uploadedData: [
             { r: 0, c: 0, v: { v: "一月" } },
             { r: 0, c: 1, v: { v: 12 } },

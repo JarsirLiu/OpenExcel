@@ -1,4 +1,4 @@
-import type { SheetChangeDelta } from "@openexcel/core";
+import type { SheetChangeDelta, SheetChangeVersion } from "@openexcel/core";
 import { SessionShell } from "@/features/session/SessionShell";
 import type { useSessionWorkspace } from "@/features/session/useSessionWorkspace";
 import styles from "./ChatSidebar.module.css";
@@ -24,7 +24,11 @@ export function ChatSidebar({
   initialMessages,
 }: {
   onWorkspaceRefresh?: () => Promise<void> | void;
-  onSheetChanged?: (sheetId: number, delta: SheetChangeDelta | null) => void | Promise<void>;
+  onSheetChanged?: (
+    sheetId: number,
+    delta: SheetChangeDelta | null,
+    version?: SheetChangeVersion,
+  ) => void | Promise<void>;
   onAttachExcel: (files: File[]) => Promise<void> | void;
   referenceCacheRevision: number;
   workspaceId: number | null;

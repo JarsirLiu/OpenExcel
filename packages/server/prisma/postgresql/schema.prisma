@@ -91,6 +91,7 @@ model Sheet {
   merges       String                  @db.Text
   uploadedData String?                 @db.Text
   config       String?                 @db.Text
+  revision     Int       @default(0)
   workbook     Workbook                @relation(fields: [workbookId], references: [id], onDelete: Cascade)
   sessions     Session[]
   runSnapshots AgentRunSheetSnapshot[]

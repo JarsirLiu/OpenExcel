@@ -1,4 +1,10 @@
 import { prisma } from "../../../infra/database/db.js";
+import { SheetRevisionConflictError } from "../domain/errors.js";
+
+export type SheetSnapshotUpdate = {
+  uploadedData: string;
+  config?: string | null;
+};
 
 export async function findSheetForWorkspace(id: number, workspaceId: number) {
   const sheet = await prisma.sheet.findFirst({
@@ -20,49 +26,28 @@ export async function findSheetsForWorkbook(workbookId: number, workspaceId: num
 
 export async function updateSheetData(
   sheetId: number,
-  data: { uploadedData: string; config?: string },
+  data: SheetSnapshotUpdate,
+  baseRevision: number,
   workspaceId: number,
 ) {
-  const sheet = await prisma.sheet.findFirst({
-    where: { id: sheetId },
-    include: { workbook: true },
-  });
+  const sheet = await findSheetForWorkspace(sheetId, workspaceId);
   if (!sheet) return null;
-  if (sheet.workbook.workspaceId !== workspaceId) return null;
 
-  return prisma.sheet.update({
-    where: { id: sheet.id },
+  const result = await prisma.sheet.updateMany({
+    where: { id: sheet.id, revision: baseRevision },
     data: {
       uploadedData: data.uploadedData,
-      config: data.config ?? null,
+      ...(Object.hasOwn(data, "config") ? { config: data.config ?? null } : {}),
+      revision: { increment: 1 },
     },
   });
-}
+  if (result.count === 0) {
+    throw new SheetRevisionConflictError(sheetId);
+  }
 
-export async function updateSheetContent(
-  sheetId: number,
-  uploadedData: string,
-  workspaceId: number,
-) {
-  const sheet = await findSheetForWorkspace(sheetId, workspaceId);
-  if (!sheet) return null;
-  return prisma.sheet.update({
-    where: { id: sheet.id },
-    data: { uploadedData },
-  });
-}
-
-export async function updateSheetState(
-  sheetId: number,
-  data: { uploadedData: string; config: string },
-  workspaceId: number,
-) {
-  const sheet = await findSheetForWorkspace(sheetId, workspaceId);
-  if (!sheet) return null;
-  return prisma.sheet.update({
-    where: { id: sheet.id },
-    data,
-  });
+  // The conditional update is atomic; this request is the one that increments
+  // the revision, so a follow-up read would only introduce a response race.
+  return { revision: baseRevision + 1 };
 }
 
 export async function updateSheetName(sheetId: number, name: string, workspaceId: number) {

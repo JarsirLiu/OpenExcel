@@ -10,8 +10,9 @@ import {
   toolRangeToA1Ref,
 } from "@openexcel/core";
 import { sheetRecordToCelldata } from "../../../shared/utils/sheetData.js";
-import { applyMergeOperation, buildSheetChangePreview } from "../domain/sheet.js";
-import * as sheetRepo from "../infrastructure/sheetRepository.js";
+import { saveSheetSnapshot } from "../application/saveSheetSnapshot.js";
+import { applyMergeOperation } from "../domain/sheet.js";
+import { buildSheetChangePreview } from "../domain/sheetPreview.js";
 import { runSheetMutation } from "./runSheetMutation.js";
 
 export const mergeCells = {
@@ -33,6 +34,8 @@ export const mergeCells = {
       const mergedRanges: string[] = [];
       let minRow = storageIndex(Number.MAX_SAFE_INTEGER);
       let maxRow = storageIndex(0);
+      let minCol = storageIndex(Number.MAX_SAFE_INTEGER);
+      let maxCol = storageIndex(0);
 
       for (const operation of operations) {
         const storageRange = sheetChangeRangeToZeroBased(operation);
@@ -47,6 +50,8 @@ export const mergeCells = {
         );
         minRow = storageIndex(Math.min(minRow, storageRange.startRow));
         maxRow = storageIndex(Math.max(maxRow, storageRange.endRow));
+        minCol = storageIndex(Math.min(minCol, storageRange.startCol));
+        maxCol = storageIndex(Math.max(maxCol, storageRange.endCol));
       }
 
       const updatedCelldata = Array.from(cellMap.values());
@@ -66,14 +71,13 @@ export const mergeCells = {
         };
       }
 
-      await sheetRepo.updateSheetState(
+      const mutation = await saveSheetSnapshot({
         sheetId,
-        {
-          uploadedData: JSON.stringify(updatedCelldata),
-          config: JSON.stringify(config),
-        },
-        context.workspaceId,
-      );
+        workspaceId: context.workspaceId,
+        baseRevision: sheet.revision,
+        uploadedData: JSON.stringify(updatedCelldata),
+        config: JSON.stringify(config),
+      });
 
       const delta: SheetChangeDelta = {
         type: "merge",
@@ -88,7 +92,11 @@ export const mergeCells = {
           rangeOperationCount: operations.length,
         },
         delta,
-        preview: buildSheetChangePreview(updatedCelldata, sheet.name, sheetId, minRow, maxRow),
+        ...mutation,
+        preview: buildSheetChangePreview(updatedCelldata, sheet.name, sheetId, minRow, maxRow, {
+          startCol: minCol,
+          endCol: maxCol,
+        }),
         sheetInfo: { sheetId: sheet.id, sheetNo: sheet.sheetNo, sheetName: sheet.name },
       };
 

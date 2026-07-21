@@ -9,8 +9,8 @@ import {
   toolRangeToA1Ref,
 } from "@openexcel/core";
 import { sheetRecordToCelldata } from "../../../shared/utils/sheetData.js";
-import { buildSheetChangePreview } from "../domain/sheet.js";
-import * as sheetRepo from "../infrastructure/sheetRepository.js";
+import { saveSheetSnapshot } from "../application/saveSheetSnapshot.js";
+import { buildSheetChangePreview } from "../domain/sheetPreview.js";
 import { runSheetMutation } from "./runSheetMutation.js";
 
 export const unmergeCells = {
@@ -59,17 +59,18 @@ export const unmergeCells = {
         }
       }
 
-      await sheetRepo.updateSheetState(
+      const mutation = await saveSheetSnapshot({
         sheetId,
-        {
-          uploadedData: JSON.stringify(celldata),
-          config: JSON.stringify(config),
-        },
-        context.workspaceId,
-      );
+        workspaceId: context.workspaceId,
+        baseRevision: sheet.revision,
+        uploadedData: JSON.stringify(celldata),
+        config: JSON.stringify(config),
+      });
 
       const minRow = storageIndex(Math.min(...storageRanges.map((range) => range.startRow)));
       const maxRow = storageIndex(Math.max(...storageRanges.map((range) => range.endRow)));
+      const minCol = storageIndex(Math.min(...storageRanges.map((range) => range.startCol)));
+      const maxCol = storageIndex(Math.max(...storageRanges.map((range) => range.endCol)));
 
       const delta: SheetChangeDelta = {
         type: "unmerge",
@@ -91,7 +92,11 @@ export const unmergeCells = {
           rangeOperationCount: operations.length,
         },
         delta,
-        preview: buildSheetChangePreview(celldata, sheet.name, sheetId, minRow, maxRow),
+        ...mutation,
+        preview: buildSheetChangePreview(celldata, sheet.name, sheetId, minRow, maxRow, {
+          startCol: minCol,
+          endCol: maxCol,
+        }),
         sheetInfo: { sheetId: sheet.id, sheetNo: sheet.sheetNo, sheetName: sheet.name },
       };
 

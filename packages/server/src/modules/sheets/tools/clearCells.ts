@@ -9,8 +9,9 @@ import {
   toolIndexToStorage,
 } from "@openexcel/core";
 import { sheetRecordToCelldata } from "../../../shared/utils/sheetData.js";
-import { applyClearOperation, buildSheetChangePreview } from "../domain/sheet.js";
-import * as sheetRepo from "../infrastructure/sheetRepository.js";
+import { saveSheetSnapshot } from "../application/saveSheetSnapshot.js";
+import { applyClearOperation } from "../domain/sheet.js";
+import { buildSheetChangePreview } from "../domain/sheetPreview.js";
 import { runSheetMutation } from "./runSheetMutation.js";
 
 export const clearCells = {
@@ -50,15 +51,24 @@ export const clearCells = {
 
       const updatedCelldata = Array.from(cellMap.values());
 
-      await sheetRepo.updateSheetContent(
+      const mutation = await saveSheetSnapshot({
         sheetId,
-        JSON.stringify(updatedCelldata),
-        context.workspaceId,
-      );
+        workspaceId: context.workspaceId,
+        baseRevision: sheet.revision,
+        uploadedData: JSON.stringify(updatedCelldata),
+      });
 
       const touchedRows = Array.from(touchedRowIndices.values());
       const minRow = storageIndex(touchedRows.length > 0 ? Math.min(...touchedRows) : 0);
       const maxRow = storageIndex(touchedRows.length > 0 ? Math.max(...touchedRows) : 0);
+      const touchedColumns = Array.from(touchedCellKeys, (key) => Number(key.split(",")[1]));
+      const previewColumns =
+        touchedColumns.length > 0
+          ? {
+              startCol: storageIndex(Math.min(...touchedColumns)),
+              endCol: storageIndex(Math.max(...touchedColumns)),
+            }
+          : undefined;
 
       const delta: SheetChangeDelta = {
         type: "clear",
@@ -73,7 +83,15 @@ export const clearCells = {
           rangeOperationCount: 0,
         },
         delta,
-        preview: buildSheetChangePreview(updatedCelldata, sheet.name, sheetId, minRow, maxRow),
+        ...mutation,
+        preview: buildSheetChangePreview(
+          updatedCelldata,
+          sheet.name,
+          sheetId,
+          minRow,
+          maxRow,
+          previewColumns,
+        ),
         sheetInfo: { sheetId: sheet.id, sheetNo: sheet.sheetNo, sheetName: sheet.name },
       };
 

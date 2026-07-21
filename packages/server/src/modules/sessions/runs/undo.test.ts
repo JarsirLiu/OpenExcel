@@ -199,6 +199,7 @@ describe("undoLatestRun", () => {
       data: {
         uploadedData: "[1]",
         config: null,
+        revision: { increment: 1 },
       },
     });
     expect(mocks.sheetDelete).toHaveBeenCalledWith({ where: { id: 77 } });

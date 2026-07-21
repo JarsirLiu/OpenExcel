@@ -4,11 +4,11 @@ import {
   applyCellWrite,
   applyClearOperation,
   applyMergeOperation,
-  buildSheetChangePreview,
   cellContentEqual,
   normalizeWriteOperations,
   snapshotCellContent,
 } from "./sheet.js";
+import { buildSheetChangePreview } from "./sheetPreview.js";
 
 describe("sheet domain helpers", () => {
   it("normalizes write operations without changing semantics", () => {
@@ -70,6 +70,7 @@ describe("sheet domain helpers", () => {
     expect(preview.merges).toEqual([
       { startRow: 2, startCol: 2, endRow: 2, endCol: 3, clipped: true },
     ]);
+    expect(preview.truncated).toBe(false);
   });
 
   it("clips preview merges to the visible range and omits merges without a visible anchor", () => {
@@ -108,6 +109,26 @@ describe("sheet domain helpers", () => {
       { row: 2, values: [""] },
       { row: 3, values: ["third"] },
     ]);
+  });
+
+  it("limits previews to the affected range instead of the whole sheet width", () => {
+    const celldata = Array.from({ length: 101 }, (_, col) => ({
+      r: 0,
+      c: col,
+      v: { v: String(col) },
+    }));
+    const preview = buildSheetChangePreview(
+      celldata as any,
+      "Sheet1",
+      7,
+      storageIndex(0),
+      storageIndex(0),
+      { startCol: storageIndex(100), endCol: storageIndex(100) },
+    );
+
+    expect(preview.range).toEqual({ startRow: 1, endRow: 1, startCol: 101, endCol: 101 });
+    expect(preview.rows).toEqual([{ row: 1, values: ["100"] }]);
+    expect(preview.truncated).toBe(false);
   });
 
   it("applies merge and clear operations to a cell map", () => {

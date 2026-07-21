@@ -3,11 +3,12 @@ import { resolveWorkspaceIdForRequest } from "../../../middleware/resourceAccess
 import { WORKBOOK_IMPORT_LIMITS } from "../../workbooks/api/importLimits.js";
 import { decompressImportPayload } from "../../workbooks/api/importPayload.js";
 import * as application from "../application/index.js";
+import { SheetRevisionConflictError } from "../domain/errors.js";
 
 export async function sheetRoutes(app: FastifyInstance) {
   app.patch<{
     Params: { workspacePublicId: string; sheetId: string };
-    Body: { celldata: any[]; config?: any };
+    Body: { celldata: any[]; baseRevision: number; config?: any };
   }>(
     "/api/workspaces/:workspacePublicId/sheets/:sheetId",
     {
@@ -21,14 +22,22 @@ export async function sheetRoutes(app: FastifyInstance) {
         reply,
       );
       if (workspaceId == null) return;
-      const result = await application.updateSheetData(
-        workspaceId,
-        Number(req.params.sheetId),
-        req.body.celldata,
-        req.body.config,
-      );
-      if ("error" in result) return reply.status(400).send(result);
-      return result;
+      try {
+        const result = await application.updateSheetData(
+          workspaceId,
+          Number(req.params.sheetId),
+          req.body.celldata,
+          req.body.baseRevision,
+          req.body.config,
+        );
+        if ("error" in result) return reply.status(400).send(result);
+        return result;
+      } catch (error) {
+        if (error instanceof SheetRevisionConflictError) {
+          return reply.status(409).send({ error: "Sheet 已被其他操作修改" });
+        }
+        throw error;
+      }
     },
   );
 

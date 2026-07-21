@@ -1,57 +1,14 @@
-import { type SheetChangeDelta, sheetChangePatchOutputSchema } from "@openexcel/core";
+import type { SheetChangeDelta, SheetChangeVersion } from "@openexcel/core";
+import { sheetChangePatchOutputSchema } from "@openexcel/core";
 import { useEffect, useRef } from "react";
+import type { SheetPatchUpdate, WorkbookStructureUpdate } from "@/features/sync/types";
+
+export type { SheetPatchUpdate, WorkbookStructureUpdate } from "@/features/sync/types";
 
 export type SheetPatchMessageLike = {
   role?: unknown;
   parts?: ReadonlyArray<unknown> | null;
 };
-
-export type SheetPatchUpdate = {
-  toolCallId: string;
-  sheetId: number;
-  sheetNo?: number;
-  delta: SheetChangeDelta | null;
-};
-
-export type WorkbookCreatedUpdate = {
-  toolCallId: string;
-  kind: "workbook-created";
-  workbookId: number;
-  workbookName: string;
-  order: number;
-  sourceSheetId: number | null;
-  initialSheet: {
-    id: number;
-    sheetNo: number;
-    name: string;
-    order: number;
-  };
-};
-
-export type SheetCreatedUpdate = {
-  toolCallId: string;
-  kind: "sheet-created";
-  workbookId: number;
-  sheetId: number;
-  sheetNo?: number;
-  sheetName: string;
-  order: number;
-  sourceSheetId: number | null;
-};
-
-export type SheetDeletedUpdate = {
-  toolCallId: string;
-  kind: "sheet-deleted";
-  workbookId: number;
-  sheetId: number;
-  sheetNo?: number;
-  order: number;
-};
-
-export type WorkbookStructureUpdate =
-  | WorkbookCreatedUpdate
-  | SheetCreatedUpdate
-  | SheetDeletedUpdate;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -102,11 +59,20 @@ export function collectSheetPatchUpdates(
       const parsed = sheetChangePatchOutputSchema.safeParse(part.output);
       if (!parsed.success) continue;
 
+      const version =
+        parsed.data.baseRevision != null && parsed.data.revision != null
+          ? {
+              baseRevision: parsed.data.baseRevision,
+              revision: parsed.data.revision,
+            }
+          : undefined;
+
       updates.push({
         toolCallId: part.toolCallId,
         sheetId: parsed.data.sheetInfo.sheetId,
         sheetNo: parsed.data.sheetInfo.sheetNo,
         delta: parsed.data.delta ?? null,
+        ...(version ? { version } : {}),
       });
     }
   }
@@ -256,7 +222,11 @@ export function collectWorkbookRefreshToolCallIds(
 
 export function useSheetPatchSync(
   messages: ReadonlyArray<SheetPatchMessageLike>,
-  onSheetChanged?: (sheetId: number, delta: SheetChangeDelta | null) => void,
+  onSheetChanged?: (
+    sheetId: number,
+    delta: SheetChangeDelta | null,
+    version?: SheetChangeVersion,
+  ) => void,
   onWorkbookStructureChanged?: (update: WorkbookStructureUpdate) => void,
   historyReady = true,
   historicalToolCallIds?: ReadonlySet<string>,
@@ -274,7 +244,11 @@ export function useSheetPatchSync(
           appliedToolCallIdsRef.current.add(update.toolCallId);
           continue;
         }
-        onSheetChanged?.(update.sheetId, update.delta);
+        if (update.version) {
+          onSheetChanged?.(update.sheetId, update.delta, update.version);
+        } else {
+          onSheetChanged?.(update.sheetId, update.delta);
+        }
       }
 
       const initialStructureUpdates = collectWorkbookStructureUpdates(messages, new Set());
@@ -298,7 +272,11 @@ export function useSheetPatchSync(
     const patchUpdates = onSheetChanged ? collectSheetPatchUpdates(messages, seenToolCallIds) : [];
     for (const update of patchUpdates) {
       appliedToolCallIdsRef.current.add(update.toolCallId);
-      onSheetChanged?.(update.sheetId, update.delta);
+      if (update.version) {
+        onSheetChanged?.(update.sheetId, update.delta, update.version);
+      } else {
+        onSheetChanged?.(update.sheetId, update.delta);
+      }
     }
 
     const seenAfterPatchUpdates = new Set(seenToolCallIds);

@@ -2,7 +2,7 @@ import { Workbook } from "@fortune-sheet/react";
 import { useMemo, useRef } from "react";
 import "@fortune-sheet/react/dist/index.css";
 import type { WorkbookFull } from "@/api/workbooks";
-import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatchSync";
+import type { WorkbookStructureUpdate } from "@/features/sync/types";
 import { ChartOverlay } from "@/features/workbook/charts/ChartOverlay";
 import { useChartInsertion } from "@/features/workbook/charts/useChartInsertion";
 import styles from "./ExcelGrid.module.css";
@@ -62,6 +62,7 @@ interface Props {
   onWorkbookStructureChanged?: (update: WorkbookStructureUpdate) => void;
   onWorkbookRefresh?: () => Promise<void> | void;
   onWorkbookMutation?: () => Promise<void> | void;
+  onSheetRevisionChanged?: (sheetId: number, revision: number) => void;
 }
 
 export function ExcelGrid({
@@ -74,6 +75,7 @@ export function ExcelGrid({
   onWorkbookStructureChanged,
   onWorkbookRefresh,
   onWorkbookMutation,
+  onSheetRevisionChanged,
 }: Props) {
   const gridRootRef = useRef<HTMLDivElement>(null);
   const {
@@ -98,6 +100,7 @@ export function ExcelGrid({
     onWorkbookStructureChanged,
     onWorkbookRefresh,
     onWorkbookMutation,
+    onSheetRevisionChanged,
   });
   useFortuneSheetFilterMenu(gridRootRef, workbook !== null);
   useFortuneSheetWheel(gridRootRef, workbook !== null);

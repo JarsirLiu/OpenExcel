@@ -1,6 +1,7 @@
 import {
   normalizeFortuneFormula,
   type SheetChangeDelta,
+  type SheetChangeVersion,
   sheetChangeDeltaToZeroBased,
 } from "@openexcel/core";
 import type { SheetSchema, WorkbookFull } from "@/api/workbooks";
@@ -40,12 +41,14 @@ export function patchWorkbookWithDelta(
   workbook: WorkbookFull,
   sheetId: number,
   delta: SheetChangeDelta,
+  version?: SheetChangeVersion,
 ): WorkbookFull | null {
   const internalDelta = sheetChangeDeltaToZeroBased(delta);
   const sheetIndex = workbook.sheets.findIndex((s) => s.id === sheetId);
   if (sheetIndex === -1) return null;
 
   const sheet = workbook.sheets[sheetIndex];
+  if (version && sheet.revision !== version.baseRevision) return null;
   const celldata: any[] = sheet.uploadedData ? [...sheet.uploadedData] : [];
 
   const cellMap = new Map<string, any>();
@@ -89,7 +92,18 @@ export function patchWorkbookWithDelta(
       }
 
       if (newVal === "") {
-        cellMap.delete(key);
+        const cell = cellMap.get(key);
+        if (cell?.v) {
+          const nextValue = { ...cell.v };
+          delete nextValue.v;
+          delete nextValue.m;
+          delete nextValue.f;
+          if (Object.keys(nextValue).length === 0) {
+            cellMap.delete(key);
+          } else {
+            cell.v = nextValue;
+          }
+        }
         continue;
       }
 
@@ -237,6 +251,7 @@ export function patchWorkbookWithDelta(
     ...sheet,
     uploadedData: updatedCelldata,
     config: JSON.stringify(config),
+    revision: version?.revision ?? sheet.revision,
   };
 
   return {

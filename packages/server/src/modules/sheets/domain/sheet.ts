@@ -1,12 +1,9 @@
 import {
-  celldataToGrid,
   type FortuneCell,
-  fortuneMergesToToolRanges,
   normalizeFortuneFormula,
   type StorageIndex,
   storageIndex,
   storageIndexToTool,
-  storageRangeToTool,
   type ToolIndex,
 } from "@openexcel/core";
 
@@ -35,31 +32,6 @@ export function cellContentEqual(
   );
 }
 
-export interface SheetChangePreviewMerge {
-  startRow: number;
-  startCol: number;
-  endRow: number;
-  endCol: number;
-  clipped: boolean;
-}
-
-/**
- * 预览行携带显式的 1-based 行号，避免前端通过数组下标自行换算。
- * 即使中间存在空行，行号也能对齐 Excel 视觉位置。
- */
-export interface SheetChangePreviewRow {
-  row: number;
-  values: string[];
-}
-
-export interface SheetChangePreview {
-  sheetId: number;
-  sheetName: string;
-  range: { startRow: number; endRow: number; startCol: number; endCol: number };
-  rows: SheetChangePreviewRow[];
-  merges: SheetChangePreviewMerge[];
-}
-
 export type CellWriteValue = string | number | boolean;
 
 export type WriteCellOperation =
@@ -83,63 +55,6 @@ export type NormalizedWriteCellsInput = {
   sheetId: number;
   operations: WriteCellOperation[];
 };
-
-export function buildSheetChangePreview(
-  celldata: FortuneCell[],
-  sheetName: string,
-  sheetId: number,
-  minRow0: StorageIndex,
-  maxRow0: StorageIndex,
-): SheetChangePreview {
-  const maxCol0 = Math.max(...celldata.map((c) => c.c), 0);
-  const columnCount = maxCol0 + 1;
-  const grid = celldataToGrid(celldata, columnCount);
-  const previewRange = storageRangeToTool({
-    startRow: minRow0,
-    startCol: storageIndex(0),
-    endRow: maxRow0,
-    endCol: storageIndex(Math.max(0, columnCount - 1)),
-  });
-  const rows: SheetChangePreviewRow[] = [];
-  for (let row0 = minRow0; row0 <= maxRow0; row0 = storageIndex(row0 + 1)) {
-    const gridRow = grid[row0] ?? Array(columnCount).fill("");
-    rows.push({ row: storageIndexToTool(row0), values: gridRow.slice(0, columnCount) });
-  }
-
-  const merges: SheetChangePreviewMerge[] = fortuneMergesToToolRanges(celldata).flatMap((merge) => {
-    // 只有锚点在当前预览中时才返回合并区域；否则预览没有锚点值，无法正确渲染。
-    if (
-      merge.startRow < previewRange.startRow ||
-      merge.startRow > previewRange.endRow ||
-      merge.startCol < previewRange.startCol ||
-      merge.startCol > previewRange.endCol
-    ) {
-      return [];
-    }
-
-    const endRow = Math.min(merge.endRow, previewRange.endRow);
-    const endCol = Math.min(merge.endCol, previewRange.endCol);
-    return [
-      {
-        startRow: merge.startRow,
-        startCol: merge.startCol,
-        endRow,
-        endCol,
-        clipped: endRow !== merge.endRow || endCol !== merge.endCol,
-      },
-    ];
-  });
-
-  return {
-    sheetId,
-    sheetName,
-    range: {
-      ...previewRange,
-    },
-    rows,
-    merges,
-  };
-}
 
 export function normalizeWriteOperations(input: WriteCellsInput): NormalizedWriteCellsInput {
   return {

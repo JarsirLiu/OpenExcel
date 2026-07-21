@@ -222,6 +222,7 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
           handleWorkbookStructureChanged={workbook.handleWorkbookStructureChanged}
           handleWorkbookRefresh={workbook.handleWorkbookRefresh}
           onWorkbookMutation={refreshUndoAvailability}
+          onSheetRevisionChanged={workbook.handleSheetRevisionChanged}
         />
         <div className={styles.resizeHandle} onMouseDown={handleResizeMouseDown} />
       </div>

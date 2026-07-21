@@ -92,6 +92,19 @@ export async function withUndoTrackedSheetMutation<T>(
   return withUndoTrackedMutation(workspaceId, sheetIds, mutation, originRunId);
 }
 
+export async function withUndoTrackedSheetMutationAfterSuccess<T>(
+  workspaceId: number,
+  sheetIds: number[],
+  mutation: () => Promise<T>,
+  originRunId?: number,
+) {
+  return withWorkspaceUndoLock(workspaceId, async () => {
+    const result = await mutation();
+    await invalidateUndoCheckpointsForSheetsInternal(workspaceId, sheetIds, originRunId);
+    return result;
+  });
+}
+
 export async function completeRunAndUpdateUndoCheckpoint(
   workspaceId: number,
   sessionId: number,

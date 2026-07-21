@@ -79,6 +79,11 @@ export const sheetChangeSummarySchema = z.object({
   rangeOperationCount: z.number().int().nonnegative(),
 });
 
+export const sheetChangeVersionSchema = z.object({
+  baseRevision: z.number().int().nonnegative(),
+  revision: z.number().int().nonnegative(),
+});
+
 export const sheetChangePatchOutputSchema = z
   .object({
     sheetInfo: z.object({
@@ -88,6 +93,8 @@ export const sheetChangePatchOutputSchema = z
     }),
     changeSummary: sheetChangeSummarySchema,
     delta: sheetChangeDeltaSchema.nullish(),
+    baseRevision: z.number().int().nonnegative().optional(),
+    revision: z.number().int().nonnegative().optional(),
   })
   .passthrough();
 
@@ -99,4 +106,5 @@ export type SheetChangeRangeOperation = z.infer<typeof sheetChangeRangeOperation
 export type SheetChangeClearOperation = z.infer<typeof sheetChangeClearOperationSchema>;
 export type SheetChangeDelta = z.infer<typeof sheetChangeDeltaSchema>;
 export type SheetChangeSummary = z.infer<typeof sheetChangeSummarySchema>;
+export type SheetChangeVersion = z.infer<typeof sheetChangeVersionSchema>;
 export type SheetChangePatchOutput = z.infer<typeof sheetChangePatchOutputSchema>;

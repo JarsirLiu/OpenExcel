@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import type { WorkbookFull } from "@/api/workbooks";
-import type { WorkbookStructureUpdate } from "@/features/chat/hooks/useSheetPatchSync";
+import type { WorkbookStructureUpdate } from "@/features/sync/types";
 import { t } from "@/lib/i18n";
 import { ExcelWorkspace } from "../workbook/ui/ExcelWorkspace";
 import { WorkbookHeader } from "../workbook/ui/WorkbookHeader";
@@ -28,6 +28,7 @@ type Props = {
   handleWorkbookStructureChanged: (update: WorkbookStructureUpdate) => void;
   handleWorkbookRefresh: () => Promise<void>;
   onWorkbookMutation?: () => Promise<void> | void;
+  onSheetRevisionChanged?: (sheetId: number, revision: number) => void;
 };
 
 export function WorkspaceView({
@@ -46,6 +47,7 @@ export function WorkspaceView({
   handleWorkbookStructureChanged,
   handleWorkbookRefresh,
   onWorkbookMutation,
+  onSheetRevisionChanged,
 }: Props) {
   const newWbInputRef = useRef<HTMLInputElement>(null);
 
@@ -87,6 +89,7 @@ export function WorkspaceView({
           onWorkbookStructureChanged={handleWorkbookStructureChanged}
           onWorkbookRefresh={handleWorkbookRefresh}
           onWorkbookMutation={onWorkbookMutation}
+          onSheetRevisionChanged={onSheetRevisionChanged}
         />
       </div>
     </div>

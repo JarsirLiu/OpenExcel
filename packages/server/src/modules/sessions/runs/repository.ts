@@ -170,6 +170,16 @@ export async function upsertRunSheetSnapshot(data: {
   });
 }
 
+export async function findRunSheetSnapshot(runId: number, sheetId: number) {
+  return prisma.agentRunSheetSnapshot.findUnique({
+    where: { runId_sheetId: { runId, sheetId } },
+  });
+}
+
+export async function deleteRunSheetSnapshot(runId: number, sheetId: number) {
+  await prisma.agentRunSheetSnapshot.deleteMany({ where: { runId, sheetId } });
+}
+
 export async function upsertRunChartSnapshot(data: {
   runId: number;
   chartId: string;
@@ -280,6 +290,7 @@ export async function restoreRunSheetSnapshots(runId: number) {
         data: {
           uploadedData: snapshot.uploadedData,
           config: snapshot.config,
+          revision: { increment: 1 },
         },
       }),
     ),

@@ -1,10 +1,11 @@
-import { withUndoTrackedSheetMutation } from "../../sessions/runs/undoCheckpoint.js";
+import { withUndoTrackedSheetMutationAfterSuccess } from "../../sessions/runs/undoCheckpoint.js";
 import * as repo from "../infrastructure/sheetRepository.js";
 
 export async function updateSheetData(
   workspaceId: number,
   sheetId: number,
   celldata: any[],
+  baseRevision: number,
   config?: any,
 ) {
   if (!Array.isArray(celldata)) {
@@ -18,11 +19,11 @@ export async function updateSheetData(
     data.config = JSON.stringify(config);
   }
 
-  const updated = await withUndoTrackedSheetMutation(workspaceId, [sheetId], () =>
-    repo.updateSheetData(sheetId, data, workspaceId),
+  const updated = await withUndoTrackedSheetMutationAfterSuccess(workspaceId, [sheetId], () =>
+    repo.updateSheetData(sheetId, data, baseRevision, workspaceId),
   );
   if (!updated) {
     return { error: "Sheet not found" };
   }
-  return { success: true };
+  return { success: true, revision: updated.revision };
 }
