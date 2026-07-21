@@ -7,6 +7,7 @@ cropped and compressed for the OpenExcel marketing page. Retrieved 2026-07-21.
 | File | Demo | Photographer | Source |
 | --- | --- | --- | --- |
 | `student-fee-reconciliation.webp` | 学费住宿费欠费核查 | Eric Prouzet | https://www.pexels.com/photo/32421367/ |
+| `research-fund-execution.webp` | 科研经费预算执行分析 | cottonbro studio | https://www.pexels.com/photo/6208709/ |
 | `financial-health.webp` | 企业财务健康分析 | fauxels | https://www.pexels.com/photo/3184292/ |
 | `bank-audit.webp` | 银行流水智能核查 | Karolina Grabowska | https://www.pexels.com/photo/4386370/ |
 | `sales-performance.webp` | 销售业绩分析 | fauxels | https://www.pexels.com/photo/3184465/ |

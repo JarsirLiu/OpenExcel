@@ -21,10 +21,14 @@ describe("MarketingShowcase", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getAllByLabelText(/^观看.+完整回放$/)).toHaveLength(12);
+    expect(screen.getAllByLabelText(/^观看.+完整回放$/)).toHaveLength(13);
     expect(screen.getByRole("link", { name: "观看学费住宿费欠费核查完整回放" })).toHaveAttribute(
       "href",
       "/demos/student-fee-reconciliation",
+    );
+    expect(screen.getByRole("link", { name: "观看科研经费预算执行分析完整回放" })).toHaveAttribute(
+      "href",
+      "/demos/research-fund-execution",
     );
     expect(screen.getByRole("link", { name: "观看企业财务健康分析完整回放" })).toHaveAttribute(
       "href",
