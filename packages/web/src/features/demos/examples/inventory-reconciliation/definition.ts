@@ -8,6 +8,16 @@ import {
 export const inventoryReconciliationDemo: DemoDefinition = {
   id: "inventory-reconciliation",
   route: "/demos/inventory-reconciliation",
+  marketing: {
+    category: "运营",
+    marketingTitle: "进销存智能核对",
+    summary: "匹配进货、销售和库存数据，检查数量差异、缺货与滞销商品，并保留可复核公式。",
+    coverImage: "/demo-covers/inventory.webp",
+    coverAlt: "仓储人员在工业货架之间进行库存盘点",
+    proofMetric: "三表匹配 · 公式可追溯",
+    featuredOrder: 11,
+    theme: "slate",
+  },
   workspace: {
     id: -100,
     publicId: "demo-supermarket-finance",

@@ -1,0 +1,1 @@
+export { campusRecruitmentAnalysisDemo } from "./definition";

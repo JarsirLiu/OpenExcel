@@ -51,9 +51,23 @@ export type DemoPlayback = {
   restartDelay: number;
 };
 
+export type DemoCategory = "财务" | "销售" | "运营" | "人力" | "教育";
+
+export type DemoMarketing = {
+  category: DemoCategory;
+  marketingTitle: string;
+  summary: string;
+  coverImage: string;
+  coverAlt: string;
+  proofMetric: string;
+  featuredOrder: number;
+  theme: "sage" | "sand" | "slate";
+};
+
 export type DemoDefinition = {
   id: string;
   route: string;
+  marketing: DemoMarketing;
   workspace: {
     id: number;
     publicId: string;

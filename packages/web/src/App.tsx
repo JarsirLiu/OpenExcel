@@ -60,7 +60,13 @@ function LoadingScreen() {
   );
 }
 
-export function AuthPage({ mode }: { mode: "login" | "register" }) {
+export function AuthPage({
+  mode,
+  showMarketing = false,
+}: {
+  mode: "login" | "register";
+  showMarketing?: boolean;
+}) {
   const navigate = useNavigate();
   const location = useLocation();
   const auth = useAuthActions();
@@ -104,7 +110,7 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
             : nextPath,
         );
       }}
-      onOpenDemo={() => navigate(routePaths.demo("inventory-reconciliation"))}
+      showMarketing={showMarketing}
     />
   );
 }

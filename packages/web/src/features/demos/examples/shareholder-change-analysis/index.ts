@@ -1,0 +1,1 @@
+export { shareholderChangeAnalysisDemo } from "./definition";
