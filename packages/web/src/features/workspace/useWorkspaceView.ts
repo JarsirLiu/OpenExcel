@@ -239,7 +239,7 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
           if (!isCurrentRequest(generation, controller.signal)) return;
           replaceWorkbookIfFresh(nextWorkbook);
           const nextIndex = nextWorkbook.sheets.findIndex((sheet) => sheet.id === update.sheetId);
-          const fallbackIndex = Math.min(update.order, nextWorkbook.sheets.length - 1);
+          const fallbackIndex = Math.max(0, Math.min(update.order, nextWorkbook.sheets.length - 1));
           setCurrentSheetIndex(nextIndex >= 0 ? nextIndex : fallbackIndex);
           return;
         }
@@ -255,7 +255,9 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
         replaceWorkbookIfFresh(nextWorkbook);
         const nextIndex = nextWorkbook.sheets.findIndex((sheet) => sheet.id === update.sheetId);
         setCurrentSheetIndex(
-          nextIndex >= 0 ? nextIndex : Math.min(update.order, nextWorkbook.sheets.length - 1),
+          nextIndex >= 0
+            ? nextIndex
+            : Math.max(0, Math.min(update.order, nextWorkbook.sheets.length - 1)),
         );
       } catch (error) {
         if (!controller.signal.aborted) throw error;

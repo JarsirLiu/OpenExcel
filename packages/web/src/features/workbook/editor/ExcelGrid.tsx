@@ -132,6 +132,20 @@ export function ExcelGrid({
 
   if (!workbook) return null;
 
+  if (workbook.sheets.length === 0) {
+    return (
+      <div ref={gridRootRef} className={styles.container}>
+        <div className={styles.emptyState}>
+          <p>这个工作簿还没有工作表</p>
+          <button type="button" onClick={() => handleBeforeAddSheet({ name: "Sheet1" })}>
+            <span aria-hidden="true">+</span>
+            新建工作表
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const currentSheet = workbook.sheets[currentSheetIndex];
   const currentSheetLayout = currentSheet ? layoutBySheetId[String(currentSheet.id)] : undefined;
 
