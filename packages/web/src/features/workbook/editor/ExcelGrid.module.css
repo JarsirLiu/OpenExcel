@@ -12,3 +12,68 @@
   flex: 1;
   min-height: 0;
 }
+
+.container :global(.fortune-toolbar) {
+  min-height: 43px;
+  padding: 6px 8px 5px 14px;
+  border-bottom-color: #dddcd7;
+  background: #fbfaf8;
+}
+
+.container :global(.fortune-toolbar-divider) {
+  height: 18px;
+  background: #dfddd7;
+}
+
+.container :global(.fortune-toolbar-button),
+.container :global(.fortune-toolbar-combo) {
+  border-radius: 7px;
+  color: #54544f;
+  transition:
+    background 180ms ease,
+    transform 180ms ease;
+}
+
+.container :global(.fortune-toolbar-button:hover),
+.container :global(.fortune-toolbar-combo:hover) {
+  background: #ecefeb;
+  transform: translateY(-1px);
+}
+
+.container :global(.fortune-fx-editor) {
+  border-bottom-color: #e0ded9;
+  background: #fff;
+}
+
+.container :global(.fortune-name-box-container),
+.container :global(.fortune-fx-input-container) {
+  border-color: #e0ded9;
+}
+
+.container :global(.fortune-fx-input) {
+  color: #41423d;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+}
+
+.container :global(.luckysheet-sheet-area div.luckysheet-sheets-item) {
+  border-color: #dfddd7;
+  background: #f4f3ef;
+  color: #74716b;
+  font-size: 12px;
+  transition:
+    background 180ms ease,
+    color 180ms ease;
+}
+
+.container :global(.luckysheet-sheet-area div.luckysheet-sheets-item:hover) {
+  background: #eef1ed;
+  color: #425047;
+}
+
+.container :global(.luckysheet-sheet-area div.luckysheet-sheets-item-active),
+.container :global(.luckysheet-sheet-area div.luckysheet-sheets-item-active:hover) {
+  background: #e3eae4;
+  color: #3f5245;
+  font-weight: 700;
+}

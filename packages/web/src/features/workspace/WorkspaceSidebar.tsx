@@ -9,12 +9,13 @@ import { confirm } from "@/shared/lib";
 import styles from "./WorkspaceSidebar.module.css";
 
 const MIN_WIDTH = 210;
-const DEFAULT_WIDTH = 220;
+const DEFAULT_WIDTH = 246;
 const COLLAPSED_WIDTH = 32;
 const SIDEBAR_COLLAPSED_KEY = "openexcel:sidebarCollapsed:v2";
 const SIDEBAR_WIDTH_KEY = "openexcel:sidebarWidth";
 
 type Props = {
+  onNavigateHome: () => void;
   activeWorkspaceId: number | null;
   onWorkspaceSelect: (workspace: Workspace) => void;
   workspaces: Workspace[];
@@ -29,6 +30,7 @@ type Props = {
 };
 
 export function WorkspaceSidebar({
+  onNavigateHome,
   activeWorkspaceId,
   onWorkspaceSelect,
   workspaces,
@@ -57,7 +59,9 @@ export function WorkspaceSidebar({
   });
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editValue, setEditValue] = useState("");
-  const [expandedWorkspaces, setExpandedWorkspaces] = useState<Set<number>>(new Set());
+  const [expandedWorkspaces, setExpandedWorkspaces] = useState<Set<number>>(
+    () => new Set(readOnly && activeWorkspaceId != null ? [activeWorkspaceId] : []),
+  );
   const inputRef = useRef<HTMLInputElement>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
@@ -230,8 +234,20 @@ export function WorkspaceSidebar({
   return collapsed ? (
     <div className={`${styles.sidebar} ${styles.collapsed}`} style={{ width: COLLAPSED_WIDTH }}>
       <button
+        className={styles.collapsedHomeButton}
+        onClick={onNavigateHome}
+        aria-label="返回 OpenExcel 首页"
+        title="返回 OpenExcel 首页"
+      >
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <rect x="1.5" y="1.5" width="13" height="13" rx="3" stroke="currentColor" />
+          <path d="M5 1.8v12.4M10.8 1.8v12.4M1.8 6.8h12.4" stroke="currentColor" />
+        </svg>
+      </button>
+      <button
         className={styles.expandBtn}
         onClick={() => setCollapsed(false)}
+        aria-label="展开工作区侧边栏"
         title="Expand sidebar"
       >
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -248,11 +264,48 @@ export function WorkspaceSidebar({
   ) : (
     <div ref={sidebarRef} className={styles.sidebar} style={{ width, ...transitionStyle }}>
       <div ref={innerRef} className={styles.inner} style={{ width }}>
+        <button
+          className={styles.homeButton}
+          onClick={onNavigateHome}
+          aria-label="返回 OpenExcel 首页"
+          title="返回 OpenExcel 首页"
+        >
+          <span className={styles.homeMark} aria-hidden="true">
+            <svg width="17" height="17" viewBox="0 0 18 18" fill="none">
+              <rect x="1.5" y="1.5" width="15" height="15" rx="3.5" stroke="currentColor" />
+              <path d="M6 1.8v14.4M12.2 1.8v14.4M1.8 7.5h14.4" stroke="currentColor" />
+            </svg>
+          </span>
+          <span className={styles.homeCopy}>
+            <strong>OpenExcel</strong>
+            <small>返回首页</small>
+          </span>
+          <svg
+            className={styles.homeArrow}
+            width="14"
+            height="14"
+            viewBox="0 0 14 14"
+            fill="none"
+            aria-hidden="true"
+          >
+            <path
+              d="M9 3L5 7l4 4"
+              stroke="currentColor"
+              strokeWidth="1.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
         <div className={styles.header}>
-          <span className={styles.serif}>{t("workspaces", "工作区")}</span>
+          <span className={styles.sectionLabel}>
+            <small>{readOnly ? "DEMO SPACE" : "WORKSPACE"}</small>
+            <strong>{t("workspaces", "工作区")}</strong>
+          </span>
           <button
             className={styles.toggleBtn}
             onClick={() => setCollapsed(true)}
+            aria-label="收起工作区侧边栏"
             title="Collapse sidebar"
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -330,44 +383,46 @@ export function WorkspaceSidebar({
                           </svg>
                         </span>
                       )}
-                      <span className={styles.itemActions}>
-                        <button
-                          className={styles.editBtn}
-                          onClick={(e) => handleStartEdit(e, ws)}
-                          title="重命名"
-                        >
-                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                            <path
-                              d="M8.5 1.5l2 2L4 10H2V8l6.5-6.5z"
-                              stroke="currentColor"
-                              strokeWidth="1.3"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                          </svg>
-                        </button>
-                        <button
-                          className={styles.deleteBtn}
-                          onClick={(e) => void handleDelete(e, ws)}
-                          title="删除"
-                        >
-                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                            <path
-                              d="M2 3h8M4.5 3V2a1 1 0 011-1h1a1 1 0 011 1v1M9.5 3v7a1 1 0 01-1 1h-5a1 1 0 01-1-1V3"
-                              stroke="currentColor"
-                              strokeWidth="1.3"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                            <path
-                              d="M5 5.5v3M7 5.5v3"
-                              stroke="currentColor"
-                              strokeWidth="1.3"
-                              strokeLinecap="round"
-                            />
-                          </svg>
-                        </button>
-                      </span>
+                      {!readOnly && (
+                        <span className={styles.itemActions}>
+                          <button
+                            className={styles.editBtn}
+                            onClick={(e) => handleStartEdit(e, ws)}
+                            title="重命名"
+                          >
+                            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                              <path
+                                d="M8.5 1.5l2 2L4 10H2V8l6.5-6.5z"
+                                stroke="currentColor"
+                                strokeWidth="1.3"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </svg>
+                          </button>
+                          <button
+                            className={styles.deleteBtn}
+                            onClick={(e) => void handleDelete(e, ws)}
+                            title="删除"
+                          >
+                            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                              <path
+                                d="M2 3h8M4.5 3V2a1 1 0 011-1h1a1 1 0 011 1v1M9.5 3v7a1 1 0 01-1 1h-5a1 1 0 01-1-1V3"
+                                stroke="currentColor"
+                                strokeWidth="1.3"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                              <path
+                                d="M5 5.5v3M7 5.5v3"
+                                stroke="currentColor"
+                                strokeWidth="1.3"
+                                strokeLinecap="round"
+                              />
+                            </svg>
+                          </button>
+                        </span>
+                      )}
                     </>
                   )}
                 </div>
@@ -404,72 +459,76 @@ export function WorkspaceSidebar({
                             </svg>
                           </span>
                           <span className={styles.workbookName}>{wb.name}</span>
-                          <span className={styles.workbookActions}>
-                            <button
-                              className={styles.workbookDownloadBtn}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                void downloadWorkbook(ws.id, wb.id, wb.name);
-                              }}
-                              title="下载"
-                            >
-                              <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-                                <path
-                                  d="M5.5 1v6M3 4.5l2.5 2.5L8 4.5"
-                                  stroke="currentColor"
-                                  strokeWidth="1.3"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                />
-                                <path
-                                  d="M1.5 8v1a1 1 0 001 1h6a1 1 0 001-1V8"
-                                  stroke="currentColor"
-                                  strokeWidth="1.3"
-                                  strokeLinecap="round"
-                                />
-                              </svg>
-                            </button>
-                            <button
-                              className={styles.workbookDeleteBtn}
-                              onClick={(e) => void handleWorkbookDeleteClick(e, wb)}
-                              title="删除"
-                            >
-                              <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-                                <path
-                                  d="M2 2.5h7M4 2.5V1.5a1 1 0 011-1h1a1 1 0 011 1v1M8.5 2.5v6a1 1 0 01-1 1h-4a1 1 0 01-1-1v-6"
-                                  stroke="currentColor"
-                                  strokeWidth="1.3"
-                                  strokeLinecap="round"
-                                />
-                                <path
-                                  d="M4.5 4v4M6.5 4v4"
-                                  stroke="currentColor"
-                                  strokeWidth="1.3"
-                                  strokeLinecap="round"
-                                />
-                              </svg>
-                            </button>
-                          </span>
+                          {!readOnly && (
+                            <span className={styles.workbookActions}>
+                              <button
+                                className={styles.workbookDownloadBtn}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  void downloadWorkbook(ws.id, wb.id, wb.name);
+                                }}
+                                title="下载"
+                              >
+                                <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                                  <path
+                                    d="M5.5 1v6M3 4.5l2.5 2.5L8 4.5"
+                                    stroke="currentColor"
+                                    strokeWidth="1.3"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  />
+                                  <path
+                                    d="M1.5 8v1a1 1 0 001 1h6a1 1 0 001-1V8"
+                                    stroke="currentColor"
+                                    strokeWidth="1.3"
+                                    strokeLinecap="round"
+                                  />
+                                </svg>
+                              </button>
+                              <button
+                                className={styles.workbookDeleteBtn}
+                                onClick={(e) => void handleWorkbookDeleteClick(e, wb)}
+                                title="删除"
+                              >
+                                <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                                  <path
+                                    d="M2 2.5h7M4 2.5V1.5a1 1 0 011-1h1a1 1 0 011 1v1M8.5 2.5v6a1 1 0 01-1 1h-4a1 1 0 01-1-1v-6"
+                                    stroke="currentColor"
+                                    strokeWidth="1.3"
+                                    strokeLinecap="round"
+                                  />
+                                  <path
+                                    d="M4.5 4v4M6.5 4v4"
+                                    stroke="currentColor"
+                                    strokeWidth="1.3"
+                                    strokeLinecap="round"
+                                  />
+                                </svg>
+                              </button>
+                            </span>
+                          )}
                         </div>
                       );
                     })}
-                    <button
-                      className={styles.workbookCreateBtn}
-                      onClick={(e) => handleCreateWorkbook(e, ws.id)}
-                      title="新建工作簿"
-                    >
-                      <span className={styles.plusIcon}>
-                        <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-                          <path
-                            d="M5.5 1v9M1 5.5h9"
-                            stroke="currentColor"
-                            strokeWidth="1.5"
-                            strokeLinecap="round"
-                          />
-                        </svg>
-                      </span>
-                      新建工作簿
-                    </button>
+                    {!readOnly && (
+                      <button
+                        className={styles.workbookCreateBtn}
+                        onClick={(e) => handleCreateWorkbook(e, ws.id)}
+                        title="新建工作簿"
+                      >
+                        <span className={styles.plusIcon}>
+                          <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                            <path
+                              d="M5.5 1v9M1 5.5h9"
+                              stroke="currentColor"
+                              strokeWidth="1.5"
+                              strokeLinecap="round"
+                            />
+                          </svg>
+                        </span>
+                        新建工作簿
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -477,17 +536,27 @@ export function WorkspaceSidebar({
           })}
         </div>
 
-        <button className={`${styles.createBtn} ${styles.serif}`} onClick={handleCreate}>
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <path
-              d="M6 1v10M1 6h10"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-            />
-          </svg>
-          {t("new_workspace", "新建项目")}
-        </button>
+        {readOnly ? (
+          <div className={styles.demoNote}>
+            <span className={styles.demoNoteIcon}>R</span>
+            <span>
+              <strong>只读回放空间</strong>
+              <small>数据会随流程自动更新</small>
+            </span>
+          </div>
+        ) : (
+          <button className={styles.createBtn} onClick={handleCreate}>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path
+                d="M6 1v10M1 6h10"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
+            </svg>
+            {t("new_workspace", "新建项目")}
+          </button>
+        )}
       </div>
       <div className={styles.resizeHandle} onMouseDown={handleResizeMouseDown} />
     </div>

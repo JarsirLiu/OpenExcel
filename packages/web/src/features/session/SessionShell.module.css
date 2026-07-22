@@ -2,8 +2,8 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: var(--bg-surface);
-  border-left: 1px solid var(--border-default);
+  background: #fcfbf8;
+  border-left: 1px solid #dfddd7;
   overflow: hidden;
   position: relative;
   box-sizing: border-box;

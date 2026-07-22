@@ -21,7 +21,25 @@ describe("MarketingShowcase", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getAllByLabelText(/^观看.+完整回放$/)).toHaveLength(11);
+    expect(screen.getAllByLabelText(/^观看.+完整回放$/)).toHaveLength(16);
+    expect(screen.getByRole("link", { name: "观看学费住宿费欠费核查完整回放" })).toHaveAttribute(
+      "href",
+      "/demos/student-fee-reconciliation",
+    );
+    expect(screen.getByRole("link", { name: "观看科研经费预算执行分析完整回放" })).toHaveAttribute(
+      "href",
+      "/demos/research-fund-execution",
+    );
+    expect(
+      screen.getByRole("link", { name: "观看采购合同与付款进度核查完整回放" }),
+    ).toHaveAttribute("href", "/demos/school-procurement-audit");
+    expect(
+      screen.getByRole("link", { name: "观看学校预算执行与部门经费预警完整回放" }),
+    ).toHaveAttribute("href", "/demos/department-budget-monitoring");
+    expect(screen.getByRole("link", { name: "观看学生资助资金发放核查完整回放" })).toHaveAttribute(
+      "href",
+      "/demos/student-aid-disbursement",
+    );
     expect(screen.getByRole("link", { name: "观看企业财务健康分析完整回放" })).toHaveAttribute(
       "href",
       "/demos/financial-health-analysis",

@@ -13,6 +13,21 @@ describe("demo registry", () => {
     expect(getDemoDefinition("/demos/inventory-reconciliation")).toBe(
       demoRegistry["/demos/inventory-reconciliation"],
     );
+    expect(getDemoDefinition("/demos/student-fee-reconciliation")).toBe(
+      demoRegistry["/demos/student-fee-reconciliation"],
+    );
+    expect(getDemoDefinition("/demos/research-fund-execution")).toBe(
+      demoRegistry["/demos/research-fund-execution"],
+    );
+    expect(getDemoDefinition("/demos/school-procurement-audit")).toBe(
+      demoRegistry["/demos/school-procurement-audit"],
+    );
+    expect(getDemoDefinition("/demos/department-budget-monitoring")).toBe(
+      demoRegistry["/demos/department-budget-monitoring"],
+    );
+    expect(getDemoDefinition("/demos/student-aid-disbursement")).toBe(
+      demoRegistry["/demos/student-aid-disbursement"],
+    );
     for (const [route, demo] of Object.entries(demoRegistry)) {
       expect(demo.route).toBe(route);
       expect(validateDemoDefinition(demo)).toEqual([]);
@@ -20,12 +35,12 @@ describe("demo registry", () => {
   });
 
   it("does not fall back to another demo for an unknown route", () => {
-    expect(getDemoDefinition("/demos/student-fee-reconciliation")).toBeNull();
+    expect(getDemoDefinition("/demos/student-fee-refund-analysis")).toBeNull();
   });
 
   it("provides complete, uniquely ordered marketing metadata", () => {
     const demos = Object.values(demoRegistry);
-    expect(demos).toHaveLength(11);
+    expect(demos).toHaveLength(16);
     expect(new Set(demos.map((demo) => demo.marketing.featuredOrder)).size).toBe(demos.length);
 
     for (const demo of demos) {

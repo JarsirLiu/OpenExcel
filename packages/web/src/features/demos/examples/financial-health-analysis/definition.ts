@@ -12,7 +12,7 @@ export const financialHealthAnalysisDemo = createAnalysisScenario({
     coverImage: "/demo-covers/financial-health.webp",
     coverAlt: "团队在桌面上讨论财务图表和经营数据",
     proofMetric: "5 类核心指标 · 2 项风险",
-    featuredOrder: 1,
+    featuredOrder: 6,
     theme: "sage",
   },
   workspaceId: -130,

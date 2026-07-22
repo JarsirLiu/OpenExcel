@@ -1,61 +1,177 @@
 .sidebar {
   flex-shrink: 0;
   overflow: hidden;
-  background: #faf8f6;
-  border-right: 1px solid rgb(0 0 0 / 8%);
+  background: #f6f4ef;
+  border-right: 1px solid #dfddd7;
   display: flex;
   position: relative;
-  transition: width 0.2s ease;
+  transition: width 260ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .collapsed {
-  padding: 12px 0 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 0 0;
 }
 
 .inner {
   height: 100%;
   display: flex;
   flex-direction: column;
-  padding: 12px 0;
+  padding: 17px 0 14px;
   overflow: hidden;
+}
+
+.homeButton {
+  width: calc(100% - 20px);
+  min-height: 48px;
+  margin: 0 10px 17px;
+  padding: 6px 8px;
+  border: 1px solid rgba(78, 76, 69, 0.09);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.42);
+  color: #33342f;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  text-align: left;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.7);
+  transition:
+    background 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.homeButton:hover {
+  border-color: rgba(91, 110, 96, 0.24);
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 7px 18px rgba(53, 52, 46, 0.07);
+  transform: translateY(-1px);
+}
+
+.homeButton:active {
+  transform: translateY(0) scale(0.985);
+}
+
+.homeButton:focus-visible,
+.collapsedHomeButton:focus-visible,
+.toggleBtn:focus-visible,
+.expandBtn:focus-visible {
+  outline: 2px solid #607566;
+  outline-offset: 2px;
+}
+
+.homeMark {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: #31332f;
+  color: #f7f4ed;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.homeCopy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.homeCopy strong {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.homeCopy small {
+  color: #8c8981;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+}
+
+.homeArrow {
+  margin-left: auto;
+  color: #a09d95;
+  transition: transform 180ms ease;
+}
+
+.homeButton:hover .homeArrow {
+  color: #607566;
+  transform: translateX(-2px);
+}
+
+.collapsedHomeButton {
+  width: 25px;
+  height: 25px;
+  padding: 0;
+  border: 1px solid #d9d6cf;
+  border-radius: 7px;
+  background: #33342f;
+  color: #f7f4ed;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition:
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.collapsedHomeButton:hover {
+  background: #526558;
+  transform: translateY(-1px);
 }
 
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px 12px;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  padding: 0 15px 14px 17px;
+  color: #6f6c65;
 }
 
-.serif {
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 16px;
-  text-transform: none;
-  letter-spacing: normal;
+.sectionLabel {
+  display: grid;
+  gap: 4px;
+}
+
+.sectionLabel small {
+  color: #9a978f;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+}
+
+.sectionLabel strong {
+  color: #3e3f3a;
+  font-size: 14px;
+  font-weight: 720;
+  letter-spacing: -0.01em;
 }
 
 .toggleBtn {
-  width: 24px;
-  height: 24px;
-  border: none;
-  background: transparent;
+  width: 28px;
+  height: 28px;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.35);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--text-tertiary);
-  border-radius: 4px;
+  color: #8e8b83;
+  border-radius: 8px;
   flex-shrink: 0;
 }
 
 .toggleBtn:hover {
-  background: var(--bg-muted);
-  color: var(--text-primary);
+  border-color: #d7d4cc;
+  background: #fff;
+  color: #3e3f3a;
 }
 
 .expandBtn {
@@ -81,20 +197,24 @@
 .list {
   flex: 1;
   overflow-y: auto;
-  padding: 0 8px;
+  padding: 0 9px;
 }
 
 .item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  border-radius: 6px;
+  gap: 9px;
+  min-height: 42px;
+  padding: 7px 10px;
+  border: 1px solid transparent;
+  border-radius: 10px;
   cursor: pointer;
-  font-size: 14px;
-  color: var(--text-primary);
-  transition: background 0.15s ease;
-  border: none;
+  font-size: 13px;
+  color: #4a4944;
+  transition:
+    background 220ms ease,
+    border-color 220ms ease,
+    transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
   background: transparent;
   width: 100%;
   text-align: left;
@@ -102,23 +222,29 @@
 }
 
 .item:hover {
-  background: #efebe6;
+  background: rgba(255, 255, 255, 0.56);
+  transform: translateX(2px);
 }
 
 .itemActive {
-  background: #efebe6;
-  font-weight: 600;
+  border-color: #d9d8d1;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow:
+    0 8px 20px rgba(57, 54, 48, 0.05),
+    inset 0 1px rgba(255, 255, 255, 0.9);
+  color: #30312d;
+  font-weight: 680;
 }
 
 .itemActive::before {
   content: "";
   position: absolute;
-  left: 0;
-  top: 6px;
-  bottom: 6px;
-  width: 3px;
+  left: -1px;
+  top: 10px;
+  bottom: 10px;
+  width: 2px;
   border-radius: 0 2px 2px 0;
-  background: #6b5b4e;
+  background: #607566;
 }
 
 .itemName {
@@ -235,18 +361,19 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  color: var(--text-tertiary);
+  color: #718076;
 }
 
 .createBtn {
-  margin: 8px 12px 0;
+  min-height: 40px;
+  margin: 9px 12px 0;
   padding: 8px;
-  border: 1px dashed var(--border-strong);
-  border-radius: 6px;
-  background: transparent;
+  border: 1px solid #dad7cf;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.48);
   cursor: pointer;
   font-size: 13px;
-  color: var(--text-secondary);
+  color: #66635d;
   transition:
     background 0.12s ease,
     color 0.12s ease;
@@ -257,9 +384,10 @@
 }
 
 .createBtn:hover {
-  background: var(--bg-muted);
-  color: var(--text-primary);
-  border-color: var(--text-secondary);
+  border-color: #bcb8af;
+  background: #fff;
+  color: #30312d;
+  transform: translateY(-1px);
 }
 
 .resizeHandle {
@@ -275,7 +403,7 @@
 
 .resizeHandle:hover,
 .resizeHandle:active {
-  background: rgb(0 0 0 / 6%);
+  background: rgba(96, 117, 102, 0.18);
 }
 
 .chevron {
@@ -306,9 +434,9 @@
   display: flex;
   flex-direction: column;
   gap: 1px;
-  margin-left: 16px;
-  margin-top: 1px;
-  margin-bottom: 1px;
+  margin: 4px 0 4px 18px;
+  padding-left: 8px;
+  border-left: 1px solid #ddd9d1;
 }
 
 .workbookItem {
@@ -316,7 +444,7 @@
   align-items: center;
   gap: 6px;
   padding: 5px 10px;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
   font-size: 13px;
   color: var(--text-secondary);
@@ -331,12 +459,12 @@
 }
 
 .workbookItem:hover {
-  background: #efebe6;
+  background: rgba(255, 255, 255, 0.58);
   color: var(--text-primary);
 }
 
 .workbookActive {
-  background: transparent;
+  background: rgba(255, 255, 255, 0.7);
   color: var(--text-primary);
   font-weight: 600;
 }
@@ -353,11 +481,7 @@
 }
 
 .workbookActive:hover {
-  background: #efebe6;
-}
-
-.workbookActive:hover {
-  background: #d4cfc9;
+  background: #fff;
 }
 
 .workbookIcon {
@@ -456,6 +580,49 @@
   background: #efebe6;
   color: var(--text-primary);
   border-color: var(--text-secondary);
+}
+
+.demoNote {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 12px 0;
+  padding: 10px 11px;
+  border-top: 1px solid #dedbd4;
+  color: #65635d;
+}
+
+.demoNoteIcon {
+  display: grid;
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border-radius: 8px;
+  background: #dfe7e1;
+  color: #53685a;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.demoNote > span:last-child {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.demoNote strong {
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.demoNote small {
+  overflow: hidden;
+  color: #9a978f;
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .workbookCreateBtn .plusIcon {

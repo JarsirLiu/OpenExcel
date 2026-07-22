@@ -11,7 +11,7 @@ export const campusRecruitmentAnalysisDemo = createAnalysisScenario({
     coverImage: "/demo-covers/campus-recruitment.webp",
     coverAlt: "招聘人员与候选人在办公室进行面试",
     proofMetric: "5 个渠道 · 6 层漏斗",
-    featuredOrder: 9,
+    featuredOrder: 14,
     theme: "sage",
   },
   workspaceId: -150,

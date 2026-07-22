@@ -1,8 +1,8 @@
 .sidebar {
-  width: min(400px, 32vw);
+  width: min(410px, 32vw);
   flex-shrink: 0;
   min-width: 0;
   overflow: hidden;
-  background: var(--bg-surface);
-  border-left: 1px solid rgb(0 0 0 / 8%);
+  background: #fcfbf8;
+  border-left: 1px solid #dfddd7;
 }

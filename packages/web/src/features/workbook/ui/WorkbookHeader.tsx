@@ -30,6 +30,7 @@ interface Props {
   onSwitchWorkbook: (index: number) => void;
   onUploadNewWorkbookClick: () => void;
   onWorkbookRename?: (workbookId: number, newName: string) => Promise<void>;
+  presentationMode?: boolean;
 }
 
 export function WorkbookHeader({
@@ -38,6 +39,7 @@ export function WorkbookHeader({
   onSwitchWorkbook,
   onUploadNewWorkbookClick,
   onWorkbookRename,
+  presentationMode = false,
 }: Props) {
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [editValue, setEditValue] = useState("");
@@ -109,9 +111,15 @@ export function WorkbookHeader({
         )}
       </div>
       <div className={styles.actions}>
-        <button onClick={onUploadNewWorkbookClick} className={styles.pillBtn}>
-          <FileIcon /> {t("upload", "上传Excel")}
-        </button>
+        {presentationMode ? (
+          <span className={styles.demoDataStatus}>
+            <i /> 示例工作簿
+          </span>
+        ) : (
+          <button onClick={onUploadNewWorkbookClick} className={styles.pillBtn}>
+            <FileIcon /> {t("upload", "导入工作簿")}
+          </button>
+        )}
       </div>
     </div>
   );
