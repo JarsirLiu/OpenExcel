@@ -70,7 +70,17 @@ export function AuthScreen({
           OpenExcel
         </span>
         <div className={styles.navMeta}>
-          <a href="#marketing-heading">真实案例</a>
+          <button
+            type="button"
+            onClick={() =>
+              document.getElementById("marketing-heading")?.scrollIntoView({
+                behavior: "smooth",
+                block: "start",
+              })
+            }
+          >
+            真实案例
+          </button>
           <span className={styles.navStatus}>
             <i /> 可交互回放
           </span>

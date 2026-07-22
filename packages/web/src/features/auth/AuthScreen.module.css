@@ -62,13 +62,18 @@
   font-size: 12px;
 }
 
-.navMeta a {
+.navMeta button {
+  border: 0;
+  background: transparent;
   color: #67655f;
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
   text-decoration: none;
   transition: color 220ms ease;
 }
 
-.navMeta a:hover {
+.navMeta button:hover {
   color: #252521;
 }
 
@@ -749,7 +754,7 @@
     padding: 22px 24px;
   }
 
-  .navMeta a {
+  .navMeta button {
     display: none;
   }
 
