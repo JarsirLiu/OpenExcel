@@ -194,13 +194,8 @@ export function MarketingShowcase() {
         aria-labelledby="marketing-heading"
       >
         <div className={styles.bridgeIntro}>
-          <span className={styles.eyebrow}>AI 表格工作流</span>
-          <h2 id="marketing-heading">
-            从原始表格，
-            <br />
-            到可以直接行动的结论。
-          </h2>
-          <p>不是给你一段回答，而是读取真实工作簿、执行分析，再把结果写回可以继续工作的表格。</p>
+          <span className={styles.eyebrow}>AI 操控 Excel</span>
+          <h2 id="marketing-heading">让 AI 辅助您的数据分析和处理工作</h2>
         </div>
         <ol className={styles.process}>
           {processSteps.map((step, index) => (
@@ -239,12 +234,14 @@ export function MarketingShowcase() {
       )}
 
       {compactDemos.length > 0 && (
-        <section className={styles.moreCases} aria-labelledby="more-cases-heading">
+        <section
+          className={styles.moreCases}
+          aria-label={activeCategory === "全部" ? "更多真实场景" : `${activeCategory}场景`}
+        >
           <div className={`${styles.sectionHeading} ${styles.reveal}`} data-reveal>
             <span className={styles.eyebrow}>
               {activeCategory === "全部" ? "更多真实场景" : `${activeCategory}场景`}
             </span>
-            <h2 id="more-cases-heading">每一种表格，都有自己的判断逻辑。</h2>
           </div>
           <div className={styles.compactGrid}>
             {compactDemos.map((demo, index) => (

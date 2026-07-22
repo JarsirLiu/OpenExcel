@@ -657,7 +657,7 @@
   position: relative;
   z-index: 1;
   max-width: 850px;
-  font-size: clamp(42px, 6vw, 76px);
+  font-size: clamp(34px, 4vw, 56px);
   line-height: 1.02;
 }
 
@@ -672,8 +672,8 @@
 .primaryCta,
 .secondaryCta {
   border-radius: 999px;
-  padding: 13px 20px;
-  font-size: 13px;
+  padding: 12px 18px;
+  font-size: 12px;
   font-weight: 800;
   text-decoration: none;
   transition:
@@ -868,7 +868,7 @@
     border-radius: 3px 32px 3px 32px;
   }
   .finalCta h2 {
-    font-size: 42px;
+    font-size: 34px;
   }
   .finalCta > div {
     align-items: flex-start;

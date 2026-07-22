@@ -30,7 +30,7 @@ describe("AuthScreen", () => {
     );
     expect(
       screen.getByRole("heading", {
-        name: /从原始表格.*到可以直接行动的结论/,
+        name: /让 AI 辅助您的数据分析和处理工作/,
       }),
     ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "真实案例" })).not.toBeInTheDocument();
