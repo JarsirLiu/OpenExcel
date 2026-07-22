@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { ProgressiveImage } from "@/shared/ui";
 import { demoRegistry } from "../registry";
 import styles from "./DemoCatalogPage.module.css";
 
@@ -20,7 +21,11 @@ export function DemoCatalogPage() {
         {demos.map((demo, index) => (
           <Link className={styles.card} key={demo.id} to={demo.route}>
             <div className={styles.cover}>
-              <img src={demo.marketing.coverImage} alt={demo.marketing.coverAlt} loading="lazy" />
+              <ProgressiveImage
+                src={demo.marketing.coverImage}
+                alt={demo.marketing.coverAlt}
+                priority={index === 0}
+              />
             </div>
             <span className={styles.index}>CASE {String(index + 1).padStart(2, "0")}</span>
             <h2>{demo.marketing.marketingTitle}</h2>

@@ -2,6 +2,7 @@ import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react"
 import { Link } from "react-router-dom";
 import { demoRegistry } from "@/features/demos/registry";
 import type { DemoCategory, DemoDefinition, DemoSheet } from "@/features/demos/runtime/replayTypes";
+import { ProgressiveImage } from "@/shared/ui";
 import styles from "./MarketingShowcase.module.css";
 
 const categories: Array<DemoCategory | "全部"> = ["全部", "财务", "销售", "运营", "人力", "教育"];
@@ -97,10 +98,10 @@ function FeaturedCase({ demo, index }: { demo: DemoDefinition; index: number }) 
         aria-label={`观看${demo.marketing.marketingTitle}完整回放`}
       >
         <div className={styles.caseMedia}>
-          <img
+          <ProgressiveImage
             src={demo.marketing.coverImage}
             alt={demo.marketing.coverAlt}
-            loading={index === 0 ? "eager" : "lazy"}
+            priority={index === 0}
           />
           <div className={styles.mediaShade} />
           <div className={styles.caseNumber}>CASE {String(index + 1).padStart(2, "0")}</div>
@@ -134,7 +135,7 @@ function CompactCase({ demo, index }: { demo: DemoDefinition; index: number }) {
       aria-label={`观看${demo.marketing.marketingTitle}完整回放`}
     >
       <div className={styles.compactMedia}>
-        <img src={demo.marketing.coverImage} alt={demo.marketing.coverAlt} loading="lazy" />
+        <ProgressiveImage src={demo.marketing.coverImage} alt={demo.marketing.coverAlt} />
         <div className={styles.compactWorkbook}>
           <WorkbookPreview demo={demo} compact />
         </div>
