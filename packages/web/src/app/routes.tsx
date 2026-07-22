@@ -7,7 +7,7 @@ import {
   redirect,
   useLoaderData,
 } from "react-router-dom";
-import { AppShell, AuthPage, NotFoundPage, WorkbenchPage } from "@/App";
+import { AppShell, AuthPage, NotFoundPage } from "@/App";
 import { demoLoader } from "@/app/loaders/demoLoader";
 import { protectedLoader } from "@/app/loaders/protectedLoader";
 import { authPageLoader } from "@/app/loaders/publicLoader";
@@ -114,8 +114,11 @@ export const routes: RouteObject[] = [
           {
             id: "workspace-route",
             path: "workspaces/:workspacePublicId",
-            element: <WorkbenchPage />,
             loader: workspaceLoader,
+            lazy: async () => {
+              const { WorkbenchRoutePage } = await import("@/app/WorkbenchRoutePage");
+              return { Component: WorkbenchRoutePage };
+            },
           },
         ],
       },

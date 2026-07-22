@@ -64,6 +64,17 @@ export type DemoMarketing = {
   theme: "sage" | "sand" | "slate";
 };
 
+export type DemoCatalogEntry = {
+  id: string;
+  marketing: DemoMarketing;
+  preview: {
+    workbookName: string;
+    sheetName: string;
+    columns: string[];
+    rows: Array<Array<string | number>>;
+  };
+};
+
 export type DemoDefinition = {
   id: string;
   marketing: DemoMarketing;

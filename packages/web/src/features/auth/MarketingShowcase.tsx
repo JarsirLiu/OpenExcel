@@ -1,12 +1,11 @@
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { routePaths } from "@/app/routePaths";
-import { demoRegistry } from "@/features/demos/registry";
-import type { DemoCategory, DemoDefinition, DemoSheet } from "@/features/demos/runtime/replayTypes";
+import { demoCatalog, demoCategories } from "@/features/demos/catalog";
+import type { DemoCatalogEntry, DemoCategory } from "@/features/demos/runtime/replayTypes";
 import { ProgressiveImage } from "@/shared/ui";
 import styles from "./MarketingShowcase.module.css";
 
-const categories: Array<DemoCategory | "全部"> = ["全部", "财务", "销售", "运营", "人力", "教育"];
 const processSteps = [
   { index: "01", title: "导入数据", description: "保留工作簿、公式与表结构" },
   { index: "02", title: "AI 分析", description: "读取、计算并定位业务异常" },
@@ -28,14 +27,9 @@ function formatCell(value: string | number) {
     : String(value);
 }
 
-function getPreviewSheet(demo: DemoDefinition): DemoSheet | undefined {
-  return demo.initialWorkbooks[0]?.sheets[0];
-}
-
-function WorkbookPreview({ demo, compact = false }: { demo: DemoDefinition; compact?: boolean }) {
-  const sheet = getPreviewSheet(demo);
-  const columns = sheet?.columns.slice(0, compact ? 3 : 4) ?? [];
-  const rows = sheet?.rows.slice(1, compact ? 4 : 5) ?? [];
+function WorkbookPreview({ demo, compact = false }: { demo: DemoCatalogEntry; compact?: boolean }) {
+  const columns = demo.preview.columns.slice(0, compact ? 3 : 4);
+  const rows = demo.preview.rows.slice(0, compact ? 3 : 4);
 
   return (
     <div
@@ -48,7 +42,7 @@ function WorkbookPreview({ demo, compact = false }: { demo: DemoDefinition; comp
           <i />
           <i />
         </span>
-        <span className={styles.workbookName}>{demo.initialWorkbooks[0]?.name}</span>
+        <span className={styles.workbookName}>{demo.preview.workbookName}</span>
         <span className={styles.workbookStatus}>AI 分析完成</span>
       </div>
       <div className={styles.stageBar}>
@@ -57,7 +51,7 @@ function WorkbookPreview({ demo, compact = false }: { demo: DemoDefinition; comp
         <span className={`${styles.stage} ${styles.stageActive}`}>最终结果</span>
       </div>
       <div className={styles.sheet}>
-        <div className={styles.sheetName}>{sheet?.name}</div>
+        <div className={styles.sheetName}>{demo.preview.sheetName}</div>
         <div className={styles.table} style={{ "--column-count": columns.length } as CSSProperties}>
           {columns.map((column) => (
             <span className={styles.tableHead} key={column}>
@@ -70,7 +64,7 @@ function WorkbookPreview({ demo, compact = false }: { demo: DemoDefinition; comp
                 className={`${styles.tableCell} ${columnIndex === columns.length - 1 && rowIndex < 2 ? styles.tableCellEmphasis : ""}`}
                 key={`${rowIndex}-${columnIndex}`}
               >
-                {formatCell(cell.value)}
+                {formatCell(cell)}
               </span>
             )),
           )}
@@ -86,7 +80,7 @@ function WorkbookPreview({ demo, compact = false }: { demo: DemoDefinition; comp
   );
 }
 
-function FeaturedCase({ demo, index }: { demo: DemoDefinition; index: number }) {
+function FeaturedCase({ demo, index }: { demo: DemoCatalogEntry; index: number }) {
   return (
     <article
       className={`${styles.featuredCase} ${index % 2 === 1 ? styles.featuredCaseReverse : ""} ${styles.reveal}`}
@@ -126,7 +120,7 @@ function FeaturedCase({ demo, index }: { demo: DemoDefinition; index: number }) 
   );
 }
 
-function CompactCase({ demo, index }: { demo: DemoDefinition; index: number }) {
+function CompactCase({ demo, index }: { demo: DemoCatalogEntry; index: number }) {
   return (
     <Link
       className={`${styles.compactCase} ${styles.reveal}`}
@@ -157,10 +151,7 @@ export function MarketingShowcase() {
   const rootRef = useRef<HTMLElement>(null);
   const [activeCategory, setActiveCategory] = useState<DemoCategory | "全部">("全部");
   const demos = useMemo(
-    () =>
-      Object.values(demoRegistry).sort(
-        (a, b) => a.marketing.featuredOrder - b.marketing.featuredOrder,
-      ),
+    () => [...demoCatalog].sort((a, b) => a.marketing.featuredOrder - b.marketing.featuredOrder),
     [],
   );
   const visibleDemos =
@@ -209,7 +200,7 @@ export function MarketingShowcase() {
           ))}
         </ol>
         <fieldset className={styles.categories} aria-label="按业务类型筛选案例">
-          {categories.map((category) => (
+          {demoCategories.map((category) => (
             <button
               key={category}
               type="button"

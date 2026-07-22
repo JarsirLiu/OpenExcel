@@ -1,46 +1,68 @@
-import { bankTransactionAuditDemo } from "./examples/bank-transaction-audit";
-import { campusRecruitmentAnalysisDemo } from "./examples/campus-recruitment-analysis";
-import { departmentBudgetMonitoringDemo } from "./examples/department-budget-monitoring";
-import { examScoreAnalysisDemo } from "./examples/exam-score-analysis";
-import { financialHealthAnalysisDemo } from "./examples/financial-health-analysis";
-import { inventoryReconciliationDemo } from "./examples/inventory-reconciliation";
-import { investmentBudgetReviewDemo } from "./examples/investment-budget-review";
-import { logisticsOperationsAnalysisDemo } from "./examples/logistics-operations-analysis";
-import { marketingRoiAnalysisDemo } from "./examples/marketing-roi-analysis";
-import { orderFulfillmentAnalysisDemo } from "./examples/order-fulfillment-analysis";
-import { researchFundExecutionDemo } from "./examples/research-fund-execution";
-import { salesPerformanceAnalysisDemo } from "./examples/sales-performance-analysis";
-import { schoolProcurementAuditDemo } from "./examples/school-procurement-audit";
-import { shareholderChangeAnalysisDemo } from "./examples/shareholder-change-analysis";
-import { studentAidDisbursementDemo } from "./examples/student-aid-disbursement";
-import { studentFeeReconciliationDemo } from "./examples/student-fee-reconciliation";
 import type { DemoDefinition } from "./runtime/replayTypes";
 
-export const demoRegistry: Record<string, DemoDefinition> = {
-  [bankTransactionAuditDemo.id]: bankTransactionAuditDemo,
-  [campusRecruitmentAnalysisDemo.id]: campusRecruitmentAnalysisDemo,
-  [departmentBudgetMonitoringDemo.id]: departmentBudgetMonitoringDemo,
-  [examScoreAnalysisDemo.id]: examScoreAnalysisDemo,
-  [financialHealthAnalysisDemo.id]: financialHealthAnalysisDemo,
-  [investmentBudgetReviewDemo.id]: investmentBudgetReviewDemo,
-  [inventoryReconciliationDemo.id]: inventoryReconciliationDemo,
-  [logisticsOperationsAnalysisDemo.id]: logisticsOperationsAnalysisDemo,
-  [marketingRoiAnalysisDemo.id]: marketingRoiAnalysisDemo,
-  [orderFulfillmentAnalysisDemo.id]: orderFulfillmentAnalysisDemo,
-  [researchFundExecutionDemo.id]: researchFundExecutionDemo,
-  [salesPerformanceAnalysisDemo.id]: salesPerformanceAnalysisDemo,
-  [schoolProcurementAuditDemo.id]: schoolProcurementAuditDemo,
-  [shareholderChangeAnalysisDemo.id]: shareholderChangeAnalysisDemo,
-  [studentAidDisbursementDemo.id]: studentAidDisbursementDemo,
-  [studentFeeReconciliationDemo.id]: studentFeeReconciliationDemo,
+type DemoLoader = () => Promise<DemoDefinition>;
+
+const demoLoaders: Record<string, DemoLoader> = {
+  "bank-transaction-audit": () =>
+    import("./examples/bank-transaction-audit").then(({ bankTransactionAuditDemo }) => bankTransactionAuditDemo),
+  "campus-recruitment-analysis": () =>
+    import("./examples/campus-recruitment-analysis").then(
+      ({ campusRecruitmentAnalysisDemo }) => campusRecruitmentAnalysisDemo,
+    ),
+  "department-budget-monitoring": () =>
+    import("./examples/department-budget-monitoring").then(
+      ({ departmentBudgetMonitoringDemo }) => departmentBudgetMonitoringDemo,
+    ),
+  "exam-score-analysis": () =>
+    import("./examples/exam-score-analysis").then(({ examScoreAnalysisDemo }) => examScoreAnalysisDemo),
+  "financial-health-analysis": () =>
+    import("./examples/financial-health-analysis").then(
+      ({ financialHealthAnalysisDemo }) => financialHealthAnalysisDemo,
+    ),
+  "inventory-reconciliation": () =>
+    import("./examples/inventory-reconciliation").then(
+      ({ inventoryReconciliationDemo }) => inventoryReconciliationDemo,
+    ),
+  "investment-budget-review": () =>
+    import("./examples/investment-budget-review").then(
+      ({ investmentBudgetReviewDemo }) => investmentBudgetReviewDemo,
+    ),
+  "logistics-operations-analysis": () =>
+    import("./examples/logistics-operations-analysis").then(
+      ({ logisticsOperationsAnalysisDemo }) => logisticsOperationsAnalysisDemo,
+    ),
+  "marketing-roi-analysis": () =>
+    import("./examples/marketing-roi-analysis").then(({ marketingRoiAnalysisDemo }) => marketingRoiAnalysisDemo),
+  "order-fulfillment-analysis": () =>
+    import("./examples/order-fulfillment-analysis").then(
+      ({ orderFulfillmentAnalysisDemo }) => orderFulfillmentAnalysisDemo,
+    ),
+  "research-fund-execution": () =>
+    import("./examples/research-fund-execution").then(
+      ({ researchFundExecutionDemo }) => researchFundExecutionDemo,
+    ),
+  "sales-performance-analysis": () =>
+    import("./examples/sales-performance-analysis").then(
+      ({ salesPerformanceAnalysisDemo }) => salesPerformanceAnalysisDemo,
+    ),
+  "school-procurement-audit": () =>
+    import("./examples/school-procurement-audit").then(
+      ({ schoolProcurementAuditDemo }) => schoolProcurementAuditDemo,
+    ),
+  "shareholder-change-analysis": () =>
+    import("./examples/shareholder-change-analysis").then(
+      ({ shareholderChangeAnalysisDemo }) => shareholderChangeAnalysisDemo,
+    ),
+  "student-aid-disbursement": () =>
+    import("./examples/student-aid-disbursement").then(
+      ({ studentAidDisbursementDemo }) => studentAidDisbursementDemo,
+    ),
+  "student-fee-reconciliation": () =>
+    import("./examples/student-fee-reconciliation").then(
+      ({ studentFeeReconciliationDemo }) => studentFeeReconciliationDemo,
+    ),
 };
 
-export function getDemoDefinition(pathname: string): DemoDefinition | null {
-  const prefix = "/demos/";
-  if (!pathname.startsWith(prefix)) return null;
-  return getDemoDefinitionById(pathname.slice(prefix.length));
-}
-
-export function getDemoDefinitionById(id: string): DemoDefinition | null {
-  return Object.values(demoRegistry).find((demo) => demo.id === id) ?? null;
+export async function loadDemoDefinitionById(id: string): Promise<DemoDefinition | null> {
+  return demoLoaders[id]?.() ?? null;
 }

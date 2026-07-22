@@ -1,11 +1,11 @@
 import { Link } from "react-router-dom";
 import { routePaths } from "@/app/routePaths";
+import { demoCatalog } from "../catalog";
 import { ProgressiveImage } from "@/shared/ui";
-import { demoRegistry } from "../registry";
 import styles from "./DemoCatalogPage.module.css";
 
 export function DemoCatalogPage() {
-  const demos = Object.values(demoRegistry).sort(
+  const demos = [...demoCatalog].sort(
     (a, b) => a.marketing.featuredOrder - b.marketing.featuredOrder,
   );
 
