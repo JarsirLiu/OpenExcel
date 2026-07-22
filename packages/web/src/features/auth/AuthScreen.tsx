@@ -69,39 +69,13 @@ export function AuthScreen({
           </span>
           OpenExcel
         </span>
-        <div className={styles.navMeta}>
-          <button
-            type="button"
-            onClick={() =>
-              document.getElementById("marketing-heading")?.scrollIntoView({
-                behavior: "smooth",
-                block: "start",
-              })
-            }
-          >
-            真实案例
-          </button>
-          <span className={styles.navStatus}>
-            <i /> 可交互回放
-          </span>
-        </div>
       </nav>
 
       <div className={styles.hero}>
         <div className={styles.content}>
-          <div className={styles.eyebrow}>
-            <span>AI 原生表格工作台</span>
-            <i />
-            <span>真实操作，可复现</span>
-          </div>
           <h1 className={styles.headline}>
             {mode === "login" ? "让复杂表格，直接给出下一步。" : "从一张表，开始完成整项工作。"}
           </h1>
-          <p className={styles.subtitle}>
-            {mode === "login"
-              ? "读取真实工作簿、执行分析、定位异常，再把可执行结论写回 Excel。登录后继续你的工作。"
-              : "创建工作区，让 AI 在真实 Excel 中完成读取、计算、核查与结果写回。"}
-          </p>
 
           <form className={styles.form} onSubmit={(event) => void handleSubmit(event)}>
             {mode === "register" && (
@@ -161,7 +135,6 @@ export function AuthScreen({
                 {mode === "login" ? t("sign_up", "注册") : t("sign_in", "登录")}
               </button>
             </p>
-            <span>登录即进入你的私有工作区</span>
           </div>
         </div>
 
