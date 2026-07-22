@@ -74,7 +74,7 @@ export function AuthScreen({
       <div className={styles.hero}>
         <div className={styles.content}>
           <h1 className={styles.headline}>
-            {mode === "login" ? "让复杂表格，直接给出下一步。" : "从一张表，开始完成整项工作。"}
+            {mode === "login" ? "AI 操控 Excel，表格工作事半功倍" : "从一张表，开始完成整项工作。"}
           </h1>
 
           <form className={styles.form} onSubmit={(event) => void handleSubmit(event)}>
