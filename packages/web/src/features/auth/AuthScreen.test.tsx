@@ -14,7 +14,8 @@ describe("AuthScreen", () => {
     vi.stubGlobal("IntersectionObserver", IntersectionObserverMock);
   });
 
-  it("keeps public cases available without promotional navigation", () => {
+  it("keeps public cases available without promotional navigation", async () => {
+    await import("./MarketingShowcase");
     render(
       <MemoryRouter initialEntries={["/"]}>
         <AuthScreen
@@ -29,7 +30,7 @@ describe("AuthScreen", () => {
       </MemoryRouter>,
     );
     expect(
-      screen.getByRole("heading", {
+      await screen.findByRole("heading", {
         name: /让 AI 辅助您的数据分析和处理工作/,
       }),
     ).toBeInTheDocument();

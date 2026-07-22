@@ -1,3 +1,4 @@
+import { lazy, type ReactNode, Suspense } from "react";
 import {
   createBrowserRouter,
   type LoaderFunctionArgs,
@@ -12,10 +13,38 @@ import { protectedLoader } from "@/app/loaders/protectedLoader";
 import { authPageLoader } from "@/app/loaders/publicLoader";
 import { workspaceLoader } from "@/app/loaders/workspaceLoader";
 import type { DemoDefinition } from "@/features/demos/runtime/replayTypes";
-import { DemoCatalogPage } from "@/features/demos/shell/DemoCatalogPage";
-import { DemoPage } from "@/features/demos/shell/DemoPage";
 import { RouteErrorBoundary } from "./RouteErrorBoundary";
 import { routePaths } from "./routePaths";
+
+const DemoCatalogPage = lazy(() =>
+  import("@/features/demos/shell/DemoCatalogPage").then(({ DemoCatalogPage }) => ({
+    default: DemoCatalogPage,
+  })),
+);
+const DemoPage = lazy(() =>
+  import("@/features/demos/shell/DemoPage").then(({ DemoPage }) => ({ default: DemoPage })),
+);
+
+function RouteLoading() {
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "grid",
+        placeItems: "center",
+        background: "var(--bg-page)",
+        color: "var(--text-secondary)",
+        fontSize: 14,
+      }}
+    >
+      加载中…
+    </div>
+  );
+}
+
+function LazyRoute({ children }: { children: ReactNode }) {
+  return <Suspense fallback={<RouteLoading />}>{children}</Suspense>;
+}
 
 function DemoRoutePage() {
   const { demo } = useLoaderData() as { demo: DemoDefinition };
@@ -46,12 +75,20 @@ export const routes: RouteObject[] = [
         children: [
           {
             index: true,
-            element: <DemoCatalogPage />,
+            element: (
+              <LazyRoute>
+                <DemoCatalogPage />
+              </LazyRoute>
+            ),
           },
           {
             path: ":demoId",
             loader: demoLoader,
-            element: <DemoRoutePage />,
+            element: (
+              <LazyRoute>
+                <DemoRoutePage />
+              </LazyRoute>
+            ),
           },
         ],
       },

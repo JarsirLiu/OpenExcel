@@ -1,11 +1,14 @@
-import { type FormEvent, useState } from "react";
+import { type FormEvent, lazy, Suspense, useState } from "react";
 import { Link } from "react-router-dom";
 import { routePaths } from "@/app/routePaths";
 import { Button } from "@/components/ui/Button/Button";
 import { Input } from "@/components/ui/Input/Input";
 import { t } from "@/lib/i18n";
 import styles from "./AuthScreen.module.css";
-import { MarketingShowcase } from "./MarketingShowcase";
+
+const MarketingShowcase = lazy(() =>
+  import("./MarketingShowcase").then(({ MarketingShowcase }) => ({ default: MarketingShowcase })),
+);
 
 const previewRows = [
   ["材料学院", "¥128,400", "73%", "正常"],
@@ -236,7 +239,11 @@ export function AuthScreen({
         </div>
       </div>
 
-      {showMarketing && <MarketingShowcase />}
+      {showMarketing && (
+        <Suspense fallback={null}>
+          <MarketingShowcase />
+        </Suspense>
+      )}
     </div>
   );
 }
