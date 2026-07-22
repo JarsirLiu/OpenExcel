@@ -3,13 +3,17 @@ import { fetchCurrentUser } from "@/api/auth";
 import { ApiError } from "@/api/http";
 import { getInternalReturnTo, routePaths } from "@/app/routePaths";
 
-async function findCurrentUser() {
+export async function findCurrentUser() {
   try {
     return await fetchCurrentUser();
   } catch (error) {
     if (!(error instanceof ApiError) || error.status !== 401) throw error;
     return null;
   }
+}
+
+export async function homeLoader() {
+  return { currentUser: await findCurrentUser() };
 }
 
 async function redirectAuthenticatedUser(returnTo?: string | null) {

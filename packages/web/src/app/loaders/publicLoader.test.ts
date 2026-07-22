@@ -8,7 +8,7 @@ const { fetchCurrentUser } = vi.hoisted(() => ({
 vi.mock("@/api/auth", () => ({ fetchCurrentUser }));
 
 import { ApiError } from "@/api/http";
-import { authPageLoader } from "./publicLoader";
+import { authPageLoader, homeLoader } from "./publicLoader";
 
 const user = { id: 7, email: "user@example.com", displayName: "User" };
 
@@ -25,6 +25,12 @@ describe("public route loaders", () => {
     fetchCurrentUser.mockRejectedValue(new ApiError("unauthenticated", 401));
 
     await expect(authPageLoader(loaderArgs("http://localhost/login"))).resolves.toBeNull();
+  });
+
+  it("returns the current user for the home page when a session exists", async () => {
+    fetchCurrentUser.mockResolvedValue(user);
+
+    await expect(homeLoader()).resolves.toEqual({ currentUser: user });
   });
 
   it("returns authenticated users from the auth page to the public home route", async () => {

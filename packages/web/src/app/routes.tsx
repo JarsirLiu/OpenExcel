@@ -7,10 +7,10 @@ import {
   redirect,
   useLoaderData,
 } from "react-router-dom";
-import { AppShell, AuthPage, NotFoundPage } from "@/App";
+import { AppShell, AuthPage, HomePage, NotFoundPage } from "@/App";
 import { demoLoader } from "@/app/loaders/demoLoader";
 import { protectedLoader } from "@/app/loaders/protectedLoader";
-import { authPageLoader } from "@/app/loaders/publicLoader";
+import { authPageLoader, homeLoader } from "@/app/loaders/publicLoader";
 import { workspaceLoader } from "@/app/loaders/workspaceLoader";
 import type { DemoDefinition } from "@/features/demos/runtime/replayTypes";
 import { RouteErrorBoundary } from "./RouteErrorBoundary";
@@ -58,7 +58,8 @@ export const routes: RouteObject[] = [
     children: [
       {
         index: true,
-        element: <AuthPage mode="login" showMarketing />,
+        loader: homeLoader,
+        element: <HomePage />,
       },
       {
         path: "login",

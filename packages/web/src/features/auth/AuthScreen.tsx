@@ -30,6 +30,8 @@ type Props = {
     displayName?: string;
   }) => Promise<unknown>;
   onSwitchMode: () => void;
+  isAuthenticated?: boolean;
+  onStart?: () => Promise<unknown>;
   showMarketing?: boolean;
 };
 
@@ -40,6 +42,8 @@ export function AuthScreen({
   onLogin,
   onRegister,
   onSwitchMode,
+  isAuthenticated = false,
+  onStart,
   showMarketing = false,
 }: Props) {
   const [email, setEmail] = useState("");
@@ -60,6 +64,14 @@ export function AuthScreen({
       });
     } catch {
       // The auth hook already stores the message for the UI.
+    }
+  }
+
+  async function handleStart() {
+    try {
+      await onStart?.();
+    } catch {
+      // The parent stores the error for the UI.
     }
   }
 
@@ -85,65 +97,87 @@ export function AuthScreen({
             {mode === "login" ? "AI 操控 Excel，表格工作事半功倍" : "从一张表，开始完成整项工作。"}
           </h1>
 
-          <form className={styles.form} onSubmit={(event) => void handleSubmit(event)}>
-            {mode === "register" && (
-              <label className={styles.field} htmlFor="auth-display-name">
-                <span>{t("display_name", "显示名称")}</span>
-                <Input
-                  id="auth-display-name"
-                  value={displayName}
-                  onChange={(event) => setDisplayName(event.target.value)}
-                  placeholder="你的姓名"
-                  autoComplete="name"
-                />
-              </label>
-            )}
+          {isAuthenticated ? (
+            <div className={styles.form}>
+              {error && <div className={styles.error}>{error}</div>}
+              <Button
+                variant="primary"
+                type="button"
+                disabled={submitting}
+                className={styles.startButton}
+                onClick={() => void handleStart()}
+              >
+                <span>{submitting ? t("processing", "处理中…") : "立即开始"}</span>
+                {!submitting && (
+                  <svg aria-hidden="true" viewBox="0 0 20 20">
+                    <path d="M4 10h11M11 6l4 4-4 4" />
+                  </svg>
+                )}
+              </Button>
+            </div>
+          ) : (
+            <>
+              <form className={styles.form} onSubmit={(event) => void handleSubmit(event)}>
+                {mode === "register" && (
+                  <label className={styles.field} htmlFor="auth-display-name">
+                    <span>{t("display_name", "显示名称")}</span>
+                    <Input
+                      id="auth-display-name"
+                      value={displayName}
+                      onChange={(event) => setDisplayName(event.target.value)}
+                      placeholder="你的姓名"
+                      autoComplete="name"
+                    />
+                  </label>
+                )}
 
-            <label className={styles.field} htmlFor="auth-email">
-              <span>{t("email", "邮箱地址")}</span>
-              <Input
-                id="auth-email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="name@organization.cn"
-                type="email"
-                autoComplete="email"
-                required
-              />
-            </label>
+                <label className={styles.field} htmlFor="auth-email">
+                  <span>{t("email", "邮箱地址")}</span>
+                  <Input
+                    id="auth-email"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    placeholder="name@organization.cn"
+                    type="email"
+                    autoComplete="email"
+                    required
+                  />
+                </label>
 
-            <label className={styles.field} htmlFor="auth-password">
-              <span>{t("password", "密码")}</span>
-              <Input
-                id="auth-password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder="输入登录密码"
-                type="password"
-                autoComplete={mode === "login" ? "current-password" : "new-password"}
-                required
-              />
-            </label>
+                <label className={styles.field} htmlFor="auth-password">
+                  <span>{t("password", "密码")}</span>
+                  <Input
+                    id="auth-password"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    placeholder="输入登录密码"
+                    type="password"
+                    autoComplete={mode === "login" ? "current-password" : "new-password"}
+                    required
+                  />
+                </label>
 
-            {error && <div className={styles.error}>{error}</div>}
+                {error && <div className={styles.error}>{error}</div>}
 
-            <Button variant="primary" type="submit" disabled={submitting} className={styles.submit}>
-              {submitting
-                ? t("processing", "处理中…")
-                : mode === "login"
-                  ? t("sign_in", "登录")
-                  : t("create_account", "创建账号")}
-            </Button>
-          </form>
+                <Button variant="primary" type="submit" disabled={submitting} className={styles.submit}>
+                  {submitting
+                    ? t("processing", "处理中…")
+                    : mode === "login"
+                      ? t("sign_in", "登录")
+                      : t("create_account", "创建账号")}
+                </Button>
+              </form>
 
-          <div className={styles.formFooter}>
-            <p className={styles.switch}>
-              {mode === "login" ? t("no_account", "还没有账号？") : t("has_account", "已有账号？")}
-              <button type="button" className={styles.switchLink} onClick={onSwitchMode}>
-                {mode === "login" ? t("sign_up", "注册") : t("sign_in", "登录")}
-              </button>
-            </p>
-          </div>
+              <div className={styles.formFooter}>
+                <p className={styles.switch}>
+                  {mode === "login" ? t("no_account", "还没有账号？") : t("has_account", "已有账号？")}
+                  <button type="button" className={styles.switchLink} onClick={onSwitchMode}>
+                    {mode === "login" ? t("sign_up", "注册") : t("sign_in", "登录")}
+                  </button>
+                </p>
+              </div>
+            </>
+          )}
         </div>
 
         <div className={styles.visual}>
