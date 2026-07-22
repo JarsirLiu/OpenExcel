@@ -1,4 +1,5 @@
 import { prisma } from "../../../infra/database/db.js";
+import type { Prisma } from "../../../infra/database/prismaTypes.js";
 import * as sessionRepo from "../infrastructure/sessionRepository.js";
 import { withWorkspaceUndoLock } from "../infrastructure/workspaceUndoLock.js";
 import * as runRepo from "./repository.js";
@@ -21,13 +22,33 @@ async function clearSessionUndoCheckpointInternal(workspaceId: number, sessionId
   ]);
 }
 
+export async function invalidateUndoCheckpointInTransaction(
+  tx: Prisma.TransactionClient,
+  sessionId: number,
+  runId: number,
+) {
+  await Promise.all([
+    tx.session.updateMany({
+      where: { id: sessionId, undoRunId: runId },
+      data: { undoRunId: null },
+    }),
+    tx.agentRun.update({
+      where: { id: runId },
+      data: { undoInvalidated: true },
+    }),
+    tx.agentRunSheetSnapshot.deleteMany({ where: { runId } }),
+    tx.agentRunChartSnapshot.deleteMany({ where: { runId } }),
+  ]);
+}
+
 export async function clearSessionUndoCheckpoint(workspaceId: number, sessionId: number) {
   return withWorkspaceUndoLock(workspaceId, () =>
     clearSessionUndoCheckpointInternal(workspaceId, sessionId),
   );
 }
 
-async function invalidateUndoCheckpointsForSheetsInternal(
+export async function invalidateUndoCheckpointsForSheetsInTransaction(
+  tx: Prisma.TransactionClient,
   workspaceId: number,
   sheetIds: number[],
   originRunId?: number,
@@ -35,26 +56,27 @@ async function invalidateUndoCheckpointsForSheetsInternal(
   const uniqueSheetIds = [...new Set(sheetIds.filter(Number.isInteger))];
   if (uniqueSheetIds.length === 0) return;
 
-  const affectedRunIds = await runRepo.findRunsWithSnapshotsForSheets(
+  const affectedRunIds = await runRepo.findRunsWithSnapshotsForSheetsInTransaction(
+    tx,
     workspaceId,
     uniqueSheetIds,
     originRunId,
   );
   if (affectedRunIds.length === 0) return;
 
-  await prisma.$transaction([
-    prisma.agentRun.updateMany({
+  await Promise.all([
+    tx.agentRun.updateMany({
       where: { id: { in: affectedRunIds } },
       data: { undoInvalidated: true },
     }),
-    prisma.session.updateMany({
+    tx.session.updateMany({
       where: { workspaceId, undoRunId: { in: affectedRunIds } },
       data: { undoRunId: null },
     }),
-    prisma.agentRunSheetSnapshot.deleteMany({
+    tx.agentRunSheetSnapshot.deleteMany({
       where: { runId: { in: affectedRunIds } },
     }),
-    prisma.agentRunChartSnapshot.deleteMany({
+    tx.agentRunChartSnapshot.deleteMany({
       where: { runId: { in: affectedRunIds } },
     }),
   ]);
@@ -66,7 +88,9 @@ export async function invalidateUndoCheckpointsForSheets(
   originRunId?: number,
 ) {
   return withWorkspaceUndoLock(workspaceId, () =>
-    invalidateUndoCheckpointsForSheetsInternal(workspaceId, sheetIds, originRunId),
+    prisma.$transaction((tx) =>
+      invalidateUndoCheckpointsForSheetsInTransaction(tx, workspaceId, sheetIds, originRunId),
+    ),
   );
 }
 
@@ -78,7 +102,14 @@ export async function withUndoTrackedMutation<T>(
 ) {
   return withWorkspaceUndoLock(workspaceId, async () => {
     const resolvedSheetIds = typeof sheetIds === "function" ? await sheetIds() : sheetIds;
-    await invalidateUndoCheckpointsForSheetsInternal(workspaceId, resolvedSheetIds, originRunId);
+    await prisma.$transaction((tx) =>
+      invalidateUndoCheckpointsForSheetsInTransaction(
+        tx,
+        workspaceId,
+        resolvedSheetIds,
+        originRunId,
+      ),
+    );
     return mutation();
   });
 }
@@ -95,13 +126,15 @@ export async function withUndoTrackedSheetMutation<T>(
 export async function withUndoTrackedSheetMutationAfterSuccess<T>(
   workspaceId: number,
   sheetIds: number[],
-  mutation: () => Promise<T>,
+  mutation: (tx: Prisma.TransactionClient) => Promise<T>,
   originRunId?: number,
 ) {
   return withWorkspaceUndoLock(workspaceId, async () => {
-    const result = await mutation();
-    await invalidateUndoCheckpointsForSheetsInternal(workspaceId, sheetIds, originRunId);
-    return result;
+    return prisma.$transaction(async (tx) => {
+      const result = await mutation(tx);
+      await invalidateUndoCheckpointsForSheetsInTransaction(tx, workspaceId, sheetIds, originRunId);
+      return result;
+    });
   });
 }
 

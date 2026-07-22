@@ -20,6 +20,7 @@ export const createWorkbook = {
       sheetId: result.initialSheet.id,
       uploadedData: null,
       config: null,
+      kind: "created",
     });
     return result;
   },

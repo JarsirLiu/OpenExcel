@@ -23,6 +23,7 @@ export const createSheet = {
       sheetId: result.id,
       uploadedData: null,
       config: null,
+      kind: "created",
     });
     return result;
   },

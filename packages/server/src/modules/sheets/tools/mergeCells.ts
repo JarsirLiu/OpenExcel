@@ -8,7 +8,7 @@ import {
   toolIndex,
   toolRangeToA1Ref,
 } from "@openexcel/core";
-import { executeSheetCommand } from "../application/executeSheetCommand.js";
+import { executeSheetCommandInTransaction } from "../application/executeSheetCommand.js";
 import { buildSheetChangePreview } from "../domain/sheetPreview.js";
 import { runSheetMutation } from "./runSheetMutation.js";
 import { createSheetToolMutationId } from "./sheetToolCommand.js";
@@ -21,9 +21,9 @@ export const mergeCells = {
     input: { sheetId: number; operations: SheetChangeRangeOperation[] },
     options: { context: { runId: number; workspaceId: number }; toolCallId?: string },
   ) => {
-    return runSheetMutation(options.context, input.sheetId, async (sheet) => {
+    return runSheetMutation(options.context, input.sheetId, async (sheet, tx) => {
       const mutation: SheetMutation = { type: "merge", operations: input.operations };
-      const result = await executeSheetCommand(options.context.workspaceId, {
+      const result = await executeSheetCommandInTransaction(tx, options.context.workspaceId, {
         kind: "mutation",
         mutationId: createSheetToolMutationId(
           options.context.runId,

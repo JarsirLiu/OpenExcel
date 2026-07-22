@@ -11,7 +11,7 @@ import {
   type SheetToolRange,
   sheetToolRangeToA1,
 } from "@openexcel/core";
-import { sheetRecordToCelldata } from "../../../shared/utils/sheetData.js";
+import { sheetRecordToSnapshot } from "../../../shared/utils/sheetSnapshot.js";
 import { findSheetForWorkspace } from "../infrastructure/sheetRepository.js";
 
 const MAX_CELLS_PER_READ = 4_000;
@@ -62,7 +62,7 @@ export const readSheetData = {
     const requestedRange: SheetToolRange | undefined = range
       ? parseSheetToolRange(range)
       : coreContinuation?.requestedRange;
-    const celldata = sheetRecordToCelldata(sheet);
+    const celldata = sheetRecordToSnapshot(sheet).celldata;
     const project = (maxCells: number) => {
       const projection = projectSheetData(celldata, {
         requestedRange,

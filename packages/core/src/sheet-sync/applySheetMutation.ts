@@ -87,11 +87,13 @@ function applyMerge(
   forEachRange(range, (row, col) => {
     const key = cellKey(row, col);
     const current = cells.get(key) ?? ({ r: row, c: col, v: {} } as FortuneCell);
+    const preserved =
+      row === range.startRow && col === range.startCol
+        ? current
+        : (removeContent(current) ?? { r: row, c: col, v: {} });
     cells.set(key, {
-      ...current,
-      v: (row === range.startRow && col === range.startCol
-        ? { ...current.v, mc: merge }
-        : { mc: merge }) as FortuneCell["v"],
+      ...preserved,
+      v: { ...preserved.v, mc: merge } as FortuneCell["v"],
     });
   });
 }
@@ -102,7 +104,8 @@ function removeMergeConfig(
 ): void {
   const merges = config.merge;
   if (!merges || typeof merges !== "object" || Array.isArray(merges)) return;
-  for (const [ref, value] of Object.entries(merges)) {
+  const mergeEntries = merges as Record<string, unknown>;
+  for (const [ref, value] of Object.entries(mergeEntries)) {
     if (!value || typeof value !== "object" || Array.isArray(value)) continue;
     const merge = value as { r?: unknown; c?: unknown };
     if (
@@ -113,9 +116,10 @@ function removeMergeConfig(
       merge.c >= range.startCol &&
       merge.c <= range.endCol
     ) {
-      delete (merges as Record<string, unknown>)[ref];
+      delete mergeEntries[ref];
     }
   }
+  if (Object.keys(mergeEntries).length === 0) delete config.merge;
 }
 
 function columnRef(column: number): string {

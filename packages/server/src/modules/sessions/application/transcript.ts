@@ -4,6 +4,7 @@ import type { findRunsBySession } from "../runs/repository.js";
 export function historyFromRuns(runs: Awaited<ReturnType<typeof findRunsBySession>>) {
   const transcript: { role: "user" | "assistant"; content: string }[] = [];
   for (const run of runs) {
+    if (run.status === "reverted") continue;
     if (run.inputText) transcript.push({ role: "user", content: run.inputText });
     if (run.outputText) transcript.push({ role: "assistant", content: run.outputText });
   }

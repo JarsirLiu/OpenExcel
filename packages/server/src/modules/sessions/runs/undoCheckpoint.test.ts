@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   findSessionUndoCheckpoint: vi.fn(),
   setSessionUndoRun: vi.fn(),
   findRunsWithSnapshotsForSheets: vi.fn(),
+  findRunsWithSnapshotsForSheetsInTransaction: vi.fn(),
   updateRun: vi.fn(),
   findRunUndoState: vi.fn(),
   deleteRunSnapshots: vi.fn(),
@@ -46,6 +47,7 @@ vi.mock("./repository.js", () => ({
   updateRun: mocks.updateRun,
   findRunUndoState: mocks.findRunUndoState,
   findRunsWithSnapshotsForSheets: mocks.findRunsWithSnapshotsForSheets,
+  findRunsWithSnapshotsForSheetsInTransaction: mocks.findRunsWithSnapshotsForSheetsInTransaction,
   deleteRunSnapshots: mocks.deleteRunSnapshots,
 }));
 
@@ -56,10 +58,21 @@ import {
   withUndoTrackedSheetMutationAfterSuccess,
 } from "./undoCheckpoint.js";
 
+function buildTx() {
+  return {
+    session: { updateMany: mocks.sessionUpdateMany },
+    agentRun: { updateMany: mocks.agentRunUpdateMany },
+    agentRunSheetSnapshot: { deleteMany: mocks.snapshotDeleteMany },
+    agentRunChartSnapshot: { deleteMany: mocks.snapshotDeleteMany },
+  } as any;
+}
+
 describe("undo checkpoint", () => {
   beforeEach(() => {
     Object.values(mocks).forEach((mock) => mock.mockReset());
-    mocks.transaction.mockResolvedValue([]);
+    mocks.transaction.mockImplementation((callback: (tx: unknown) => unknown) =>
+      callback(buildTx()),
+    );
   });
 
   it("arms exactly the completed run when it has undo effects", async () => {
@@ -94,11 +107,16 @@ describe("undo checkpoint", () => {
   });
 
   it("invalidates every active checkpoint candidate that snapshots the changed sheets", async () => {
-    mocks.findRunsWithSnapshotsForSheets.mockResolvedValueOnce([19]);
+    mocks.findRunsWithSnapshotsForSheetsInTransaction.mockResolvedValueOnce([19]);
 
     await invalidateUndoCheckpointsForSheets(3, [7]);
 
-    expect(mocks.findRunsWithSnapshotsForSheets).toHaveBeenCalledWith(3, [7], undefined);
+    expect(mocks.findRunsWithSnapshotsForSheetsInTransaction).toHaveBeenCalledWith(
+      expect.anything(),
+      3,
+      [7],
+      undefined,
+    );
 
     expect(mocks.agentRunUpdateMany).toHaveBeenCalledWith({
       where: { id: { in: [19] } },
@@ -115,23 +133,28 @@ describe("undo checkpoint", () => {
   });
 
   it("keeps unrelated checkpoints intact", async () => {
-    mocks.findRunsWithSnapshotsForSheets.mockResolvedValueOnce([]);
+    mocks.findRunsWithSnapshotsForSheetsInTransaction.mockResolvedValueOnce([]);
 
     await invalidateUndoCheckpointsForSheets(3, [7]);
 
-    expect(mocks.transaction).not.toHaveBeenCalled();
+    expect(mocks.agentRunUpdateMany).not.toHaveBeenCalled();
   });
 
   it("excludes the mutating run while invalidating concurrent candidates", async () => {
-    mocks.findRunsWithSnapshotsForSheets.mockResolvedValueOnce([]);
+    mocks.findRunsWithSnapshotsForSheetsInTransaction.mockResolvedValueOnce([]);
 
     await invalidateUndoCheckpointsForSheets(3, [7], 17);
 
-    expect(mocks.findRunsWithSnapshotsForSheets).toHaveBeenCalledWith(3, [7], 17);
+    expect(mocks.findRunsWithSnapshotsForSheetsInTransaction).toHaveBeenCalledWith(
+      expect.anything(),
+      3,
+      [7],
+      17,
+    );
   });
 
   it("invalidates checkpoints before applying a sheet mutation", async () => {
-    mocks.findRunsWithSnapshotsForSheets.mockResolvedValueOnce([19]);
+    mocks.findRunsWithSnapshotsForSheetsInTransaction.mockResolvedValueOnce([19]);
     const mutation = vi.fn().mockResolvedValueOnce("written");
 
     await expect(withUndoTrackedSheetMutation(3, [7], mutation)).resolves.toBe("written");
@@ -148,7 +171,24 @@ describe("undo checkpoint", () => {
       "conflict",
     );
 
-    expect(mocks.findRunsWithSnapshotsForSheets).not.toHaveBeenCalled();
+    expect(mocks.findRunsWithSnapshotsForSheetsInTransaction).not.toHaveBeenCalled();
+  });
+
+  it("invalidates the touched AI checkpoint after a successful external save", async () => {
+    mocks.findRunsWithSnapshotsForSheetsInTransaction.mockResolvedValueOnce([19]);
+    const mutation = vi.fn().mockResolvedValueOnce("saved");
+
+    await expect(withUndoTrackedSheetMutationAfterSuccess(3, [7], mutation)).resolves.toBe("saved");
+
+    expect(mocks.findRunsWithSnapshotsForSheetsInTransaction).toHaveBeenCalledWith(
+      expect.anything(),
+      3,
+      [7],
+      undefined,
+    );
+    expect(mutation.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.findRunsWithSnapshotsForSheetsInTransaction.mock.invocationCallOrder[0],
+    );
   });
 
   it("does not arm an invalidated run after it settles", async () => {

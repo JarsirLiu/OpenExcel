@@ -1,6 +1,9 @@
 import { prisma } from "../../../infra/database/db.js";
+import type { Prisma } from "../../../infra/database/prismaTypes.js";
 
 const STALE_RUN_AFTER_MS = 5 * 60 * 1000;
+
+export type RunSheetSnapshotKind = "created" | "restorable";
 
 export async function createRun(data: {
   sessionId: number;
@@ -157,6 +160,7 @@ export async function upsertRunSheetSnapshot(data: {
   sheetId: number;
   uploadedData: string | null;
   config: string | null;
+  kind: RunSheetSnapshotKind;
 }) {
   return prisma.agentRunSheetSnapshot.upsert({
     where: {
@@ -170,14 +174,35 @@ export async function upsertRunSheetSnapshot(data: {
   });
 }
 
-export async function findRunSheetSnapshot(runId: number, sheetId: number) {
-  return prisma.agentRunSheetSnapshot.findUnique({
-    where: { runId_sheetId: { runId, sheetId } },
+export async function recordRestorableRunSheetSnapshot(
+  tx: Prisma.TransactionClient,
+  data: {
+    runId: number;
+    sheetId: number;
+    uploadedData: string;
+    config: string | null;
+    beforeRevision: number;
+    afterRevision: number;
+  },
+) {
+  const existing = await tx.agentRunSheetSnapshot.findUnique({
+    where: { runId_sheetId: { runId: data.runId, sheetId: data.sheetId } },
   });
-}
 
-export async function deleteRunSheetSnapshot(runId: number, sheetId: number) {
-  await prisma.agentRunSheetSnapshot.deleteMany({ where: { runId, sheetId } });
+  if (existing?.kind === "created") return existing;
+
+  return tx.agentRunSheetSnapshot.upsert({
+    where: {
+      runId_sheetId: {
+        runId: data.runId,
+        sheetId: data.sheetId,
+      },
+    },
+    create: { ...data, kind: "restorable" },
+    update: {
+      afterRevision: data.afterRevision,
+    },
+  });
 }
 
 export async function upsertRunChartSnapshot(data: {
@@ -220,21 +245,20 @@ export async function upsertRunChartSnapshot(data: {
   });
 }
 
-export async function findRunSheetSnapshots(runId: number) {
-  return prisma.agentRunSheetSnapshot.findMany({
-    where: { runId },
-    orderBy: { id: "asc" },
-  });
-}
+type SnapshotQueryClient = Pick<
+  Prisma.TransactionClient,
+  "agentRunSheetSnapshot" | "agentRunChartSnapshotSheet"
+>;
 
-export async function findRunsWithSnapshotsForSheets(
+async function findRunsWithSnapshotsForSheetsUsing(
+  db: SnapshotQueryClient,
   workspaceId: number,
   sheetIds: number[],
   originRunId?: number,
 ) {
   if (sheetIds.length === 0) return [];
 
-  const sheetSnapshots = await prisma.agentRunSheetSnapshot.findMany({
+  const sheetSnapshots = await db.agentRunSheetSnapshot.findMany({
     where: {
       sheetId: { in: sheetIds },
       run: {
@@ -247,7 +271,7 @@ export async function findRunsWithSnapshotsForSheets(
     select: { runId: true },
   });
 
-  const chartSnapshots = await prisma.agentRunChartSnapshotSheet.findMany({
+  const chartSnapshots = await db.agentRunChartSnapshotSheet.findMany({
     where: {
       sheetId: { in: sheetIds },
       snapshot: {
@@ -277,34 +301,11 @@ export async function deleteRunSnapshots(runId: number) {
   ]);
 }
 
-export async function restoreRunSheetSnapshots(runId: number) {
-  const snapshots = await findRunSheetSnapshots(runId);
-  if (snapshots.length === 0) {
-    throw new Error("当前运行没有可撤销的 Sheet 修改");
-  }
-
-  await prisma.$transaction([
-    ...snapshots.map((snapshot: (typeof snapshots)[number]) =>
-      prisma.sheet.update({
-        where: { id: snapshot.sheetId },
-        data: {
-          uploadedData: snapshot.uploadedData,
-          config: snapshot.config,
-          revision: { increment: 1 },
-        },
-      }),
-    ),
-    prisma.agentRun.update({
-      where: { id: runId },
-      data: {
-        status: "reverted",
-        revertedAt: new Date(),
-      },
-    }),
-    prisma.agentRunSheetSnapshot.deleteMany({
-      where: { runId },
-    }),
-  ]);
-
-  return snapshots.map((snapshot: (typeof snapshots)[number]) => snapshot.sheetId);
+export async function findRunsWithSnapshotsForSheetsInTransaction(
+  tx: Prisma.TransactionClient,
+  workspaceId: number,
+  sheetIds: number[],
+  originRunId?: number,
+) {
+  return findRunsWithSnapshotsForSheetsUsing(tx, workspaceId, sheetIds, originRunId);
 }

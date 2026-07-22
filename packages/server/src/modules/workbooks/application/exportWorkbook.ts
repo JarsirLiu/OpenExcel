@@ -1,6 +1,6 @@
 import { workbookToXlsx } from "@openexcel/core";
-import { sheetRecordToCelldata } from "../../../shared/utils/sheetData.js";
 import { deserializeSheet } from "../../../shared/utils/sheetSerialization.js";
+import { sheetRecordToSnapshot } from "../../../shared/utils/sheetSnapshot.js";
 import { deserializeChartSpec } from "../../charts/domain/chart.js";
 import * as repo from "../infrastructure/workbookRepository.js";
 
@@ -10,7 +10,7 @@ export async function exportWorkbook(workspaceId: number, id: number) {
 
   const sheets = wb.sheets.map((s) => {
     const parsed = deserializeSheet(s);
-    const celldata = sheetRecordToCelldata(s);
+    const celldata = sheetRecordToSnapshot(s).celldata;
     const fallbackRows =
       celldata.length > 0 ? undefined : [parsed.columns.map((column) => column.label)];
     const columnWidths = parsed.columns.reduce(

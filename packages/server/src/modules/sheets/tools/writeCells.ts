@@ -5,7 +5,7 @@ import {
   sheetChangePatchOutputSchema,
   storageIndex,
 } from "@openexcel/core";
-import { executeSheetCommand } from "../application/executeSheetCommand.js";
+import { executeSheetCommandInTransaction } from "../application/executeSheetCommand.js";
 import { buildSheetChangePreview } from "../domain/sheetPreview.js";
 import { runSheetMutation } from "./runSheetMutation.js";
 import { createSheetToolMutationId } from "./sheetToolCommand.js";
@@ -57,10 +57,10 @@ export const writeCells = {
     options: { context: { runId: number; workspaceId: number }; toolCallId?: string },
   ) => {
     const { sheetId, operations } = input;
-    return runSheetMutation(options.context, sheetId, async (sheet) => {
+    return runSheetMutation(options.context, sheetId, async (sheet, tx) => {
       const cells = expandOperations(operations);
       const mutation: SheetMutation = { type: "write", cells };
-      const result = await executeSheetCommand(options.context.workspaceId, {
+      const result = await executeSheetCommandInTransaction(tx, options.context.workspaceId, {
         kind: "mutation",
         mutationId: createSheetToolMutationId(
           options.context.runId,

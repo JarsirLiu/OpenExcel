@@ -713,6 +713,10 @@ use `mutation` commands. Manual editing must move to mutation only after the edi
 reliable operation-level event for values, formulas, and clears; until then, complex or ambiguous
 operations must use the same `replaceSnapshot` command as the permanent correctness fallback.
 
+Sheet merge state is canonicalized in celldata. The server has one legacy snapshot adapter for
+historical rows that only contain `Sheet.merges`; command commits and undo restores derive that
+legacy field from canonical celldata, and the web editor does not read it as a fallback.
+
 The known sync risks and their remediation order are tracked in
 [Spreadsheet Sync and Calculation Boundaries, section 9](spreadsheet-sync-boundaries.md#9-当前实现状态与已知风险).
 The incremental protocol remains the target architecture: it must not become a second independent
@@ -767,11 +771,17 @@ The title endpoint remains available for explicit retry or manual client actions
 
 1. A run that modifies a workbook saves pre-mutation Sheet snapshots and becomes the session's single undo checkpoint only after it finishes.
 2. Starting another chat turn clears that Session's prior checkpoint. A later mutation invalidates only Runs that captured the touched Sheet, including Runs still in progress; unrelated Sheets and newly uploaded workbooks do not affect it.
-3. User requests undo only while the session still points to that checkpoint.
-4. Server restores the stored Sheet snapshots, removes workbook structures created by that run, clears the checkpoint, and trims the corresponding chat turn.
+3. Each captured Sheet stores its `beforeRevision` and the AI run's resulting `afterRevision`. User requests undo only while the session still points to that checkpoint and every captured Sheet is still at its `afterRevision`.
+4. Server restores stored Sheet snapshots through the transaction-aware `replaceSnapshot` command, removes workbook structures created by that run, clears the checkpoint, and trims the corresponding chat turn.
 5. Web refreshes workbook and session metadata.
 
-Undo is a workbook-side capability, not a chat rendering concern. It is intentionally a one-shot operation: it never searches older runs after a checkpoint has been invalidated.
+Manual Sheet saves do not create undo snapshots. The Sheet command and invalidation of AI checkpoints
+that captured the touched Sheets commit in one database transaction under the workspace undo lock. Undo
+is a workbook-side capability, not a chat rendering concern. It is intentionally a one-shot operation:
+it never searches older runs after a checkpoint has been invalidated. Restorable AI snapshots carry an
+explicit `restorable` kind and both revisions; structural snapshots for newly created Sheets carry a
+separate `created` kind. Pre-revision legacy checkpoints are invalidated during migration rather than
+being guessed at runtime.
 
 ## 8. API Boundaries
 

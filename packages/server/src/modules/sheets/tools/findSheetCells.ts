@@ -4,7 +4,7 @@ import {
   parseSheetToolRange,
   type SheetCellQuery,
 } from "@openexcel/core";
-import { sheetRecordToCelldata } from "../../../shared/utils/sheetData.js";
+import { sheetRecordToSnapshot } from "../../../shared/utils/sheetSnapshot.js";
 import { findSheetForWorkspace } from "../infrastructure/sheetRepository.js";
 
 export const findSheetCells = {
@@ -20,7 +20,7 @@ export const findSheetCells = {
     return {
       workbook: { id: sheet.workbook.id, name: sheet.workbook.name },
       sheet: { id: sheet.id, sheetNo: sheet.sheetNo, name: sheet.name },
-      matches: findCells(sheetRecordToCelldata(sheet), query, {
+      matches: findCells(sheetRecordToSnapshot(sheet).celldata, query, {
         range: range ? parseSheetToolRange(range) : undefined,
       }),
     };

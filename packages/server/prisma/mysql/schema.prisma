@@ -209,6 +209,9 @@ model AgentRunSheetSnapshot {
   sheetId      Int
   uploadedData String? @db.LongText
   config       String? @db.LongText
+  kind         String     @default("created")
+  beforeRevision Int?
+  afterRevision  Int?
   createdAt    DateTime @default(now())
   run          AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
   sheet        Sheet    @relation(fields: [sheetId], references: [id], onDelete: Cascade)

@@ -2,6 +2,7 @@ import type { SheetCommand } from "@openexcel/core";
 import type { FastifyInstance } from "fastify";
 import { ZodError } from "zod";
 import { resolveWorkspaceIdForRequest } from "../../../middleware/resourceAccess.js";
+import { withUndoTrackedSheetMutationAfterSuccess } from "../../sessions/runs/undoCheckpoint.js";
 import { WORKBOOK_IMPORT_LIMITS } from "../../workbooks/api/importLimits.js";
 import { decompressImportPayload } from "../../workbooks/api/importPayload.js";
 import * as application from "../application/index.js";
@@ -55,7 +56,11 @@ export async function sheetRoutes(app: FastifyInstance) {
         if (req.body?.sheetId !== Number(req.params.sheetId)) {
           return reply.status(400).send({ error: "Sheet ID 不匹配" });
         }
-        const result = await application.executeSheetCommand(workspaceId, req.body);
+        const result = await withUndoTrackedSheetMutationAfterSuccess(
+          workspaceId,
+          [req.body.sheetId],
+          (tx) => application.executeSheetCommandInTransaction(tx, workspaceId, req.body),
+        );
         const { snapshot: _snapshot, ...response } = result;
         return response;
       } catch (error) {

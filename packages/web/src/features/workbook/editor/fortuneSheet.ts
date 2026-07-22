@@ -12,7 +12,6 @@ export function toFortuneSheetData(sheet: {
   id: number;
   name: string;
   columns: { label: string; width?: number }[];
-  merges: { row: [number, number]; col: [number, number] }[];
   uploadedData: any[] | null;
   config: any | null;
 }): FortuneSheetData {
@@ -22,18 +21,9 @@ export function toFortuneSheetData(sheet: {
   if (sheet.uploadedData && isCelldata(sheet.uploadedData)) {
     celldata = sheet.uploadedData as FortuneCell[];
     merges = extractMergesFromCelldata(celldata);
-    if (merges.length === 0) {
-      merges = (sheet.merges || []).map((m) => ({
-        row: [m.row[0], m.row[1]],
-        col: [m.col[0], m.col[1]],
-      }));
-    }
   } else {
     celldata = [];
-    merges = (sheet.merges || []).map((m) => ({
-      row: [m.row[0], m.row[1]],
-      col: [m.col[0], m.col[1]],
-    }));
+    merges = [];
   }
 
   celldata = normalizeFortuneCellData(celldata);

@@ -1,8 +1,12 @@
 import { parseChartSpec } from "@openexcel/core";
 import { prisma } from "../../../infra/database/db.js";
 import type { Prisma } from "../../../infra/database/prismaTypes.js";
+import { runSnapshotToSheetSnapshot } from "../../../shared/utils/sheetSnapshot.js";
+import { executeSheetCommandInTransaction } from "../../sheets/application/executeSheetCommand.js";
+import { SheetRevisionConflictError } from "../../sheets/domain/errors.js";
 import { withWorkspaceUndoLock } from "../infrastructure/workspaceUndoLock.js";
 import * as repo from "./repository.js";
+import { invalidateUndoCheckpointInTransaction } from "./undoCheckpoint.js";
 
 type ChatMessageLike = {
   role?: unknown;
@@ -165,38 +169,67 @@ function parseStructuralUndoEffects(steps: UndoableRunStep[]): StructuralUndoEff
   return effects;
 }
 
+type RestoreSheetSnapshotsResult =
+  | { kind: "restored"; sheetIds: number[] }
+  | { kind: "conflict"; error: Error };
+
 async function restoreSheetSnapshots(
   tx: Prisma.TransactionClient,
+  workspaceId: number,
   runId: number,
   excludedSheetIds: Set<number>,
-): Promise<number[]> {
+): Promise<RestoreSheetSnapshotsResult> {
   const snapshots = await tx.agentRunSheetSnapshot.findMany({
     where: { runId },
     orderBy: { id: "asc" },
   });
 
-  const restoredSheetIds: number[] = [];
-  for (const snapshot of snapshots) {
-    if (excludedSheetIds.has(snapshot.sheetId)) {
-      continue;
+  const restorableSnapshots = snapshots.filter(
+    (snapshot) => snapshot.kind === "restorable" && !excludedSheetIds.has(snapshot.sheetId),
+  );
+  const currentSheets = new Map<number, { id: number; revision: number }>();
+
+  for (const snapshot of restorableSnapshots) {
+    if (snapshot.beforeRevision == null || snapshot.afterRevision == null) {
+      return {
+        kind: "conflict",
+        error: new Error(`运行记录缺少 Sheet ${snapshot.sheetId} 的版本信息，无法撤销`),
+      };
     }
 
+    const currentSheet = await tx.sheet.findFirst({
+      where: { id: snapshot.sheetId, workbook: { workspaceId } },
+      select: { id: true, revision: true },
+    });
+    if (!currentSheet) {
+      return {
+        kind: "conflict",
+        error: new Error(`Sheet ${snapshot.sheetId} 不存在，无法撤销`),
+      };
+    }
+    if (currentSheet.revision !== snapshot.afterRevision) {
+      return { kind: "conflict", error: new SheetRevisionConflictError(snapshot.sheetId) };
+    }
+
+    currentSheets.set(snapshot.sheetId, currentSheet);
+  }
+
+  const restoredSheetIds: number[] = [];
+  for (const snapshot of snapshots) {
+    const currentSheet = currentSheets.get(snapshot.sheetId);
+    if (!currentSheet || snapshot.beforeRevision == null) continue;
+
     restoredSheetIds.push(snapshot.sheetId);
-    await tx.sheet.update({
-      where: { id: snapshot.sheetId },
-      data: {
-        uploadedData: snapshot.uploadedData,
-        config: snapshot.config,
-        revision: { increment: 1 },
-      },
+    await executeSheetCommandInTransaction(tx, workspaceId, {
+      kind: "replaceSnapshot",
+      mutationId: `undo:${runId}:${snapshot.sheetId}`,
+      sheetId: snapshot.sheetId,
+      baseRevision: currentSheet.revision,
+      snapshot: runSnapshotToSheetSnapshot(snapshot.uploadedData, snapshot.config),
     });
   }
 
-  await tx.agentRunSheetSnapshot.deleteMany({
-    where: { runId },
-  });
-
-  return restoredSheetIds;
+  return { kind: "restored", sheetIds: restoredSheetIds };
 }
 
 async function restoreChartSnapshots(
@@ -266,7 +299,15 @@ async function deleteSheetAndReindex(
     throw new Error(`Workbook ${workbookId} 不存在`);
   }
 
-  await tx.sheet.delete({ where: { id: sheetId } });
+  const sheet = await tx.sheet.findFirst({
+    where: { id: sheetId, workbookId },
+    select: { id: true },
+  });
+  if (!sheet) {
+    throw new Error(`Sheet ${sheetId} 不属于 Workbook ${workbookId}`);
+  }
+
+  await tx.sheet.delete({ where: { id: sheet.id } });
 
   const sheets = await tx.sheet.findMany({
     where: { workbookId },
@@ -317,7 +358,7 @@ async function undoLatestRunInternal(workspaceId: number, sessionId: number) {
     throw new Error("运行记录缺少用户输入，无法撤销");
   }
 
-  const restoredSheetIds = await prisma.$transaction(async (tx) => {
+  const restoreResult = await prisma.$transaction(async (tx) => {
     const session = await tx.session.findFirst({
       where: { id: sessionId, workspaceId },
       select: { id: true, chatMessages: true, undoRunId: true },
@@ -335,10 +376,17 @@ async function undoLatestRunInternal(workspaceId: number, sessionId: number) {
     );
     const restoredMessages = trimMessagesAfterUserTurn(messages, transcriptInputText);
 
-    const restoredSheetIds = await restoreSheetSnapshots(tx, run.id, createdSheetIds);
+    const restoredSheetIds = await restoreSheetSnapshots(tx, workspaceId, run.id, createdSheetIds);
+    if (restoredSheetIds.kind === "conflict") {
+      await invalidateUndoCheckpointInTransaction(tx, session.id, run.id);
+      return restoredSheetIds;
+    }
+
     if ((run.chartSnapshots?.length ?? 0) > 0) {
       await restoreChartSnapshots(tx, run.id, createdSheetIds);
     }
+
+    await tx.agentRunSheetSnapshot.deleteMany({ where: { runId: run.id } });
 
     for (const effect of createdSheetEffects.slice().reverse()) {
       if (createdWorkbookIds.has(effect.workbookId)) {
@@ -371,9 +419,13 @@ async function undoLatestRunInternal(workspaceId: number, sessionId: number) {
     return restoredSheetIds;
   });
 
+  if (restoreResult.kind === "conflict") {
+    throw restoreResult.error;
+  }
+
   return {
     runId: run.id,
-    restoredSheetIds,
+    restoredSheetIds: restoreResult.sheetIds,
     undoneUserText: transcriptInputText,
   };
 }

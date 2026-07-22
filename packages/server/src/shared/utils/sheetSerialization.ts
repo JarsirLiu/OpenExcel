@@ -1,4 +1,5 @@
 import type { Prisma } from "../../infra/database/prismaTypes.js";
+import { sheetRecordToSnapshot, snapshotMergesJson } from "./sheetSnapshot.js";
 
 export interface SheetJson {
   id: number;
@@ -20,14 +21,15 @@ function safeParse<T>(value: string, fallback: T): T {
 }
 
 export function deserializeSheet(sheet: Prisma.SheetGetPayload<{}>): SheetJson {
+  const snapshot = sheetRecordToSnapshot(sheet);
   return {
     id: sheet.id,
     sheetNo: sheet.sheetNo,
     name: sheet.name,
     columns: safeParse(sheet.columns, []),
-    merges: safeParse(sheet.merges, []),
-    uploadedData: sheet.uploadedData ? safeParse(sheet.uploadedData, null) : null,
-    config: sheet.config ? safeParse(sheet.config, null) : null,
+    merges: safeParse(snapshotMergesJson(snapshot), []),
+    uploadedData: snapshot.celldata,
+    config: snapshot.config,
     revision: sheet.revision,
   };
 }

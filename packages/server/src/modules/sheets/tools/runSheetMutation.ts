@@ -1,7 +1,13 @@
+import { prisma } from "../../../infra/database/db.js";
+import type { Prisma } from "../../../infra/database/prismaTypes.js";
+import {
+  serializeSheetSnapshot,
+  sheetRecordToSnapshot,
+} from "../../../shared/utils/sheetSnapshot.js";
+import { withWorkspaceUndoLock } from "../../sessions/infrastructure/workspaceUndoLock.js";
 import * as runRepo from "../../sessions/runs/repository.js";
-import { withUndoTrackedSheetMutationAfterSuccess } from "../../sessions/runs/undoCheckpoint.js";
-import { SheetRevisionConflictError } from "../domain/errors.js";
-import * as sheetRepo from "../infrastructure/sheetRepository.js";
+import { invalidateUndoCheckpointsForSheetsInTransaction } from "../../sessions/runs/undoCheckpoint.js";
+import type * as sheetRepo from "../infrastructure/sheetRepository.js";
 
 type RunToolContext = {
   runId: number;
@@ -9,36 +15,40 @@ type RunToolContext = {
 };
 
 type SheetForWorkspace = NonNullable<Awaited<ReturnType<typeof sheetRepo.findSheetForWorkspace>>>;
+type RevisionedResult = { revision: number };
 
-export async function runSheetMutation<T>(
+export async function runSheetMutation<T extends RevisionedResult>(
   context: RunToolContext,
   sheetId: number,
-  mutation: (sheet: SheetForWorkspace) => Promise<T>,
+  mutation: (sheet: SheetForWorkspace, tx: Prisma.TransactionClient) => Promise<T>,
 ) {
-  return withUndoTrackedSheetMutationAfterSuccess(
-    context.workspaceId,
-    [sheetId],
-    async () => {
-      const sheet = await sheetRepo.findSheetForWorkspace(sheetId, context.workspaceId);
+  return withWorkspaceUndoLock(context.workspaceId, () =>
+    prisma.$transaction(async (tx) => {
+      const sheet = await tx.sheet.findFirst({
+        where: { id: sheetId, workbook: { workspaceId: context.workspaceId } },
+        include: { workbook: true },
+      });
       if (!sheet) throw new Error(`Sheet ${sheetId} 不存在`);
 
-      const existingSnapshot = await runRepo.findRunSheetSnapshot(context.runId, sheetId);
-      await runRepo.upsertRunSheetSnapshot({
+      const result = await mutation(sheet, tx);
+      const snapshot = serializeSheetSnapshot(sheetRecordToSnapshot(sheet));
+
+      await runRepo.recordRestorableRunSheetSnapshot(tx, {
         runId: context.runId,
         sheetId,
-        uploadedData: sheet.uploadedData ?? null,
-        config: sheet.config ?? null,
+        uploadedData: snapshot.uploadedData,
+        config: snapshot.config,
+        beforeRevision: sheet.revision,
+        afterRevision: result.revision,
       });
+      await invalidateUndoCheckpointsForSheetsInTransaction(
+        tx,
+        context.workspaceId,
+        [sheetId],
+        context.runId,
+      );
 
-      try {
-        return await mutation(sheet);
-      } catch (error) {
-        if (!existingSnapshot && error instanceof SheetRevisionConflictError) {
-          await runRepo.deleteRunSheetSnapshot(context.runId, sheetId);
-        }
-        throw error;
-      }
-    },
-    context.runId,
+      return result;
+    }),
   );
 }
