@@ -1,5 +1,5 @@
 import { formatAIError } from "@openexcel/agent";
-import { pipeUIMessageStreamToResponse } from "ai";
+import { consumeStream, pipeUIMessageStreamToResponse } from "ai";
 import type { FastifyInstance } from "fastify";
 import {
   resolveSessionIdForRequest,
@@ -86,7 +86,11 @@ export async function sessionRoutes(app: FastifyInstance) {
       reply.raw.setHeader("X-OpenExcel-Session-Id", String(sessionId));
       reply.raw.setHeader("X-OpenExcel-Session-Name", encodeURIComponent(result.session.name));
       reply.hijack();
-      pipeUIMessageStreamToResponse({ response: reply.raw, stream: result.stream });
+      pipeUIMessageStreamToResponse({
+        response: reply.raw,
+        stream: result.stream,
+        consumeSseStream: consumeStream,
+      });
     } catch (error) {
       if (controller.signal.aborted) {
         if (sessionId != null) await application.deleteSession(workspaceId, sessionId);
@@ -284,7 +288,11 @@ export async function sessionRoutes(app: FastifyInstance) {
 
       if (controller.signal.aborted) return;
       reply.hijack();
-      pipeUIMessageStreamToResponse({ response: reply.raw, stream });
+      pipeUIMessageStreamToResponse({
+        response: reply.raw,
+        stream,
+        consumeSseStream: consumeStream,
+      });
     } catch (error) {
       if (controller.signal.aborted) return;
       if (error instanceof SessionBusyError) {

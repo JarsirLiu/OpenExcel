@@ -102,6 +102,11 @@ export function useChatConversation({
   const seenWorkbookRefreshToolCallIdsRef = useRef<Set<string>>(new Set());
   const hasPrimedWorkbookMutationHistoryRef = useRef(false);
   const pendingWorkspaceRefreshRef = useRef(false);
+  const handledStreamErrorRef = useRef<{
+    error: unknown;
+    sessionId: number | null;
+    workspaceId: number;
+  } | null>(null);
   const wasStreamingRef = useRef(false);
   const loadedOffsetRef = useRef(initialMessages?.length ?? 0);
   const requestGenerationRef = useRef(0);
@@ -259,9 +264,28 @@ export function useChatConversation({
   }, [isStreaming, onStreamingChange]);
 
   useEffect(() => {
-    if (!error) return;
+    if (!error) {
+      handledStreamErrorRef.current = null;
+      return;
+    }
+    const handledError = handledStreamErrorRef.current;
+    if (
+      handledError &&
+      handledError.error === error &&
+      handledError.sessionId === sessionId &&
+      handledError.workspaceId === workspaceId
+    ) {
+      return;
+    }
+    handledStreamErrorRef.current = { error, sessionId, workspaceId };
     setMessages(removeEmptyAssistantMessages);
-  }, [error, setMessages]);
+    // The stream may end before the client receives the tool output. Refresh
+    // from the server so committed Sheet transactions are reflected locally.
+    void Promise.resolve(onWorkspaceRefresh?.()).catch((refreshError) => {
+      console.error("[chat] Failed to refresh workspace after stream error:", refreshError);
+    });
+    void refreshUndoAvailability();
+  }, [error, onWorkspaceRefresh, refreshUndoAvailability, sessionId, setMessages, workspaceId]);
 
   useEffect(() => {
     const toolCallIds = onSheetChanged

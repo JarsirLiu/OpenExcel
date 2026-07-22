@@ -99,7 +99,7 @@ export interface StreamChatInput {
   onFinish?: (...args: any[]) => void | Promise<void>;
   onAbort?: (...args: any[]) => void | Promise<void>;
   onError?: (...args: any[]) => void | Promise<void>;
-  onEnd?: ({ messages }: { messages: any[] }) => void | Promise<void>;
+  onEnd?: (event: { messages: any[]; isAborted: boolean }) => void | Promise<void>;
 }
 
 export function removeEmptyAssistantMessages(messages: any[]): any[] {
@@ -163,8 +163,8 @@ export async function streamChat(
     stream: result.stream,
     originalMessages: persistenceMessages,
     onError: (error) => formatAIError(error),
-    onEnd: async ({ messages }) => {
-      await input.onEnd?.({ messages });
+    onEnd: async ({ messages, isAborted }) => {
+      await input.onEnd?.({ messages, isAborted });
     },
   });
 }

@@ -4,6 +4,7 @@ import {
   buildSystemPrompt,
   buildWorkspaceToolContext,
   formatAIError,
+  removeEmptyAssistantMessages,
   streamChat as streamAgentChat,
   ToolResultBudget,
   wrapToolSetWithResultBudget,
@@ -37,17 +38,6 @@ function serializeJson(value: unknown): string | null {
       return null;
     }
   }
-}
-
-function removeEmptyAssistantMessages(messages: any[]): any[] {
-  return messages.filter(
-    (message) =>
-      !(
-        message?.role === "assistant" &&
-        Array.isArray(message.parts) &&
-        message.parts.length === 0
-      ),
-  );
 }
 
 export async function streamChat(
@@ -121,6 +111,20 @@ export async function streamChat(
       console.error(`[session] Failed to finalize run ${run.id}:`, error);
     }
   };
+
+  const persistTranscript = async (transcript: any[]) => {
+    try {
+      await withSessionLock(sessionId, () =>
+        persistSessionMessages(workspaceId, sessionId, transcript),
+      );
+    } catch (error) {
+      console.error(`[session] Failed to persist transcript for session ${sessionId}:`, error);
+    }
+  };
+
+  // Persist the submitted turn before generation starts. This keeps the user
+  // message recoverable even if model setup or the network fails immediately.
+  await persistTranscript(removeEmptyAssistantMessages(messages));
 
   const persistStepOnce = async (step: any) => {
     try {
@@ -198,23 +202,19 @@ export async function streamChat(
           errorMessage,
         });
       },
-      onEnd: async ({ messages: newMessages }) => {
-        const outcome =
+      onEnd: async ({ messages: newMessages, isAborted }) => {
+        const outcome: {
+          status: string;
+          outputText?: string | null;
+          errorMessage?: string;
+        } =
           terminalOutcome ??
-          ({ status: "error", errorMessage: "对话流未正常结束" } satisfies {
-            status: string;
-            errorMessage: string;
-          });
-        const transcript =
-          outcome.status === "completed" ? newMessages : removeEmptyAssistantMessages(messages);
+          (isAborted
+            ? { status: "aborted" }
+            : { status: "error", errorMessage: "对话流未正常结束" });
+        const transcript = removeEmptyAssistantMessages(newMessages);
 
-        try {
-          await withSessionLock(sessionId, () =>
-            persistSessionMessages(workspaceId, sessionId, transcript),
-          );
-        } catch (error) {
-          console.error(`[session] Failed to persist transcript for session ${sessionId}:`, error);
-        }
+        await persistTranscript(transcript);
 
         scheduleSessionTitleGeneration(
           workspaceId,

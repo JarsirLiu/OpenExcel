@@ -1,7 +1,11 @@
 export { createChatModel, createTitleModel, type ModelConfig } from "./model.js";
 export { buildSystemPrompt, DEFAULT_PROMPT } from "./prompt/systemPrompt.js";
 export { formatAIError } from "./runtime/formatAIError.js";
-export { type StreamChatInput, streamChat } from "./runtime/streamChat.js";
+export {
+  removeEmptyAssistantMessages,
+  type StreamChatInput,
+  streamChat,
+} from "./runtime/streamChat.js";
 export {
   type BudgetableToolSet,
   DEFAULT_READ_SHEET_DATA_BUDGET_TOKENS,
