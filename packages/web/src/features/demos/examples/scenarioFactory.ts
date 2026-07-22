@@ -151,7 +151,6 @@ export function createAnalysisScenario(config: AnalysisScenarioConfig): DemoDefi
 
   return {
     id: config.id,
-    route: `/demos/${config.id}`,
     marketing: config.marketing,
     workspace: {
       id: config.workspaceId,

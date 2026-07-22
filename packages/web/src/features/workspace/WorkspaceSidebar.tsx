@@ -25,6 +25,7 @@ type Props = {
   onWorkbookSelect: (workspaceId: number, workbookId: number) => void;
   onWorkbookDelete: (workbookId: number) => Promise<void>;
   onWorkbookCreate: (workspaceId: number) => Promise<void>;
+  homeLabel?: string;
   readOnly?: boolean;
   storageNamespace?: string;
 };
@@ -40,6 +41,7 @@ export function WorkspaceSidebar({
   onWorkbookSelect,
   onWorkbookDelete,
   onWorkbookCreate,
+  homeLabel = "返回首页",
   readOnly = false,
   storageNamespace,
 }: Props) {
@@ -236,8 +238,8 @@ export function WorkspaceSidebar({
       <button
         className={styles.collapsedHomeButton}
         onClick={onNavigateHome}
-        aria-label="返回 OpenExcel 首页"
-        title="返回 OpenExcel 首页"
+        aria-label={homeLabel}
+        title={homeLabel}
       >
         <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
           <rect x="1.5" y="1.5" width="13" height="13" rx="3" stroke="currentColor" />
@@ -267,8 +269,8 @@ export function WorkspaceSidebar({
         <button
           className={styles.homeButton}
           onClick={onNavigateHome}
-          aria-label="返回 OpenExcel 首页"
-          title="返回 OpenExcel 首页"
+          aria-label={homeLabel}
+          title={homeLabel}
         >
           <span className={styles.homeMark} aria-hidden="true">
             <svg width="17" height="17" viewBox="0 0 18 18" fill="none">
@@ -278,7 +280,7 @@ export function WorkspaceSidebar({
           </span>
           <span className={styles.homeCopy}>
             <strong>OpenExcel</strong>
-            <small>返回首页</small>
+            <small>{homeLabel}</small>
           </span>
           <svg
             className={styles.homeArrow}

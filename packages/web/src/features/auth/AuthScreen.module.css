@@ -25,6 +25,18 @@
   font-size: 21px;
   font-weight: 700;
   letter-spacing: -0.03em;
+  text-decoration: none;
+}
+
+.catalogLink {
+  color: #59645c;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.catalogLink:hover {
+  color: #252521;
 }
 
 .brandMark {

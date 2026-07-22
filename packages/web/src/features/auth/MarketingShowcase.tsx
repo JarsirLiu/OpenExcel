@@ -1,5 +1,6 @@
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { routePaths } from "@/app/routePaths";
 import { demoRegistry } from "@/features/demos/registry";
 import type { DemoCategory, DemoDefinition, DemoSheet } from "@/features/demos/runtime/replayTypes";
 import { ProgressiveImage } from "@/shared/ui";
@@ -94,7 +95,7 @@ function FeaturedCase({ demo, index }: { demo: DemoDefinition; index: number }) 
     >
       <Link
         className={styles.featuredLink}
-        to={demo.route}
+        to={routePaths.demo(demo.id)}
         aria-label={`观看${demo.marketing.marketingTitle}完整回放`}
       >
         <div className={styles.caseMedia}>
@@ -130,7 +131,7 @@ function CompactCase({ demo, index }: { demo: DemoDefinition; index: number }) {
     <Link
       className={`${styles.compactCase} ${styles.reveal}`}
       data-reveal
-      to={demo.route}
+      to={routePaths.demo(demo.id)}
       style={{ "--reveal-delay": `${index * 80}ms` } as CSSProperties}
       aria-label={`观看${demo.marketing.marketingTitle}完整回放`}
     >
@@ -260,7 +261,7 @@ export function MarketingShowcase() {
           看看 OpenExcel 如何完成工作。
         </h2>
         <div>
-          <Link className={styles.primaryCta} to="/demos">
+          <Link className={styles.primaryCta} to={routePaths.demos}>
             浏览全部案例 <ArrowIcon />
           </Link>
           <Link className={styles.secondaryCta} to="/register">

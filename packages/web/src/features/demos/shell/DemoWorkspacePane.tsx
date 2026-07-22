@@ -73,6 +73,7 @@ export const DemoWorkspacePane = memo(function DemoWorkspacePane({
     <>
       <WorkspaceSidebar
         onNavigateHome={onNavigateHome}
+        homeLabel="返回案例库"
         activeWorkspaceId={demoWorkspace.id}
         onWorkspaceSelect={() => undefined}
         workspaces={[demoWorkspace]}

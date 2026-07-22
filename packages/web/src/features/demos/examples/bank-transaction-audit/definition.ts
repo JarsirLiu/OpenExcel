@@ -3,7 +3,6 @@ import { bankAuditInitialWorkbooks, bankAuditPrompt, bankAuditTimeline } from ".
 
 export const bankTransactionAuditDemo: DemoDefinition = {
   id: "bank-transaction-audit",
-  route: "/demos/bank-transaction-audit",
   marketing: {
     category: "财务",
     marketingTitle: "银行流水智能核查",

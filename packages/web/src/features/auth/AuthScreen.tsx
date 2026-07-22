@@ -1,4 +1,6 @@
 import { type FormEvent, useState } from "react";
+import { Link } from "react-router-dom";
+import { routePaths } from "@/app/routePaths";
 import { Button } from "@/components/ui/Button/Button";
 import { Input } from "@/components/ui/Input/Input";
 import { t } from "@/lib/i18n";
@@ -61,14 +63,17 @@ export function AuthScreen({
   return (
     <div className={styles.shell}>
       <nav className={styles.nav}>
-        <span className={styles.brand}>
+        <Link className={styles.brand} to={routePaths.home}>
           <span className={styles.brandMark}>
             <span className={styles.markLine}></span>
             <span className={styles.markLine}></span>
             <span className={styles.markLine}></span>
           </span>
           OpenExcel
-        </span>
+        </Link>
+        <Link className={styles.catalogLink} to={routePaths.demos}>
+          案例库
+        </Link>
       </nav>
 
       <div className={styles.hero}>

@@ -5,7 +5,6 @@ import { validateDemoDefinition } from "./validateDemoDefinition";
 function definition(overrides: Partial<DemoDefinition> = {}): DemoDefinition {
   return {
     id: "demo",
-    route: "/demos/demo",
     marketing: {
       category: "财务",
       marketingTitle: "演示案例",

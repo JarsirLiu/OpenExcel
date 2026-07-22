@@ -66,7 +66,6 @@ export type DemoMarketing = {
 
 export type DemoDefinition = {
   id: string;
-  route: string;
   marketing: DemoMarketing;
   workspace: {
     id: number;

@@ -17,26 +17,28 @@ import { studentFeeReconciliationDemo } from "./examples/student-fee-reconciliat
 import type { DemoDefinition } from "./runtime/replayTypes";
 
 export const demoRegistry: Record<string, DemoDefinition> = {
-  [bankTransactionAuditDemo.route]: bankTransactionAuditDemo,
-  [campusRecruitmentAnalysisDemo.route]: campusRecruitmentAnalysisDemo,
-  [departmentBudgetMonitoringDemo.route]: departmentBudgetMonitoringDemo,
-  [examScoreAnalysisDemo.route]: examScoreAnalysisDemo,
-  [financialHealthAnalysisDemo.route]: financialHealthAnalysisDemo,
-  [investmentBudgetReviewDemo.route]: investmentBudgetReviewDemo,
-  [inventoryReconciliationDemo.route]: inventoryReconciliationDemo,
-  [logisticsOperationsAnalysisDemo.route]: logisticsOperationsAnalysisDemo,
-  [marketingRoiAnalysisDemo.route]: marketingRoiAnalysisDemo,
-  [orderFulfillmentAnalysisDemo.route]: orderFulfillmentAnalysisDemo,
-  [researchFundExecutionDemo.route]: researchFundExecutionDemo,
-  [salesPerformanceAnalysisDemo.route]: salesPerformanceAnalysisDemo,
-  [schoolProcurementAuditDemo.route]: schoolProcurementAuditDemo,
-  [shareholderChangeAnalysisDemo.route]: shareholderChangeAnalysisDemo,
-  [studentAidDisbursementDemo.route]: studentAidDisbursementDemo,
-  [studentFeeReconciliationDemo.route]: studentFeeReconciliationDemo,
+  [bankTransactionAuditDemo.id]: bankTransactionAuditDemo,
+  [campusRecruitmentAnalysisDemo.id]: campusRecruitmentAnalysisDemo,
+  [departmentBudgetMonitoringDemo.id]: departmentBudgetMonitoringDemo,
+  [examScoreAnalysisDemo.id]: examScoreAnalysisDemo,
+  [financialHealthAnalysisDemo.id]: financialHealthAnalysisDemo,
+  [investmentBudgetReviewDemo.id]: investmentBudgetReviewDemo,
+  [inventoryReconciliationDemo.id]: inventoryReconciliationDemo,
+  [logisticsOperationsAnalysisDemo.id]: logisticsOperationsAnalysisDemo,
+  [marketingRoiAnalysisDemo.id]: marketingRoiAnalysisDemo,
+  [orderFulfillmentAnalysisDemo.id]: orderFulfillmentAnalysisDemo,
+  [researchFundExecutionDemo.id]: researchFundExecutionDemo,
+  [salesPerformanceAnalysisDemo.id]: salesPerformanceAnalysisDemo,
+  [schoolProcurementAuditDemo.id]: schoolProcurementAuditDemo,
+  [shareholderChangeAnalysisDemo.id]: shareholderChangeAnalysisDemo,
+  [studentAidDisbursementDemo.id]: studentAidDisbursementDemo,
+  [studentFeeReconciliationDemo.id]: studentFeeReconciliationDemo,
 };
 
 export function getDemoDefinition(pathname: string): DemoDefinition | null {
-  return demoRegistry[pathname] ?? null;
+  const prefix = "/demos/";
+  if (!pathname.startsWith(prefix)) return null;
+  return getDemoDefinitionById(pathname.slice(prefix.length));
 }
 
 export function getDemoDefinitionById(id: string): DemoDefinition | null {

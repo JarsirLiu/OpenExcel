@@ -4,6 +4,7 @@ export const routePaths = {
   register: "/register",
   loginWithReturnTo: (returnTo: string) => withReturnTo("/login", returnTo),
   registerWithReturnTo: (returnTo: string) => withReturnTo("/register", returnTo),
+  demos: "/demos",
   demo: (demoId: string) => `/demos/${demoId}`,
   workspace: (publicId: string) => `/workspaces/${publicId}`,
 } as const;

@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest";
 import { getInternalReturnTo, routePaths } from "./routePaths";
 
 describe("getInternalReturnTo", () => {
+  it("builds the canonical demo collection and detail paths", () => {
+    expect(routePaths.demos).toBe("/demos");
+    expect(routePaths.demo("bank-transaction-audit")).toBe("/demos/bank-transaction-audit");
+  });
+
   it("accepts an internal path with its query and hash", () => {
     expect(getInternalReturnTo("/workspaces/ws_existing?tab=chat#messages")).toBe(
       "/workspaces/ws_existing?tab=chat#messages",

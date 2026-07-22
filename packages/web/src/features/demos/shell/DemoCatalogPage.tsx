@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { routePaths } from "@/app/routePaths";
 import { ProgressiveImage } from "@/shared/ui";
 import { demoRegistry } from "../registry";
 import styles from "./DemoCatalogPage.module.css";
@@ -11,7 +12,7 @@ export function DemoCatalogPage() {
   return (
     <main className={styles.page}>
       <header className={styles.header}>
-        <Link className={styles.back} to="/">
+        <Link className={styles.back} to={routePaths.home}>
           ← 返回首页
         </Link>
         <h1 className={styles.title}>AI Excel 案例库</h1>
@@ -19,7 +20,7 @@ export function DemoCatalogPage() {
       </header>
       <section className={styles.grid}>
         {demos.map((demo, index) => (
-          <Link className={styles.card} key={demo.id} to={demo.route}>
+          <Link className={styles.card} key={demo.id} to={routePaths.demo(demo.id)}>
             <div className={styles.cover}>
               <ProgressiveImage
                 src={demo.marketing.coverImage}

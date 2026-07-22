@@ -15,7 +15,7 @@ export function DemoPage({ scenario }: { scenario: DemoDefinition }) {
   return (
     <div className={workbenchStyles.layout}>
       <DemoWorkspacePane
-        onNavigateHome={() => navigate("/")}
+        onNavigateHome={() => navigate(routePaths.demos)}
         scenario={scenario}
         workbooks={replay.workbooks}
         workbookRevision={replay.workbookRevision}

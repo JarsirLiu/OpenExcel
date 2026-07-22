@@ -7,7 +7,6 @@ import {
 
 export const inventoryReconciliationDemo: DemoDefinition = {
   id: "inventory-reconciliation",
-  route: "/demos/inventory-reconciliation",
   marketing: {
     category: "运营",
     marketingTitle: "进销存智能核对",
