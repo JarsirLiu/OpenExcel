@@ -1,7 +1,11 @@
 # Agent Layer Notes
 
 This file is the working guide for any AI or maintainer editing `packages/agent`.
-Read it together with [docs/architecture.md](../../docs/architecture.md) before making changes.
+Read it together with [docs/agent-loop.md](../../docs/agent-loop.md) and
+[docs/architecture.md](../../docs/architecture.md) before making changes.
+
+`docs/agent-loop.md` is the detailed source of truth for Agent behavior. The
+architecture document only defines stable package boundaries.
 
 ## 1. What this package owns
 

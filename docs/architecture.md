@@ -2,6 +2,19 @@
 
 > This document defines the long-term architecture of OpenExcel.
 > It is the source of truth for package boundaries, ownership, and data flow.
+>
+> Agent loop implementation details are intentionally maintained in
+> [Agent Loop](agent-loop.md). That document is the source of truth for Agent
+> protocols, runtime state, context assembly, tool execution coordination,
+> retry/backoff, recovery, persistence barriers, and migration steps.
+
+This document is deliberately stable. Change it only when a package boundary,
+dependency direction, ownership rule, or top-level data flow changes. Do not
+add model prompts, AgentRunner internals, event schemas, retry constants, tool
+idempotency rules, or Agent migration checklists here; update
+[`docs/agent-loop.md`](agent-loop.md) instead. When an Agent change crosses a
+package boundary, update both documents so this file records only the durable
+boundary and links to the detailed contract.
 
 ## 1. Goals
 
@@ -57,9 +70,9 @@ multipart request limits only protect the compressed HTTP body.
 
 ### 2.2 Agent logic is headless
 
-Agent execution, session context assembly, compaction, and tool registry belong to
-`packages/agent`. The AgentRunner owns the model/tool loop and model-facing message assembly;
-the server supplies authorized inputs and executes concrete side effects.
+`packages/agent` owns headless Agent behavior. `packages/server` supplies
+authorized inputs, persistence ports, and concrete side-effect executors.
+The detailed Agent contract is defined in [Agent Loop](agent-loop.md).
 
 This layer must not know about:
 
@@ -111,12 +124,8 @@ The long-term package layout should look like this:
 ```text
 packages/
 ├── core/          # Excel core library, stable and framework-free
-├── agent/         # AI agent runtime, sessions, tools, compaction
-│   ├── session/   # session storage and history
-│   ├── compaction/# context compression
-│   ├── tools/     # Excel tool definitions
-│   └── runtime/   # execution environment abstraction
-├── server/        # API layer, persistence, auth, streaming transport
+├── agent/         # headless AI runtime and model-facing contracts
+├── server/        # API layer, persistence, auth, side-effect adapters
 └── web/           # front-end, layout, feature composition, local UI state
 ```
 
@@ -160,15 +169,18 @@ not sheet names, so same-named sheets in different workbooks remain unambiguous.
 
 ### 3.2 `packages/agent`
 
-This package is the ideal long-term home for AI behavior.
+This package is the long-term home for headless AI behavior. Its detailed
+runtime design is maintained in [Agent Loop](agent-loop.md).
 
 Responsibilities:
 
-- Session model and session context assembly
-- Tool registry for spreadsheet actions
-- AgentRunner and model/tool execution loop
-- Context compaction and model-facing message assembly
-- Runtime abstraction for future environments
+- Model-facing Agent behavior and session context transformation
+- AI-visible tool contracts and runtime ports
+- Provider-neutral execution events
+
+It must not depend on HTTP, React, Fastify, Prisma, or concrete workbook
+storage. The package may request a tool through an injected port, but the
+server owns authorization, side effects, and persistence.
 
 ### 3.3 `packages/server`
 
@@ -483,7 +495,8 @@ Authentication and workspace boundaries have completed the first application-lay
 - `src/modules/sessions/runs/*` owns run, step, snapshot, and undo behavior.
 
 The sessions domain remains intentionally transitional. Its `routes.ts`, `service.ts`, and
-`repository.ts` files will be extracted later using the same dependency direction.
+`repository.ts` files will be extracted later using the same dependency direction. Agent-specific
+extraction order and compatibility work belong in [Agent Loop](agent-loop.md), not in this document.
 
 Current session-related files:
 
@@ -494,12 +507,16 @@ Current session-related files:
 - `src/modules/sessions/runs/*`
 - `src/modules/sheets/tools/*`
 
-represent the agent/server boundary today.
+represent the server-side session boundary today. The Agent-side boundary and
+future extraction targets are defined in [Agent Loop](agent-loop.md).
 
-Long term, these should move toward a cleaner split:
+The durable split is:
 
-- `agent` owns model/tool/session execution semantics and message assembly
-- `server` owns request handling and persistence
+- `agent` owns headless model-facing behavior and Agent execution semantics
+- `server` owns request handling, authorization, persistence, and concrete side effects
+
+Do not infer a more detailed directory split from this document. Use
+[Agent Loop](agent-loop.md) for the implementation map and migration sequence.
 
 Session title generation remains in `server`, because it is a session API capability rather than an agent primitive.
 Sheet mutation tools now live under `src/modules/sheets/tools/*`, which is a better fit for the domain than the old session-tools location.
@@ -741,23 +758,16 @@ save system beside full snapshots.
 
 1. Entering a workspace opens a new in-memory draft conversation. The persisted session list is history and is not automatically selected.
 2. User sends one new user message from the draft. Web posts the message, stable workbook/Sheet reference IDs, and an idempotency key to `sessions/draft/chat`; it never submits the full local transcript as the model context. The server creates the persisted `Session`, reads or creates the canonical transcript, stores the initial user message, and starts the stream in one application use case. The initial session name is a deterministic fallback derived from the first user message.
-3. The server resolves references and authorization against the current workspace, then passes the canonical transcript and authorized context to `packages/agent`. AgentRunner builds the complete model input, removes empty placeholders, and compacts the model-facing copy to the configured context budget. The default model input budget is 180,000 tokens, with 16,000 tokens reserved for the response.
-   It also keeps only the latest 20 complete user turns by default (`MODEL_MAX_CONVERSATION_TURNS`); turn trimming happens before token trimming, so an assistant tool call and its result are not split across the window.
-   Each user message sent to the model is independently capped at 16,000 tokens (`MODEL_MAX_USER_INPUT_TOKENS`). Only the model-facing copy is truncated; the complete user message remains in the persisted transcript.
-4. Server creates a run and streams the assistant response through the AgentRunner.
-5. Server persists the complete canonical transcript, run, and step data; compaction only affects the model request and does not remove history from the session. The server never replaces this transcript with a paginated or otherwise incomplete client message list.
-6. Web renders the server stream and tool output. The browser does not execute tools, advance the agent loop, or produce authoritative tool results.
+3. The server resolves references and authorization against the current workspace, then invokes `packages/agent` with the canonical transcript, authorized context, and server-owned runtime ports. Agent context construction, tool-loop control, retries, and recovery follow [Agent Loop](agent-loop.md).
+4. The server persists authoritative run state, transcript updates, tool effects, and recoverable events. Only persisted events are sent through the stream; a transport failure never becomes a persistence decision.
+5. Web renders the server stream and refreshes affected workbook/session state from server versions. The browser does not execute tools, advance the Agent loop, assemble model context, or produce authoritative tool results.
 
-Sheet and workbook mentions use an AI SDK `data-chat-reference` message part. The web editor only
-extracts stable workbook or Sheet IDs; it does not serialize TipTap nodes or rely on display names.
-The server resolves those IDs against the current workspace and replaces the payload with authoritative
-workbook/Sheet metadata. The agent converts the resolved data part into model-facing identity text,
-while the persisted/UI message keeps the user-visible text separate from that hidden context. This
-keeps editor, resource authorization, and model prompt formatting in separate ownership boundaries.
-
-Tool results are processed at one run-scoped boundary before they are returned to the model. The default shared result budget is 32,000 tokens per run, each result is capped at 8,000 tokens, and `readSheetData` has a 24,000-token sub-budget. Generic tools may be structurally compacted, but `readSheetData` uses a paged-structured policy: the server sizes a complete rectangular page against the available result budget and the budget wrapper never samples or removes values from that page. When no allowance remains, the wrapper returns a normal `truncated` result without executing the underlying tool; on the next model step, exhausted tools are removed from `activeTools`, allowing the model to finish without an error or an unbounded tool loop. These limits are configured with `MODEL_TOOL_RESULT_BUDGET_TOKENS`, `MODEL_TOOL_RESULT_MAX_TOKENS`, and `MODEL_READ_SHEET_DATA_BUDGET_TOKENS`.
-
-Spreadsheet read projections, formula compression, format lookup, cell queries, Excel object summaries, and their token-budget rules are defined in [`docs/ai-spreadsheet-tools.md`](ai-spreadsheet-tools.md). The architecture boundary is that core owns pure projections, server owns authorization and resource access, and agent owns model-facing tool contracts. The tools use bounded rectangular ranges and explicit continuation ranges; a generic result compressor must not randomly remove rows from a two-dimensional read.
+Sheet and workbook mentions use stable workbook or Sheet IDs. The web editor
+does not serialize editor nodes or rely on display names; the server resolves
+IDs against the current workspace and supplies authoritative metadata to the
+Agent runtime. The message and context transformation rules are defined in
+[Agent Loop](agent-loop.md). Spreadsheet read projections and tool result
+shaping remain specified in [AI Spreadsheet Tools](ai-spreadsheet-tools.md).
 
 ### 7.3 Title flow
 
@@ -854,7 +864,10 @@ It should load on demand instead of being fetched during workbook bootstrap, so 
 
 The chat API may use SSE or streamed response piping.
 
-The transport layer should only carry the chat run. It should not become a hidden place for title generation or session refresh logic.
+The transport layer only carries the server-owned chat run and persisted
+events. It must not become a hidden place for title generation, Agent loop
+control, session refresh logic, or client-provided transcript persistence.
+Reconnect and event replay rules are defined in [Agent Loop](agent-loop.md).
 
 ### 9.2 Persistence
 
@@ -867,10 +880,16 @@ Persist:
 - sheet snapshots for undo
 
 Persisting a title is a separate write path from persisting the chat run.
+The server remains the authority for transcript and workbook state. The
+transaction boundaries, event durability barriers, and tool idempotency rules
+are maintained in [Agent Loop](agent-loop.md).
 
 ### 9.3 Model usage
 
-The model adapter should be provider-agnostic as long as it remains compatible with chat/completions style input and output.
+The model adapter should be provider-agnostic as long as it remains compatible
+with chat/completions style input and output. Model-facing message assembly,
+context limits, provider errors, and retry policy belong to `packages/agent`;
+their detailed contract is in [Agent Loop](agent-loop.md).
 
 Do not make UI code depend on provider specifics.
 
@@ -888,9 +907,12 @@ If model-based title generation fails:
 
 If the chat run fails:
 
-- mark the run as error or aborted
+- persist the server-owned user message and confirmed server events
+- mark the run as a diagnosable failure or cancellation according to the Agent
+  run contract
 - keep the session usable
 - do not block future messages
+- do not let a lost stream overwrite canonical history with a partial client transcript
 
 ### 10.3 Workbook failure
 
@@ -925,12 +947,11 @@ both protections:
 - a monotonically increasing request generation to discard a response that was
   already returned after the context changed.
 
-The server run lifecycle has the opposite ordering requirement: transcript
-persistence must complete before a run becomes terminal. Failed and aborted
-streams retain the server-owned user message and any confirmed server events;
-they must not persist an empty assistant placeholder or use an incomplete client
-transcript to replace session history. This prevents a new run from observing a
-run that is marked finished while the previous stream is still writing its history.
+The server run lifecycle has the opposite ordering requirement: authoritative
+transcript and run persistence must complete before a run becomes terminal.
+Transport loss must not change that state or allow an incomplete client
+transcript to replace session history. The complete Agent failure, cancellation,
+disconnect, retry, and recovery contract is defined in [Agent Loop](agent-loop.md).
 
 Undo is available only through persisted run effects and must be treated as a
 workbook mutation operation. A failed run without snapshots or structural
@@ -954,6 +975,8 @@ The architecture is considered aligned when:
 - switching chat sessions does not reset the active workbook
 - an Excel patch failure does not break the chat panel
 - local UI state cannot corrupt persisted session or workbook state
+- Agent behavior changes are specified and tested in [Agent Loop](agent-loop.md)
+  without expanding this stable package-boundary document
 
 ## 13. Summary
 
