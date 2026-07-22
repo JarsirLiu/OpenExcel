@@ -55,7 +55,7 @@ COPY --from=build /app/packages/web/dist ./packages/web/dist
 COPY --from=build /app/templates ./templates
 
 RUN mkdir -p /app/.data \
-  && sed -i 's/\r$//' /app/packages/server/scripts/docker-entrypoint.sh \
+  && find /app/packages/server/scripts -type f -name '*.sh' -exec sed -i 's/\r$//' {} + \
   && chmod +x /app/packages/server/scripts/docker-entrypoint.sh
 
 EXPOSE 4000
