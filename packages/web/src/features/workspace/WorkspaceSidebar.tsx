@@ -15,6 +15,7 @@ const SIDEBAR_COLLAPSED_KEY = "openexcel:sidebarCollapsed:v2";
 const SIDEBAR_WIDTH_KEY = "openexcel:sidebarWidth";
 
 type Props = {
+  onNavigateHome: () => void;
   activeWorkspaceId: number | null;
   onWorkspaceSelect: (workspace: Workspace) => void;
   workspaces: Workspace[];
@@ -29,6 +30,7 @@ type Props = {
 };
 
 export function WorkspaceSidebar({
+  onNavigateHome,
   activeWorkspaceId,
   onWorkspaceSelect,
   workspaces,
@@ -232,8 +234,20 @@ export function WorkspaceSidebar({
   return collapsed ? (
     <div className={`${styles.sidebar} ${styles.collapsed}`} style={{ width: COLLAPSED_WIDTH }}>
       <button
+        className={styles.collapsedHomeButton}
+        onClick={onNavigateHome}
+        aria-label="返回 OpenExcel 首页"
+        title="返回 OpenExcel 首页"
+      >
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <rect x="1.5" y="1.5" width="13" height="13" rx="3" stroke="currentColor" />
+          <path d="M5 1.8v12.4M10.8 1.8v12.4M1.8 6.8h12.4" stroke="currentColor" />
+        </svg>
+      </button>
+      <button
         className={styles.expandBtn}
         onClick={() => setCollapsed(false)}
+        aria-label="展开工作区侧边栏"
         title="Expand sidebar"
       >
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -250,6 +264,39 @@ export function WorkspaceSidebar({
   ) : (
     <div ref={sidebarRef} className={styles.sidebar} style={{ width, ...transitionStyle }}>
       <div ref={innerRef} className={styles.inner} style={{ width }}>
+        <button
+          className={styles.homeButton}
+          onClick={onNavigateHome}
+          aria-label="返回 OpenExcel 首页"
+          title="返回 OpenExcel 首页"
+        >
+          <span className={styles.homeMark} aria-hidden="true">
+            <svg width="17" height="17" viewBox="0 0 18 18" fill="none">
+              <rect x="1.5" y="1.5" width="15" height="15" rx="3.5" stroke="currentColor" />
+              <path d="M6 1.8v14.4M12.2 1.8v14.4M1.8 7.5h14.4" stroke="currentColor" />
+            </svg>
+          </span>
+          <span className={styles.homeCopy}>
+            <strong>OpenExcel</strong>
+            <small>返回首页</small>
+          </span>
+          <svg
+            className={styles.homeArrow}
+            width="14"
+            height="14"
+            viewBox="0 0 14 14"
+            fill="none"
+            aria-hidden="true"
+          >
+            <path
+              d="M9 3L5 7l4 4"
+              stroke="currentColor"
+              strokeWidth="1.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
         <div className={styles.header}>
           <span className={styles.sectionLabel}>
             <small>{readOnly ? "DEMO SPACE" : "WORKSPACE"}</small>
@@ -258,6 +305,7 @@ export function WorkspaceSidebar({
           <button
             className={styles.toggleBtn}
             onClick={() => setCollapsed(true)}
+            aria-label="收起工作区侧边栏"
             title="Collapse sidebar"
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">

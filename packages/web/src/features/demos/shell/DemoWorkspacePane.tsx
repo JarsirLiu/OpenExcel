@@ -9,6 +9,7 @@ import type { DemoDefinition, DemoWorkbook } from "../runtime/replayTypes";
 import { toWorkbook } from "../runtime/replayWorkbookProjection";
 
 type Props = {
+  onNavigateHome: () => void;
   scenario: DemoDefinition;
   workbooks: DemoWorkbook[];
   workbookRevision: number;
@@ -25,6 +26,7 @@ const DemoWorkspaceView = memo(function DemoWorkspaceView(
 });
 
 export const DemoWorkspacePane = memo(function DemoWorkspacePane({
+  onNavigateHome,
   scenario,
   workbooks,
   workbookRevision,
@@ -70,6 +72,7 @@ export const DemoWorkspacePane = memo(function DemoWorkspacePane({
   return (
     <>
       <WorkspaceSidebar
+        onNavigateHome={onNavigateHome}
         activeWorkspaceId={demoWorkspace.id}
         onWorkspaceSelect={() => undefined}
         workspaces={[demoWorkspace]}

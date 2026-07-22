@@ -194,6 +194,7 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
   return (
     <div ref={layoutRef} className={styles.layout}>
       <WorkspaceSidebar
+        onNavigateHome={() => navigate("/")}
         activeWorkspaceId={selectedWorkspaceId}
         onWorkspaceSelect={handleWorkspaceSelect}
         workspaces={workspaces}
