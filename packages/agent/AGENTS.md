@@ -11,10 +11,12 @@ It owns:
 
 - model factory helpers
 - prompt assembly
-- workspace context assembly for model input
-- transcript reconstruction helpers
+- model-facing workspace context assembly from server-provided authorized data
+- canonical transcript normalization/reconstruction helpers
 - tool schema and tool catalog definitions
-- streaming execution of chat/completions-style models
+- AgentRunner and the complete model/tool execution loop
+- context compaction, token budgets, retry/backoff policy, and stop conditions
+- provider-neutral Agent events and stream adapters
 
 It must not own:
 
@@ -120,8 +122,10 @@ It should:
 
 - validate messages
 - build the model call
-- wire callbacks for step/finish/error/end
-- return a UI-message stream for the server to pipe
+- run the complete model/tool loop
+- apply retry/backoff and stop policies
+- invoke injected tool executors and event sinks
+- return provider-neutral events or a UI-message stream adapter for the server to pipe
 
 It should not:
 
@@ -129,6 +133,7 @@ It should not:
 - write transcripts
 - update titles
 - know about Fastify or response objects
+- execute concrete Prisma-backed workbook, sheet, or chart tools
 
 ## 5. Relationship to `packages/server`
 
@@ -137,9 +142,9 @@ It should not:
 
 The direction should stay one-way:
 
-- server prepares config and persistence context
-- agent performs model-facing work
-- server persists the result
+- server authorizes resources, prepares canonical messages and runtime ports
+- agent performs the complete model-facing Agent loop
+- server executes injected concrete tools and persists authoritative events/results
 
 If a helper starts importing database code, HTTP code, or route code, it is in the wrong package.
 

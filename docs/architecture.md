@@ -57,7 +57,9 @@ multipart request limits only protect the compressed HTTP body.
 
 ### 2.2 Agent logic is headless
 
-Agent execution, session context, compaction, and tool registry belong to an agent layer.
+Agent execution, session context assembly, compaction, and tool registry belong to
+`packages/agent`. The AgentRunner owns the model/tool loop and model-facing message assembly;
+the server supplies authorized inputs and executes concrete side effects.
 
 This layer must not know about:
 
@@ -164,8 +166,8 @@ Responsibilities:
 
 - Session model and session context assembly
 - Tool registry for spreadsheet actions
-- Agent execution loop
-- Context compaction
+- AgentRunner and model/tool execution loop
+- Context compaction and model-facing message assembly
 - Runtime abstraction for future environments
 
 ### 3.3 `packages/server`
@@ -496,7 +498,7 @@ represent the agent/server boundary today.
 
 Long term, these should move toward a cleaner split:
 
-- `agent` owns model/tool/session semantics
+- `agent` owns model/tool/session execution semantics and message assembly
 - `server` owns request handling and persistence
 
 Session title generation remains in `server`, because it is a session API capability rather than an agent primitive.
@@ -738,13 +740,13 @@ save system beside full snapshots.
 ### 7.2 Chat flow
 
 1. Entering a workspace opens a new in-memory draft conversation. The persisted session list is history and is not automatically selected.
-2. User sends a chat message from the draft. Web posts the transcript to `sessions/draft/chat` with an idempotency key; the server creates the persisted `Session`, stores the initial user transcript and starts the stream in one application use case. The initial session name is a deterministic fallback derived from the first user message.
-3. The agent removes empty placeholders and compacts the recent contiguous transcript to the configured context budget. The default model input budget is 180,000 tokens, with 16,000 tokens reserved for the response.
+2. User sends one new user message from the draft. Web posts the message, stable workbook/Sheet reference IDs, and an idempotency key to `sessions/draft/chat`; it never submits the full local transcript as the model context. The server creates the persisted `Session`, reads or creates the canonical transcript, stores the initial user message, and starts the stream in one application use case. The initial session name is a deterministic fallback derived from the first user message.
+3. The server resolves references and authorization against the current workspace, then passes the canonical transcript and authorized context to `packages/agent`. AgentRunner builds the complete model input, removes empty placeholders, and compacts the model-facing copy to the configured context budget. The default model input budget is 180,000 tokens, with 16,000 tokens reserved for the response.
    It also keeps only the latest 20 complete user turns by default (`MODEL_MAX_CONVERSATION_TURNS`); turn trimming happens before token trimming, so an assistant tool call and its result are not split across the window.
    Each user message sent to the model is independently capped at 16,000 tokens (`MODEL_MAX_USER_INPUT_TOKENS`). Only the model-facing copy is truncated; the complete user message remains in the persisted transcript.
-4. Server creates a run and streams the assistant response.
-5. Server persists the complete transcript, run, and step data; compaction only affects the model request and does not remove history from the session.
-6. Web renders streaming messages and tool output.
+4. Server creates a run and streams the assistant response through the AgentRunner.
+5. Server persists the complete canonical transcript, run, and step data; compaction only affects the model request and does not remove history from the session. The server never replaces this transcript with a paginated or otherwise incomplete client message list.
+6. Web renders the server stream and tool output. The browser does not execute tools, advance the agent loop, or produce authoritative tool results.
 
 Sheet and workbook mentions use an AI SDK `data-chat-reference` message part. The web editor only
 extracts stable workbook or Sheet IDs; it does not serialize TipTap nodes or rely on display names.
@@ -925,10 +927,10 @@ both protections:
 
 The server run lifecycle has the opposite ordering requirement: transcript
 persistence must complete before a run becomes terminal. Failed and aborted
-streams may persist only the cleaned client transcript; they must not persist an
-empty assistant placeholder or an incomplete assistant turn. This prevents a
-new run from observing a run that is marked finished while the previous stream
-is still writing its history.
+streams retain the server-owned user message and any confirmed server events;
+they must not persist an empty assistant placeholder or use an incomplete client
+transcript to replace session history. This prevents a new run from observing a
+run that is marked finished while the previous stream is still writing its history.
 
 Undo is available only through persisted run effects and must be treated as a
 workbook mutation operation. A failed run without snapshots or structural

@@ -122,7 +122,9 @@ If title generation fails, fall back to the first user message or another short 
 
 ### 4.5 Keep agent logic out of server-only helpers
 
-`packages/agent` owns model/session semantics and tool registry behavior.
+`packages/agent` owns the AgentRunner, model/session execution semantics, tool-call protocol, context
+compaction, retry/backoff policy, and stop conditions. `packages/server` owns authorization, persistence,
+concrete workbook/sheet/chart tool execution, and HTTP/stream transport.
 `packages/server` may call into `@openexcel/agent`, but should not reimplement agent semantics.
 
 If a helper is about:
@@ -130,6 +132,7 @@ If a helper is about:
 - context assembly for the model
 - transcript reconstruction
 - tool catalog shape
+- model retry/backoff or tool-loop control
 
 then check whether it belongs in `agent` instead of `server`.
 
@@ -184,14 +187,16 @@ Only add what the current feature needs, but avoid designs that make later scopi
 
 Chat streaming has a few important invariants:
 
-- the chat request owns the run lifecycle
-- step persistence should not break streaming if one step save fails
+- the server owns persisted run records, while `packages/agent` owns the in-memory AgentRunner lifecycle
+- step/event persistence is a durability barrier; a failed save must stop further model/tool execution and
+  put the run into a diagnosable persistence-failed state before any recoverable stream continues
 - run finalization should happen even on abort or error
-- session transcript persistence should happen after the stream ends
+- canonical user-message persistence happens before model execution
+- server persistence callbacks receive authoritative Agent events; the browser transcript is never authoritative
 
 If you change streaming behavior:
 
-- keep abort handling intact
+- keep explicit cancellation separate from HTTP connection detachment
 - keep finalization idempotent
 - keep transcript persistence separate from run status updates
 
