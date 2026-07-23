@@ -108,7 +108,10 @@ describe("workbookToXlsx", () => {
     expect(drawingXml).toContain("twoCellAnchor");
     expect(drawingXml).toContain("<xdr:from>");
     expect(drawingXml).toContain("<xdr:to>");
-    expect(drawingXml).toContain('<xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm>');
+    expect(drawingXml).toContain('<xdr:xfrm><a:off x="0" y="0"/><a:ext cx="1" cy="1"/></xdr:xfrm>');
+    expect(drawingXml).toContain(
+      'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"',
+    );
     expect(drawingXml).toContain('r:id="rId1"');
     expect(drawingRelationships).toContain('Target="../charts/chart1.xml"');
     expect(worksheetRelationships).toContain('Target="../drawings/drawing1.xml"');

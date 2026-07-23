@@ -103,6 +103,12 @@ export function useExcelGridWorkspace({
   }, [registerActivateSheet]);
 
   useEffect(() => {
+    if (!workbook || !workbookRef.current) return;
+    const index = Math.max(0, Math.min(currentSheetIndex, workbook.sheets.length - 1));
+    workbookRef.current.activateSheet({ index });
+  }, [currentSheetIndex, workbook]);
+
+  useEffect(() => {
     return () => {
       saveSchedulerRef.current?.dispose();
       if (saveStatusResetRef.current) {

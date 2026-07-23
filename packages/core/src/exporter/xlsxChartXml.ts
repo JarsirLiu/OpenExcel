@@ -175,7 +175,7 @@ export function createDrawingXml(
     .map((chart, index) => {
       const relationshipId = chartRelationships[index];
       if (!relationshipId) throw new Error(`Missing chart relationship for ${chart.id}`);
-      const graphic = `<xdr:graphicFrame macro=""><xdr:nvGraphicFramePr><xdr:cNvPr id="${index + 2}" name="Chart ${index + 1}"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr><xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm><a:graphic><a:graphicData uri="${CHART_NS}"><c:chart xmlns:c="${CHART_NS}" xmlns:r="${REL_NS}" r:id="${relationshipId}"/></a:graphicData></a:graphic></xdr:graphicFrame>`;
+      const graphic = `<xdr:graphicFrame macro=""><xdr:nvGraphicFramePr><xdr:cNvPr id="${index + 2}" name="Chart ${index + 1}"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr><xdr:xfrm><a:off x="0" y="0"/><a:ext cx="1" cy="1"/></xdr:xfrm><a:graphic><a:graphicData uri="${CHART_NS}"><c:chart r:id="${relationshipId}"/></a:graphicData></a:graphic></xdr:graphicFrame>`;
       const clientData = "<xdr:clientData/>";
       if (chart.anchor.kind === "absolute") {
         return `<xdr:absoluteAnchor><xdr:pos x="${chart.anchor.xEmu}" y="${chart.anchor.yEmu}"/><xdr:ext cx="${chart.anchor.widthEmu}" cy="${chart.anchor.heightEmu}"/>${graphic}${clientData}</xdr:absoluteAnchor>`;
@@ -187,7 +187,7 @@ export function createDrawingXml(
     })
     .join("");
 
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="${DRAWING_NS}" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:c="${CHART_NS}">${anchors}</xdr:wsDr>`;
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="${DRAWING_NS}" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:c="${CHART_NS}" xmlns:r="${REL_NS}">${anchors}</xdr:wsDr>`;
 }
 
 export function createDrawingRelationships(chartCount: number, chartStartIndex: number): string {
