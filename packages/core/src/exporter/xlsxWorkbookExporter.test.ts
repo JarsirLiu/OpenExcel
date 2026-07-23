@@ -31,6 +31,20 @@ function chart(): ChartSpec {
           end: { row: 5, col: 1 },
         },
       },
+      {
+        id: "series-2",
+        name: "采购额",
+        categoryRef: {
+          sheetId: "sheet-1",
+          start: { row: 1, col: 0 },
+          end: { row: 5, col: 0 },
+        },
+        valueRef: {
+          sheetId: "sheet-1",
+          start: { row: 1, col: 2 },
+          end: { row: 5, col: 2 },
+        },
+      },
     ],
   };
 }
@@ -103,6 +117,9 @@ describe("workbookToXlsx", () => {
     expect(chartXml).toContain("销售趋势");
     expect(chartXml).toContain('<c:marker><c:symbol val="circle"/></c:marker>');
     expect(chartXml).not.toContain('<c:marker val="1"/>');
+    expect(chartXml).toContain('<c:legend><c:legendPos val="t"/>');
+    expect(chartXml).toContain('<c:showVal val="0"/>');
+    expect(chartXml).toContain('<a:srgbClr val="5470C6"/>');
     expect(chartXml).toContain("'销售明细'!$A$2:$A$6");
     expect(chartXml).toContain("'销售明细'!$B$2:$B$6");
     expect(drawingXml).toContain("twoCellAnchor");

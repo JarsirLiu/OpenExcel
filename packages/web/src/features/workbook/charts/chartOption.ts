@@ -1,4 +1,4 @@
-import type { ChartSpec } from "@openexcel/core";
+import { CHART_PALETTE, type ChartSpec } from "@openexcel/core";
 import type { EChartsOption } from "echarts";
 import type { ChartRenderData } from "./chartData";
 
@@ -37,6 +37,7 @@ export function buildChartOption(chart: ChartSpec, data: ChartRenderData): EChar
   return {
     title: chart.title ? { text: chart.title } : undefined,
     tooltip: { trigger: "axis" },
+    color: [...CHART_PALETTE],
     legend: data.series.length > 1 ? { top: 28 } : undefined,
     grid: { top: chart.title ? 56 : 24, left: 48, right: 20, bottom: 32 },
     xAxis: isScatter ? { type: "value" } : { type: "category", data: data.categories },

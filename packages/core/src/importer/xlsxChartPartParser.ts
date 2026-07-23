@@ -156,22 +156,28 @@ function chartGroups(plotArea: XmlNode, path: string): ChartGroup[] {
 
 function assertUnsupportedPresentation(root: XmlNode, groups: readonly ChartGroup[], path: string) {
   const chart = child(root, "chart") ?? root;
-  const unsupported = [
-    child(chart, "spPr"),
-    child(chart, "txPr"),
-    child(chart, "legend"),
-    child(chart, "view3D"),
-  ];
+  const legend = child(chart, "legend");
+  const legendPosition = legend
+    ? attribute(child(legend, "legendPos") ?? legend, "val")
+    : undefined;
+  const unsupported = [child(chart, "spPr"), child(chart, "txPr"), child(chart, "view3D")];
   if (unsupported.some(Boolean)) {
+    throw new XlsxChartImportError(`XLSX 图表包含尚未建模的展示属性：${path}`);
+  }
+  if (legend && legendPosition !== "t") {
     throw new XlsxChartImportError(`XLSX 图表包含尚未建模的展示属性：${path}`);
   }
 
   for (const group of groups) {
-    if (child(group.node, "spPr") || child(group.node, "dLbls")?.children.length) {
+    const dataLabels = child(group.node, "dLbls");
+    const hasVisibleDataLabels = dataLabels?.children.some(
+      (node) => attribute(node, "val") !== "0",
+    );
+    if (hasVisibleDataLabels) {
       throw new XlsxChartImportError(`XLSX 图表包含尚未建模的系列展示属性：${path}`);
     }
     for (const series of group.series) {
-      if (child(series, "spPr") || child(series, "txPr")) {
+      if (child(series, "txPr")) {
         throw new XlsxChartImportError(`XLSX 图表包含尚未建模的系列样式：${path}`);
       }
     }

@@ -27,6 +27,7 @@ export {
   isChartSpec,
   parseChartSpec,
 } from "./chart/chartModel.js";
+export { CHART_PALETTE } from "./chart/chartPalette.js";
 export { cellAddressToA1, rangeReferenceToA1 } from "./chart/chartReference.js";
 export type {
   ChartComboSeriesType,

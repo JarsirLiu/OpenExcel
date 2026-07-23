@@ -1,4 +1,5 @@
 import type { ChartSeriesSpec, ChartSpec, RangeReference } from "../chart/chartModel.js";
+import { CHART_PALETTE } from "../chart/chartPalette.js";
 import { rangeReferenceToA1 } from "../chart/chartReference.js";
 
 const CHART_NS = "http://schemas.openxmlformats.org/drawingml/2006/chart";
@@ -43,6 +44,17 @@ function valueReference(series: ChartSeriesSpec, resolveSheetName: ChartSheetNam
   return `<c:val><c:numRef><c:f>${escapeXml(formula(series.valueRef, resolveSheetName))}</c:f></c:numRef></c:val>`;
 }
 
+function seriesStyleXml(
+  chartType: ChartSpec["type"] | NonNullable<ChartSeriesSpec["chartType"]>,
+  index: number,
+): string {
+  const color = CHART_PALETTE[index % CHART_PALETTE.length].slice(1).toUpperCase();
+  if (chartType === "line" || chartType === "scatter") {
+    return `<c:spPr><a:ln w="19050"><a:solidFill><a:srgbClr val="${color}"/></a:solidFill><a:prstDash val="solid"/></a:ln></c:spPr>`;
+  }
+  return `<c:spPr><a:solidFill><a:srgbClr val="${color}"/></a:solidFill><a:ln><a:noFill/></a:ln></c:spPr>`;
+}
+
 function scatterReference(
   tag: "xVal" | "yVal",
   reference: RangeReference,
@@ -67,7 +79,8 @@ function seriesXml(
     return `<c:ser><c:idx val="${index}"/><c:order val="${index}"/>${title}${scatterReference("xVal", series.categoryRef, resolveSheetName)}${scatterReference("yVal", series.valueRef, resolveSheetName)}</c:ser>`;
   }
 
-  return `<c:ser><c:idx val="${index}"/><c:order val="${index}"/>${title}${categoryReference(series, resolveSheetName)}${valueReference(series, resolveSheetName)}</c:ser>`;
+  const style = chartType === "pie" ? "" : seriesStyleXml(chartType, index);
+  return `<c:ser><c:idx val="${index}"/><c:order val="${index}"/>${title}${style}${categoryReference(series, resolveSheetName)}${valueReference(series, resolveSheetName)}</c:ser>`;
 }
 
 function titleXml(title: string | undefined): string {
@@ -89,25 +102,28 @@ function chartGroupXml(
   resolveSheetName: ChartSheetNameResolver,
   categoryAxisId: number,
   valueAxisId: number,
+  seriesIndexById: ReadonlyMap<string, number>,
 ): string {
   const seriesMarkup = series
-    .map((item, index) => seriesXml(item, index, type, resolveSheetName))
+    .map((item, index) =>
+      seriesXml(item, seriesIndexById.get(item.id) ?? index, type, resolveSheetName),
+    )
     .join("");
 
   if (type === "bar") {
-    return `<c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:varyColors val="0"/>${seriesMarkup}<c:dLbls/><c:gapWidth val="150"/><c:axId val="${categoryAxisId}"/><c:axId val="${valueAxisId}"/></c:barChart>`;
+    return `<c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:varyColors val="0"/>${seriesMarkup}<c:dLbls><c:showLegendKey val="0"/><c:showVal val="0"/><c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="0"/></c:dLbls><c:gapWidth val="150"/><c:axId val="${categoryAxisId}"/><c:axId val="${valueAxisId}"/></c:barChart>`;
   }
   if (type === "line") {
-    return `<c:lineChart><c:grouping val="standard"/><c:varyColors val="0"/>${seriesMarkup}<c:dLbls/><c:marker><c:symbol val="circle"/></c:marker><c:axId val="${categoryAxisId}"/><c:axId val="${valueAxisId}"/></c:lineChart>`;
+    return `<c:lineChart><c:grouping val="standard"/><c:varyColors val="0"/>${seriesMarkup}<c:dLbls><c:showLegendKey val="0"/><c:showVal val="0"/><c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="0"/></c:dLbls><c:marker><c:symbol val="circle"/></c:marker><c:axId val="${categoryAxisId}"/><c:axId val="${valueAxisId}"/></c:lineChart>`;
   }
   if (type === "area") {
-    return `<c:areaChart><c:grouping val="standard"/><c:varyColors val="0"/>${seriesMarkup}<c:dropLines/><c:axId val="${categoryAxisId}"/><c:axId val="${valueAxisId}"/></c:areaChart>`;
+    return `<c:areaChart><c:grouping val="standard"/><c:varyColors val="0"/>${seriesMarkup}<c:dLbls><c:showLegendKey val="0"/><c:showVal val="0"/><c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="0"/></c:dLbls><c:dropLines/><c:axId val="${categoryAxisId}"/><c:axId val="${valueAxisId}"/></c:areaChart>`;
   }
   if (type === "pie") {
-    return `<c:pieChart><c:varyColors val="1"/>${seriesMarkup}<c:dLbls/></c:pieChart>`;
+    return `<c:pieChart><c:varyColors val="1"/>${seriesMarkup}<c:dLbls><c:showLegendKey val="0"/><c:showVal val="0"/><c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="0"/></c:dLbls></c:pieChart>`;
   }
   if (type === "scatter") {
-    return `<c:scatterChart><c:scatterStyle val="lineMarker"/><c:varyColors val="0"/>${seriesMarkup}<c:dLbls/><c:axId val="${categoryAxisId}"/><c:axId val="${valueAxisId}"/></c:scatterChart>`;
+    return `<c:scatterChart><c:scatterStyle val="lineMarker"/><c:varyColors val="0"/>${seriesMarkup}<c:dLbls><c:showLegendKey val="0"/><c:showVal val="0"/><c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="0"/></c:dLbls><c:axId val="${categoryAxisId}"/><c:axId val="${valueAxisId}"/></c:scatterChart>`;
   }
   throw new Error(`Unsupported chart type: ${type}`);
 }
@@ -139,9 +155,10 @@ export function createChartXml(
   const categoryAxisId = 100000 + chartIndex * 2;
   const valueAxisId = categoryAxisId + 1;
   const groups = groupSeries(chart);
+  const seriesIndexById = new Map(chart.series.map((series, index) => [series.id, index]));
   const groupsXml = groups
     .map(({ type, series }) =>
-      chartGroupXml(type, series, resolveSheetName, categoryAxisId, valueAxisId),
+      chartGroupXml(type, series, resolveSheetName, categoryAxisId, valueAxisId, seriesIndexById),
     )
     .join("");
   const hasScatter = groups.some(({ type }) => type === "scatter");
@@ -155,7 +172,11 @@ export function createChartXml(
       ? axisXml(categoryAxisId, valueAxisId)
       : "";
 
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><c:chartSpace xmlns:c="${CHART_NS}" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><c:date1904 val="0"/><c:lang val="zh-CN"/><c:roundedCorners val="0"/><c:chart>${titleXml(chart.title)}<c:plotArea><c:layout/>${groupsXml}${axes}</c:plotArea><c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/></c:chart><c:printSettings><c:headerFooter/><c:pageMargins b="0.75" l="0.7" r="0.7" t="0.75" header="0.3" footer="0.3"/><c:pageSetup/></c:printSettings></c:chartSpace>`;
+  const legend =
+    chart.type !== "pie" && chart.series.length > 1
+      ? '<c:legend><c:legendPos val="t"/><c:layout/><c:overlay val="0"/></c:legend>'
+      : "";
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><c:chartSpace xmlns:c="${CHART_NS}" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><c:date1904 val="0"/><c:lang val="zh-CN"/><c:roundedCorners val="0"/><c:chart>${titleXml(chart.title)}<c:plotArea><c:layout/>${groupsXml}${axes}</c:plotArea>${legend}<c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/></c:chart><c:printSettings><c:headerFooter/><c:pageMargins b="0.75" l="0.7" r="0.7" t="0.75" header="0.3" footer="0.3"/><c:pageSetup/></c:printSettings></c:chartSpace>`;
 }
 
 function marker(point: {
