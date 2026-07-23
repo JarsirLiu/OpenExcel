@@ -163,6 +163,10 @@ model Session {
   workspace    Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   sheet        Sheet?     @relation(fields: [sheetId], references: [id], onDelete: SetNull)
   runs         AgentRun[]
+  leaseOwnerId String?
+  leaseExpiresAt DateTime?
+  leaseHeartbeatAt DateTime?
+  version      Int        @default(0)
   createdAt    DateTime   @default(now())
 
   @@index([workspaceId])
@@ -179,6 +183,13 @@ model AgentRun {
   inputText    String?
   outputText   String?
   errorMessage String?
+  cancelRequestedAt DateTime?
+  ownerId      String?
+  sessionVersion Int?
+  leaseExpiresAt DateTime?
+  heartbeatAt  DateTime?
+  lastEventSequence Int @default(0)
+  requestPayloadHash String?
   undoInvalidated Boolean                @default(false)
   revertedAt   DateTime?
   session      Session                 @relation(fields: [sessionId], references: [id], onDelete: Cascade)

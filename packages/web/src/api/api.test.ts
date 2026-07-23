@@ -1,5 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fetchMessages, fetchRuns, fetchUndoAvailability, undoLatestRun } from "./chat";
+import {
+  cancelRun,
+  fetchMessages,
+  fetchRunEvents,
+  fetchRunSnapshot,
+  fetchRuns,
+  fetchUndoAvailability,
+  undoLatestRun,
+} from "./chat";
 import { generateSessionTitle } from "./sessions";
 import {
   createSheet,
@@ -189,6 +197,43 @@ describe("fetchRuns", () => {
     const result = await fetchRuns(9, 3);
     expect(result).toEqual(runs);
     expect(mockFetch).toHaveBeenCalledWith("/api/workspaces/9/sessions/3/runs", {});
+  });
+});
+
+describe("cancelRun", () => {
+  it("posts an explicit cancellation request", async () => {
+    const result = { runId: 7, status: "running", cancelRequested: true };
+    mockFetch.mockResolvedValue(new Response(JSON.stringify(result), { status: 200 }));
+
+    await expect(cancelRun(9, 3, 7)).resolves.toEqual(result);
+    expect(mockFetch).toHaveBeenCalledWith("/api/workspaces/9/sessions/3/runs/7/cancel", {
+      method: "POST",
+    });
+  });
+});
+
+describe("fetchRunSnapshot", () => {
+  it("loads a run snapshot by session and run id", async () => {
+    const snapshot = { runId: 7, status: "running", terminal: false };
+    mockFetch.mockResolvedValue(new Response(JSON.stringify(snapshot), { status: 200 }));
+
+    await expect(fetchRunSnapshot(9, 3, 7)).resolves.toEqual(snapshot);
+    expect(mockFetch).toHaveBeenCalledWith("/api/workspaces/9/sessions/3/runs/7", {
+      signal: undefined,
+    });
+  });
+});
+
+describe("fetchRunEvents", () => {
+  it("loads events after the supplied cursor", async () => {
+    const page = { run: { runId: 7 }, events: [], cursor: { after: 4 }, hasMore: false };
+    mockFetch.mockResolvedValue(new Response(JSON.stringify(page), { status: 200 }));
+
+    await expect(fetchRunEvents(9, 3, 7, 4, 50)).resolves.toEqual(page);
+    expect(mockFetch).toHaveBeenCalledWith(
+      "/api/workspaces/9/sessions/3/runs/7/events?after=4&limit=50",
+      { signal: undefined },
+    );
   });
 });
 

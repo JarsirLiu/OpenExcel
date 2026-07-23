@@ -56,16 +56,17 @@ export function useDraftSessionTransition({
   }, [activateSession, isDraft, onDraftSessionCreated]);
 
   const captureDraftResponse = useCallback(
-    (response: Response) => {
-      if (!isDraft) return;
+    (response: Response): number | null => {
+      if (!isDraft) return null;
 
       const sessionId = readCreatedSessionId(response);
-      if (sessionId == null) return;
+      if (sessionId == null) return null;
 
       createdSessionIdRef.current = sessionId;
       if (response.status === 409) {
         beginTransition();
       }
+      return sessionId;
     },
     [beginTransition, isDraft],
   );

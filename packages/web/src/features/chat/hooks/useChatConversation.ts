@@ -3,11 +3,18 @@ import type { SheetChangeDelta } from "@openexcel/core";
 import { DefaultChatTransport } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  cancelRun,
   fetchMessages as fetchChatMessages,
   fetchUndoAvailability,
   undoLatestRun,
 } from "@/api/chat";
 import type { ChatReferenceTarget } from "../composer/chatReferences";
+import {
+  findActiveRunCursor,
+  type RunRecoveryCursor,
+  readRunId,
+  recoverRunUntilTerminal,
+} from "./runRecovery";
 import { useDraftSessionTransition } from "./useDraftSessionTransition";
 import {
   collectWorkbookMutationToolCallIds,
@@ -69,6 +76,18 @@ export function applyInitialMessages(currentMessages: any[], loadedMessages: any
   return currentMessages.length > 0 ? currentMessages : loadedMessages;
 }
 
+function mergeRecoveredMessages(currentMessages: any[], recoveredMessages: any[]): any[] {
+  const recoveredIds = new Set(
+    recoveredMessages
+      .map((message) => message?.id)
+      .filter((id): id is string => typeof id === "string"),
+  );
+  return [
+    ...currentMessages.filter((message) => !recoveredIds.has(message?.id)),
+    ...recoveredMessages,
+  ];
+}
+
 export function prepareChatTurn(messages: any[], trigger: string) {
   if (trigger !== "submit-message") {
     throw new Error("聊天只支持提交新的用户消息");
@@ -119,6 +138,7 @@ export function useChatConversation({
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [hasOlder, setHasOlder] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
+  const [streamRecovered, setStreamRecovered] = useState(false);
   const [initialLoaded, setInitialLoaded] = useState(!!initialMessages);
   const [historicalToolCallIds] = useState<Set<string>>(
     () =>
@@ -137,6 +157,12 @@ export function useChatConversation({
   const wasStreamingRef = useRef(false);
   const loadedOffsetRef = useRef(initialMessages?.length ?? 0);
   const requestGenerationRef = useRef(0);
+  const activeRunRef = useRef<RunRecoveryCursor | null>(null);
+  const activeSessionIdRef = useRef<number | null>(sessionId);
+  const cancelRequestedRef = useRef(false);
+  const cancellationRequestRef = useRef<{ sessionId: number; runId: number } | null>(null);
+  const recoveryControllerRef = useRef<AbortController | null>(null);
+  const recoveryInFlightRef = useRef(false);
   const undoAvailabilityRequestRef = useRef(0);
   const mountedRef = useRef(true);
   const {
@@ -148,6 +174,26 @@ export function useChatConversation({
     isDraft: sessionId == null,
     onDraftSessionCreated,
   });
+
+  const requestRunCancellation = useCallback(
+    (runId: number, targetSessionId: number) => {
+      const previousRequest = cancellationRequestRef.current;
+      if (previousRequest?.runId === runId && previousRequest.sessionId === targetSessionId) {
+        return;
+      }
+      cancellationRequestRef.current = { runId, sessionId: targetSessionId };
+      void cancelRun(workspaceId, targetSessionId, runId).catch((error) => {
+        if (
+          cancellationRequestRef.current?.runId === runId &&
+          cancellationRequestRef.current.sessionId === targetSessionId
+        ) {
+          cancellationRequestRef.current = null;
+        }
+        console.error("[chat] Failed to cancel run:", error);
+      });
+    },
+    [workspaceId],
+  );
 
   const invalidateUndoAvailability = useCallback(() => {
     undoAvailabilityRequestRef.current += 1;
@@ -185,25 +231,60 @@ export function useChatConversation({
         ? `/api/workspaces/${workspaceId}/sessions/draft/chat`
         : `/api/workspaces/${workspaceId}/sessions/${sessionId}/chat`,
       prepareSendMessagesRequest: ({ messages, trigger }) => ({
-        body: prepareChatTurn(messages, trigger),
+        body: (() => {
+          const turn = prepareChatTurn(messages, trigger);
+          cancelRequestedRef.current = false;
+          cancellationRequestRef.current = null;
+          activeRunRef.current = null;
+          activeSessionIdRef.current = sessionId;
+          setStreamRecovered(false);
+          return turn;
+        })(),
       }),
       fetch: async (input, init) => {
         const response = await fetch(input, init);
-        captureDraftResponse(response);
+        const runId = readRunId(response);
+        const createdSessionId = captureDraftResponse(response);
+        const targetSessionId = createdSessionId ?? sessionId;
+        if (targetSessionId != null) {
+          activeSessionIdRef.current = targetSessionId;
+        }
+        if (runId != null) {
+          activeRunRef.current = { runId, after: -1 };
+          if (cancelRequestedRef.current && targetSessionId != null) {
+            requestRunCancellation(runId, targetSessionId);
+            beginDraftSessionTransition();
+          }
+        }
         return response;
       },
     });
-  }, [captureDraftResponse, sessionId, workspaceId]);
+  }, [
+    beginDraftSessionTransition,
+    captureDraftResponse,
+    requestRunCancellation,
+    sessionId,
+    workspaceId,
+  ]);
 
-  const { messages, setMessages, sendMessage, status, stop, error } = useChat({
+  const {
+    messages,
+    setMessages,
+    sendMessage,
+    status,
+    stop: stopChat,
+    error,
+  } = useChat({
     id: `${workspaceId}:${sessionId}`,
     messages: initialMessages ?? [],
     transport,
     onFinish: async ({ isAbort }) => {
+      activeRunRef.current = null;
       if (!isAbort) {
         beginDraftSessionTransition();
       }
       if (!mountedRef.current) return;
+      await onWorkspaceRefresh?.();
       await onRunSettled?.();
       await refreshUndoAvailability();
     },
@@ -272,6 +353,8 @@ export function useChatConversation({
       mountedRef.current = false;
       requestGenerationRef.current += 1;
       controller.abort();
+      recoveryControllerRef.current?.abort();
+      recoveryControllerRef.current = null;
     };
   }, [sessionId, workspaceId, initialMessages, setMessages]);
 
@@ -281,11 +364,91 @@ export function useChatConversation({
 
   useEffect(() => {
     return () => {
-      stop();
+      stopChat();
     };
-  }, [stop]);
+  }, [stopChat]);
+
+  const stop = useCallback(() => {
+    cancelRequestedRef.current = true;
+    const run = activeRunRef.current;
+    const targetSessionId = activeSessionIdRef.current;
+    if (run && targetSessionId != null) {
+      requestRunCancellation(run.runId, targetSessionId);
+    }
+    beginDraftSessionTransition();
+    stopChat();
+  }, [beginDraftSessionTransition, requestRunCancellation, stopChat]);
 
   const isStreaming = status === "submitted" || status === "streaming";
+
+  const recoverActiveRun = useCallback(
+    async (cursor: RunRecoveryCursor) => {
+      if (recoveryInFlightRef.current || !mountedRef.current || sessionId == null) return;
+
+      recoveryInFlightRef.current = true;
+      const controller = new AbortController();
+      recoveryControllerRef.current = controller;
+      activeRunRef.current = cursor;
+
+      try {
+        const result = await recoverRunUntilTerminal(workspaceId, sessionId, cursor, {
+          signal: controller.signal,
+          onUpdate: (update) => {
+            activeRunRef.current = update.cursor;
+          },
+        });
+        if (!mountedRef.current || controller.signal.aborted) return;
+
+        activeRunRef.current = result.cursor;
+        if (result.messages) {
+          setMessages((currentMessages) =>
+            mergeRecoveredMessages(currentMessages, result.messages ?? []),
+          );
+        }
+        setStreamRecovered(true);
+        await onWorkspaceRefresh?.();
+        await onRunSettled?.();
+        await refreshUndoAvailability();
+      } catch (recoveryError) {
+        if (!controller.signal.aborted) {
+          console.error("[chat] Failed to recover disconnected run:", recoveryError);
+          await onWorkspaceRefresh?.();
+          await refreshUndoAvailability();
+        }
+      } finally {
+        if (recoveryControllerRef.current === controller) {
+          recoveryControllerRef.current = null;
+        }
+        recoveryInFlightRef.current = false;
+      }
+    },
+    [
+      onRunSettled,
+      onWorkspaceRefresh,
+      refreshUndoAvailability,
+      sessionId,
+      setMessages,
+      workspaceId,
+    ],
+  );
+
+  useEffect(() => {
+    if (sessionId == null || !initialLoaded || isStreaming) return;
+    let cancelled = false;
+
+    void findActiveRunCursor(workspaceId, sessionId)
+      .then((cursor) => {
+        if (!cancelled && cursor) return recoverActiveRun(cursor);
+        return undefined;
+      })
+      .catch((recoveryError) => {
+        if (!cancelled) console.error("[chat] Failed to inspect active run:", recoveryError);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [initialLoaded, isStreaming, recoverActiveRun, sessionId, workspaceId]);
 
   useEffect(() => {
     onStreamingChange?.(isStreaming);
@@ -307,13 +470,44 @@ export function useChatConversation({
     }
     handledStreamErrorRef.current = { error, sessionId, workspaceId };
     setMessages(removeEmptyAssistantMessages);
-    // The stream may end before the client receives the tool output. Refresh
-    // from the server so committed Sheet transactions are reflected locally.
-    void Promise.resolve(onWorkspaceRefresh?.()).catch((refreshError) => {
-      console.error("[chat] Failed to refresh workspace after stream error:", refreshError);
+    let cancelled = false;
+    const recover = async () => {
+      if (sessionId == null) {
+        beginDraftSessionTransition();
+        return;
+      }
+
+      const cursor = activeRunRef.current ?? (await findActiveRunCursor(workspaceId, sessionId));
+      if (cancelled) return;
+      if (cursor) {
+        await recoverActiveRun(cursor);
+        return;
+      }
+
+      // There is no run to replay. Still refresh committed workbook state so
+      // a transport failure cannot hide a completed server-side mutation.
+      await onWorkspaceRefresh?.();
+      await refreshUndoAvailability();
+    };
+
+    void recover().catch((recoveryError) => {
+      if (!cancelled) {
+        console.error("[chat] Failed to recover disconnected run:", recoveryError);
+      }
     });
-    void refreshUndoAvailability();
-  }, [error, onWorkspaceRefresh, refreshUndoAvailability, sessionId, setMessages, workspaceId]);
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    beginDraftSessionTransition,
+    error,
+    onWorkspaceRefresh,
+    recoverActiveRun,
+    refreshUndoAvailability,
+    sessionId,
+    setMessages,
+    workspaceId,
+  ]);
 
   useEffect(() => {
     const toolCallIds = onSheetChanged
@@ -366,6 +560,7 @@ export function useChatConversation({
   const handleSend = useCallback(
     (text: string, references: ChatReferenceTarget[]) => {
       if (!text || isStreaming || isSendLocked()) return;
+      setStreamRecovered(false);
       invalidateUndoAvailability();
       if (references.length === 0) {
         sendMessage({ text });
@@ -433,7 +628,7 @@ export function useChatConversation({
   return {
     messages,
     historicalToolCallIds,
-    error,
+    error: streamRecovered ? null : error,
     canUndo,
     isStreaming,
     isDraftSessionTransitioning,

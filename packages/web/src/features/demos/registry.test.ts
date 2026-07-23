@@ -6,8 +6,14 @@ import { validateDemoDefinition } from "./runtime/validateDemoDefinition";
 
 describe("demo registry", () => {
   it("loads every active demo by its own route", async () => {
-    for (const entry of demoCatalog) {
-      const demo = await loadDemoDefinitionById(entry.id);
+    const loadedDemos = await Promise.all(
+      demoCatalog.map(async (entry) => ({
+        entry,
+        demo: await loadDemoDefinitionById(entry.id),
+      })),
+    );
+
+    for (const { entry, demo } of loadedDemos) {
       expect(demo?.id).toBe(entry.id);
       expect(routePaths.demo(entry.id)).toBe(`/demos/${entry.id}`);
       expect(demo).toBeTruthy();

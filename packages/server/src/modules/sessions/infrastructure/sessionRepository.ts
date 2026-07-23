@@ -52,6 +52,25 @@ export async function updateSession(
   return prisma.session.update({ where: { id: session.id }, data });
 }
 
+export async function updateSessionMessagesWithLease(data: {
+  workspaceId: number;
+  sessionId: number;
+  ownerId: string;
+  sessionVersion: number;
+  chatMessages: string;
+}) {
+  const result = await prisma.session.updateMany({
+    where: {
+      id: data.sessionId,
+      workspaceId: data.workspaceId,
+      leaseOwnerId: data.ownerId,
+      version: data.sessionVersion,
+    },
+    data: { chatMessages: data.chatMessages },
+  });
+  return result.count === 1;
+}
+
 export async function updateSessionNameIfUnchanged(
   id: number,
   workspaceId: number,

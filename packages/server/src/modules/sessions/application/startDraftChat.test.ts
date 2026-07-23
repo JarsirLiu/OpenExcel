@@ -46,13 +46,13 @@ describe("startDraftChat", () => {
   it("creates the session and starts its first stream in one use case", async () => {
     const stream = new ReadableStream();
     mocks.createSession.mockResolvedValue(session);
-    mocks.streamChat.mockResolvedValue(stream);
+    mocks.streamChat.mockResolvedValue({ stream, runId: 19 });
 
     const result = await startDraftChat(3, turn);
 
     expect(mocks.createSession).toHaveBeenCalledWith(3, "你好", "[]");
-    expect(mocks.streamChat).toHaveBeenCalledWith(3, 7, turn, undefined);
-    expect(result).toEqual({ session, stream });
+    expect(mocks.streamChat).toHaveBeenCalledWith(3, 7, turn);
+    expect(result).toEqual({ session, stream, runId: 19 });
     expect(mocks.deleteSession).not.toHaveBeenCalled();
   });
 

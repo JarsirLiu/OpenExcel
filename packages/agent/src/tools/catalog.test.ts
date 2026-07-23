@@ -44,6 +44,40 @@ describe("buildExcelToolCatalog", () => {
     expect(result.success).toBe(true);
   });
 
+  it("validates each flattened chart anchor shape", () => {
+    const base = {
+      workbookId: 1,
+      sheetId: 10,
+      type: "line" as const,
+      sourceRange: {
+        sheetId: 10,
+        startRow: 1,
+        startCol: 1,
+        endRow: 10,
+        endCol: 4,
+      },
+    };
+
+    expect(
+      excelToolSpecs.createChart.inputSchema.safeParse({
+        ...base,
+        anchor: { kind: "twoCell", from: { row: 1, col: 5 }, to: { row: 16, col: 12 } },
+      }).success,
+    ).toBe(true);
+    expect(
+      excelToolSpecs.createChart.inputSchema.safeParse({
+        ...base,
+        anchor: { kind: "absolute", xEmu: 0, yEmu: 0, widthEmu: 1000, heightEmu: 1000 },
+      }).success,
+    ).toBe(true);
+    expect(
+      excelToolSpecs.createChart.inputSchema.safeParse({
+        ...base,
+        anchor: { kind: "twoCell", from: { row: 1, col: 5 } },
+      }).success,
+    ).toBe(false);
+  });
+
   it("requires at least one style condition when finding cells by style", () => {
     expect(
       excelToolSpecs.findSheetCells.inputSchema.safeParse({

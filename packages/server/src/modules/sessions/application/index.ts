@@ -1,12 +1,14 @@
 export { streamChat } from "../chat/index.js";
 export { undoLatestRun } from "../runs/undo.js";
 export { getUndoAvailability } from "../runs/undoAvailability.js";
+export { cancelRun } from "./cancelRun.js";
 export {
   appendChatTurn,
   type ChatTurnRequest,
   chatTurnRequestSchema,
   parseChatTurnRequest,
 } from "./chatTurn.js";
+export { getRunEventPage, getRunReplaySnapshot } from "./queryRun.js";
 export {
   deleteSession,
   getMessages,

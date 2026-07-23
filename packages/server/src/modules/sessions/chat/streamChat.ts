@@ -20,15 +20,14 @@ import {
 } from "../application/chatTurn.js";
 import { extractMessageText } from "../application/messageText.js";
 import { scheduleSessionTitleGeneration } from "../application/title.js";
-import { getSessionMessages, persistSessionMessages } from "../application/transcript.js";
-import { SessionBusyError } from "../domain/sessionErrors.js";
 import { withSessionLock } from "../infrastructure/sessionLock.js";
 import * as repo from "../infrastructure/sessionRepository.js";
 import {
   createAgentPersistenceBarrier,
   createIdempotentToolExecutor,
 } from "../runs/agentPersistence.js";
-import * as runRepo from "../runs/repository.js";
+import { registerRunCancellation } from "../runs/cancellation.js";
+import { type AcquiredRunLease, acquireRunLease } from "../runs/runLease.js";
 import {
   clearSessionUndoCheckpoint,
   completeRunAndUpdateUndoCheckpoint,
@@ -36,48 +35,44 @@ import {
 import { loadWorkspaceChatContext } from "./context.js";
 import { resolveChatMessageReferences } from "./references.js";
 
-export async function streamChat(
-  workspaceId: number,
-  sessionId: number,
-  turn: ChatTurnRequest,
-  abortSignal?: AbortSignal,
-) {
+export async function streamChat(workspaceId: number, sessionId: number, turn: ChatTurnRequest) {
   const session = await repo.findSession(sessionId, workspaceId);
   if (!session) throw new Error("Session not found");
 
   const config = loadModelConfig();
   const workspace = await loadWorkspaceChatContext(workspaceId);
-  const canonicalMessages = await getSessionMessages(workspaceId, sessionId);
   const userMessage = toCanonicalUserMessage(turn);
-  const transcript = appendChatTurn(canonicalMessages, turn);
-  const resolvedMessages = resolveChatMessageReferences(transcript, workspace.workbooks);
   const inputText = extractMessageText(userMessage);
 
-  const run = await withSessionLock(sessionId, async () => {
-    const activeRun = await runRepo.findActiveRun(sessionId);
-    if (activeRun) {
-      if (runRepo.isRunStale(activeRun.startedAt)) {
-        await runRepo.markRunStale(activeRun.id);
-      } else {
-        throw new SessionBusyError();
-      }
-    }
-
-    await clearSessionUndoCheckpoint(workspaceId, sessionId);
-    await persistSessionMessages(workspaceId, sessionId, transcript);
-
-    return runRepo.createRun({
+  const lease: AcquiredRunLease = await withSessionLock(sessionId, () =>
+    acquireRunLease({
+      workspaceId,
       sessionId,
-      status: "running",
-      clientRequestId: turn.requestId,
-      model: config.modelName,
+      requestId: turn.requestId,
       inputText,
-    });
+      model: config.modelName,
+      appendUserTurn: (canonicalTranscript) =>
+        appendChatTurn(canonicalTranscript as Array<Record<string, unknown>>, turn),
+    }),
+  );
+  const transcript = lease.transcript as Array<Record<string, unknown>>;
+  const resolvedMessages = resolveChatMessageReferences(transcript, workspace.workbooks);
+  const run = lease.run;
+  try {
+    await clearSessionUndoCheckpoint(workspaceId, sessionId);
+  } catch (error) {
+    await lease.release();
+    throw error;
+  }
+
+  /* The lease transaction owns the canonical user turn. */
+  const cancellation = registerRunCancellation(run.id);
+  let leaseLost = false;
+  lease.startHeartbeat(() => {
+    leaseLost = true;
+    cancellation.abort(new Error("Agent run lease lost"));
   });
-  const toolsContext = {
-    ...buildWorkspaceToolContext(workspaceId),
-    ...buildRunToolContext(run.id, workspaceId),
-  };
+
   const toolResultBudget = new ToolResultBudget({
     totalTokens: config.toolResultBudgetTokens,
     maxResultTokens: config.toolResultMaxTokens,
@@ -89,6 +84,10 @@ export async function streamChat(
     toolResultBudget,
   );
   const toolNames = Object.keys(tools);
+  const toolsContext = {
+    ...buildWorkspaceToolContext(workspaceId),
+    ...buildRunToolContext(run.id, workspaceId),
+  };
   const executionContext = { toolContexts: toolsContext, resultBudget: toolResultBudget };
   const concreteToolExecutor: ToolExecutor = {
     execute: async (
@@ -126,12 +125,24 @@ export async function streamChat(
       await completeRunAndUpdateUndoCheckpoint(workspaceId, sessionId, run.id, data);
     } catch (error) {
       console.error(`[session] Failed to finalize run ${run.id}:`, error);
+    } finally {
+      try {
+        await lease.release();
+      } catch (error) {
+        console.error(`[session] Failed to release lease for run ${run.id}:`, error);
+      }
     }
   };
 
-  const persistTranscript = async (transcript: any[]) => {
-    await withSessionLock(sessionId, () =>
-      persistSessionMessages(workspaceId, sessionId, transcript),
+  const persistTranscript = async (messages: any[]) => {
+    return withSessionLock(sessionId, () =>
+      repo.updateSessionMessagesWithLease({
+        workspaceId,
+        sessionId,
+        ownerId: lease.ownerId,
+        sessionVersion: lease.sessionVersion,
+        chatMessages: JSON.stringify(messages),
+      }),
     );
   };
 
@@ -144,7 +155,7 @@ export async function streamChat(
   };
 
   try {
-    return await createAgentRunner({
+    const result = await createAgentRunner({
       modelConfig: config,
       transcript: resolvedMessages,
       workspace: workspace.workbooks,
@@ -164,52 +175,79 @@ export async function streamChat(
       prepareStep: async () => ({
         activeTools: toolNames.filter((name) => !toolResultBudget.isToolExhausted(name)) as any,
       }),
-      abortSignal,
+      abortSignal: cancellation.signal,
       onFinish: async ({ text }: any) => {
-        recordTerminalOutcome({
-          status: "completed",
-          outputText: typeof text === "string" && text.length > 0 ? text : null,
-        });
+        recordTerminalOutcome(
+          leaseLost
+            ? { status: "recovery_required", errorMessage: "运行租约丢失，等待恢复器检查" }
+            : {
+                status: "completed",
+                outputText: typeof text === "string" && text.length > 0 ? text : null,
+              },
+        );
       },
       onAbort: async () => {
-        recordTerminalOutcome({ status: "aborted" });
+        recordTerminalOutcome(
+          leaseLost
+            ? { status: "recovery_required", errorMessage: "运行租约丢失，等待恢复器检查" }
+            : { status: "cancelled" },
+        );
       },
       onError: async (error: any) => {
         const errorMessage = formatAIError(error);
         console.error(`[session] AI stream error for run ${run.id}: ${errorMessage}`);
         recordTerminalOutcome({
-          status: "error",
+          status: "failed",
           errorMessage,
         });
       },
       onEnd: async ({ messages: newMessages, isAborted }) => {
-        const outcome: {
+        let outcome: {
           status: string;
           outputText?: string | null;
           errorMessage?: string;
         } =
           terminalOutcome ??
-          (isAborted
-            ? { status: "aborted" }
-            : { status: "error", errorMessage: "对话流未正常结束" });
+          (leaseLost
+            ? { status: "recovery_required", errorMessage: "运行租约丢失，等待恢复器检查" }
+            : isAborted
+              ? { status: "cancelled" }
+              : { status: "failed", errorMessage: "对话流未正常结束" });
         const generatedMessages = newMessages.slice(resolvedMessages.length);
         const completedTranscript = removeEmptyAssistantMessages([
           ...transcript,
           ...generatedMessages,
         ]);
 
-        await persistTranscript(completedTranscript);
+        try {
+          const transcriptPersisted = await persistTranscript(completedTranscript);
+          if (!transcriptPersisted) {
+            outcome = {
+              status: "recovery_required",
+              errorMessage: "运行租约已失效，未覆盖后续会话消息",
+            };
+          }
+        } catch (error) {
+          console.error(`[session] Failed to persist transcript for run ${run.id}:`, error);
+          outcome = {
+            status: "persistence_failed",
+            errorMessage: "会话消息持久化失败，需要恢复后再继续",
+          };
+        }
 
-        scheduleSessionTitleGeneration(workspaceId, sessionId, inputText);
-
-        await finalizeRunOnce(outcome);
+        try {
+          scheduleSessionTitleGeneration(workspaceId, sessionId, inputText);
+        } finally {
+          await finalizeRunOnce(outcome);
+        }
       },
-    })
-      .run()
-      .then((result) => result.stream);
+    }).run();
+    void result.completion.finally(() => cancellation.close());
+    return { stream: result.stream, runId: run.id };
   } catch (error) {
+    cancellation.close();
     await finalizeRunOnce({
-      status: "error",
+      status: "failed",
       errorMessage: formatAIError(error),
     });
     throw error;

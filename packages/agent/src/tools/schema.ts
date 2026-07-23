@@ -51,26 +51,42 @@ const chartAnchorPointSchema = z.object({
   col: z.coerce.number().int().positive().describe("列号，从 1 开始"),
 });
 
-const chartAnchorSchema = z.discriminatedUnion("kind", [
-  z.object({
-    kind: z.literal("oneCell"),
-    from: chartAnchorPointSchema,
-    widthEmu: z.coerce.number().int().positive(),
-    heightEmu: z.coerce.number().int().positive(),
-  }),
-  z.object({
-    kind: z.literal("twoCell"),
-    from: chartAnchorPointSchema,
-    to: chartAnchorPointSchema,
-  }),
-  z.object({
-    kind: z.literal("absolute"),
-    xEmu: z.coerce.number().int().nonnegative(),
-    yEmu: z.coerce.number().int().nonnegative(),
-    widthEmu: z.coerce.number().int().positive(),
-    heightEmu: z.coerce.number().int().positive(),
-  }),
-]);
+const chartAnchorSchema = z
+  .object({
+    kind: z
+      .enum(["oneCell", "twoCell", "absolute"])
+      .describe("锚点类型：oneCell、twoCell 或 absolute"),
+    from: chartAnchorPointSchema.optional().describe("oneCell/twoCell 的左上角单元格"),
+    to: chartAnchorPointSchema.optional().describe("twoCell 的右下角单元格"),
+    widthEmu: z.coerce.number().int().positive().optional().describe("oneCell/absolute 宽度"),
+    heightEmu: z.coerce.number().int().positive().optional().describe("oneCell/absolute 高度"),
+    xEmu: z.coerce.number().int().nonnegative().optional().describe("absolute 的水平位置"),
+    yEmu: z.coerce.number().int().nonnegative().optional().describe("absolute 的垂直位置"),
+  })
+  .superRefine((anchor, ctx) => {
+    const requireField = (field: keyof typeof anchor, message: string) => {
+      if (anchor[field] === undefined) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: [field], message });
+      }
+    };
+
+    if (anchor.kind === "oneCell") {
+      requireField("from", "oneCell 锚点需要 from");
+      requireField("widthEmu", "oneCell 锚点需要 widthEmu");
+      requireField("heightEmu", "oneCell 锚点需要 heightEmu");
+    } else if (anchor.kind === "twoCell") {
+      requireField("from", "twoCell 锚点需要 from");
+      requireField("to", "twoCell 锚点需要 to");
+    } else {
+      requireField("xEmu", "absolute 锚点需要 xEmu");
+      requireField("yEmu", "absolute 锚点需要 yEmu");
+      requireField("widthEmu", "absolute 锚点需要 widthEmu");
+      requireField("heightEmu", "absolute 锚点需要 heightEmu");
+    }
+  })
+  .describe(
+    "使用扁平对象传递图表位置，避免 oneOf。oneCell 需要 kind/from/widthEmu/heightEmu；twoCell 需要 kind/from/to；absolute 需要 kind/xEmu/yEmu/widthEmu/heightEmu。行列号从 1 开始。",
+  );
 
 const chartRangeSchema = z
   .object({
@@ -377,7 +393,7 @@ export const excelToolSpecs = {
   },
   createChart: {
     description:
-      "在工作簿中创建真实 Excel 图表。传入一个连续数据源矩形范围即可，系统会按 Excel 规则将首行作为系列标题、首列作为分类并生成多个系列；单行和单列范围也支持。创建组合图时可额外传入 seriesTypes 指定每个系列为 bar、line 或 area，但不需要传入具体数据值。图表、系列和引用会作为独立对象保存，并可随工作簿导出为 XLSX；行列号从 1 开始，Sheet ID 必须是真实 ID。",
+      '在工作簿中创建真实 Excel 图表。传入一个连续数据源矩形范围即可，系统会按 Excel 规则将首行作为系列标题、首列作为分类并生成多个系列；单行和单列范围也支持。anchor 必须是扁平对象，推荐使用 twoCell，例如 { kind: "twoCell", from: { row: 2, col: 8 }, to: { row: 16, col: 14 } }，不要传字符串范围或嵌套 oneOf。创建组合图时可额外传入 seriesTypes 指定每个系列为 bar、line 或 area，但不需要传入具体数据值。图表、系列和引用会作为独立对象保存，并可随工作簿导出为 XLSX；行列号从 1 开始，Sheet ID 必须是真实 ID。',
     needsRunContext: true,
     inputSchema: chartCreateSchema,
   },

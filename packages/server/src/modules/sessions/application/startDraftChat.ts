@@ -7,16 +7,7 @@ import { toCanonicalUserMessage } from "./chatTurn.js";
 import { extractMessageText } from "./messageText.js";
 import { fallbackTitleFromPrompt } from "./title.js";
 
-export async function startDraftChat(
-  workspaceId: number,
-  turn: ChatTurnRequest,
-  options: { abortSignal?: AbortSignal } = {},
-) {
-  const { abortSignal } = options;
-  if (abortSignal?.aborted) {
-    throw new Error("Chat request aborted");
-  }
-
+export async function startDraftChat(workspaceId: number, turn: ChatTurnRequest) {
   if (turn.requestId) {
     const existingRun = await runRepo.findRunByClientRequestId(workspaceId, turn.requestId);
     if (existingRun) {
@@ -33,8 +24,8 @@ export async function startDraftChat(
   );
 
   try {
-    const stream = await streamChat(workspaceId, session.id, turn, abortSignal);
-    return { session, stream };
+    const result = await streamChat(workspaceId, session.id, turn);
+    return { session, ...result };
   } catch (error) {
     await repo.deleteSession(session.id, workspaceId);
     if (turn.requestId) {

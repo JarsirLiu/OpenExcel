@@ -29,6 +29,23 @@ function isUndoConflict(error: unknown): boolean {
   );
 }
 
+function parseRunId(value: string): number | null {
+  const runId = Number(value);
+  return Number.isInteger(runId) && runId > 0 ? runId : null;
+}
+
+function parseEventCursor(value: string | undefined): number | null {
+  if (value == null || value === "") return -1;
+  const cursor = Number(value);
+  return Number.isInteger(cursor) && cursor >= -1 ? cursor : null;
+}
+
+function parseEventLimit(value: string | undefined): number | null {
+  if (value == null || value === "") return 200;
+  const limit = Number(value);
+  return Number.isInteger(limit) && limit > 0 ? Math.min(limit, 500) : null;
+}
+
 export async function sessionRoutes(app: FastifyInstance) {
   app.get<{ Params: { workspacePublicId: string } }>(
     "/api/workspaces/:workspacePublicId/sessions",
@@ -60,32 +77,14 @@ export async function sessionRoutes(app: FastifyInstance) {
     } catch {
       return reply.status(400).send({ error: "聊天请求格式无效" });
     }
-    const controller = new AbortController();
-    const abort = () => {
-      if (!controller.signal.aborted) controller.abort();
-    };
-
-    req.raw.on("aborted", abort);
-    reply.raw.on("close", () => {
-      if (!reply.raw.writableEnded) abort();
-    });
-
-    let sessionId: number | null = null;
     try {
-      const result = await application.startDraftChat(workspaceId, turn, {
-        abortSignal: controller.signal,
-      });
-      sessionId = result.session.id;
-
-      if (controller.signal.aborted) {
-        await application.deleteSession(workspaceId, sessionId);
-        return;
-      }
+      const result = await application.startDraftChat(workspaceId, turn);
 
       // The stream is written directly to the raw response after hijacking;
       // Fastify reply headers would otherwise be skipped.
-      reply.raw.setHeader("X-OpenExcel-Session-Id", String(sessionId));
+      reply.raw.setHeader("X-OpenExcel-Session-Id", String(result.session.id));
       reply.raw.setHeader("X-OpenExcel-Session-Name", encodeURIComponent(result.session.name));
+      reply.raw.setHeader("X-OpenExcel-Run-Id", String(result.runId));
       reply.hijack();
       pipeUIMessageStreamToResponse({
         response: reply.raw,
@@ -93,10 +92,6 @@ export async function sessionRoutes(app: FastifyInstance) {
         consumeSseStream: consumeStream,
       });
     } catch (error) {
-      if (controller.signal.aborted) {
-        if (sessionId != null) await application.deleteSession(workspaceId, sessionId);
-        return;
-      }
       if (error instanceof SessionBusyError) {
         return reply.status(error.statusCode).send({ error: error.message });
       }
@@ -176,6 +171,87 @@ export async function sessionRoutes(app: FastifyInstance) {
       const session = await application.getSession(ids.workspaceId, ids.sessionId);
       if (!session) return reply.status(404).send({ error: "Session not found" });
       return application.getRuns(ids.workspaceId, ids.sessionId);
+    },
+  );
+
+  app.get<{
+    Params: { workspacePublicId: string; sessionPublicId: string; runId: string };
+  }>(
+    "/api/workspaces/:workspacePublicId/sessions/:sessionPublicId/runs/:runId",
+    async (req, reply) => {
+      const ids = await resolveSessionIdForRequest(
+        req,
+        req.params.workspacePublicId,
+        req.params.sessionPublicId,
+        reply,
+      );
+      if (ids == null) return;
+
+      const runId = parseRunId(req.params.runId);
+      if (runId == null) return reply.status(400).send({ error: "运行 ID 无效" });
+
+      const run = await application.getRunReplaySnapshot(ids.workspaceId, ids.sessionId, runId);
+      if (!run) return reply.status(404).send({ error: "Run not found" });
+      return run;
+    },
+  );
+
+  app.get<{
+    Params: { workspacePublicId: string; sessionPublicId: string; runId: string };
+    Querystring: { after?: string; limit?: string };
+  }>(
+    "/api/workspaces/:workspacePublicId/sessions/:sessionPublicId/runs/:runId/events",
+    async (req, reply) => {
+      const ids = await resolveSessionIdForRequest(
+        req,
+        req.params.workspacePublicId,
+        req.params.sessionPublicId,
+        reply,
+      );
+      if (ids == null) return;
+
+      const runId = parseRunId(req.params.runId);
+      if (runId == null) return reply.status(400).send({ error: "运行 ID 无效" });
+      const afterSequence = parseEventCursor(req.query.after);
+      if (afterSequence == null) return reply.status(400).send({ error: "事件游标无效" });
+      const limit = parseEventLimit(req.query.limit);
+      if (limit == null) return reply.status(400).send({ error: "事件数量无效" });
+
+      const page = await application.getRunEventPage({
+        workspaceId: ids.workspaceId,
+        sessionId: ids.sessionId,
+        runId,
+        afterSequence,
+        limit,
+      });
+      if (!page) return reply.status(404).send({ error: "Run not found" });
+      return page;
+    },
+  );
+
+  app.post<{
+    Params: { workspacePublicId: string; sessionPublicId: string; runId: string };
+  }>(
+    "/api/workspaces/:workspacePublicId/sessions/:sessionPublicId/runs/:runId/cancel",
+    async (req, reply) => {
+      const ids = await resolveSessionIdForRequest(
+        req,
+        req.params.workspacePublicId,
+        req.params.sessionPublicId,
+        reply,
+      );
+      if (ids == null) return;
+      const session = await application.getSession(ids.workspaceId, ids.sessionId);
+      if (!session) return reply.status(404).send({ error: "Session not found" });
+
+      const runId = Number(req.params.runId);
+      if (!Number.isInteger(runId) || runId <= 0) {
+        return reply.status(400).send({ error: "运行 ID 无效" });
+      }
+
+      const result = await application.cancelRun(ids.workspaceId, ids.sessionId, runId);
+      if (!result) return reply.status(404).send({ error: "Run not found" });
+      return result;
     },
   );
 
@@ -271,36 +347,16 @@ export async function sessionRoutes(app: FastifyInstance) {
     } catch {
       return reply.status(400).send({ error: "聊天请求格式无效" });
     }
-    const controller = new AbortController();
-
-    const abort = () => {
-      if (!controller.signal.aborted) controller.abort();
-    };
-
-    req.raw.on("aborted", abort);
-    reply.raw.on("close", () => {
-      if (!reply.raw.writableEnded) {
-        abort();
-      }
-    });
-
     try {
-      const stream = await application.streamChat(
-        ids.workspaceId,
-        sessionId,
-        turn,
-        controller.signal,
-      );
-
-      if (controller.signal.aborted) return;
+      const result = await application.streamChat(ids.workspaceId, sessionId, turn);
+      reply.raw.setHeader("X-OpenExcel-Run-Id", String(result.runId));
       reply.hijack();
       pipeUIMessageStreamToResponse({
         response: reply.raw,
-        stream,
+        stream: result.stream,
         consumeSseStream: consumeStream,
       });
     } catch (error) {
-      if (controller.signal.aborted) return;
       if (error instanceof SessionBusyError) {
         return reply.status(error.statusCode).send({ error: error.message });
       }

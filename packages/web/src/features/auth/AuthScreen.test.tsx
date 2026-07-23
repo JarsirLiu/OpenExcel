@@ -14,8 +14,7 @@ describe("AuthScreen", () => {
     vi.stubGlobal("IntersectionObserver", IntersectionObserverMock);
   });
 
-  it("keeps public cases available without promotional navigation", async () => {
-    await import("./MarketingShowcase");
+  it("renders the login screen without promotional navigation", () => {
     render(
       <MemoryRouter initialEntries={["/"]}>
         <AuthScreen
@@ -30,10 +29,9 @@ describe("AuthScreen", () => {
       </MemoryRouter>,
     );
     expect(
-      await screen.findByRole("heading", {
-        name: /让 AI 辅助您的数据分析和处理工作/,
-      }),
+      screen.getByRole("heading", { name: "AI 操控 Excel，表格工作事半功倍" }),
     ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "登录" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "真实案例" })).not.toBeInTheDocument();
     expect(window.location.pathname).not.toBe("/login");
   });

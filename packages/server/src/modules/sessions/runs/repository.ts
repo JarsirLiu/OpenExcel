@@ -1,5 +1,6 @@
 import { prisma } from "../../../infra/database/db.js";
 import type { Prisma } from "../../../infra/database/prismaTypes.js";
+import { assertRunStatusTransition, type RunStatus } from "./status.js";
 
 const STALE_RUN_AFTER_MS = 5 * 60 * 1000;
 
@@ -7,7 +8,7 @@ export type RunSheetSnapshotKind = "created" | "restorable";
 
 export async function createRun(data: {
   sessionId: number;
-  status: string;
+  status: RunStatus;
   clientRequestId?: string;
   model?: string;
   systemPrompt?: string;
@@ -33,23 +34,70 @@ export async function findActiveRun(sessionId: number) {
   });
 }
 
+export async function findRunForSession(workspaceId: number, sessionId: number, runId: number) {
+  return prisma.agentRun.findFirst({
+    where: { id: runId, sessionId, session: { workspaceId } },
+  });
+}
+
+export async function findRunReplaySnapshot(workspaceId: number, sessionId: number, runId: number) {
+  return prisma.agentRun.findFirst({
+    where: { id: runId, sessionId, session: { workspaceId } },
+    select: {
+      id: true,
+      status: true,
+      clientRequestId: true,
+      startedAt: true,
+      endedAt: true,
+      outputText: true,
+      errorMessage: true,
+      cancelRequestedAt: true,
+      lastEventSequence: true,
+    },
+  });
+}
+
 export function isRunStale(startedAt: Date, now = Date.now()) {
   return now - startedAt.getTime() >= STALE_RUN_AFTER_MS;
 }
 
 export async function markRunStale(id: number) {
-  return prisma.agentRun.update({
-    where: { id },
-    data: {
-      status: "error",
-      errorMessage: "运行超时，服务已回收未完成的运行记录",
-      endedAt: new Date(),
-    },
+  return transitionRunStatus(id, "recovery_required", {
+    errorMessage: "运行超时，服务已回收未完成的运行记录",
+    endedAt: new Date(),
   });
 }
 
 export async function updateRun(id: number, data: Record<string, unknown>) {
+  if (typeof data.status === "string") {
+    const current = await prisma.agentRun.findUnique({ where: { id }, select: { status: true } });
+    if (!current) return null;
+    assertRunStatusTransition(current.status, data.status as RunStatus);
+  }
   return prisma.agentRun.update({ where: { id }, data });
+}
+
+export async function transitionRunStatus(
+  id: number,
+  status: RunStatus,
+  data: Record<string, unknown> = {},
+) {
+  return updateRun(id, { ...data, status });
+}
+
+export async function requestRunCancellation(id: number) {
+  return prisma.agentRun.updateMany({
+    where: { id, status: "running", cancelRequestedAt: null },
+    data: { cancelRequestedAt: new Date() },
+  });
+}
+
+export async function isRunCancellationRequested(id: number) {
+  const run = await prisma.agentRun.findUnique({
+    where: { id },
+    select: { cancelRequestedAt: true },
+  });
+  return run?.cancelRequestedAt != null;
 }
 
 export async function findRun(id: number) {
@@ -67,7 +115,7 @@ export async function findUndoCheckpointRun(workspaceId: number, sessionId: numb
     where: {
       id: session.undoRunId,
       sessionId: session.id,
-      status: { in: ["completed", "aborted", "error"] },
+      status: { in: ["completed", "cancelled", "failed"] },
       OR: [
         { snapshots: { some: {} } },
         { chartSnapshots: { some: {} } },
@@ -162,7 +210,25 @@ export async function upsertRunSheetSnapshot(data: {
   config: string | null;
   kind: RunSheetSnapshotKind;
 }) {
-  return prisma.agentRunSheetSnapshot.upsert({
+  return upsertRunSheetSnapshotUsing(prisma, data);
+}
+
+type RunSnapshotDatabase = Pick<
+  Prisma.TransactionClient,
+  "agentRunSheetSnapshot" | "agentRunChartSnapshot" | "agentRunChartSnapshotSheet"
+>;
+
+async function upsertRunSheetSnapshotUsing(
+  db: RunSnapshotDatabase,
+  data: {
+    runId: number;
+    sheetId: number;
+    uploadedData: string | null;
+    config: string | null;
+    kind: RunSheetSnapshotKind;
+  },
+) {
+  return db.agentRunSheetSnapshot.upsert({
     where: {
       runId_sheetId: {
         runId: data.runId,
@@ -214,35 +280,48 @@ export async function upsertRunChartSnapshot(data: {
   order: number;
   spec: string | null;
 }) {
-  return prisma.$transaction(async (tx) => {
-    const existing = await tx.agentRunChartSnapshot.findUnique({
-      where: {
-        runId_chartId: {
-          runId: data.runId,
-          chartId: data.chartId,
-        },
-      },
-    });
-    if (existing) return existing;
+  return prisma.$transaction((tx) => upsertRunChartSnapshotUsing(tx, data));
+}
 
-    const snapshot = await tx.agentRunChartSnapshot.create({
-      data: {
+async function upsertRunChartSnapshotUsing(
+  db: RunSnapshotDatabase,
+  data: {
+    runId: number;
+    chartId: string;
+    workbookId: number;
+    sheetId: number;
+    sheetIds: number[];
+    order: number;
+    spec: string | null;
+  },
+) {
+  const existing = await db.agentRunChartSnapshot.findUnique({
+    where: {
+      runId_chartId: {
         runId: data.runId,
         chartId: data.chartId,
-        workbookId: data.workbookId,
-        sheetId: data.sheetId,
-        order: data.order,
-        spec: data.spec,
       },
-    });
-    const sheetIds = [...new Set(data.sheetIds)];
-    if (sheetIds.length > 0) {
-      await tx.agentRunChartSnapshotSheet.createMany({
-        data: sheetIds.map((sheetId) => ({ snapshotId: snapshot.id, sheetId })),
-      });
-    }
-    return snapshot;
+    },
   });
+  if (existing) return existing;
+
+  const snapshot = await db.agentRunChartSnapshot.create({
+    data: {
+      runId: data.runId,
+      chartId: data.chartId,
+      workbookId: data.workbookId,
+      sheetId: data.sheetId,
+      order: data.order,
+      spec: data.spec,
+    },
+  });
+  const sheetIds = [...new Set(data.sheetIds)];
+  if (sheetIds.length > 0) {
+    await db.agentRunChartSnapshotSheet.createMany({
+      data: sheetIds.map((sheetId) => ({ snapshotId: snapshot.id, sheetId })),
+    });
+  }
+  return snapshot;
 }
 
 type SnapshotQueryClient = Pick<
@@ -263,7 +342,7 @@ async function findRunsWithSnapshotsForSheetsUsing(
       sheetId: { in: sheetIds },
       run: {
         undoInvalidated: false,
-        status: { in: ["running", "completed", "aborted", "error"] },
+        status: { in: ["running", "completed", "cancelled", "failed"] },
         session: { workspaceId },
         ...(originRunId == null ? {} : { id: { not: originRunId } }),
       },
@@ -277,7 +356,7 @@ async function findRunsWithSnapshotsForSheetsUsing(
       snapshot: {
         run: {
           undoInvalidated: false,
-          status: { in: ["running", "completed", "aborted", "error"] },
+          status: { in: ["running", "completed", "cancelled", "failed"] },
           session: { workspaceId },
           ...(originRunId == null ? {} : { id: { not: originRunId } }),
         },

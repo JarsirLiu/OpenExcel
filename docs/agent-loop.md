@@ -18,8 +18,8 @@
 > 服务端从持久化会话恢复上下文，调用 `packages/agent` 的 AgentRunner 执行完整 Agent loop，
 > 保存运行结果，再通过流式事件通知前端。
 
-本文档替代旧的“前端提交完整 AI SDK messages，由服务端直接转发给 Agent”的规划。旧协议只能作为
-迁移期间的兼容输入，不能作为最终架构。
+本文档替代旧的“前端提交完整 AI SDK messages，由服务端直接转发给 Agent”的规划。旧协议不再接受，
+必须在 HTTP 边界直接返回 400。
 
 ## 1. 当前基线
 
@@ -58,7 +58,16 @@
 
 本阶段已经补齐 AgentEvent 和 AgentToolExecution 的基础服务端持久化。事件持久化适配器会在同一事务中写入
 AgentEvent 和对应 AgentStep；工具账本会对 `(runId, toolCallId)` 做参数校验、完成结果回放和 stale running 回收。
-断流回放、工具副作用与账本的同事务提交、以及独立取消接口仍按后续迁移阶段执行。
+本阶段还未完成断流回放、持久化失败诊断和进程恢复；基础独立取消接口、数据库级 session lease，以及有副作用工具各自的短事务与幂等账本已落地，跨进程取消仍按后续迁移阶段执行。
+
+### 1.2 本轮已落地：运行生命周期与取消边界
+
+- `AgentRun` 使用受限状态转换：`running` 只能进入 `completed`、`cancelled`、`failed`、
+  `persistence_failed` 或 `recovery_required`；撤销只允许把已结束运行标记为 `reverted`。
+- `cancelRequestedAt` 是服务端取消意图的持久化标记。取消接口重复调用不会重复执行取消动作，终态运行也不会被改写。
+- `POST .../runs/:runId/cancel` 是唯一的显式取消入口。它先更新数据库，再通知当前进程中的 Agent；Agent 在模型调用和工具执行边界收到 `AbortSignal` 后结束为 `cancelled`。
+- SSE/HTTP 响应断开不再调用 Agent 的 `AbortController`。AI SDK 的独立消费支路继续驱动服务端运行，连接断开只影响订阅者。
+- 当前取消信号在本进程通过注册表即时唤醒，并周期性读取数据库标记；跨进程运行租约、进程退出恢复和事件回放仍未完成。
 
 ## 2. 不可违反的职责边界
 
@@ -395,6 +404,7 @@ GET  /api/workspaces/:workspacePublicId/sessions/:sessionPublicId/runs/:runId/ev
 - cancel 接口只接受显式用户取消命令，必须鉴权、幂等，并返回当前 run 状态。
 - run 查询返回状态、错误分类、最后事件序号、受影响资源版本和是否需要恢复。
 - events 接口必须鉴权并按 workspace/session/run 校验归属；浏览器只能读取经过授权的事件投影。
+- web 的中断按钮必须使用响应头保存的 session/run ID 调用 cancel 接口，再停止本地流；组件卸载和普通断流仍不能调用 cancel。
 - 连接断开不调用 cancel 接口；重连使用 run 查询和事件游标恢复 UI。
 
 ## 5. Agent 执行生命周期
@@ -674,8 +684,9 @@ model AgentToolExecution {
 `AgentEvent` 是流回放日志，`AgentToolExecution` 是工具副作用幂等账本，二者都不能被浏览器写入。
 工具执行记录必须先进入 `running`。当前实现已经在工具执行前占用幂等键，在完成后保存结构化结果；遇到
 `completed` 直接复用结果，参数不一致拒绝执行，短时间内的 `running` 拒绝并发重复调用，超时 `running` 才允许回收。
-下一阶段要把账本完成状态、工作簿修改、撤销快照和 canonical tool-result transcript 收敛到同一数据库事务；在此之前，
-有副作用的 Sheet 工具继续依赖现有 mutation receipt 做第二层幂等保护。
+当前有副作用的 Sheet、Workbook 和 Chart Agent 工具由各自的 server application/service 管理短事务；
+工具账本通过 mutation receipt 和 stale running 回收保持幂等，不把数据库 transaction 注入 Agent 或通用工具执行上下文。
+canonical tool-result transcript 仍由 Agent event/persistence 边界负责，后续继续补齐事件回放和持久化失败诊断。
 
 `AgentRun` 至少要能区分以下状态：
 
@@ -685,6 +696,8 @@ model AgentToolExecution {
 
 `detached` 只表示没有当前浏览器订阅者，不表示 Agent 已停止。所有终态必须有 `endedAt`、最终事件和
 错误分类（如果有）；状态转换必须由服务端按允许的状态图执行，不能由前端提交状态。
+
+当前实现已为 `AgentRun` 增加 `cancelRequestedAt DateTime?`，用于持久化显式取消意图；它不属于 `Session`，也不由浏览器直接修改运行状态。
 
 `AgentRun` 还必须保存或可查询以下运行控制字段：`requestId`、请求体哈希、`ownerId`、`leaseExpiresAt`、
 `heartbeatAt`、`lastEventSequence`、`startedAt`、`endedAt` 和错误分类。`requestId` 在草稿阶段按 workspace
@@ -723,6 +736,10 @@ model AgentToolExecution {
 
 - workspace context 加载、引用解析和资源授权。
 - 创建 `AgentRunner` 的服务端适配器、`ToolExecutor` 和持久化端口。
+
+其中 `runs/agentPersistence.ts` 只负责 server 侧的持久化适配：记录工具执行账本、回放已完成调用、
+并在失败时标记执行失败；具体 sheet 副作用仍由 `sheets/tools/runSheetMutation.ts` 和 sheets application 完成。
+该适配器不负责模型循环、上下文裁剪或工具选择。
 - 协调 Agent 事件、transcript、run/step 和 HTTP stream。
 - 不实现模型循环、上下文裁剪、重试退避或停止条件。
 
@@ -796,11 +813,11 @@ model AgentToolExecution {
 这一阶段先完成 `packages/agent` 内部重构，再扩展 server 的事件持久化。目标是让 Agent
 内核可以在没有 HTTP、Prisma 和 React 的环境中独立测试和运行：
 
-当前状态：内核边界和服务端基础持久化已落地。`AgentRunner` 已收敛为 facade，模型/工具循环位于
+当前状态：内核边界、服务端基础持久化和基础运行取消边界已落地。`AgentRunner` 已收敛为 facade，模型/工具循环位于
 `runtime/agentLoop.ts`；工具定义通过 `AgentToolDefinition` 注入，具体执行通过
 `ToolExecutor` 注入；事件通过 `PersistenceBarrier` 确认后才广播；UI stream 与
-运行 completion 已分离。server 的 `agentPersistence` 适配器已接入事件落库、步骤事务落库和工具完成结果回放；当前仍待
-工具副作用与账本的同事务提交、事件回放接口、断流恢复和独立取消，因此本阶段完成不代表整套 Agent 重构已经完成。
+运行 completion 已分离。server 的 `agentPersistence` 适配器已接入事件落库、步骤事务落库和工具完成结果回放。
+本轮进入运行可靠性阶段：数据库级 session run lease 和有副作用工具事务已落地，随后继续处理工具失败诊断、事件回放和进程恢复。
 
 - 将 `AgentRunner` 收敛为 facade，模型/工具循环移动到 `runtime/agentLoop.ts`。
 - 在 `runtime/contracts.ts` 定义 `ToolExecutor`、`AgentEventSink`、`PersistenceBarrier`、
@@ -815,7 +832,35 @@ model AgentToolExecution {
 - 为 AgentRunner、agentLoop、toolAdapter、事件顺序、取消和持久化 barrier 增加包内测试，
   测试不得依赖 server 数据库或 HTTP。
 
-这一阶段不新增浏览器上下文能力，也不把数据库模型直接引入 `packages/agent`。
+#### Phase 1.5a：数据库级运行租约（当前实施项）
+
+运行租约属于 `packages/server` 的运行控制层，不属于 Agent 内核。它解决的是同一个 session
+在多请求、多进程下只能有一个 Agent loop 持有执行权的问题。
+
+`Session` 保存当前 session lease：
+
+- `leaseOwnerId`：随机生成的运行 owner token，不使用进程名或用户可控值。
+- `leaseExpiresAt`：租约过期时间。
+- `leaseHeartbeatAt`：最近一次续租时间。
+- `version`：单调递增的 session 版本。
+
+`AgentRun` 同时保存取得租约时的 `ownerId`、`sessionVersion`、`leaseExpiresAt`、`heartbeatAt`
+和 `lastEventSequence`，用于诊断、恢复和事件断点。创建 run 的事务顺序固定为：
+
+1. 读取并校验 workspace/session 归属和 requestId 幂等记录。
+2. 判断 session lease 是否为空或已过期；未过期则返回 busy。
+3. 过期 lease 对应的 `running` run 先转为 `recovery_required`，不能静默覆盖。
+4. 条件更新 session lease 并递增 `version`；更新条数必须为 1。
+5. 在同一事务中从数据库读取 canonical transcript，追加本轮 user message，写回 transcript，创建 `running` AgentRun。
+
+续租和释放都必须带 `sessionId + ownerId + sessionVersion` 条件。续租失败表示 owner 已失效，
+Agent loop 必须停止；释放只清理自己持有的 lease，不能清理后来 owner 的 lease。进程内
+`withSessionLock` 只能降低同进程竞争，不能作为正确性保证。
+
+本阶段验收：两个并发请求最多一个拿到 lease；过期 lease 只能被一个请求接管；旧 owner
+不能续租或释放新 owner 的 lease；同一事务失败时 transcript、run 和 lease 不得部分提交。
+
+这一阶段不新增浏览器上下文能力，也不把数据库模型直接引入 `packages/agent`。取消标记、状态转换和取消信号属于 server 的运行控制层，Agent 只接收抽象的 `AbortSignal`。
 
 ### Phase 2：前端切换单轮请求
 
@@ -831,12 +876,60 @@ model AgentToolExecution {
 - 增加并验收 run event replay 接口、Last-Event-ID/cursor 和终态快照。
 - 不让浏览器通过重发 transcript 恢复 Agent loop。
 
+#### 3.1 当前回放接口契约
+
+服务端提供两个只读接口，二者都先通过 workspace/session 资源边界校验 run 所属关系：
+
+```text
+GET /api/workspaces/:workspacePublicId/sessions/:sessionPublicId/runs/:runId
+GET /api/workspaces/:workspacePublicId/sessions/:sessionPublicId/runs/:runId/events?after=<sequence>&limit=<n>
+```
+
+run 快照只返回运行状态、时间、终态输出/错误、取消标记和 `lastEventSequence`，不返回
+system prompt、模型上下文或工具定义。事件接口按 `sequence > after` 查询，默认从头回放，单页最多
+500 条，并返回：
+
+```json
+{
+  "run": { "runId": 12, "status": "completed", "terminal": true },
+  "events": [{ "eventId": "...", "sequence": 3, "type": "run.completed", "payload": {} }],
+  "cursor": { "after": 3, "lastEventSequence": 3 },
+  "hasMore": false
+}
+```
+
+前端只保存已经应用的 sequence，断流后使用该 cursor 请求下一页；收到重复请求或重连时，服务端的
+`sequence > after` 条件保证不会返回 cursor 之前的事件。终态快照与事件页一起返回，前端不需要通过
+重发用户消息来判断运行是否结束，也不得因为 SSE 断开再次启动模型或工具。
+
+#### 3.2 当前前端断流恢复流程
+
+流式响应建立后，服务端通过 `X-OpenExcel-Run-Id` 返回本次 `AgentRun` 的 ID；该响应头与草稿会话头
+一起通过 CORS 暴露。浏览器只把它作为恢复索引保存，不把它转换为模型输入。
+
+恢复由 `packages/web/src/features/chat/hooks/runRecovery.ts` 负责：
+
+1. SSE/transport 断开时，使用当前 `runId` 和已应用的 `after` 游标读取事件页。
+2. 每次响应只推进到服务端返回的最大 sequence；重复事件不会回退游标，也不会触发工具执行。
+3. 运行未终止时按固定短间隔重新查询；运行终止后读取服务端 canonical messages，并刷新 workbook。
+   达到恢复期限仍未终止时必须保留错误/恢复中状态，不能调用 settled 回调或隐藏错误。
+4. 页面重新进入已有 session 时，先查询 session 下仍为 `running` 的 run，执行相同的恢复流程。
+5. 草稿请求断流时先完成服务端 session 激活；后续 session 页面通过运行记录发现该 run，不重发用户消息。
+
+恢复过程不使用浏览器内存中的完整 transcript 作为事实来源，不向 chat endpoint 重发任何历史消息，
+也不从 `AgentEvent.payload` 重新执行工具。事件回放只用于推进诊断/恢复游标，最终消息展示以服务端
+持久化 transcript 为准。
+
 ### Phase 4：协议收紧与可靠性补齐
 
 - 删除旧的 `{ messages: [] }` 请求兼容分支。
 - 将 `AgentStep.type/status` 收敛为受限类型并在边界校验。
 - AgentEvent 和 AgentToolExecution 的正式基础持久化已启用，不允许用浏览器 transcript 替代它们。
 - 将工具账本、工作簿副作用、撤销快照和 canonical tool-result transcript 放入同一事务，并补充事件游标回放、断流恢复和显式 cancel。
+
+当前进度：Phase 1.5a 的数据库级 session lease 已落地；Sheet、Workbook 和 Chart 的有副作用 Agent 工具保留各自
+application/service 的短事务，并通过 mutation receipt 与工具账本实现幂等；run 快照、事件游标回放接口和前端断流恢复接入已落地，
+跨进程 stale run 恢复、恢复超时后的人工诊断入口和真正的跨进程 Agent run 接管仍待完成。
 
 ## 11. 验收标准
 
