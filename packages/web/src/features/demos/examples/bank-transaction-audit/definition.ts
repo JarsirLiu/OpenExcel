@@ -1,4 +1,5 @@
 import type { DemoDefinition } from "../../runtime/replayTypes";
+import { expandDemoWorkbooksForPresentation } from "../scenarioFactory";
 import { bankAuditInitialWorkbooks, bankAuditPrompt, bankAuditTimeline } from "./fixtures";
 
 export const bankTransactionAuditDemo: DemoDefinition = {
@@ -21,7 +22,7 @@ export const bankTransactionAuditDemo: DemoDefinition = {
   },
   sessionName: "银行流水智能核查 Demo",
   prompt: bankAuditPrompt,
-  initialWorkbooks: bankAuditInitialWorkbooks,
+  initialWorkbooks: expandDemoWorkbooksForPresentation(bankAuditInitialWorkbooks),
   timeline: bankAuditTimeline,
   playback: {
     textTokenDelay: 22,

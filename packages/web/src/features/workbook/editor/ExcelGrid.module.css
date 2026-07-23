@@ -8,6 +8,43 @@
   position: relative;
 }
 
+.container::after {
+  content: "";
+  position: absolute;
+  z-index: 4;
+  inset: 86px 8px 28px 46px;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  pointer-events: none;
+}
+
+.demoFocusActive::after {
+  animation: demo-focus-pulse 920ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes demo-focus-pulse {
+  0% {
+    border-color: rgba(67, 112, 79, 0);
+    box-shadow: 0 0 0 0 rgba(67, 112, 79, 0);
+  }
+
+  32% {
+    border-color: rgba(67, 112, 79, 0.72);
+    box-shadow: 0 0 0 5px rgba(67, 112, 79, 0.09);
+  }
+
+  100% {
+    border-color: rgba(67, 112, 79, 0);
+    box-shadow: 0 0 0 12px rgba(67, 112, 79, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .demoFocusActive::after {
+    animation-duration: 1ms;
+  }
+}
+
 .inner {
   flex: 1;
   min-height: 0;

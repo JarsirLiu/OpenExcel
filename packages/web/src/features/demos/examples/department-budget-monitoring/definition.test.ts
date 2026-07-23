@@ -14,7 +14,7 @@ describe("department budget monitoring demo", () => {
     ]);
     expect(sheets[0].rows).toHaveLength(37);
     expect(sheets[1].rows).toHaveLength(217);
-    expect(sheets[2].rows).toHaveLength(19);
+    expect(sheets[2].rows).toHaveLength(36);
     expect(sheets[3].rows).toHaveLength(73);
 
     const writeStep = departmentBudgetMonitoringDemo.timeline.find(

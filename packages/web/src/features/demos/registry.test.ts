@@ -14,6 +14,14 @@ describe("demo registry", () => {
       if (demo) {
         expect(demo.marketing).toEqual(entry.marketing);
         expect(validateDemoDefinition(demo)).toEqual([]);
+        for (const workbook of demo.initialWorkbooks) {
+          for (const sheet of workbook.sheets) {
+            const hasSourceData = sheet.rows
+              .slice(1)
+              .some((row) => row.some((cell) => cell.value !== ""));
+            if (hasSourceData) expect(sheet.rows.length).toBeGreaterThanOrEqual(36);
+          }
+        }
       }
     }
   });

@@ -1,5 +1,6 @@
 import type { WorkbookFull } from "@/api/workbooks";
 import type { WorkbookStructureUpdate } from "@/features/sync/types";
+import type { DemoGridFocus } from "@/features/workbook/editor/demoGridFocus";
 import { ExcelGrid } from "@/features/workbook/editor/ExcelGrid";
 import styles from "./ExcelWorkspace.module.css";
 
@@ -14,6 +15,7 @@ interface Props {
   onWorkbookRefresh?: () => Promise<void>;
   onWorkbookMutation?: () => Promise<void> | void;
   onSheetRevisionChanged?: (sheetId: number, revision: number) => void;
+  demoGridFocus?: DemoGridFocus;
 }
 
 export function ExcelWorkspace({
@@ -27,6 +29,7 @@ export function ExcelWorkspace({
   onWorkbookRefresh,
   onWorkbookMutation,
   onSheetRevisionChanged,
+  demoGridFocus,
 }: Props) {
   return (
     <div className={styles.container}>
@@ -42,6 +45,7 @@ export function ExcelWorkspace({
           onWorkbookRefresh={onWorkbookRefresh}
           onWorkbookMutation={onWorkbookMutation}
           onSheetRevisionChanged={onSheetRevisionChanged}
+          demoGridFocus={demoGridFocus}
         />
       </div>
     </div>

@@ -13,7 +13,7 @@ describe("research fund execution demo", () => {
     ]);
     expect(sheets[0].rows).toHaveLength(37);
     expect(sheets[1].rows).toHaveLength(217);
-    expect(sheets[2].rows).toHaveLength(13);
+    expect(sheets[2].rows).toHaveLength(36);
 
     const writeStep = researchFundExecutionDemo.timeline.find(
       (step) => step.id === "write-results",

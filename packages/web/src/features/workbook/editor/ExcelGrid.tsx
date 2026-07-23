@@ -5,6 +5,7 @@ import type { WorkbookFull } from "@/api/workbooks";
 import type { WorkbookStructureUpdate } from "@/features/sync/types";
 import { ChartOverlay } from "@/features/workbook/charts/ChartOverlay";
 import { useChartInsertion } from "@/features/workbook/charts/useChartInsertion";
+import { type DemoGridFocus, useDemoGridFocus } from "./demoGridFocus";
 import styles from "./ExcelGrid.module.css";
 import { useFortuneSheetFilterMenu } from "./fortuneSheetFilterMenu";
 import { useExcelGridWorkspace } from "./useExcelGridWorkspace";
@@ -63,6 +64,7 @@ interface Props {
   onWorkbookRefresh?: () => Promise<void> | void;
   onWorkbookMutation?: () => Promise<void> | void;
   onSheetRevisionChanged?: (sheetId: number, revision: number) => void;
+  demoGridFocus?: DemoGridFocus;
 }
 
 export function ExcelGrid({
@@ -76,6 +78,7 @@ export function ExcelGrid({
   onWorkbookRefresh,
   onWorkbookMutation,
   onSheetRevisionChanged,
+  demoGridFocus,
 }: Props) {
   const gridRootRef = useRef<HTMLDivElement>(null);
   const {
@@ -104,6 +107,11 @@ export function ExcelGrid({
   });
   useFortuneSheetFilterMenu(gridRootRef, workbook !== null);
   useFortuneSheetWheel(gridRootRef, workbook !== null);
+  const isDemoFocusActive = useDemoGridFocus({
+    workbookRef,
+    focus: demoGridFocus,
+    sessionKey,
+  });
 
   const { dialog, handleSelectionChange, toolbarItems } = useChartInsertion({
     workspaceId,
@@ -150,7 +158,10 @@ export function ExcelGrid({
   const currentSheetLayout = currentSheet ? layoutBySheetId[String(currentSheet.id)] : undefined;
 
   return (
-    <div ref={gridRootRef} className={styles.container}>
+    <div
+      ref={gridRootRef}
+      className={`${styles.container} ${isDemoFocusActive ? styles.demoFocusActive : ""}`}
+    >
       <div className={styles.inner}>
         <Workbook
           key={`${workbook.id}:${sessionKey}`}

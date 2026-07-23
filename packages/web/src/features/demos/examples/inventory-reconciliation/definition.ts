@@ -1,4 +1,5 @@
 import type { DemoDefinition } from "../../runtime/replayTypes";
+import { expandDemoWorkbooksForPresentation } from "../scenarioFactory";
 import {
   inventoryInitialWorkbooks,
   inventoryReconciliationPrompt,
@@ -25,7 +26,7 @@ export const inventoryReconciliationDemo: DemoDefinition = {
   },
   sessionName: "进销存核对 Demo",
   prompt: inventoryReconciliationPrompt,
-  initialWorkbooks: inventoryInitialWorkbooks,
+  initialWorkbooks: expandDemoWorkbooksForPresentation(inventoryInitialWorkbooks),
   timeline: inventoryTimeline,
   playback: {
     textTokenDelay: 24,

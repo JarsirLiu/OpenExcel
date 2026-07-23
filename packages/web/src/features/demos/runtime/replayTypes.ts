@@ -92,3 +92,10 @@ export type DemoDefinition = {
 };
 
 export type PlaybackPhase = "idle" | "text" | "tool" | "result" | "done";
+
+export type DemoReplayFocus = {
+  workbookName: string;
+  sheetName: string;
+  range?: string;
+  sequence: number;
+};

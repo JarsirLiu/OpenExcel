@@ -18,6 +18,7 @@ export function useDemoReplay(scenario: DemoDefinition) {
   const [currentTool, setCurrentTool] = useState<"input" | "output" | null>(null);
   const [assistantParts, setAssistantParts] = useState<DemoAssistantPart[]>([]);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [focusSequence, setFocusSequence] = useState(0);
   const steps = scenario.timeline;
   const playback = useMemo(() => resolveDemoPlayback(scenario.playback), [scenario.playback]);
   const currentStep = stepIndex >= 0 ? steps[stepIndex] : null;
@@ -57,6 +58,7 @@ export function useDemoReplay(scenario: DemoDefinition) {
       setTextOffset(0);
       setCurrentTool(null);
       setPhase("text");
+      setFocusSequence((sequence) => sequence + 1);
       setAssistantParts((parts) => [
         ...(clearParts ? [] : parts),
         { type: "text", partId: `demo-text-${step.id}`, stepId: step.id, text: "" },
@@ -192,6 +194,21 @@ export function useDemoReplay(scenario: DemoDefinition) {
     );
   }, [currentStep, phase, textOffset]);
 
+  const focus = useMemo(
+    () =>
+      currentStep && (currentStep.activeWorkbook || currentStep.activeSheet)
+        ? {
+            workbookName:
+              currentStep.activeWorkbook ?? scenario.initialWorkbooks[0]?.name ?? "当前文件",
+            sheetName:
+              currentStep.activeSheet ?? scenario.initialWorkbooks[0]?.sheets[0]?.name ?? "Sheet1",
+            ...(currentStep.highlight ? { range: currentStep.highlight } : {}),
+            sequence: focusSequence,
+          }
+        : null,
+    [currentStep, focusSequence, scenario.initialWorkbooks],
+  );
+
   return {
     workbooks,
     workbookRevision,
@@ -200,6 +217,7 @@ export function useDemoReplay(scenario: DemoDefinition) {
       [assistantParts, scenario.prompt],
     ),
     isPlaying,
+    focus,
     start,
     stop: useCallback(() => setIsPlaying(false), []),
     reset,

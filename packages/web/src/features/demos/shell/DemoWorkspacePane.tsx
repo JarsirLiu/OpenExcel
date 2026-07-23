@@ -1,11 +1,11 @@
-import { type ComponentProps, memo, useCallback, useMemo, useState } from "react";
+import { type ComponentProps, memo, useCallback, useEffect, useMemo, useState } from "react";
 import type { WorkbookMeta } from "@/api/workbooks";
 import type { Workspace } from "@/api/workspaces";
 import workbenchStyles from "@/app/Workbench.module.css";
 import { SheetActivationProvider } from "@/features/workbook/editor/SheetActivationContext";
 import { WorkspaceSidebar } from "@/features/workspace/WorkspaceSidebar";
 import { WorkspaceView } from "@/features/workspace/WorkspaceView";
-import type { DemoDefinition, DemoWorkbook } from "../runtime/replayTypes";
+import type { DemoDefinition, DemoReplayFocus, DemoWorkbook } from "../runtime/replayTypes";
 import { toWorkbook } from "../runtime/replayWorkbookProjection";
 
 type Props = {
@@ -13,6 +13,7 @@ type Props = {
   scenario: DemoDefinition;
   workbooks: DemoWorkbook[];
   workbookRevision: number;
+  focus: DemoReplayFocus | null;
 };
 
 const DemoWorkspaceView = memo(function DemoWorkspaceView(
@@ -30,6 +31,7 @@ export const DemoWorkspacePane = memo(function DemoWorkspacePane({
   scenario,
   workbooks,
   workbookRevision,
+  focus,
 }: Props) {
   const [currentWorkbookIndex, setCurrentWorkbookIndex] = useState(0);
   const [currentSheetIndex, setCurrentSheetIndex] = useState(0);
@@ -68,6 +70,26 @@ export const DemoWorkspacePane = memo(function DemoWorkspacePane({
   const handleWorkbookNoop = useCallback(async () => undefined, []);
   const handleStructureNoop = useCallback(() => undefined, []);
   const demoWorkspace = scenario.workspace as Workspace;
+  const gridFocus = useMemo(() => {
+    if (!focus) return undefined;
+    const workbookIndex = workbooks.findIndex((workbook) => workbook.name === focus.workbookName);
+    const workbook = workbooks[workbookIndex];
+    const sheetIndex = workbook?.sheets.findIndex((sheet) => sheet.name === focus.sheetName) ?? -1;
+    if (workbookIndex < 0 || sheetIndex < 0 || workbookIndex !== currentWorkbookIndex) {
+      return undefined;
+    }
+    return { sheetIndex, range: focus.range, sequence: focus.sequence };
+  }, [currentWorkbookIndex, focus, workbooks]);
+
+  useEffect(() => {
+    if (!focus) return;
+    const workbookIndex = workbooks.findIndex((workbook) => workbook.name === focus.workbookName);
+    const workbook = workbooks[workbookIndex];
+    const sheetIndex = workbook?.sheets.findIndex((sheet) => sheet.name === focus.sheetName) ?? -1;
+    if (workbookIndex < 0 || sheetIndex < 0) return;
+    setCurrentWorkbookIndex(workbookIndex);
+    setCurrentSheetIndex(sheetIndex);
+  }, [focus, workbooks]);
 
   return (
     <>
@@ -104,6 +126,7 @@ export const DemoWorkspacePane = memo(function DemoWorkspacePane({
           handleWorkbookRefresh={handleWorkbookNoop}
           onWorkbookMutation={handleWorkbookNoop}
           presentationMode
+          demoGridFocus={gridFocus}
         />
         <div className={workbenchStyles.resizeHandle} />
       </div>

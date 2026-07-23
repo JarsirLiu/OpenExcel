@@ -1,6 +1,7 @@
 import { useRef } from "react";
 import type { WorkbookFull } from "@/api/workbooks";
 import type { WorkbookStructureUpdate } from "@/features/sync/types";
+import type { DemoGridFocus } from "@/features/workbook/editor/demoGridFocus";
 import { t } from "@/lib/i18n";
 import { ExcelWorkspace } from "../workbook/ui/ExcelWorkspace";
 import { WorkbookHeader } from "../workbook/ui/WorkbookHeader";
@@ -30,6 +31,7 @@ type Props = {
   onWorkbookMutation?: () => Promise<void> | void;
   onSheetRevisionChanged?: (sheetId: number, revision: number) => void;
   presentationMode?: boolean;
+  demoGridFocus?: DemoGridFocus;
 };
 
 export function WorkspaceView({
@@ -50,6 +52,7 @@ export function WorkspaceView({
   onWorkbookMutation,
   onSheetRevisionChanged,
   presentationMode = false,
+  demoGridFocus,
 }: Props) {
   const newWbInputRef = useRef<HTMLInputElement>(null);
 
@@ -93,6 +96,7 @@ export function WorkspaceView({
           onWorkbookRefresh={handleWorkbookRefresh}
           onWorkbookMutation={onWorkbookMutation}
           onSheetRevisionChanged={onSheetRevisionChanged}
+          demoGridFocus={demoGridFocus}
         />
       </div>
     </div>

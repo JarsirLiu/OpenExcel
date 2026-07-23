@@ -19,6 +19,7 @@ export function DemoPage({ scenario }: { scenario: DemoDefinition }) {
         scenario={scenario}
         workbooks={replay.workbooks}
         workbookRevision={replay.workbookRevision}
+        focus={replay.focus}
       />
       <DemoChatSidebar
         scenario={scenario}

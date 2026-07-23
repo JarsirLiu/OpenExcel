@@ -5,9 +5,11 @@ import type {
   DemoPatch,
   DemoSheet,
   DemoStep,
+  DemoWorkbook,
 } from "../runtime/replayTypes";
 
 const headerBackground = "#DCE6F1";
+export const demoPresentationRowCount = 36;
 
 export function demoCell(value: string | number, options: Omit<DemoCell, "value"> = {}): DemoCell {
   return { value, ...options };
@@ -27,6 +29,81 @@ export function resultCell(
     danger: "#FCE8E6",
   };
   return demoCell(value, { background: backgrounds[tone] });
+}
+
+function clonePresentationCell(
+  cell: DemoCell,
+  columnIndex: number,
+  sourceRowIndex: number,
+  sampleIndex: number,
+  sourceRowCount: number,
+): DemoCell {
+  if (cell.formula || cell.value === "") return { ...cell };
+
+  if (typeof cell.value === "number") {
+    const variationSeed = (sampleIndex * 17 + columnIndex * 7 + sourceRowIndex * 3) % 11;
+    const variedValue = cell.value * (1 + (variationSeed - 5) / 100);
+    const value = Number.isInteger(cell.value)
+      ? Math.round(variedValue)
+      : Number(variedValue.toFixed(cell.numberFormat?.includes("%") ? 4 : 2));
+    return { ...cell, value };
+  }
+
+  if (columnIndex !== 0) return { ...cell };
+
+  const trailingNumber = cell.value.match(/^(.*?)(\d+)$/);
+  if (trailingNumber) {
+    const [, prefix, digits] = trailingNumber;
+    return {
+      ...cell,
+      value: `${prefix}${String(Number(digits) + sampleIndex * sourceRowCount).padStart(
+        digits.length,
+        "0",
+      )}`,
+    };
+  }
+
+  return { ...cell, value: `${cell.value} · 样本${String(sampleIndex).padStart(2, "0")}` };
+}
+
+export function expandDemoSheetForPresentation(
+  sheet: DemoSheet,
+  minimumRows = demoPresentationRowCount,
+): DemoSheet {
+  if (sheet.rows.length >= minimumRows || sheet.rows.length === 0) return sheet;
+
+  const hasHeader =
+    sheet.rows[0]?.length === sheet.columns.length &&
+    sheet.rows[0]?.every((cell, index) => String(cell.value) === sheet.columns[index]);
+  const headerRows = hasHeader ? sheet.rows.slice(0, 1) : [];
+  const dataRows = sheet.rows.slice(headerRows.length);
+  if (dataRows.length === 0 || dataRows.every((row) => row.every((cell) => cell.value === ""))) {
+    return sheet;
+  }
+
+  const rows = [...headerRows, ...dataRows];
+  let sampleIndex = 1;
+  while (rows.length < minimumRows) {
+    const sourceRowIndex = (sampleIndex - 1) % dataRows.length;
+    const sourceRow = dataRows[sourceRowIndex];
+    rows.push(
+      sourceRow.map((cell, columnIndex) =>
+        clonePresentationCell(cell, columnIndex, sourceRowIndex, sampleIndex, dataRows.length),
+      ),
+    );
+    sampleIndex += 1;
+  }
+
+  return { ...sheet, rows };
+}
+
+export function expandDemoWorkbooksForPresentation(
+  workbooks: readonly DemoWorkbook[],
+): DemoWorkbook[] {
+  return workbooks.map((workbook) => ({
+    ...workbook,
+    sheets: workbook.sheets.map((sheet) => expandDemoSheetForPresentation(sheet)),
+  }));
 }
 
 type ScenarioSheet = {
@@ -164,7 +241,10 @@ export function createAnalysisScenario(config: AnalysisScenarioConfig): DemoDefi
       {
         name: config.workbookName,
         publicId: `demo-${config.id}-workbook`,
-        sheets: [...config.sourceSheets.map(withHeader), blankResultSheet(config.resultSheet)],
+        sheets: [
+          ...config.sourceSheets.map((sheet) => expandDemoSheetForPresentation(withHeader(sheet))),
+          blankResultSheet(config.resultSheet),
+        ],
       },
     ],
     timeline,
