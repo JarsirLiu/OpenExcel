@@ -19,7 +19,7 @@ export function ChatPanel({
   sessionId: number | null;
   isDraft?: boolean;
   onDraftSessionCreated?: (sessionId: number) => Promise<void> | void;
-  onRunSettled?: (sessionId: number, messages: any[]) => Promise<void> | void;
+  onRunSettled?: (sessionId: number) => Promise<void> | void;
   onRegenerate?: () => void;
 }) {
   const {
@@ -52,9 +52,9 @@ export function ChatPanel({
     workspaceId,
     onDraftSessionCreated,
     initialMessages,
-    onRunSettled: (finishedMessages) => {
+    onRunSettled: () => {
       if (sessionId == null) return;
-      return onRunSettled?.(sessionId, finishedMessages);
+      return onRunSettled?.(sessionId);
     },
     onWorkspaceRefresh,
     onSheetChanged,

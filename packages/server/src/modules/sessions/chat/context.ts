@@ -1,9 +1,7 @@
 import type { WorkspaceWorkbookSummary } from "@openexcel/agent";
-import { buildWorkspaceContext as buildAgentWorkspaceContext } from "@openexcel/agent";
 import * as workbookRepo from "../../workbooks/infrastructure/workbookRepository.js";
 
 export async function loadWorkspaceChatContext(workspaceId: number): Promise<{
-  prompt: string;
   workbooks: WorkspaceWorkbookSummary[];
 }> {
   const workbooks = await workbookRepo.findWorkbooksWithSheets(workspaceId);
@@ -18,12 +16,6 @@ export async function loadWorkspaceChatContext(workspaceId: number): Promise<{
   }));
 
   return {
-    prompt: buildAgentWorkspaceContext(summaries),
     workbooks: summaries,
   };
-}
-
-export async function buildWorkspaceContext(workspaceId: number): Promise<string> {
-  const context = await loadWorkspaceChatContext(workspaceId);
-  return context.prompt;
 }

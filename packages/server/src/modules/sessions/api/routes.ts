@@ -6,6 +6,7 @@ import {
   resolveWorkspaceIdForRequest,
 } from "../../../middleware/resourceAccess.js";
 import { SheetRevisionConflictError } from "../../sheets/domain/errors.js";
+import { type ChatTurnRequest, parseChatTurnRequest } from "../application/chatTurn.js";
 import * as application from "../application/index.js";
 import { DraftRequestConflictError, SessionBusyError } from "../domain/sessionErrors.js";
 
@@ -44,7 +45,7 @@ export async function sessionRoutes(app: FastifyInstance) {
 
   app.post<{
     Params: { workspacePublicId: string };
-    Body: { messages: any[] };
+    Body: unknown;
   }>("/api/workspaces/:workspacePublicId/sessions/draft/chat", async (req, reply) => {
     const workspaceId = await resolveWorkspaceIdForRequest(
       req,
@@ -53,11 +54,12 @@ export async function sessionRoutes(app: FastifyInstance) {
     );
     if (workspaceId == null) return;
 
-    const { messages } = req.body;
-    const clientRequestId = req.headers["idempotency-key"];
-    const normalizedClientRequestId = Array.isArray(clientRequestId)
-      ? clientRequestId[0]
-      : clientRequestId;
+    let turn: ChatTurnRequest;
+    try {
+      turn = parseChatTurnRequest(req.body);
+    } catch {
+      return reply.status(400).send({ error: "聊天请求格式无效" });
+    }
     const controller = new AbortController();
     const abort = () => {
       if (!controller.signal.aborted) controller.abort();
@@ -70,9 +72,8 @@ export async function sessionRoutes(app: FastifyInstance) {
 
     let sessionId: number | null = null;
     try {
-      const result = await application.startDraftChat(workspaceId, messages, {
+      const result = await application.startDraftChat(workspaceId, turn, {
         abortSignal: controller.signal,
-        clientRequestId: normalizedClientRequestId,
       });
       sessionId = result.session.id;
 
@@ -252,7 +253,7 @@ export async function sessionRoutes(app: FastifyInstance) {
 
   app.post<{
     Params: { workspacePublicId: string; sessionPublicId: string };
-    Body: { messages: any[] };
+    Body: unknown;
   }>("/api/workspaces/:workspacePublicId/sessions/:sessionPublicId/chat", async (req, reply) => {
     const ids = await resolveSessionIdForRequest(
       req,
@@ -264,7 +265,12 @@ export async function sessionRoutes(app: FastifyInstance) {
     const sessionId = ids.sessionId;
     const session = await application.getSession(ids.workspaceId, sessionId);
     if (!session) return reply.status(404).send({ error: "Session not found" });
-    const { messages } = req.body;
+    let turn: ChatTurnRequest;
+    try {
+      turn = parseChatTurnRequest(req.body);
+    } catch {
+      return reply.status(400).send({ error: "聊天请求格式无效" });
+    }
     const controller = new AbortController();
 
     const abort = () => {
@@ -282,7 +288,7 @@ export async function sessionRoutes(app: FastifyInstance) {
       const stream = await application.streamChat(
         ids.workspaceId,
         sessionId,
-        messages,
+        turn,
         controller.signal,
       );
 

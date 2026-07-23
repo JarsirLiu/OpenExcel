@@ -1,11 +1,11 @@
 import {
-  buildExcelToolCatalog,
+  buildExcelToolDefinitions,
   buildRunToolContext,
-  buildSystemPrompt,
   buildWorkspaceToolContext,
+  createAgentRunner,
   formatAIError,
   removeEmptyAssistantMessages,
-  streamChat as streamAgentChat,
+  type ToolExecutor,
   ToolResultBudget,
   wrapToolSetWithResultBudget,
 } from "@openexcel/agent";
@@ -13,12 +13,21 @@ import { loadModelConfig } from "../../../config.js";
 import { chartTools } from "../../charts/tools/index.js";
 import { excelTools } from "../../sheets/tools/index.js";
 import { workbookTools } from "../../workbooks/tools/index.js";
-import { extractFirstUserText, extractLatestUserText } from "../application/messageText.js";
+import {
+  appendChatTurn,
+  type ChatTurnRequest,
+  toCanonicalUserMessage,
+} from "../application/chatTurn.js";
+import { extractMessageText } from "../application/messageText.js";
 import { scheduleSessionTitleGeneration } from "../application/title.js";
-import { persistSessionMessages } from "../application/transcript.js";
+import { getSessionMessages, persistSessionMessages } from "../application/transcript.js";
 import { SessionBusyError } from "../domain/sessionErrors.js";
 import { withSessionLock } from "../infrastructure/sessionLock.js";
 import * as repo from "../infrastructure/sessionRepository.js";
+import {
+  createAgentPersistenceBarrier,
+  createIdempotentToolExecutor,
+} from "../runs/agentPersistence.js";
 import * as runRepo from "../runs/repository.js";
 import {
   clearSessionUndoCheckpoint,
@@ -27,35 +36,22 @@ import {
 import { loadWorkspaceChatContext } from "./context.js";
 import { resolveChatMessageReferences } from "./references.js";
 
-function serializeJson(value: unknown): string | null {
-  if (value === undefined) return null;
-  try {
-    return JSON.stringify(value);
-  } catch {
-    try {
-      return JSON.stringify(String(value));
-    } catch {
-      return null;
-    }
-  }
-}
-
 export async function streamChat(
   workspaceId: number,
   sessionId: number,
-  messages: any[],
+  turn: ChatTurnRequest,
   abortSignal?: AbortSignal,
-  options: { clientRequestId?: string } = {},
 ) {
   const session = await repo.findSession(sessionId, workspaceId);
   if (!session) throw new Error("Session not found");
 
   const config = loadModelConfig();
   const workspace = await loadWorkspaceChatContext(workspaceId);
-  const resolvedMessages = resolveChatMessageReferences(messages, workspace.workbooks);
-  const workspaceContext = workspace.prompt;
-  const systemPrompt = buildSystemPrompt(workspaceContext, buildExcelToolCatalog());
-  const inputText = extractLatestUserText(resolvedMessages);
+  const canonicalMessages = await getSessionMessages(workspaceId, sessionId);
+  const userMessage = toCanonicalUserMessage(turn);
+  const transcript = appendChatTurn(canonicalMessages, turn);
+  const resolvedMessages = resolveChatMessageReferences(transcript, workspace.workbooks);
+  const inputText = extractMessageText(userMessage);
 
   const run = await withSessionLock(sessionId, async () => {
     const activeRun = await runRepo.findActiveRun(sessionId);
@@ -68,13 +64,13 @@ export async function streamChat(
     }
 
     await clearSessionUndoCheckpoint(workspaceId, sessionId);
+    await persistSessionMessages(workspaceId, sessionId, transcript);
 
     return runRepo.createRun({
       sessionId,
       status: "running",
-      clientRequestId: options.clientRequestId,
+      clientRequestId: turn.requestId,
       model: config.modelName,
-      systemPrompt,
       inputText,
     });
   });
@@ -93,6 +89,28 @@ export async function streamChat(
     toolResultBudget,
   );
   const toolNames = Object.keys(tools);
+  const executionContext = { toolContexts: toolsContext, resultBudget: toolResultBudget };
+  const concreteToolExecutor: ToolExecutor = {
+    execute: async (
+      toolName: string,
+      input: unknown,
+      options: { toolCallId: string; abortSignal?: AbortSignal; context: unknown },
+    ) => {
+      const tool = (
+        tools as Record<string, { execute?: (value: unknown, options: unknown) => unknown }>
+      )[toolName];
+      if (!tool || typeof tool.execute !== "function") {
+        throw new Error(`Tool ${toolName} is not executable`);
+      }
+      const context = executionContext.toolContexts[toolName];
+      return tool.execute(input, {
+        toolCallId: options.toolCallId,
+        abortSignal: options.abortSignal,
+        context,
+      });
+    },
+  };
+  const toolExecutor = createIdempotentToolExecutor(run.id, concreteToolExecutor);
 
   let finalized = false;
   let terminalOutcome: {
@@ -100,7 +118,6 @@ export async function streamChat(
     outputText?: string | null;
     errorMessage?: string;
   } | null = null;
-  let stepOrder = 0;
 
   const finalizeRunOnce = async (data: Record<string, unknown>) => {
     if (finalized) return;
@@ -113,47 +130,9 @@ export async function streamChat(
   };
 
   const persistTranscript = async (transcript: any[]) => {
-    try {
-      await withSessionLock(sessionId, () =>
-        persistSessionMessages(workspaceId, sessionId, transcript),
-      );
-    } catch (error) {
-      console.error(`[session] Failed to persist transcript for session ${sessionId}:`, error);
-    }
-  };
-
-  // Persist the submitted turn before generation starts. This keeps the user
-  // message recoverable even if model setup or the network fails immediately.
-  await persistTranscript(removeEmptyAssistantMessages(messages));
-
-  const persistStepOnce = async (step: any) => {
-    try {
-      await withSessionLock(sessionId, () =>
-        runRepo.createStep({
-          runId: run.id,
-          type: String(step?.stepType ?? "step"),
-          status:
-            Array.isArray(step?.toolResults) &&
-            step.toolResults.some((result: any) => result?.isError)
-              ? "error"
-              : String(step?.finishReason ?? "completed"),
-          content: typeof step?.text === "string" ? step.text : null,
-          toolName: Array.isArray(step?.toolCalls)
-            ? step.toolCalls
-                .map((call: any) => call?.toolName)
-                .filter(
-                  (name: unknown): name is string => typeof name === "string" && name.length > 0,
-                )
-                .join(",") || null
-            : null,
-          input: serializeJson(step?.toolCalls ?? []),
-          output: serializeJson(step?.toolResults ?? []),
-          order: stepOrder++,
-        }),
-      );
-    } catch (error) {
-      console.error(`[session] Failed to persist step for run ${run.id}:`, error);
-    }
+    await withSessionLock(sessionId, () =>
+      persistSessionMessages(workspaceId, sessionId, transcript),
+    );
   };
 
   const recordTerminalOutcome = (outcome: {
@@ -165,10 +144,10 @@ export async function streamChat(
   };
 
   try {
-    return await streamAgentChat({
+    return await createAgentRunner({
       modelConfig: config,
-      systemPrompt,
-      messages: resolvedMessages,
+      transcript: resolvedMessages,
+      workspace: workspace.workbooks,
       maxRetries: config.maxRetries,
       contextWindowTokens: config.contextWindowTokens,
       outputReserveTokens: config.outputReserveTokens,
@@ -178,13 +157,14 @@ export async function streamChat(
         totalMs: config.timeoutMs,
         chunkMs: config.chunkTimeoutMs,
       },
-      tools: tools as any,
-      toolsContext,
+      tools: buildExcelToolDefinitions(),
+      toolExecutor,
+      executionContext,
+      persistenceBarrier: createAgentPersistenceBarrier(run.id),
       prepareStep: async () => ({
         activeTools: toolNames.filter((name) => !toolResultBudget.isToolExhausted(name)) as any,
       }),
       abortSignal,
-      onStepFinish: persistStepOnce,
       onFinish: async ({ text }: any) => {
         recordTerminalOutcome({
           status: "completed",
@@ -212,19 +192,21 @@ export async function streamChat(
           (isAborted
             ? { status: "aborted" }
             : { status: "error", errorMessage: "对话流未正常结束" });
-        const transcript = removeEmptyAssistantMessages(newMessages);
+        const generatedMessages = newMessages.slice(resolvedMessages.length);
+        const completedTranscript = removeEmptyAssistantMessages([
+          ...transcript,
+          ...generatedMessages,
+        ]);
 
-        await persistTranscript(transcript);
+        await persistTranscript(completedTranscript);
 
-        scheduleSessionTitleGeneration(
-          workspaceId,
-          sessionId,
-          extractFirstUserText(transcript) || extractLatestUserText(messages),
-        );
+        scheduleSessionTitleGeneration(workspaceId, sessionId, inputText);
 
         await finalizeRunOnce(outcome);
       },
-    });
+    })
+      .run()
+      .then((result) => result.stream);
   } catch (error) {
     await finalizeRunOnce({
       status: "error",

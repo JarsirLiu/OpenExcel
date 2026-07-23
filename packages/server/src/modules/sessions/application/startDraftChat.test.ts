@@ -19,6 +19,14 @@ vi.mock("../runs/repository.js", () => ({
 import { startDraftChat } from "./startDraftChat.js";
 
 describe("startDraftChat", () => {
+  const turn = {
+    requestId: "request-1",
+    message: {
+      messageId: "message-1",
+      role: "user" as const,
+      parts: [{ type: "text" as const, text: "你好" }],
+    },
+  };
   const session = {
     id: 7,
     publicId: "session-7",
@@ -40,20 +48,10 @@ describe("startDraftChat", () => {
     mocks.createSession.mockResolvedValue(session);
     mocks.streamChat.mockResolvedValue(stream);
 
-    const result = await startDraftChat(3, [{ role: "user", content: "你好" }]);
+    const result = await startDraftChat(3, turn);
 
-    expect(mocks.createSession).toHaveBeenCalledWith(
-      3,
-      "你好",
-      JSON.stringify([{ role: "user", content: "你好" }]),
-    );
-    expect(mocks.streamChat).toHaveBeenCalledWith(
-      3,
-      7,
-      [{ role: "user", content: "你好" }],
-      undefined,
-      { clientRequestId: undefined },
-    );
+    expect(mocks.createSession).toHaveBeenCalledWith(3, "你好", "[]");
+    expect(mocks.streamChat).toHaveBeenCalledWith(3, 7, turn, undefined);
     expect(result).toEqual({ session, stream });
     expect(mocks.deleteSession).not.toHaveBeenCalled();
   });
@@ -63,7 +61,7 @@ describe("startDraftChat", () => {
     mocks.createSession.mockResolvedValue(session);
     mocks.streamChat.mockRejectedValue(error);
 
-    await expect(startDraftChat(3, [])).rejects.toBe(error);
+    await expect(startDraftChat(3, turn)).rejects.toBe(error);
 
     expect(mocks.deleteSession).toHaveBeenCalledWith(7, 3);
   });
@@ -71,11 +69,7 @@ describe("startDraftChat", () => {
   it("rejects a duplicate first-message request before creating another session", async () => {
     mocks.findRunByClientRequestId.mockResolvedValue({ sessionId: 11 });
 
-    await expect(
-      startDraftChat(3, [{ role: "user", content: "你好" }], {
-        clientRequestId: "request-1",
-      }),
-    ).rejects.toMatchObject({
+    await expect(startDraftChat(3, turn)).rejects.toMatchObject({
       code: "DRAFT_REQUEST_ALREADY_PROCESSED",
       sessionId: 11,
     });

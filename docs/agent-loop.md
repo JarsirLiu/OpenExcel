@@ -46,6 +46,20 @@
 
 因此当前实现是过渡状态，不能把“前端提交 transcript”视为目标架构。
 
+### 1.1 第一阶段已落地
+
+当前代码已经完成单轮请求边界的硬切换：
+
+- chat 接口只接受 `{ requestId, message }`，旧的 `{ messages: [] }` 请求直接返回 400，不提供兼容分支。
+- 服务端从 `Session.chatMessages` 读取 canonical transcript，在创建 `AgentRun` 前追加并保存本轮 user message。
+- `packages/agent` 提供 `AgentRunner` 入口，在包内组装 workspace context、system prompt 和模型上下文。
+- 服务端 chat adapter 只负责资源加载、工具注入、运行记录和流适配；不再向 AgentRunner 传入浏览器历史。
+- 前端仍可用本地 `messages` 做展示和流式状态，但 transport 只发送当前 user turn；`onRunSettled` 不再接收消息数组。
+
+本阶段已经补齐 AgentEvent 和 AgentToolExecution 的基础服务端持久化。事件持久化适配器会在同一事务中写入
+AgentEvent 和对应 AgentStep；工具账本会对 `(runId, toolCallId)` 做参数校验、完成结果回放和 stale running 回收。
+断流回放、工具副作用与账本的同事务提交、以及独立取消接口仍按后续迁移阶段执行。
+
 ## 2. 不可违反的职责边界
 
 ### 2.1 Web 前端负责什么
@@ -104,6 +118,15 @@
 - 把工具请求交给注入的 `ToolExecutor`，接收结果后继续循环。
 - 产出与传输无关的 Agent 事件，以及可选的 AI SDK UI stream 适配。
 
+Agent 包使用 Vercel AI SDK 作为内部模型执行引擎。当前实现使用
+`streamText`、`stopWhen` 和 AI SDK 的多步工具执行能力；后续可以在不改变
+OpenExcel Agent contract 的前提下切换到 AI SDK 的 `ToolLoopAgent`。这两个
+API 都只能出现在 `packages/agent` 内部，不能成为 server 的业务接口。
+
+Vercel AI SDK 是执行引擎，不是 OpenExcel 的业务边界。OpenExcel 自己的
+`AgentRunner`、`ToolExecutor`、`AgentEvent` 和持久化确认协议位于 AI SDK 之上，
+用于隔离模型供应商、工具执行、数据库持久化和 HTTP 传输。
+
 `packages/agent` 不负责：
 
 - Prisma 查询。
@@ -117,6 +140,62 @@
 服务端可以把完整的 canonical transcript 和已授权的运行上下文传给 agent，但 agent 不应从浏览器接收或信任一份完整历史。
 Agent 引擎只依赖显式输入和端口，不依赖 `packages/server`；服务端不得在 `sessions/chat` 中重新实现
 模型循环、上下文裁剪、重试或停止条件。
+
+### 2.4 Agent 内核模块职责
+
+Agent 内核采用一个 facade 加多个单一职责模块的结构。`AgentRunner` 是对外入口，
+但不是所有实现的容器；除非一个模块保持单一且内聚的职责，否则不得继续向
+`agentRunner.ts` 添加逻辑。
+
+```text
+packages/agent/src/
+├─ runtime/
+│  ├─ agentRunner.ts       # 一次运行的 facade 和生命周期编排
+│  ├─ agentLoop.ts         # Vercel AI SDK 模型/工具 loop 适配
+│  ├─ contracts.ts         # Agent 输入、端口和运行结果协议
+│  ├─ toolAdapter.ts       # Agent tool contract -> AI SDK ToolSet
+│  ├─ events.ts            # provider-neutral AgentEvent 和序列
+│  ├─ retryPolicy.ts       # provider 错误分类、退避和重试预算
+│  └─ uiStreamAdapter.ts   # Agent 输出 -> AI SDK UI message stream
+├─ prompt/
+│  └─ systemPrompt.ts      # system prompt 纯函数
+├─ session/
+│  ├─ context.ts            # workspace model-facing context
+│  ├─ contextWindow.ts      # token 预算和上下文裁剪
+│  └─ transcript.ts         # canonical transcript -> model messages
+└─ tools/
+   ├─ catalog.ts            # AI 可见工具目录
+   ├─ schema.ts             # 工具名称和输入 schema
+   └─ capabilities.ts      # 工具能力边界说明
+```
+
+各模块的硬边界如下：
+
+- `agentRunner.ts` 负责读取输入、调用 context/prompt builder、创建 loop、汇总运行终态；
+  不直接调用 Prisma、HTTP 或具体 workbook 工具。
+- `agentLoop.ts` 负责调用 Vercel AI SDK、执行多步模型/工具循环、应用停止条件和
+  运行时预算；不负责 server 持久化和 HTTP response。
+- `contracts.ts` 只定义 `ToolExecutor`、`AgentEventSink`、持久化确认、取消和恢复输入；
+  不依赖 AI SDK 的 server 类型。
+- `toolAdapter.ts` 是唯一允许把 OpenExcel tool contract 转换成 AI SDK `ToolSet` 的位置。
+  server 不直接把 AI SDK `ToolSet` 传入 AgentRunner。
+- `events.ts` 只定义事件结构和事件序列，不落数据库，也不发送 HTTP。
+- `retryPolicy.ts` 只决定 provider/Agent 调用是否可重试，不执行工具、不修改 run 状态。
+- `uiStreamAdapter.ts` 只负责传输格式转换；UI stream 不是 canonical transcript，也不是
+  Agent 状态机。
+- `session/` 和 `prompt/` 中的 context/prompt 构造必须保持纯函数，不读取数据库或浏览器状态。
+
+Agent 内核的依赖方向必须保持为：
+
+```text
+AgentRunner
+  -> AgentLoop
+  -> Vercel AI SDK
+  -> injected ToolExecutor / EventSink / PersistenceBarrier
+```
+
+`AgentRunner` 可以依赖 `agentLoop`，但 `agentLoop` 不能反向依赖 server；
+`uiStreamAdapter` 只能被需要 UI stream 的 server transport 使用，Agent 核心不能依赖 React。
 
 ## 3. 目标数据流
 
@@ -245,21 +324,21 @@ POST /api/workspaces/:workspacePublicId/sessions/:sessionPublicId/chat
 - `originalMessages` 等 AI SDK 参数不能成为前端历史覆盖数据库的理由。
 - 服务端断流时，客户端必须通过查询接口恢复状态，而不是把本地消息重新提交为权威 transcript。
 
-目标实现必须在现有 session/run 资源边界下提供 Agent event stream：
+目标实现必须在现有 session/run 资源边界下提供 Agent event stream。Agent 内部事件不携带
+Prisma 或 HTTP 字段；server 持久化适配器负责补充 run 身份、序号和传输元数据：
 
 ```ts
 type AgentEvent =
-  | { type: "run.started"; runId: number }
-  | { type: "message.started"; runId: number; messageId: string; role: "assistant" }
-  | { type: "message.delta"; runId: number; messageId: string; text: string }
-  | { type: "message.completed"; runId: number; messageId: string }
-  | { type: "tool.started"; runId: number; stepId: number; toolCallId: string; toolName: string; input: unknown }
-  | { type: "tool.completed"; runId: number; stepId: number; toolCallId: string; toolName: string; result: unknown }
-  | { type: "tool.failed"; runId: number; stepId: number; toolCallId: string; toolName: string; error: AgentError }
-  | { type: "run.completed"; runId: number }
-  | { type: "run.failed"; runId: number; error: AgentError }
-  | { type: "run.cancelled"; runId: number }
-  | { type: "run.detached"; runId: number };
+  | { type: "run.started" }
+  | { type: "message.started"; messageId: string; role: "assistant" }
+  | { type: "message.delta"; messageId: string; text: string }
+  | { type: "message.completed"; messageId: string }
+  | { type: "tool.started"; toolCallId: string; toolName: string; input: unknown }
+  | { type: "tool.completed"; toolCallId: string; toolName: string; result: unknown }
+  | { type: "tool.failed"; toolCallId: string; toolName: string; error: AgentError }
+  | { type: "run.completed" }
+  | { type: "run.failed"; error: AgentError }
+  | { type: "run.cancelled" };
 
 type AgentError = {
   code: string;
@@ -267,17 +346,25 @@ type AgentError = {
   retryable: boolean;
   providerRequestId?: string;
 };
+
+type PersistedAgentEvent = {
+  runId: number;
+  eventId: string;
+  sequence: number;
+  occurredAt: string;
+  event: AgentEvent;
+};
 ```
 
 每个事件通过统一信封传输，并在服务端持久化后才允许进入可恢复流：
 
 ```ts
-type PersistedAgentEvent = {
-  eventId: string;
-  runId: number;
-  sequence: number;
-  occurredAt: string;
-  event: AgentEvent;
+type AgentEventSink = {
+  publish(event: AgentEvent): Promise<void>;
+};
+
+type PersistenceBarrier = {
+  persist(event: AgentEvent): Promise<PersistedAgentEvent>;
 };
 ```
 
@@ -364,19 +451,61 @@ browser renders and refreshes affected UI
 
 ### 6.1 AgentRunner contract
 
-`AgentRunner` 是唯一的 Agent loop 状态推进器。它必须通过显式输入和端口工作，至少接收：
+`AgentRunner` 是 Agent 运行 facade 和生命周期协调器；实际的 Vercel AI SDK loop
+由同包的 `agentLoop.ts` 执行。二者共同拥有 Agent loop，server 不能复制其中任何一部分。
+
+`AgentRunner` 必须通过显式输入和端口工作，至少接收：
 
 - 已授权的 model-facing context 输入，而不是浏览器消息数组；
 - 稳定的模型和工具配置；
 - 服务端注入的 `ToolExecutor`；
-- 事件 sink、持久化确认端口、取消信号和恢复输入；
+- `AgentEventSink`、持久化确认端口、取消信号和恢复输入；
 - 上下文、步骤、工具调用、累计等待和总运行时预算。
+
+最小输入协议的职责形态如下，具体 TypeScript 名称可以调整，但不能退回到直接传入
+AI SDK `ToolSet` 或 server callback：
+
+```ts
+type AgentRunnerInput = {
+  modelConfig: ModelConfig;
+  transcript: AgentTranscriptMessage[];
+  workspace: WorkspaceWorkbookSummary[];
+  enabledTools: string[];
+  toolExecutor: ToolExecutor;
+  eventSink?: AgentEventSink;
+  persistenceBarrier?: PersistenceBarrier;
+  abortSignal?: AbortSignal;
+  runtimeOptions: AgentRuntimeOptions;
+};
+
+interface ToolExecutor {
+  execute(request: {
+    toolName: string;
+    toolCallId: string;
+    input: unknown;
+    context: unknown;
+  }): Promise<unknown>;
+}
+```
+
+`context` 是 Agent 不解释的不透明执行上下文。server 可以在自己的适配器中把它实现为
+`{ workspaceId, runId }`，但这些字段不能进入 Agent 包的通用 contract，也不能让 Agent
+根据这些字段执行授权判断。授权和具体 ID 语义始终属于 server。
+
+`AgentRunner` 的运行结果必须同时区分两条通道：
+
+- `stream`：面向当前订阅者的实时输出，断开后可以丢失；
+- `completion`：一次运行的最终结果和持久化完成状态，不能依赖浏览器是否仍连接。
+
+UI stream adapter 只能消费 `stream`，server persistence adapter 必须等待 `completion`，
+不能通过等待 HTTP response 结束来判断 Agent 是否已经完成。
 
 每一个循环边界都遵循同一顺序：
 
-1. 构造本次模型输入并执行 provider 调用。
+1. `agentLoop.ts` 构造本次模型输入并调用 Vercel AI SDK。
 2. 先把 assistant 文本、tool call 或 provider 错误转换成 provider-neutral 事件。
-3. 等待服务端持久化确认；确认失败时停止，不进入下一步。
+3. 通过 `PersistenceBarrier` 持久化事件并等待 durable acknowledgement，再通过
+   `AgentEventSink` 广播已确认事件；持久化失败时停止，不进入下一步。
 4. 对 tool call 调用注入的 `ToolExecutor`，只消费结构化结果。
 5. 等待工具结果、工作簿事务、撤销快照、工具账本和对应事件全部确认后，才把结果用于下一次模型输入。
 6. 达到模型终止、取消、错误或任一预算上限时，生成唯一终态并停止循环。
@@ -513,10 +642,11 @@ model Session {
 ```prisma
 model AgentEvent {
   id          Int      @id @default(autoincrement())
-  eventId     String   @unique
   runId       Int
+  eventId     String   @unique
   sequence    Int
   type        String
+  occurredAt  DateTime
   payload     String
   createdAt   DateTime @default(now())
 
@@ -528,11 +658,13 @@ model AgentToolExecution {
   runId        Int
   toolCallId   String
   toolName     String
-  inputHash    String
+  input        String
   status       String
-  result       String?
-  error        String?
-  committedAt  DateTime?
+  output       String?
+  errorMessage String?
+  startedAt    DateTime @default(now())
+  endedAt      DateTime?
+  updatedAt    DateTime
   createdAt    DateTime @default(now())
 
   @@unique([runId, toolCallId])
@@ -540,8 +672,10 @@ model AgentToolExecution {
 ```
 
 `AgentEvent` 是流回放日志，`AgentToolExecution` 是工具副作用幂等账本，二者都不能被浏览器写入。
-工具执行记录必须先进入 `running`，并在工作簿修改、撤销快照和结果写入同一事务后变为 `completed`；恢复时
-遇到 `completed` 直接复用结果，遇到 `running` 必须依据事务结果和租约判定，不能直接再次执行。
+工具执行记录必须先进入 `running`。当前实现已经在工具执行前占用幂等键，在完成后保存结构化结果；遇到
+`completed` 直接复用结果，参数不一致拒绝执行，短时间内的 `running` 拒绝并发重复调用，超时 `running` 才允许回收。
+下一阶段要把账本完成状态、工作簿修改、撤销快照和 canonical tool-result transcript 收敛到同一数据库事务；在此之前，
+有副作用的 Sheet 工具继续依赖现有 mutation receipt 做第二层幂等保护。
 
 `AgentRun` 至少要能区分以下状态：
 
@@ -596,20 +730,22 @@ model AgentToolExecution {
 
 - Prisma session repository。
 - session 运行租约、版本检查和并发保护。
-- AgentEvent、AgentToolExecution、AgentRun 和 transcript 的事务写入。
 - 不包含 React 或 AI SDK UI 状态。
 
 ### `packages/server/src/modules/sessions/runs`
 
 - run/step 持久化。
-- 事件追加、事件游标和回放查询。
-- 工具执行账本和工具结果复用。
+- `agentEventRepository.ts` 负责 AgentEvent 追加，并在同一事务中写入 AgentStep。
+- `toolExecutionRepository.ts` 负责 `(runId, toolCallId)` 账本、参数一致性和结果回放。
+- `agentPersistence.ts` 负责将 Agent 端口适配到上述 repository；不包含 HTTP 和 Agent loop。
+- 事件游标和回放查询（待补齐）。
 - undo checkpoint 和运行结果。
 - 运行状态恢复和幂等查询。
 
 ### `packages/agent/src/runtime`
 
-- AgentRunner 和模型调用。
+- `AgentRunner` facade、运行生命周期和运行结果。
+- `agentLoop` 对 Vercel AI SDK `streamText`/`ToolLoopAgent` 的内部适配。
 - model-facing message 转换与 system prompt 组装。
 - 上下文窗口、工具结果预算和上下文压缩。
 - 工具循环、停止条件、错误分类、指数退避和运行时事件。
@@ -617,10 +753,13 @@ model AgentToolExecution {
 
 建议拆分为以下职责明确的内部模块，名称可调整但边界不能合并回 server：
 
-- `runtime/agentRunner.ts`：唯一的模型/工具 loop 和状态推进器。
+- `runtime/agentRunner.ts`：运行 facade、依赖组装和终态协调，不承载所有 loop 细节。
+- `runtime/agentLoop.ts`：唯一的模型/工具 loop 执行模块，内部使用 Vercel AI SDK。
+- `runtime/toolAdapter.ts`：将 Agent 工具协议转换成 AI SDK `ToolSet`，不执行 server 业务逻辑。
 - `runtime/retryPolicy.ts`：错误分类、Retry-After、指数退避、抖动和预算。
-- `runtime/events.ts`：provider-neutral 事件和事件序列生成，不负责落库。
-- `runtime/contracts.ts`：`ToolExecutor`、取消信号、持久化确认和恢复输入接口。
+- `runtime/events.ts`：provider-neutral 事件和事件序列生成，不负责落库或发送 HTTP。
+- `runtime/contracts.ts`：`ToolExecutor`、`AgentEventSink`、持久化确认、取消信号和恢复输入接口。
+- `runtime/uiStreamAdapter.ts`：只负责 AI SDK UI message stream 传输适配。
 - `session/context.ts`、`session/transcript.ts`：model-facing context 和 transcript 转换。
 
 该目录是 Agent 行为的唯一实现位置。服务端的 `sessions/chat` 只能创建适配器、消费 Agent
@@ -649,8 +788,34 @@ model AgentToolExecution {
 - 服务端保存完整 transcript 后再启动模型。
 - 服务端调用 `packages/agent` 的 AgentRunner，并通过端口注入授权上下文、工具执行器和持久化回调。
 - 不在 `packages/server` 重新实现模型循环、上下文裁剪、重试或停止条件。
-- 暂时可以兼容旧 `{ messages: [] }` 请求，但旧 messages 只能用于提取本轮用户消息，不能覆盖数据库历史。
-- 兼容分支必须经过同一个严格的 UserTurnRequest 规范化函数，禁止把旧消息数组传入 AgentRunner。
+- 不兼容旧 `{ messages: [] }` 请求；旧请求必须在 HTTP 边界被拒绝。
+- 任何进入 AgentRunner 的历史都必须来自服务端 canonical transcript，不能来自请求体或浏览器状态。
+
+### Phase 1.5：稳定 Agent 内核边界
+
+这一阶段先完成 `packages/agent` 内部重构，再扩展 server 的事件持久化。目标是让 Agent
+内核可以在没有 HTTP、Prisma 和 React 的环境中独立测试和运行：
+
+当前状态：内核边界和服务端基础持久化已落地。`AgentRunner` 已收敛为 facade，模型/工具循环位于
+`runtime/agentLoop.ts`；工具定义通过 `AgentToolDefinition` 注入，具体执行通过
+`ToolExecutor` 注入；事件通过 `PersistenceBarrier` 确认后才广播；UI stream 与
+运行 completion 已分离。server 的 `agentPersistence` 适配器已接入事件落库、步骤事务落库和工具完成结果回放；当前仍待
+工具副作用与账本的同事务提交、事件回放接口、断流恢复和独立取消，因此本阶段完成不代表整套 Agent 重构已经完成。
+
+- 将 `AgentRunner` 收敛为 facade，模型/工具循环移动到 `runtime/agentLoop.ts`。
+- 在 `runtime/contracts.ts` 定义 `ToolExecutor`、`AgentEventSink`、`PersistenceBarrier`、
+  取消信号和恢复输入。
+- `AgentRunner` 不再接收 server 直接组装的 AI SDK `ToolSet`；`runtime/toolAdapter.ts`
+  在 Agent 包内部完成 Agent tool contract 到 Vercel AI SDK tool set 的转换。
+- 保留 Vercel AI SDK 作为底层执行引擎，第一阶段继续使用 `streamText + stopWhen`；
+  未来切换 `ToolLoopAgent` 时不得改变 OpenExcel 对外 contract。
+- 将 provider-neutral `AgentEvent` 与 AI SDK UI stream 适配分离；UI stream 只能由
+  `runtime/uiStreamAdapter.ts` 负责。
+- 任何 Agent event sink 或持久化确认失败都必须让运行停止，禁止仅记录日志后继续执行。
+- 为 AgentRunner、agentLoop、toolAdapter、事件顺序、取消和持久化 barrier 增加包内测试，
+  测试不得依赖 server 数据库或 HTTP。
+
+这一阶段不新增浏览器上下文能力，也不把数据库模型直接引入 `packages/agent`。
 
 ### Phase 2：前端切换单轮请求
 
@@ -666,11 +831,12 @@ model AgentToolExecution {
 - 增加并验收 run event replay 接口、Last-Event-ID/cursor 和终态快照。
 - 不让浏览器通过重发 transcript 恢复 Agent loop。
 
-### Phase 4：协议收紧
+### Phase 4：协议收紧与可靠性补齐
 
 - 删除旧的 `{ messages: [] }` 请求兼容分支。
 - 将 `AgentStep.type/status` 收敛为受限类型并在边界校验。
-- 启用 AgentEvent 和 AgentToolExecution 的正式持久化，不允许用浏览器 transcript 替代它们。
+- AgentEvent 和 AgentToolExecution 的正式基础持久化已启用，不允许用浏览器 transcript 替代它们。
+- 将工具账本、工作簿副作用、撤销快照和 canonical tool-result transcript 放入同一事务，并补充事件游标回放、断流恢复和显式 cancel。
 
 ## 11. 验收标准
 
@@ -717,8 +883,13 @@ model AgentToolExecution {
 工具循环，再追加保存结果。OpenExcel 应借鉴它的职责边界，但不能照搬其进程内状态：
 
 - `SessionManager` 对应 OpenExcel 的 session application + repository。
-- `CodingAgent` 对应 OpenExcel 的 `packages/agent` `AgentRunner`；server chat orchestration 只对应
-  `SessionManager` 的持久化、授权和端口适配部分。
+- `CodingAgent` 对应 OpenExcel 的 `packages/agent` `AgentRunner` facade；其内部的
+  `ToolLoopAgent` 对应 OpenExcel 的 `runtime/agentLoop.ts` 和 Vercel AI SDK 适配层。
+- edge-pi 的 `EdgePiRuntime` 对应 OpenExcel 的 `ToolExecutor`，但 OpenExcel 的具体实现由
+  server 负责授权并执行 workbook/sheet/chart 操作。
+- edge-pi 的 session 自动追加逻辑不能直接搬入 OpenExcel Agent；OpenExcel 必须由 server
+  通过 `AgentEventSink` 和 `PersistenceBarrier` 控制数据库提交顺序。
+- server chat orchestration 只对应 edge-pi 的 session 持久化、授权和 runtime 端口适配部分。
 - edge-pi 的 CLI/App 对应 OpenExcel 的浏览器，但浏览器只能提交本轮输入和渲染结果。
 - OpenExcel 的数据库 transcript 负责跨请求、跨实例恢复。
 

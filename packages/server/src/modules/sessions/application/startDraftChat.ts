@@ -2,42 +2,43 @@ import { streamChat } from "../chat/index.js";
 import { DraftRequestConflictError } from "../domain/sessionErrors.js";
 import * as repo from "../infrastructure/sessionRepository.js";
 import * as runRepo from "../runs/repository.js";
-import { extractFirstUserText } from "./messageText.js";
+import type { ChatTurnRequest } from "./chatTurn.js";
+import { toCanonicalUserMessage } from "./chatTurn.js";
+import { extractMessageText } from "./messageText.js";
 import { fallbackTitleFromPrompt } from "./title.js";
 
 export async function startDraftChat(
   workspaceId: number,
-  messages: any[],
-  options: { abortSignal?: AbortSignal; clientRequestId?: string } = {},
+  turn: ChatTurnRequest,
+  options: { abortSignal?: AbortSignal } = {},
 ) {
-  const { abortSignal, clientRequestId } = options;
+  const { abortSignal } = options;
   if (abortSignal?.aborted) {
     throw new Error("Chat request aborted");
   }
 
-  if (clientRequestId) {
-    const existingRun = await runRepo.findRunByClientRequestId(workspaceId, clientRequestId);
+  if (turn.requestId) {
+    const existingRun = await runRepo.findRunByClientRequestId(workspaceId, turn.requestId);
     if (existingRun) {
       throw new DraftRequestConflictError(existingRun.sessionId);
     }
   }
 
-  const firstUserText = extractFirstUserText(messages);
+  const message = toCanonicalUserMessage(turn);
+  const firstUserText = extractMessageText(message);
   const session = await repo.createSession(
     workspaceId,
     fallbackTitleFromPrompt(firstUserText),
-    JSON.stringify(messages),
+    "[]",
   );
 
   try {
-    const stream = await streamChat(workspaceId, session.id, messages, abortSignal, {
-      clientRequestId,
-    });
+    const stream = await streamChat(workspaceId, session.id, turn, abortSignal);
     return { session, stream };
   } catch (error) {
     await repo.deleteSession(session.id, workspaceId);
-    if (clientRequestId) {
-      const existingRun = await runRepo.findRunByClientRequestId(workspaceId, clientRequestId);
+    if (turn.requestId) {
+      const existingRun = await runRepo.findRunByClientRequestId(workspaceId, turn.requestId);
       if (existingRun) {
         throw new DraftRequestConflictError(existingRun.sessionId);
       }

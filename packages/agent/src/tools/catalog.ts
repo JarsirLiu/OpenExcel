@@ -1,5 +1,14 @@
+import type { AgentToolDefinition } from "../runtime/contracts.js";
 import { EXCEL_TOOL_CAPABILITY_BOUNDARY } from "./capabilities.js";
 import { type ExcelToolName, type ExcelToolSpec, excelToolSpecs } from "./schema.js";
+
+export function buildExcelToolDefinitions(): AgentToolDefinition[] {
+  return Object.entries(excelToolSpecs).map(([name, tool]) => ({
+    name,
+    description: tool.description,
+    inputSchema: tool.inputSchema,
+  }));
+}
 
 export function buildExcelToolCatalog(): string {
   const tools = Object.entries(excelToolSpecs)

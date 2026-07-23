@@ -1,12 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-function createClientRequestId(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
-  }
-  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
-
 function readCreatedSessionId(response: Response): number | null {
   const sessionId = Number(response.headers.get("X-OpenExcel-Session-Id"));
   return Number.isInteger(sessionId) && sessionId > 0 ? sessionId : null;
@@ -19,7 +12,6 @@ export function useDraftSessionTransition({
   isDraft: boolean;
   onDraftSessionCreated?: (sessionId: number) => Promise<void> | void;
 }) {
-  const draftRequestIdRef = useRef<string | null>(isDraft ? createClientRequestId() : null);
   const createdSessionIdRef = useRef<number | null>(null);
   const transitionInFlightRef = useRef(false);
   const retryTimerRef = useRef<number | undefined>(undefined);
@@ -79,7 +71,6 @@ export function useDraftSessionTransition({
   );
 
   return {
-    draftRequestId: isDraft ? draftRequestIdRef.current : null,
     isTransitioning,
     captureDraftResponse,
     beginTransition,

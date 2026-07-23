@@ -1,5 +1,22 @@
 export { createChatModel, createTitleModel, type ModelConfig } from "./model.js";
 export { buildSystemPrompt, DEFAULT_PROMPT } from "./prompt/systemPrompt.js";
+export {
+  AgentRunner,
+  type AgentRunnerInput,
+  createAgentRunner,
+} from "./runtime/agentRunner.js";
+export type {
+  AgentEvent,
+  AgentEventSink,
+  AgentEventType,
+  AgentRunCompletion,
+  AgentRunResult,
+  AgentTimeoutConfiguration,
+  AgentToolDefinition,
+  AgentToolExecutionOptions,
+  PersistenceBarrier,
+  ToolExecutor,
+} from "./runtime/contracts.js";
 export { formatAIError } from "./runtime/formatAIError.js";
 export {
   removeEmptyAssistantMessages,
@@ -35,6 +52,7 @@ export { historyFromRuns } from "./session/transcript.js";
 export {
   buildExcelToolCatalog,
   buildExcelToolContext,
+  buildExcelToolDefinitions,
   buildRunToolContext,
   buildWorkspaceToolContext,
   type ExcelToolName,

@@ -69,6 +69,33 @@ export function applyInitialMessages(currentMessages: any[], loadedMessages: any
   return currentMessages.length > 0 ? currentMessages : loadedMessages;
 }
 
+export function prepareChatTurn(messages: any[], trigger: string) {
+  if (trigger !== "submit-message") {
+    throw new Error("聊天只支持提交新的用户消息");
+  }
+
+  const message = [...messages].reverse().find((candidate) => candidate?.role === "user");
+  if (!message || typeof message.id !== "string" || !Array.isArray(message.parts)) {
+    throw new Error("缺少有效的用户消息");
+  }
+
+  const parts = message.parts.filter(
+    (part: any) => part?.type === "text" || part?.type === "data-chat-reference",
+  );
+  if (parts.length !== message.parts.length || parts.length === 0) {
+    throw new Error("用户消息包含不支持的内容");
+  }
+
+  return {
+    requestId: message.id,
+    message: {
+      messageId: message.id,
+      role: "user" as const,
+      parts,
+    },
+  };
+}
+
 export function useChatConversation({
   sessionId,
   workspaceId,
@@ -83,7 +110,7 @@ export function useChatConversation({
   workspaceId: number;
   onDraftSessionCreated?: (sessionId: number) => Promise<void> | void;
   initialMessages?: any[];
-  onRunSettled?: (messages: any[]) => Promise<void> | void;
+  onRunSettled?: () => Promise<void> | void;
   onWorkspaceRefresh?: () => Promise<void> | void;
   onSheetChanged?: SheetChangedHandler;
   onStreamingChange?: (isStreaming: boolean) => void;
@@ -113,7 +140,6 @@ export function useChatConversation({
   const undoAvailabilityRequestRef = useRef(0);
   const mountedRef = useRef(true);
   const {
-    draftRequestId,
     isTransitioning: isDraftSessionTransitioning,
     captureDraftResponse,
     beginTransition: beginDraftSessionTransition,
@@ -154,29 +180,31 @@ export function useChatConversation({
 
   const transport = useMemo(() => {
     const isDraft = sessionId == null;
-    return new DefaultChatTransport({
+    return new DefaultChatTransport<any>({
       api: isDraft
         ? `/api/workspaces/${workspaceId}/sessions/draft/chat`
         : `/api/workspaces/${workspaceId}/sessions/${sessionId}/chat`,
-      headers: isDraft && draftRequestId ? { "Idempotency-Key": draftRequestId } : undefined,
+      prepareSendMessagesRequest: ({ messages, trigger }) => ({
+        body: prepareChatTurn(messages, trigger),
+      }),
       fetch: async (input, init) => {
         const response = await fetch(input, init);
         captureDraftResponse(response);
         return response;
       },
     });
-  }, [captureDraftResponse, draftRequestId, sessionId, workspaceId]);
+  }, [captureDraftResponse, sessionId, workspaceId]);
 
   const { messages, setMessages, sendMessage, status, stop, error } = useChat({
     id: `${workspaceId}:${sessionId}`,
     messages: initialMessages ?? [],
     transport,
-    onFinish: async ({ isAbort, messages: finishedMessages }) => {
+    onFinish: async ({ isAbort }) => {
       if (!isAbort) {
         beginDraftSessionTransition();
       }
       if (!mountedRef.current) return;
-      await onRunSettled?.(finishedMessages);
+      await onRunSettled?.();
       await refreshUndoAvailability();
     },
   });

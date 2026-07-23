@@ -183,6 +183,8 @@ model AgentRun {
   revertedAt   DateTime?
   session      Session                 @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   steps        AgentStep[]
+  events       AgentEvent[]
+  toolExecutions AgentToolExecution[]
   snapshots    AgentRunSheetSnapshot[]
   chartSnapshots AgentRunChartSnapshot[]
   startedAt    DateTime                @default(now())
@@ -201,6 +203,40 @@ model AgentStep {
   order     Int
   run       AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
+}
+
+model AgentEvent {
+  id          Int      @id @default(autoincrement())
+  runId       Int
+  eventId     String   @unique
+  sequence    Int
+  type        String
+  occurredAt  DateTime
+  payload     String
+  run         AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@unique([runId, sequence])
+  @@index([runId, sequence])
+}
+
+model AgentToolExecution {
+  id          Int      @id @default(autoincrement())
+  runId       Int
+  toolCallId  String
+  toolName    String
+  status      String
+  input       String
+  output      String?
+  errorMessage String?
+  startedAt   DateTime @default(now())
+  endedAt     DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  run         AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, toolCallId])
+  @@index([runId, status])
 }
 
 model AgentRunSheetSnapshot {

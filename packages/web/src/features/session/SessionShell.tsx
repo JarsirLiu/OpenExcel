@@ -20,7 +20,7 @@ type Props = {
   historyOpen: boolean;
   setHistoryOpen: (next: boolean) => void;
   handleDraftSessionCreated: (sessionId: number) => Promise<void> | void;
-  handleRunSettled: (sessionId: number, messages: any[]) => Promise<void>;
+  handleRunSettled: (sessionId: number) => Promise<void>;
   handleNewSession: () => void;
   handleSelectSession: (id: number) => void;
   handleDeleteSession: (id: number) => Promise<void>;

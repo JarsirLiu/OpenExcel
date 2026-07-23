@@ -78,7 +78,7 @@ export function useSessionWorkspace(
   );
 
   const handleRunSettled = useCallback(
-    async (_sessionId: number, _finishedMessages: any[]) => {
+    async (_sessionId: number) => {
       try {
         await refreshSessions();
       } catch (error) {

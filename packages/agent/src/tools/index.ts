@@ -1,6 +1,7 @@
 export {
   buildExcelToolCatalog,
   buildExcelToolContext,
+  buildExcelToolDefinitions,
   buildRunToolContext,
   buildWorkspaceToolContext,
 } from "./catalog.js";

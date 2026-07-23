@@ -42,7 +42,13 @@ The current codebase is intentionally small and focused:
 - `src/session/context.ts` - workspace context assembly for model input
 - `src/session/transcript.ts` - transcript helpers
 - `src/tools/*` - tool schema, catalog, and Excel tool definitions
-- `src/runtime/streamChat.ts` - streaming execution wrapper
+- `src/runtime/agentRunner.ts` - public facade and lifecycle assembly
+- `src/runtime/agentLoop.ts` - complete model/tool loop
+- `src/runtime/contracts.ts` - provider-neutral runtime ports and results
+- `src/runtime/toolAdapter.ts` - Agent tools to AI SDK tools
+- `src/runtime/events.ts` - provider-neutral event sequencing
+- `src/runtime/uiStreamAdapter.ts` - UI message stream transport adapter
+- `src/runtime/streamChat.ts` - package-local bridge retained for existing tests
 
 Tests currently live next to the implementation files.
 
