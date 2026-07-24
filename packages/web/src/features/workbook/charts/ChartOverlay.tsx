@@ -306,6 +306,7 @@ export function ChartOverlay({
           top: layout.columnHeaderHeight * layout.zoomRatio + rect.top - scroll.top,
           width: rect.width,
           height: rect.height,
+          zIndex: selectedId === chart.id ? 2 : 1,
         };
 
         const beginInteraction = (event: React.PointerEvent, mode: InteractionMode) => {
