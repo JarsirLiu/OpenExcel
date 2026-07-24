@@ -47,4 +47,32 @@ describe("createAgentToolSet", () => {
       output: { ok: true },
     });
   });
+
+  it("allows callers to disable adapter-level input validation", async () => {
+    const execute = vi.fn().mockResolvedValue({ ok: true });
+    const tools = createAgentToolSet(
+      [
+        {
+          name: "readSheetData",
+          description: "Read a sheet",
+          inputSchema: z.object({ sheetId: z.number() }),
+        },
+      ],
+      { execute },
+      undefined,
+      {},
+      { validateInput: false },
+    );
+
+    await (tools.readSheetData as any).execute(
+      { sheetId: "7" },
+      { toolCallId: "call-2", abortSignal: undefined },
+    );
+
+    expect(execute).toHaveBeenCalledWith(
+      "readSheetData",
+      { sheetId: "7" },
+      expect.objectContaining({ toolCallId: "call-2" }),
+    );
+  });
 });

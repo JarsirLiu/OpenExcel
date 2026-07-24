@@ -1,5 +1,7 @@
 import { type ToolSet, tool } from "ai";
 import type { AgentToolDefinition, AgentToolExecutionOptions, ToolExecutor } from "../contracts.js";
+import { toToolError } from "./errors.js";
+import { validateToolInput } from "./inputValidation.js";
 
 export interface ToolAdapterHooks {
   onToolStart?: (event: {
@@ -16,11 +18,16 @@ export interface ToolAdapterHooks {
   }) => void | Promise<void>;
 }
 
+export interface ToolAdapterOptions {
+  validateInput?: boolean;
+}
+
 export function createAgentToolSet(
   definitions: readonly AgentToolDefinition[],
   executor: ToolExecutor,
   executionContext: unknown,
   hooks: ToolAdapterHooks = {},
+  adapterOptions: ToolAdapterOptions = {},
 ): ToolSet {
   const tools = Object.fromEntries(
     definitions.map((definition) => [
@@ -28,17 +35,35 @@ export function createAgentToolSet(
       tool({
         description: definition.description,
         inputSchema: definition.inputSchema,
-        execute: async (input: unknown, options: any) => {
-          const toolCallId = String(options?.toolCallId ?? "unknown-tool-call");
+        execute: async (input: unknown, executeOptions: any) => {
+          const toolCallId = String(executeOptions?.toolCallId ?? "unknown-tool-call");
           await hooks.onToolStart?.({
             toolName: definition.name,
             toolCallId,
             input,
           });
 
+          if (adapterOptions.validateInput !== false && definition.inputSchema) {
+            const validationResult = validateToolInput(
+              definition.inputSchema,
+              input,
+              definition.name,
+            );
+            if (!validationResult.success && validationResult.error) {
+              await hooks.onToolFinish?.({
+                toolName: definition.name,
+                toolCallId,
+                input,
+                error: validationResult.error,
+              });
+              throw validationResult.error;
+            }
+            input = validationResult.data;
+          }
+
           const executionOptions: AgentToolExecutionOptions = {
             toolCallId,
-            abortSignal: options?.abortSignal,
+            abortSignal: executeOptions?.abortSignal,
             context: executionContext,
           };
 
@@ -52,13 +77,14 @@ export function createAgentToolSet(
             });
             return output;
           } catch (error) {
+            const toolError = toToolError(error);
             await hooks.onToolFinish?.({
               toolName: definition.name,
               toolCallId,
               input,
-              error,
+              error: toolError,
             });
-            throw error;
+            throw toolError;
           }
         },
       } as any),

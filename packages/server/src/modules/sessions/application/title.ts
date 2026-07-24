@@ -1,4 +1,4 @@
-import { createTitleModel, type ModelConfig } from "@openexcel/agent";
+import { type ModelConfig, resolveModelForPurpose } from "@openexcel/agent";
 import { generateText, type LanguageModel } from "ai";
 import { loadModelConfig } from "../../../config.js";
 import { withSessionLock } from "../infrastructure/sessionLock.js";
@@ -43,7 +43,7 @@ export async function generateSessionTitleForSession(
   }
 
   const config: ModelConfig = loadModelConfig();
-  const title = await generateTitle(createTitleModel(config), firstUserText);
+  const title = await generateTitle(resolveModelForPurpose(config, "title"), firstUserText);
   return withSessionLock(sessionId, async () => {
     const latestSession = await repo.findSession(sessionId, workspaceId);
     if (!latestSession) throw new Error("会话不存在");

@@ -1,6 +1,12 @@
 import type { z } from "zod";
 import type { ModelConfig } from "../model.js";
 import type { WorkspaceWorkbookSummary } from "../session/context.js";
+import type {
+  AgentEvent,
+  AgentEventSink,
+  AgentEventType,
+  PersistenceBarrier,
+} from "./events/types.js";
 
 export type AgentTranscriptMessage = Record<string, unknown>;
 
@@ -20,30 +26,7 @@ export interface ToolExecutor {
   execute(toolName: string, input: unknown, options: AgentToolExecutionOptions): Promise<unknown>;
 }
 
-export type AgentEventType =
-  | "run.started"
-  | "tool.started"
-  | "tool.finished"
-  | "step.finished"
-  | "run.completed"
-  | "run.cancelled"
-  | "run.failed";
-
-export interface AgentEvent {
-  eventId: string;
-  sequence: number;
-  type: AgentEventType;
-  occurredAt: string;
-  payload: unknown;
-}
-
-export interface AgentEventSink {
-  publish(event: AgentEvent): void | Promise<void>;
-}
-
-export interface PersistenceBarrier {
-  persist(event: AgentEvent): void | Promise<void>;
-}
+export type { AgentEvent, AgentEventSink, AgentEventType, PersistenceBarrier };
 
 export type AgentTimeoutConfiguration =
   | number
@@ -65,10 +48,14 @@ export interface AgentRunCompletion {
 }
 
 export interface AgentRunResult {
-  /** UI messages are a transport projection, never the canonical transcript. */
   stream: ReadableStream<any>;
-  /** Resolves after the UI stream reaches a terminal state. */
   completion: Promise<AgentRunCompletion>;
+}
+
+export interface CompactionOptions {
+  enabled?: boolean;
+  minTurnsToCompact?: number;
+  maxTurnsAfterCompact?: number;
 }
 
 export interface AgentRunnerInput {
@@ -77,7 +64,6 @@ export interface AgentRunnerInput {
   workspace: WorkspaceWorkbookSummary[];
   tools: readonly AgentToolDefinition[];
   toolExecutor: ToolExecutor;
-  /** Agent treats this value as opaque and passes it to ToolExecutor. */
   executionContext?: unknown;
   abortSignal?: AbortSignal;
   maxRetries?: number;
@@ -86,6 +72,7 @@ export interface AgentRunnerInput {
   outputReserveTokens?: number;
   maxConversationTurns?: number;
   maxUserInputTokens?: number;
+  compaction?: CompactionOptions;
   prepareStep?: (...args: any[]) => unknown;
   onStepFinish?: (...args: any[]) => void | Promise<void>;
   onFinish?: (...args: any[]) => void | Promise<void>;

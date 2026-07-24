@@ -7,7 +7,8 @@ import {
   type ToolSet,
   validateUIMessages,
 } from "ai";
-import { createChatModel } from "../../model.js";
+import { resolveModelForPurpose } from "../../model.js";
+import { compactMessagesIfNeeded } from "../../session/compaction.js";
 import {
   DEFAULT_MAX_CONVERSATION_TURNS,
   DEFAULT_MAX_USER_INPUT_TOKENS,
@@ -34,7 +35,19 @@ export interface AgentLoopInput extends Omit<AgentRunnerInput, "workspace" | "tr
 
 export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResult> {
   const normalizedMessages = removeEmptyAssistantMessages(input.transcript);
-  const contextWindow = trimMessagesToContextWindow(normalizedMessages, {
+
+  const messagesForContext = normalizedMessages;
+  // TODO: compaction 实现缺少 token 阈值触发、工具结果截断、checkpoint 持久化和恢复保护，
+  // 目前先禁用，仅使用 contextWindow 截断。后续按 eve 的多级压缩策略完整实现。
+  if (input.compaction?.enabled === true) {
+    throw new Error(
+      "Compaction is not fully implemented: token-threshold trigger, tool-result capping, " +
+        "checkpoint persistence, and resumption guard are missing. " +
+        "Use context window truncation instead.",
+    );
+  }
+
+  const contextWindow = trimMessagesToContextWindow(messagesForContext, {
     contextWindowTokens: input.contextWindowTokens,
     outputReserveTokens: input.outputReserveTokens,
     maxConversationTurns: input.maxConversationTurns ?? DEFAULT_MAX_CONVERSATION_TURNS,
@@ -79,7 +92,7 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
   };
 
   const result = streamText({
-    model: createChatModel(input.modelConfig),
+    model: resolveModelForPurpose(input.modelConfig, "chat"),
     system: input.systemPrompt,
     messages: await convertToModelMessages(validatedMessages as any, {
       convertDataPart: convertChatReferenceDataPart,

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockGenerateText = vi.fn();
-const mockCreateTitleModel = vi.fn();
+const mockResolveModelForPurpose = vi.fn();
 const mockFindSession = vi.fn();
 const mockUpdateSession = vi.fn();
 const mockUpdateSessionNameIfUnchanged = vi.fn();
@@ -12,7 +12,7 @@ vi.mock("ai", () => ({
 }));
 
 vi.mock("@openexcel/agent", () => ({
-  createTitleModel: mockCreateTitleModel,
+  resolveModelForPurpose: mockResolveModelForPurpose,
 }));
 
 vi.mock("../infrastructure/sessionRepository.js", () => ({
@@ -29,7 +29,7 @@ const { generateSessionTitleForSession, generateTitle } = await import("./title.
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockCreateTitleModel.mockReturnValue("title-model");
+  mockResolveModelForPurpose.mockReturnValue("title-model");
   mockUpdateSessionNameIfUnchanged.mockResolvedValue(true);
   mockLoadModelConfig.mockReturnValue({
     baseUrl: "http://test.local",
@@ -98,11 +98,14 @@ describe("generateSessionTitleForSession", () => {
 
     const title = await generateSessionTitleForSession(1, 1, "分析这些数据");
 
-    expect(mockCreateTitleModel).toHaveBeenCalledWith({
-      baseUrl: "http://test.local",
-      apiKey: "test-key",
-      modelName: "test-model",
-    });
+    expect(mockResolveModelForPurpose).toHaveBeenCalledWith(
+      {
+        baseUrl: "http://test.local",
+        apiKey: "test-key",
+        modelName: "test-model",
+      },
+      "title",
+    );
     expect(mockUpdateSessionNameIfUnchanged).toHaveBeenCalledWith(1, 1, ["新对话"], "数据分析");
     expect(title).toBe("数据分析");
   });

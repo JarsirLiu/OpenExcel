@@ -1,27 +1,4 @@
-import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import type { LanguageModel } from "ai";
-
-export interface ModelConfig {
-  baseUrl: string;
-  apiKey: string;
-  modelName: string;
-}
-
-function createOpenAICompatibleProvider(config: ModelConfig) {
-  return createOpenAICompatible({
-    name: "openexcel",
-    baseURL: config.baseUrl,
-    apiKey: config.apiKey,
-    includeUsage: true,
-  });
-}
-
-export function createChatModel(config: ModelConfig): LanguageModel {
-  const provider = createOpenAICompatibleProvider(config);
-  return provider.chatModel(config.modelName);
-}
-
-export function createTitleModel(config: ModelConfig): LanguageModel {
-  const provider = createOpenAICompatibleProvider(config);
-  return provider.chatModel(config.modelName);
-}
+export { createChatModel } from "./runtime/model/factory.js";
+export { createFixedResponseModel, createMockModel } from "./runtime/model/mock.js";
+export { resolveModelForPurpose } from "./runtime/model/resolver.js";
+export type { ModelConfig, ModelPurpose, RuntimeModelReference } from "./runtime/model/types.js";
