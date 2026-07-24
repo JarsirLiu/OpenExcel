@@ -1,6 +1,7 @@
 import { ReactRenderer } from "@tiptap/react";
 import type { SuggestionKeyDownProps, SuggestionProps } from "@tiptap/suggestion";
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import styles from "./SheetMentionList.module.css";
 
 type MentionItem = {
   id: string;
@@ -585,6 +586,7 @@ export function createMentionSuggestion(
             },
             editor: props.editor,
           });
+          component.element.classList.add(styles.popup);
           unmount = props.mount(component.element);
         },
         onUpdate: (props: SuggestionProps) => {

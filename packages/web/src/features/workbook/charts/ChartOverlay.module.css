@@ -33,7 +33,7 @@
   position: absolute;
   top: -12px;
   right: -12px;
-  z-index: 2;
+  z-index: 4;
   display: grid;
   width: 24px;
   height: 24px;
@@ -46,6 +46,16 @@
   font-size: 17px;
   line-height: 1;
   pointer-events: auto;
+}
+
+.closeIcon {
+  display: block;
+  width: 14px;
+  height: 18px;
+  font-family: Arial, sans-serif;
+  font-size: 20px;
+  font-weight: 400;
+  line-height: 17px;
 }
 
 .handle {

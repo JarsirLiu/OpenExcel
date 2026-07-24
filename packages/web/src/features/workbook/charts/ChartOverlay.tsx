@@ -2,6 +2,7 @@ import type { ChartAnchor, ChartSpec } from "@openexcel/core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { deleteChart, updateChart } from "@/api/charts";
 import type { WorkbookFull } from "@/api/workbooks";
+import { confirm } from "@/shared/lib";
 import type { SheetGridLayout } from "../layout/fortuneSheetLayout";
 import styles from "./ChartOverlay.module.css";
 import { ChartRenderer } from "./ChartRenderer";
@@ -208,6 +209,13 @@ export function ChartOverlay({
   const removeChart = useCallback(
     async (chartId: string) => {
       if (workspaceId == null) return;
+      const confirmed = await confirm({
+        title: "删除图表",
+        message: "确定要删除这个图表吗？此操作无法撤销。",
+        confirmText: "删除",
+        cancelText: "取消",
+      });
+      if (!confirmed) return;
       setError(null);
       try {
         await deleteChart(workspaceId, chartId);
@@ -344,7 +352,9 @@ export function ChartOverlay({
                   onPointerDown={(event) => event.stopPropagation()}
                   onClick={() => void removeChart(chart.id)}
                 >
-                  ×
+                  <span className={styles.closeIcon} aria-hidden="true">
+                    ×
+                  </span>
                 </button>
                 {HANDLE_DIRECTIONS.map((direction) => (
                   <span

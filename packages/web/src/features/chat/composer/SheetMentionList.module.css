@@ -1,0 +1,4 @@
+.popup {
+  /* Suggestion mounts directly under body; keep it above sheet overlays. */
+  z-index: 200;
+}
