@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { estimateTokens } from "../session/contextWindow.js";
+import { estimateTokens } from "../../session/contextWindow.js";
 import { ToolResultBudget, wrapToolSetWithResultBudget } from "./toolResultBudget.js";
 
 describe("ToolResultBudget", () => {

@@ -1,5 +1,5 @@
 import { type ToolSet, tool } from "ai";
-import type { AgentToolDefinition, AgentToolExecutionOptions, ToolExecutor } from "./contracts.js";
+import type { AgentToolDefinition, AgentToolExecutionOptions, ToolExecutor } from "../contracts.js";
 
 export interface ToolAdapterHooks {
   onToolStart?: (event: {

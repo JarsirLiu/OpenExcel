@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("ai", () => mocks);
-vi.mock("../model.js", () => ({
+vi.mock("../../model.js", () => ({
   createChatModel: vi.fn(() => ({ modelId: "test-model" })),
 }));
 

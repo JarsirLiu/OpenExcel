@@ -19,7 +19,7 @@ It owns:
 - canonical transcript normalization/reconstruction helpers
 - tool schema and tool catalog definitions
 - AgentRunner and the complete model/tool execution loop
-- context compaction, token budgets, retry/backoff policy, and stop conditions
+- context-window trimming, token budgets, retry/backoff policy, and stop conditions
 - provider-neutral Agent events and stream adapters
 
 It must not own:
@@ -42,12 +42,15 @@ The current codebase is intentionally small and focused:
 - `src/session/context.ts` - workspace context assembly for model input
 - `src/session/transcript.ts` - transcript helpers
 - `src/tools/*` - tool schema, catalog, and Excel tool definitions
-- `src/runtime/agentRunner.ts` - public facade and lifecycle assembly
-- `src/runtime/agentLoop.ts` - complete model/tool loop
+- `src/runtime/loop/agentRunner.ts` - public facade and lifecycle assembly
+- `src/runtime/loop/agentLoop.ts` - complete model/tool loop
 - `src/runtime/contracts.ts` - provider-neutral runtime ports and results
-- `src/runtime/toolAdapter.ts` - Agent tools to AI SDK tools
-- `src/runtime/events.ts` - provider-neutral event sequencing
-- `src/runtime/uiStreamAdapter.ts` - UI message stream transport adapter
+- `src/runtime/tools/toolAdapter.ts` - Agent tools to AI SDK tools
+- `src/runtime/tools/toolResultBudget.ts` - tool result token budgets and truncation
+- `src/runtime/events/events.ts` - provider-neutral event sequencing
+- `src/runtime/stream/uiStreamAdapter.ts` - UI message stream transport adapter
+- `src/runtime/stream/referencePart.ts` - chat reference conversion
+- `src/runtime/errors/formatAIError.ts` - model error formatting
 
 Tests currently live next to the implementation files.
 
@@ -125,7 +128,7 @@ Agent should only define the AI-facing contract and the execution wrapper.
 
 ### 4.6 Streaming execution
 
-`runtime/agentLoop.ts` is the execution wrapper around the AI SDK.
+`runtime/loop/agentLoop.ts` is the execution wrapper around the AI SDK.
 
 It should:
 

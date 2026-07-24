@@ -1,10 +1,5 @@
 export { createChatModel, createTitleModel, type ModelConfig } from "./model.js";
 export { buildSystemPrompt, DEFAULT_PROMPT } from "./prompt/systemPrompt.js";
-export {
-  AgentRunner,
-  type AgentRunnerInput,
-  createAgentRunner,
-} from "./runtime/agentRunner.js";
 export type {
   AgentEvent,
   AgentEventSink,
@@ -17,7 +12,12 @@ export type {
   PersistenceBarrier,
   ToolExecutor,
 } from "./runtime/contracts.js";
-export { formatAIError } from "./runtime/formatAIError.js";
+export { formatAIError } from "./runtime/errors/formatAIError.js";
+export {
+  AgentRunner,
+  type AgentRunnerInput,
+  createAgentRunner,
+} from "./runtime/loop/agentRunner.js";
 export {
   type BudgetableToolSet,
   DEFAULT_READ_SHEET_DATA_BUDGET_TOKENS,
@@ -29,7 +29,7 @@ export {
   type ToolResultBudgetSnapshot,
   type ToolResultPolicy,
   wrapToolSetWithResultBudget,
-} from "./runtime/toolResultBudget.js";
+} from "./runtime/tools/toolResultBudget.js";
 export {
   buildWorkspaceContext,
   type WorkspaceSheetSummary,

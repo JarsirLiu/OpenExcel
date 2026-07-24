@@ -3,7 +3,7 @@ import type {
   AgentEventSink,
   AgentEventType,
   PersistenceBarrier,
-} from "./contracts.js";
+} from "../contracts.js";
 
 export interface AgentEventEmitter {
   emit(type: AgentEventType, payload?: unknown): Promise<AgentEvent>;

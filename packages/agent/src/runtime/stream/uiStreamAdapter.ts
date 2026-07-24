@@ -1,5 +1,5 @@
 import { type ToolSet, toUIMessageStream } from "ai";
-import type { AgentTranscriptMessage } from "./contracts.js";
+import type { AgentTranscriptMessage } from "../contracts.js";
 
 export function createUIStreamAdapter(options: {
   stream: ReadableStream<any>;
