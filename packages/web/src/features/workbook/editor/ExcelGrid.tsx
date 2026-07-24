@@ -83,6 +83,7 @@ export function ExcelGrid({
   demoGridFocus,
 }: Props) {
   const gridRootRef = useRef<HTMLDivElement>(null);
+  const chartLayerRef = useRef<HTMLDivElement>(null);
   const {
     saveStatus,
     workbookRef,
@@ -182,18 +183,21 @@ export function ExcelGrid({
           allowUpdate={true}
           hooks={hooks}
         />
+        {currentSheet && currentSheetLayout ? (
+          <div ref={chartLayerRef} className={styles.chartLayer}>
+            <ChartOverlay
+              containerRef={gridRootRef}
+              layerRef={chartLayerRef}
+              workspaceId={workspaceId}
+              workbook={workbook}
+              sheetId={String(currentSheet.id)}
+              layout={currentSheetLayout}
+              onWorkbookRefresh={onWorkbookRefresh}
+              onWorkbookMutation={onWorkbookMutation}
+            />
+          </div>
+        ) : null}
       </div>
-      {currentSheet && currentSheetLayout ? (
-        <ChartOverlay
-          containerRef={gridRootRef}
-          workspaceId={workspaceId}
-          workbook={workbook}
-          sheetId={String(currentSheet.id)}
-          layout={currentSheetLayout}
-          onWorkbookRefresh={onWorkbookRefresh}
-          onWorkbookMutation={onWorkbookMutation}
-        />
-      ) : null}
       {dialog}
     </div>
   );

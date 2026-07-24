@@ -34,21 +34,31 @@ interface Props {
 
 export function ChartRenderer({ chart, sheets }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
+  const instanceRef = useRef<ReturnType<typeof init> | null>(null);
 
   useEffect(() => {
     if (!rootRef.current) return;
-    const data = buildChartRenderData(chart, sheets);
-    if (!data) return;
-
     const instance = init(rootRef.current);
-    instance.setOption(buildChartOption(chart, data), true);
+    instanceRef.current = instance;
     const resizeObserver = new ResizeObserver(() => instance.resize());
     resizeObserver.observe(rootRef.current);
 
     return () => {
       resizeObserver.disconnect();
       instance.dispose();
+      instanceRef.current = null;
     };
+  }, []);
+
+  useEffect(() => {
+    const instance = instanceRef.current;
+    if (!instance) return;
+    const data = buildChartRenderData(chart, sheets);
+    if (!data) {
+      instance.clear();
+      return;
+    }
+    instance.setOption(buildChartOption(chart, data), true);
   }, [chart, sheets]);
 
   return <div ref={rootRef} className={styles.renderer} />;

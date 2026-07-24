@@ -48,6 +48,19 @@
 .inner {
   flex: 1;
   min-height: 0;
+  position: relative;
+}
+
+.chartLayer {
+  position: absolute;
+  z-index: 12;
+  overflow: hidden;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.chartLayer[data-ready="true"] {
+  visibility: visible;
 }
 
 /* Keep FortuneSheet's toolbar overlays above the editor regions below it. */
