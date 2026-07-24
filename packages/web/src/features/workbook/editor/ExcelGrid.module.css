@@ -50,6 +50,36 @@
   min-height: 0;
 }
 
+/* Keep FortuneSheet's toolbar overlays above the editor regions below it. */
+.container :global(.fortune-container) {
+  position: relative;
+  overflow: visible;
+}
+
+.container :global(.fortune-toolbar) {
+  position: relative;
+  z-index: 30;
+  overflow: visible;
+}
+
+.container :global(.fortune-fx-editor) {
+  position: relative;
+  z-index: 20;
+}
+
+.container :global(.fortune-sheet-container),
+.container :global(.luckysheet-sheet-area) {
+  position: relative;
+  z-index: 1;
+}
+
+.container :global(.fortune-tooltip) {
+  z-index: 100;
+  pointer-events: none;
+  max-width: calc(100vw - 16px);
+  transform: translateX(var(--fortune-tooltip-shift-x, 0px));
+}
+
 .emptyState {
   flex: 1;
   min-height: 0;

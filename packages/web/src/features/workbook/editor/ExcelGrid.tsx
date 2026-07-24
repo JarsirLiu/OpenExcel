@@ -9,6 +9,7 @@ import { normalizeSheetIndex } from "@/features/workspace/sheetIndex";
 import { type DemoGridFocus, useDemoGridFocus } from "./demoGridFocus";
 import styles from "./ExcelGrid.module.css";
 import { useFortuneSheetFilterMenu } from "./fortuneSheetFilterMenu";
+import { useFortuneSheetTooltip } from "./fortuneSheetTooltip";
 import { useExcelGridWorkspace } from "./useExcelGridWorkspace";
 import { useFortuneSheetWheel } from "./useFortuneSheetWheel";
 
@@ -107,6 +108,7 @@ export function ExcelGrid({
     onSheetRevisionChanged,
   });
   useFortuneSheetFilterMenu(gridRootRef, workbook !== null);
+  useFortuneSheetTooltip(gridRootRef, workbook !== null);
   useFortuneSheetWheel(gridRootRef, workbook !== null);
   const isDemoFocusActive = useDemoGridFocus({
     workbookRef,
