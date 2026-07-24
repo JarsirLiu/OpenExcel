@@ -77,6 +77,41 @@ export async function updateRun(id: number, data: Record<string, unknown>) {
   return prisma.agentRun.update({ where: { id }, data });
 }
 
+export async function updateRunWithLease(
+  id: number,
+  data: Record<string, unknown>,
+  lease: { ownerId: string; sessionVersion: number },
+) {
+  const result = await prisma.agentRun.updateMany({
+    where: {
+      id,
+      status: "running",
+      ownerId: lease.ownerId,
+      sessionVersion: lease.sessionVersion,
+    },
+    data,
+  });
+  return result.count === 1;
+}
+
+export async function updateRunWithRecoveryGuard(
+  id: number,
+  sessionId: number,
+  sessionVersion: number,
+  data: Record<string, unknown>,
+) {
+  const result = await prisma.agentRun.updateMany({
+    where: {
+      id,
+      sessionId,
+      status: "recovery_required",
+      session: { version: sessionVersion },
+    },
+    data,
+  });
+  return result.count === 1;
+}
+
 export async function transitionRunStatus(
   id: number,
   status: RunStatus,
@@ -166,7 +201,11 @@ export async function findRunUndoState(runId: number) {
   };
 }
 
-export async function findRunsBySession(workspaceId: number, sessionId: number) {
+export async function findRunsBySession(
+  workspaceId: number,
+  sessionId: number,
+  status?: RunStatus,
+) {
   const session = await prisma.session.findFirst({
     where: { id: sessionId, workspaceId },
     select: { id: true },
@@ -174,9 +213,52 @@ export async function findRunsBySession(workspaceId: number, sessionId: number) 
   if (!session) return [];
 
   return prisma.agentRun.findMany({
-    where: { sessionId: session.id },
+    where: { sessionId: session.id, ...(status ? { status } : {}) },
     orderBy: { startedAt: "asc" },
   });
+}
+
+export async function findRunToolExecutions(runId: number) {
+  return prisma.agentToolExecution.findMany({
+    where: { runId },
+    select: { toolCallId: true, toolName: true, status: true, errorMessage: true },
+    orderBy: { startedAt: "asc" },
+  });
+}
+
+export async function findRunRecoveryState(workspaceId: number, sessionId: number, runId: number) {
+  return prisma.agentRun.findFirst({
+    where: { id: runId, sessionId, session: { workspaceId } },
+    select: {
+      id: true,
+      status: true,
+      outputText: true,
+      endedAt: true,
+      errorMessage: true,
+      session: { select: { chatMessages: true, version: true } },
+    },
+  });
+}
+
+export async function findRunAffectedEntities(runId: number) {
+  const run = await prisma.agentRun.findUnique({
+    where: { id: runId },
+    select: {
+      snapshots: { select: { sheetId: true } },
+      chartSnapshots: { select: { workbookId: true, sheetId: true } },
+    },
+  });
+  if (!run) return { workbookIds: [], sheetIds: [] };
+
+  return {
+    workbookIds: [...new Set(run.chartSnapshots.map((snapshot) => snapshot.workbookId))],
+    sheetIds: [
+      ...new Set([
+        ...run.snapshots.map((snapshot) => snapshot.sheetId),
+        ...run.chartSnapshots.map((snapshot) => snapshot.sheetId),
+      ]),
+    ],
+  };
 }
 
 export async function createStep(data: {

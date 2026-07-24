@@ -102,9 +102,18 @@ export async function findSessionUndoCheckpoint(id: number, workspaceId: number)
   });
 }
 
-export async function setSessionUndoRun(sessionId: number, workspaceId: number, undoRunId: number) {
+export async function setSessionUndoRun(
+  sessionId: number,
+  workspaceId: number,
+  undoRunId: number,
+  sessionVersion?: number,
+) {
   const result = await prisma.session.updateMany({
-    where: { id: sessionId, workspaceId },
+    where: {
+      id: sessionId,
+      workspaceId,
+      ...(sessionVersion == null ? {} : { version: sessionVersion }),
+    },
     data: { undoRunId },
   });
   return result.count === 1;

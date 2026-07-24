@@ -9,6 +9,7 @@ export {
   type AgentEventEmitter,
   type AgentEventSink,
   type AgentEventType,
+  AgentPersistenceError,
   createAgentEvent,
   type PersistenceBarrier,
 } from "./types.js";

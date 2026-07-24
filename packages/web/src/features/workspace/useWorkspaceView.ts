@@ -13,6 +13,7 @@ import type { WorkbookStructureUpdate } from "@/features/sync/types";
 import { isWorkbookSnapshotStale } from "@/features/sync/workbookRevision";
 import { toast } from "@/shared/lib";
 import { patchWorkbookWithDelta } from "../workbook/utils/patchWorkbook";
+import { getSheetIndexAfterDeletion, normalizeSheetIndex } from "./sheetIndex";
 import { useWorkbookCatalog, type WorkbookInitial } from "./useWorkbookCatalog";
 import { sortWorkbooks } from "./workbookOrdering";
 
@@ -22,7 +23,8 @@ const MAX_IMPORT_WORKBOOKS = 20;
 function loadStoredSheetIdx(): number {
   try {
     const stored = sessionStorage.getItem(SHEET_STORAGE_KEY);
-    return stored !== null ? Math.max(0, Number(stored)) : 0;
+    const parsed = stored === null ? 0 : Number(stored);
+    return Number.isFinite(parsed) ? Math.max(0, Math.trunc(parsed)) : 0;
   } catch {
     return 0;
   }
@@ -112,6 +114,12 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
   useEffect(() => {
     currentSheetIndexRef.current = currentSheetIndex;
   }, [currentSheetIndex]);
+
+  useEffect(() => {
+    if (!currentWorkbook) return;
+    const nextIndex = normalizeSheetIndex(currentSheetIndex, currentWorkbook.sheets.length);
+    if (nextIndex !== currentSheetIndex) setCurrentSheetIndex(nextIndex);
+  }, [currentSheetIndex, currentWorkbook]);
 
   const chartSheetSignature =
     currentWorkbook?.charts.map((chart) => `${chart.id}:${chart.sheetId}`).join("|") ?? "";
@@ -267,8 +275,17 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
           });
           if (!isCurrentRequest(generation, controller.signal)) return;
           replaceWorkbookIfFresh(nextWorkbook);
+
+          if (nextWorkbook.sheets.length === 0) {
+            setCurrentSheetIndex(0);
+            return;
+          }
+
           const nextIndex = nextWorkbook.sheets.findIndex((sheet) => sheet.id === update.sheetId);
-          const fallbackIndex = Math.max(0, Math.min(update.order, nextWorkbook.sheets.length - 1));
+          const fallbackIndex = getSheetIndexAfterDeletion(
+            update.order,
+            nextWorkbook.sheets.length,
+          );
           setCurrentSheetIndex(nextIndex >= 0 ? nextIndex : fallbackIndex);
           return;
         }
@@ -286,7 +303,7 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
         setCurrentSheetIndex(
           nextIndex >= 0
             ? nextIndex
-            : Math.max(0, Math.min(update.order, nextWorkbook.sheets.length - 1)),
+            : normalizeSheetIndex(update.order, nextWorkbook.sheets.length),
         );
       } catch (error) {
         if (!controller.signal.aborted) throw error;

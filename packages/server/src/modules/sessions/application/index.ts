@@ -12,11 +12,13 @@ export { getRunEventPage, getRunReplaySnapshot } from "./queryRun.js";
 export {
   deleteSession,
   getMessages,
+  getRecoveryRuns,
   getRuns,
   getSession,
   getSessions,
   renameSession,
 } from "./querySessions.js";
+export { abandonRun, recoverRun } from "./recovery.js";
 export { startDraftChat } from "./startDraftChat.js";
 export { generateSessionTitleForSession } from "./title.js";
 export { persistSessionMessages } from "./transcript.js";

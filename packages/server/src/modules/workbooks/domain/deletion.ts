@@ -7,3 +7,10 @@ export class SheetDeletionBlockedError extends Error {
     this.chartIds = chartIds;
   }
 }
+
+export class LastSheetDeletionBlockedError extends Error {
+  constructor() {
+    super("工作簿必须保留至少一个工作表");
+    this.name = "LastSheetDeletionBlockedError";
+  }
+}

@@ -1,6 +1,6 @@
 import { findChartsReferencingSheet } from "../../charts/application/index.js";
 import { withUndoTrackedMutation } from "../../sessions/runs/undoCheckpoint.js";
-import { SheetDeletionBlockedError } from "../domain/deletion.js";
+import { LastSheetDeletionBlockedError, SheetDeletionBlockedError } from "../domain/deletion.js";
 import * as repo from "../infrastructure/workbookRepository.js";
 
 export async function deleteSheet(workspaceId: number, workbookId: number, sheetId: number) {
@@ -12,10 +12,19 @@ export async function deleteSheet(workspaceId: number, workbookId: number, sheet
     return { error: "Sheet not found", statusCode: 404 as const };
   }
 
+  if (workbook.sheets.length <= 1) {
+    return { error: "工作簿必须保留至少一个工作表", statusCode: 409 as const };
+  }
+
   try {
     await withUndoTrackedMutation(
       workspaceId,
       async () => {
+        const latestWorkbook = await repo.findWorkbookWithSheets(workbookId, workspaceId);
+        if (!latestWorkbook || latestWorkbook.sheets.length <= 1) {
+          throw new LastSheetDeletionBlockedError();
+        }
+
         const chartIds = await findChartsReferencingSheet(workspaceId, workbookId, sheetId);
         if (chartIds.length > 0) throw new SheetDeletionBlockedError(chartIds);
         return [sheetId];
@@ -24,6 +33,9 @@ export async function deleteSheet(workspaceId: number, workbookId: number, sheet
     );
   } catch (error) {
     if (error instanceof SheetDeletionBlockedError) {
+      return { error: error.message, statusCode: 409 as const };
+    }
+    if (error instanceof LastSheetDeletionBlockedError) {
       return { error: error.message, statusCode: 409 as const };
     }
     throw error;

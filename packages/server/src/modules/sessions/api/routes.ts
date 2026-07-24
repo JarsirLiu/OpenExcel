@@ -158,21 +158,26 @@ export async function sessionRoutes(app: FastifyInstance) {
     },
   );
 
-  app.get<{ Params: { workspacePublicId: string; sessionPublicId: string } }>(
-    "/api/workspaces/:workspacePublicId/sessions/:sessionPublicId/runs",
-    async (req, reply) => {
-      const ids = await resolveSessionIdForRequest(
-        req,
-        req.params.workspacePublicId,
-        req.params.sessionPublicId,
-        reply,
-      );
-      if (ids == null) return;
-      const session = await application.getSession(ids.workspaceId, ids.sessionId);
-      if (!session) return reply.status(404).send({ error: "Session not found" });
-      return application.getRuns(ids.workspaceId, ids.sessionId);
-    },
-  );
+  app.get<{
+    Params: { workspacePublicId: string; sessionPublicId: string };
+    Querystring: { status?: string };
+  }>("/api/workspaces/:workspacePublicId/sessions/:sessionPublicId/runs", async (req, reply) => {
+    const ids = await resolveSessionIdForRequest(
+      req,
+      req.params.workspacePublicId,
+      req.params.sessionPublicId,
+      reply,
+    );
+    if (ids == null) return;
+    const session = await application.getSession(ids.workspaceId, ids.sessionId);
+    if (!session) return reply.status(404).send({ error: "Session not found" });
+    if (req.query.status != null && req.query.status !== "recovery_required") {
+      return reply.status(400).send({ error: "运行状态无效" });
+    }
+    return req.query.status === "recovery_required"
+      ? application.getRecoveryRuns(ids.workspaceId, ids.sessionId)
+      : application.getRuns(ids.workspaceId, ids.sessionId);
+  });
 
   app.get<{
     Params: { workspacePublicId: string; sessionPublicId: string; runId: string };
@@ -250,6 +255,49 @@ export async function sessionRoutes(app: FastifyInstance) {
       }
 
       const result = await application.cancelRun(ids.workspaceId, ids.sessionId, runId);
+      if (!result) return reply.status(404).send({ error: "Run not found" });
+      return result;
+    },
+  );
+
+  app.post<{
+    Params: { workspacePublicId: string; sessionPublicId: string; runId: string };
+  }>(
+    "/api/workspaces/:workspacePublicId/sessions/:sessionPublicId/runs/:runId/recover",
+    async (req, reply) => {
+      const ids = await resolveSessionIdForRequest(
+        req,
+        req.params.workspacePublicId,
+        req.params.sessionPublicId,
+        reply,
+      );
+      if (ids == null) return;
+      const runId = parseRunId(req.params.runId);
+      if (runId == null) return reply.status(400).send({ error: "运行 ID 无效" });
+
+      const result = await application.recoverRun(ids.workspaceId, ids.sessionId, runId);
+      if (!result) return reply.status(404).send({ error: "Run not found" });
+      if (!result.canAutoRecover) return reply.status(409).send(result);
+      return result;
+    },
+  );
+
+  app.delete<{
+    Params: { workspacePublicId: string; sessionPublicId: string; runId: string };
+  }>(
+    "/api/workspaces/:workspacePublicId/sessions/:sessionPublicId/runs/:runId",
+    async (req, reply) => {
+      const ids = await resolveSessionIdForRequest(
+        req,
+        req.params.workspacePublicId,
+        req.params.sessionPublicId,
+        reply,
+      );
+      if (ids == null) return;
+      const runId = parseRunId(req.params.runId);
+      if (runId == null) return reply.status(400).send({ error: "运行 ID 无效" });
+
+      const result = await application.abandonRun(ids.workspaceId, ids.sessionId, runId);
       if (!result) return reply.status(404).send({ error: "Run not found" });
       return result;
     },

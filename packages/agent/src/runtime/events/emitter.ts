@@ -1,10 +1,5 @@
-import type {
-  AgentEventEmitter,
-  AgentEventSink,
-  AgentEventType,
-  PersistenceBarrier,
-} from "./types.js";
-import { createAgentEvent } from "./types.js";
+import type { AgentEventEmitter, AgentEventSink, PersistenceBarrier } from "./types.js";
+import { AgentPersistenceError, createAgentEvent } from "./types.js";
 
 export function createAgentEventEmitter(options: {
   eventSink?: AgentEventSink;
@@ -16,7 +11,11 @@ export function createAgentEventEmitter(options: {
     async emit(type, payload) {
       const event = createAgentEvent(type, payload, sequence++);
 
-      await options.persistenceBarrier?.persist(event);
+      try {
+        await options.persistenceBarrier?.persist(event);
+      } catch (error) {
+        throw error instanceof AgentPersistenceError ? error : new AgentPersistenceError(error);
+      }
       await options.eventSink?.publish(event);
       return event;
     },

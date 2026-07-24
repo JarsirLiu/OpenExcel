@@ -11,15 +11,18 @@ export type {
   AgentEvent,
   AgentEventSink,
   AgentEventType,
+  AgentFailureKind,
   AgentRunCompletion,
   AgentRunResult,
   AgentTimeoutConfiguration,
   AgentToolDefinition,
   AgentToolExecutionOptions,
+  AgentTranscriptMessage,
   PersistenceBarrier,
   ToolExecutor,
 } from "./runtime/contracts.js";
 export { formatAIError } from "./runtime/errors/formatAIError.js";
+export { AgentPersistenceError } from "./runtime/events/types.js";
 export {
   AgentRunner,
   type AgentRunnerInput,
@@ -87,7 +90,11 @@ export {
   estimateTokens,
   trimMessagesToContextWindow,
 } from "./session/contextWindow.js";
-export { historyFromRuns, removeEmptyAssistantMessages } from "./session/transcript.js";
+export {
+  appendResponseMessages,
+  historyFromRuns,
+  removeEmptyAssistantMessages,
+} from "./session/transcript.js";
 export {
   buildExcelToolCatalog,
   buildExcelToolContext,

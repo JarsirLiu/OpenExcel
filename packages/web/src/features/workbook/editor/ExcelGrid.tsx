@@ -5,6 +5,7 @@ import type { WorkbookFull } from "@/api/workbooks";
 import type { WorkbookStructureUpdate } from "@/features/sync/types";
 import { ChartOverlay } from "@/features/workbook/charts/ChartOverlay";
 import { useChartInsertion } from "@/features/workbook/charts/useChartInsertion";
+import { normalizeSheetIndex } from "@/features/workspace/sheetIndex";
 import { type DemoGridFocus, useDemoGridFocus } from "./demoGridFocus";
 import styles from "./ExcelGrid.module.css";
 import { useFortuneSheetFilterMenu } from "./fortuneSheetFilterMenu";
@@ -154,7 +155,8 @@ export function ExcelGrid({
     );
   }
 
-  const currentSheet = workbook.sheets[currentSheetIndex];
+  const safeSheetIndex = normalizeSheetIndex(currentSheetIndex, workbook.sheets.length);
+  const currentSheet = workbook.sheets[safeSheetIndex];
   const currentSheetLayout = currentSheet ? layoutBySheetId[String(currentSheet.id)] : undefined;
 
   return (

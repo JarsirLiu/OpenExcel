@@ -1,5 +1,6 @@
 export type AgentEventType =
   | "run.started"
+  | "step.started"
   | "tool.started"
   | "tool.finished"
   | "step.finished"
@@ -21,6 +22,16 @@ export interface AgentEventSink {
 
 export interface PersistenceBarrier {
   persist(event: AgentEvent): void | Promise<void>;
+}
+
+export class AgentPersistenceError extends Error {
+  readonly cause: unknown;
+
+  constructor(cause: unknown) {
+    super(cause instanceof Error ? cause.message : String(cause), { cause });
+    this.name = "AgentPersistenceError";
+    this.cause = cause;
+  }
 }
 
 export interface AgentEventEmitter {

@@ -39,12 +39,15 @@ export type AgentTimeoutConfiguration =
 
 export type AgentRunStatus = "completed" | "cancelled" | "failed";
 
+export type AgentFailureKind = "execution" | "persistence";
+
 export interface AgentRunCompletion {
   status: AgentRunStatus;
   text?: string;
   error?: unknown;
   messages?: AgentTranscriptMessage[];
   isAborted: boolean;
+  failureKind?: AgentFailureKind;
 }
 
 export interface AgentRunResult {
@@ -78,10 +81,6 @@ export interface AgentRunnerInput {
   onFinish?: (...args: any[]) => void | Promise<void>;
   onAbort?: (...args: any[]) => void | Promise<void>;
   onError?: (...args: any[]) => void | Promise<void>;
-  onEnd?: (event: {
-    messages: AgentTranscriptMessage[];
-    isAborted: boolean;
-  }) => void | Promise<void>;
   eventSink?: AgentEventSink;
   persistenceBarrier?: PersistenceBarrier;
 }

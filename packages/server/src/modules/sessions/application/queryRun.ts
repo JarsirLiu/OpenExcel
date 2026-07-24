@@ -1,4 +1,5 @@
 import * as eventRepo from "../runs/agentEventRepository.js";
+import { orderAndDeduplicateEvents } from "../runs/eventReplay.js";
 import * as runRepo from "../runs/repository.js";
 import { isRunStatus, terminalRunStatuses } from "../runs/status.js";
 
@@ -50,13 +51,16 @@ export async function getRunEventPage(data: {
   const page = await eventRepo.findAgentEventPageForSession(data);
   if (!page) return null;
 
-  const events = page.events.map((event) => ({
-    eventId: event.eventId,
-    sequence: event.sequence,
-    type: event.type,
-    occurredAt: event.occurredAt,
-    payload: decodeEventPayload(event.payload),
-  }));
+  const events = orderAndDeduplicateEvents(
+    page.events.map((event) => ({
+      eventId: event.eventId,
+      sequence: event.sequence,
+      type: event.type,
+      occurredAt: event.occurredAt,
+      payload: decodeEventPayload(event.payload),
+    })),
+    data.afterSequence,
+  );
   const lastReturnedSequence = events.at(-1)?.sequence ?? data.afterSequence;
 
   return {

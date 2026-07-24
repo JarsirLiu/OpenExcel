@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { removeEmptyAssistantMessages } from "./transcript.js";
+import { appendResponseMessages, removeEmptyAssistantMessages } from "./transcript.js";
 
 describe("removeEmptyAssistantMessages", () => {
   it("removes an empty assistant placeholder left by a failed stream", () => {
@@ -16,5 +16,26 @@ describe("removeEmptyAssistantMessages", () => {
     const message = { role: "assistant", parts: [{ type: "text", text: "我是 AI" }] };
 
     expect(removeEmptyAssistantMessages([message])).toEqual([message]);
+  });
+});
+
+describe("appendResponseMessages", () => {
+  it("generates unique assistant IDs for each user turn", () => {
+    const firstTurn = [{ id: "user-1", role: "user", parts: [] }];
+    const secondTurn = [
+      ...firstTurn,
+      { id: "assistant-user-1-1", role: "assistant", parts: [{ type: "text", text: "第一轮" }] },
+      { id: "user-2", role: "user", parts: [] },
+    ];
+
+    const first = appendResponseMessages(firstTurn, [
+      { role: "assistant", content: [{ type: "text", text: "第一轮" }] },
+    ]);
+    const second = appendResponseMessages(secondTurn, [
+      { role: "assistant", content: [{ type: "text", text: "第二轮" }] },
+    ]);
+
+    expect(first.at(-1)?.id).toBe("assistant-user-1-1");
+    expect(second.at(-1)?.id).toBe("assistant-user-2-1");
   });
 });

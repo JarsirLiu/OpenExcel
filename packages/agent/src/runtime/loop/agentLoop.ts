@@ -8,14 +8,13 @@ import {
   validateUIMessages,
 } from "ai";
 import { resolveModelForPurpose } from "../../model.js";
-import { compactMessagesIfNeeded } from "../../session/compaction.js";
 import {
   DEFAULT_MAX_CONVERSATION_TURNS,
   DEFAULT_MAX_USER_INPUT_TOKENS,
   DEFAULT_OUTPUT_RESERVE_TOKENS,
   trimMessagesToContextWindow,
 } from "../../session/contextWindow.js";
-import { removeEmptyAssistantMessages } from "../../session/transcript.js";
+import { appendResponseMessages, removeEmptyAssistantMessages } from "../../session/transcript.js";
 import type {
   AgentRunCompletion,
   AgentRunnerInput,
@@ -23,7 +22,7 @@ import type {
   AgentTranscriptMessage,
 } from "../contracts.js";
 import { formatAIError } from "../errors/formatAIError.js";
-import { createAgentEventEmitter } from "../events/events.js";
+import { AgentPersistenceError, createAgentEventEmitter } from "../events/events.js";
 import { convertChatReferenceDataPart } from "../stream/referencePart.js";
 import { createUIStreamAdapter } from "../stream/uiStreamAdapter.js";
 import { createAgentToolSet } from "../tools/toolAdapter.js";
@@ -33,12 +32,44 @@ export interface AgentLoopInput extends Omit<AgentRunnerInput, "workspace" | "tr
   systemPrompt: string;
 }
 
+function normalizeStepPayload(step: Record<string, unknown>) {
+  const toolCalls = Array.isArray(step.toolCalls)
+    ? step.toolCalls
+        .map((call) => {
+          if (!call || typeof call !== "object") return null;
+          const value = call as Record<string, unknown>;
+          return {
+            toolName: String(value.toolName ?? "unknown"),
+            toolCallId: String(value.toolCallId ?? "unknown"),
+          };
+        })
+        .filter((call): call is { toolName: string; toolCallId: string } => call !== null)
+    : [];
+  const toolResults = Array.isArray(step.toolResults)
+    ? step.toolResults.map((result) => ({
+        isError:
+          Boolean(result && typeof result === "object" && "error" in result) ||
+          Boolean(
+            result && typeof result === "object" && (result as Record<string, unknown>).isError,
+          ),
+      }))
+    : [];
+
+  return {
+    stepType: toolCalls.length > 0 ? "tool-call" : toolResults.length > 0 ? "tool-result" : "text",
+    finishReason: String(step.finishReason ?? "stop"),
+    ...(typeof step.text === "string" ? { text: step.text } : {}),
+    ...(toolCalls.length > 0 ? { toolCalls } : {}),
+    ...(toolResults.length > 0 ? { toolResults } : {}),
+  };
+}
+
 export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResult> {
   const normalizedMessages = removeEmptyAssistantMessages(input.transcript);
 
   const messagesForContext = normalizedMessages;
-  // TODO: compaction 实现缺少 token 阈值触发、工具结果截断、checkpoint 持久化和恢复保护，
-  // 目前先禁用，仅使用 contextWindow 截断。后续按 eve 的多级压缩策略完整实现。
+  // TODO: compaction still lacks token thresholds, tool-result capping, checkpoint persistence,
+  // and resume protection; keep it disabled until the full strategy is implemented.
   if (input.compaction?.enabled === true) {
     throw new Error(
       "Compaction is not fully implemented: token-threshold trigger, tool-result capping, " +
@@ -58,6 +89,8 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
     eventSink: input.eventSink,
     persistenceBarrier: input.persistenceBarrier,
   });
+  const emitEvent = (type: Parameters<typeof createEventEmitter.emit>[0], payload: unknown) =>
+    createEventEmitter.emit(type, payload);
   const tools = createAgentToolSet(input.tools, input.toolExecutor, input.executionContext, {
     onToolStart: async (event) => {
       await createEventEmitter.emit("tool.started", event);
@@ -74,7 +107,7 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
     messages: normalizedMessages as any,
     tools: tools as any,
   });
-  await createEventEmitter.emit("run.started", {
+  await emitEvent("run.started", {
     droppedMessages: contextWindow.droppedMessages,
     droppedTurns: contextWindow.droppedTurns,
   });
@@ -85,6 +118,7 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
   });
   let terminal = false;
   let loopError: unknown;
+  let aborted = false;
   const finish = (value: AgentRunCompletion) => {
     if (terminal) return;
     terminal = true;
@@ -105,13 +139,20 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
     timeout: (input.timeout ?? { totalMs: 120_000, chunkMs: 30_000 }) as any,
     abortSignal: input.abortSignal,
     onStepFinish: async (step: any) => {
-      await createEventEmitter.emit("step.finished", step);
+      await emitEvent("step.finished", normalizeStepPayload(step));
       await input.onStepFinish?.(step);
     },
+    onStepStart: async (step: any) => {
+      await emitEvent("step.started", {
+        stepNumber: typeof step?.stepNumber === "number" ? step.stepNumber : 0,
+      });
+    },
     onFinish: async ({ text }: any) => {
+      // Model text generation can finish before tool execution drains.
       await input.onFinish?.({ text });
     },
     onAbort: async (event: any) => {
+      aborted = true;
       await input.onAbort?.(event);
     },
     onError: async (error: unknown) => {
@@ -124,45 +165,70 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
     stream: result.stream,
     tools,
     originalMessages: persistenceMessages as unknown as AgentTranscriptMessage[],
-    onEnd: async ({ messages, isAborted }) => {
-      const failed = !isAborted && loopError !== undefined;
+  });
+
+  // Completion is independent of the UI stream and waits for all tool steps.
+  const baseMessages = persistenceMessages as unknown as AgentTranscriptMessage[];
+  void (async () => {
+    try {
+      // Wait for the full loop, including all tool executions.
+      // The AI SDK text promise resolves after all steps finish.
+      const [text, responseMessages] = await Promise.all([
+        result.text,
+        (result as { responseMessages?: PromiseLike<unknown> }).responseMessages ??
+          Promise.resolve(undefined),
+      ]);
+      const isAborted = aborted || input.abortSignal?.aborted === true;
+      const messages = appendResponseMessages(baseMessages, responseMessages);
+      const finalMessages: AgentTranscriptMessage[] =
+        messages.length === persistenceMessages.length &&
+        typeof text === "string" &&
+        text.length > 0
+          ? appendResponseMessages(baseMessages, [
+              { role: "assistant", content: [{ type: "text", text }] },
+            ])
+          : messages;
+
+      // Emit the terminal event only after all steps finish.
+      await emitEvent(loopError ? "run.failed" : isAborted ? "run.cancelled" : "run.completed", {
+        error: loopError ? formatAIError(loopError) : undefined,
+        isAborted,
+        messageCount: finalMessages.length,
+      });
+
+      finish({
+        status: loopError ? "failed" : isAborted ? "cancelled" : "completed",
+        text: loopError ? undefined : text,
+        error: loopError,
+        messages: finalMessages,
+        isAborted,
+      });
+    } catch (error) {
       try {
-        await createEventEmitter.emit(
-          failed ? "run.failed" : isAborted ? "run.cancelled" : "run.completed",
-          {
-            error: failed ? formatAIError(loopError) : undefined,
-            isAborted,
-            messageCount: messages.length,
-          },
-        );
-        await input.onEnd?.({ messages: messages as AgentTranscriptMessage[], isAborted });
-
-        finish({
-          status: failed ? "failed" : isAborted ? "cancelled" : "completed",
-          text: failed ? undefined : await result.text,
-          error: failed ? loopError : undefined,
-          messages: messages as AgentTranscriptMessage[],
-          isAborted,
-        });
-      } catch (error) {
-        loopError = error;
-        finish({
-          status: "failed",
-          error,
-          messages: messages as AgentTranscriptMessage[],
-          isAborted: false,
-        });
-        throw error;
+        await input.onError?.(error);
+      } catch (callbackError) {
+        console.error("[agentLoop] onError callback failed:", callbackError);
       }
-    },
-  });
-
-  void Promise.resolve(result.text).catch(async (error: unknown) => {
-    if (terminal) return;
-    await createEventEmitter.emit("run.failed", { error: formatAIError(error) });
-    await input.onError?.(error);
-    finish({ status: "failed", error, isAborted: false });
-  });
+      if (!(error instanceof AgentPersistenceError)) {
+        try {
+          await emitEvent("run.failed", {
+            error: formatAIError(error),
+            isAborted: false,
+            messageCount: persistenceMessages.length,
+          });
+        } catch {
+          // The completion still settles when the terminal event cannot be persisted.
+        }
+      }
+      finish({
+        status: "failed",
+        error,
+        failureKind: error instanceof AgentPersistenceError ? "persistence" : "execution",
+        messages: baseMessages,
+        isAborted: false,
+      });
+    }
+  })();
 
   return { stream, completion };
 }

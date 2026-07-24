@@ -148,4 +148,65 @@ describe("acquireRunLease", () => {
       },
     });
   });
+
+  it("continues holding the lease when the client disconnects without explicit cancellation", async () => {
+    // A client disconnect without an explicit cancel must keep the lease alive.
+    const now = new Date("2026-07-23T00:00:00.000Z");
+    mocks.sessionFindFirst.mockResolvedValue({
+      id: 7,
+      leaseOwnerId: null,
+      leaseExpiresAt: null,
+      version: 3,
+      chatMessages: "[]",
+    });
+
+    const lease = await acquireRunLease({
+      workspaceId: 1,
+      sessionId: 7,
+      requestId: "req-4",
+      inputText: "test",
+      now,
+      appendUserTurn: (messages) => messages,
+    });
+
+    // Simulate an HTTP connection closing without a cancel request.
+    expect(lease.ownerId).toBeDefined();
+    expect(lease.sessionVersion).toBe(4);
+
+    // The lease is released only by the run finalizer or lease expiry.
+    expect(mocks.sessionUpdateMany).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          leaseOwnerId: null,
+        }),
+      }),
+    );
+  });
+
+  it("protects the run from being overwritten by concurrent requests after disconnect", async () => {
+    // A concurrent request must be rejected while the original lease is valid.
+    const now = new Date("2026-07-23T00:00:00.000Z");
+    mocks.sessionFindFirst.mockResolvedValue({
+      id: 7,
+      leaseOwnerId: "original-owner",
+      leaseExpiresAt: new Date("2026-07-23T00:01:00.000Z"), // The lease is still valid.
+      version: 3,
+      chatMessages: "[]",
+    });
+
+    await expect(
+      acquireRunLease({
+        workspaceId: 1,
+        sessionId: 7,
+        requestId: "req-5",
+        inputText: "new request",
+        now,
+        appendUserTurn: (messages) => messages,
+      }),
+    ).rejects.toBeInstanceOf(SessionBusyError);
+
+    // No session update or new run should occur.
+    expect(mocks.sessionUpdateMany).not.toHaveBeenCalled();
+    expect(mocks.agentRunCreate).not.toHaveBeenCalled();
+  });
 });

@@ -143,21 +143,33 @@ export async function completeRunAndUpdateUndoCheckpoint(
   sessionId: number,
   runId: number,
   data: Record<string, unknown>,
+  lease?: { ownerId: string; sessionVersion: number },
+  recoveryGuard?: { sessionVersion: number },
 ) {
   return withWorkspaceUndoLock(workspaceId, async () => {
-    await runRepo.updateRun(runId, {
-      ...data,
-      endedAt: new Date(),
-    });
+    const updated = recoveryGuard
+      ? await runRepo.updateRunWithRecoveryGuard(runId, sessionId, recoveryGuard.sessionVersion, {
+          ...data,
+          endedAt: new Date(),
+        })
+      : lease
+        ? await runRepo.updateRunWithLease(runId, { ...data, endedAt: new Date() }, lease)
+        : await runRepo.updateRun(runId, { ...data, endedAt: new Date() });
+    if (!updated) return false;
 
     const run = await runRepo.findRunUndoState(runId);
-    if (!run) return;
+    if (!run) return true;
 
     if (run.hasUndoEffects && !run.undoInvalidated) {
-      const armed = await sessionRepo.setSessionUndoRun(sessionId, workspaceId, runId);
-      if (armed) return;
+      const sessionVersion = lease?.sessionVersion ?? recoveryGuard?.sessionVersion;
+      const armed =
+        sessionVersion == null
+          ? await sessionRepo.setSessionUndoRun(sessionId, workspaceId, runId)
+          : await sessionRepo.setSessionUndoRun(sessionId, workspaceId, runId, sessionVersion);
+      if (armed) return true;
     }
 
     await runRepo.deleteRunSnapshots(runId);
+    return true;
   });
 }

@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   findRunsWithSnapshotsForSheets: vi.fn(),
   findRunsWithSnapshotsForSheetsInTransaction: vi.fn(),
   updateRun: vi.fn(),
+  updateRunWithLease: vi.fn(),
   findRunUndoState: vi.fn(),
   deleteRunSnapshots: vi.fn(),
 }));
@@ -45,6 +46,7 @@ vi.mock("../infrastructure/sessionRepository.js", () => ({
 
 vi.mock("./repository.js", () => ({
   updateRun: mocks.updateRun,
+  updateRunWithLease: mocks.updateRunWithLease,
   findRunUndoState: mocks.findRunUndoState,
   findRunsWithSnapshotsForSheets: mocks.findRunsWithSnapshotsForSheets,
   findRunsWithSnapshotsForSheetsInTransaction: mocks.findRunsWithSnapshotsForSheetsInTransaction,
@@ -73,6 +75,8 @@ describe("undo checkpoint", () => {
     mocks.transaction.mockImplementation((callback: (tx: unknown) => unknown) =>
       callback(buildTx()),
     );
+    mocks.updateRun.mockResolvedValue({ id: 17 });
+    mocks.updateRunWithLease.mockResolvedValue(true);
   });
 
   it("arms exactly the completed run when it has undo effects", async () => {
@@ -104,6 +108,25 @@ describe("undo checkpoint", () => {
 
     expect(mocks.setSessionUndoRun).not.toHaveBeenCalled();
     expect(mocks.deleteRunSnapshots).toHaveBeenCalledWith(17);
+  });
+
+  it("arms a leased run only for the session version that created it", async () => {
+    mocks.findRunUndoState.mockResolvedValueOnce({
+      id: 17,
+      hasUndoEffects: true,
+      undoInvalidated: false,
+    });
+    mocks.setSessionUndoRun.mockResolvedValueOnce(true);
+
+    await completeRunAndUpdateUndoCheckpoint(
+      3,
+      5,
+      17,
+      { status: "completed" },
+      { ownerId: "owner-1", sessionVersion: 4 },
+    );
+
+    expect(mocks.setSessionUndoRun).toHaveBeenCalledWith(5, 3, 17, 4);
   });
 
   it("invalidates every active checkpoint candidate that snapshots the changed sheets", async () => {

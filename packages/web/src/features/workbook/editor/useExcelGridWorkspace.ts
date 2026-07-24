@@ -11,7 +11,8 @@ import {
 } from "@/api/workbooks";
 import { SheetSaveScheduler } from "@/features/sync/sheetSaveScheduler";
 import type { WorkbookStructureUpdate } from "@/features/sync/types";
-import { confirm } from "@/shared/lib";
+import { normalizeSheetIndex } from "@/features/workspace/sheetIndex";
+import { confirm, toast } from "@/shared/lib";
 import { adaptFortuneSheetLayout, type SheetGridLayout } from "../layout/fortuneSheetLayout";
 import { toFortuneSheetData } from "./fortuneSheet";
 import { useSheetActivation } from "./SheetActivationContext";
@@ -52,6 +53,7 @@ export function useExcelGridWorkspace({
   const saveStatusResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedSnapshotRef = useRef<Record<number, string>>({});
   const saveSchedulerRef = useRef<SheetSaveScheduler | null>(null);
+  const deletingSheetRef = useRef(false);
   if (!saveSchedulerRef.current) saveSchedulerRef.current = new SheetSaveScheduler();
   const workbookRef = useRef<WorkbookInstance>(null);
   const { sheetData, sessionKey } = useWorkbookEditorSession(workbook, workbookRevision);
@@ -70,6 +72,7 @@ export function useExcelGridWorkspace({
   }>({ sessionKey: layoutSessionKey, bySheetId: initialLayouts });
   const layoutBySheetId =
     layoutState.sessionKey === layoutSessionKey ? layoutState.bySheetId : initialLayouts;
+  const activeSheetIndex = normalizeSheetIndex(currentSheetIndex, workbook?.sheets.length ?? 0);
 
   const getSnapshot = useCallback((celldata: any[], config: any) => {
     return JSON.stringify({ celldata, config });
@@ -104,7 +107,7 @@ export function useExcelGridWorkspace({
 
   useEffect(() => {
     if (!workbook || !workbookRef.current) return;
-    const index = Math.max(0, Math.min(currentSheetIndex, workbook.sheets.length - 1));
+    const index = normalizeSheetIndex(currentSheetIndex, workbook.sheets.length);
     workbookRef.current.activateSheet({ index });
   }, [currentSheetIndex, workbook]);
 
@@ -159,8 +162,8 @@ export function useExcelGridWorkspace({
 
   const scheduleSave = useCallback(
     (celldata: any[], config: any) => {
-      if (!workbook?.sheets[currentSheetIndex]) return;
-      const sheet = workbook.sheets[currentSheetIndex];
+      if (!workbook?.sheets[activeSheetIndex]) return;
+      const sheet = workbook.sheets[activeSheetIndex];
       if (!Array.isArray(celldata)) return;
 
       const snapshot = getSnapshot(celldata, config);
@@ -171,7 +174,7 @@ export function useExcelGridWorkspace({
         syncSheetToServer(sheet.id, celldata, config, baseRevision, mutationId),
       );
     },
-    [currentSheetIndex, getSnapshot, syncSheetToServer, workbook],
+    [activeSheetIndex, getSnapshot, syncSheetToServer, workbook],
   );
 
   const handleChange = useCallback(
@@ -190,7 +193,7 @@ export function useExcelGridWorkspace({
         return { sessionKey: layoutSessionKey, bySheetId };
       });
 
-      const sheet = workbook.sheets[currentSheetIndex];
+      const sheet = workbook.sheets[activeSheetIndex];
       if (!sheet) return;
       const fortuneSheet = data.find((s: any) => String(s.id) === String(sheet.id));
       if (!fortuneSheet) return;
@@ -201,7 +204,7 @@ export function useExcelGridWorkspace({
       const config = extractSheetConfig(fortuneSheet);
       scheduleSave(celldata, config);
     },
-    [currentSheetIndex, initialLayouts, layoutSessionKey, scheduleSave, workbook],
+    [activeSheetIndex, initialLayouts, layoutSessionKey, scheduleSave, workbook],
   );
 
   const handleActivateSheet = useCallback(
@@ -248,14 +251,16 @@ export function useExcelGridWorkspace({
     (sheetId: string | number) => {
       if (!workbook) return false;
       const numericSheetId = Number(sheetId);
+      if (!Number.isInteger(numericSheetId)) return false;
       const deletedSheet = workbook.sheets.find((sheet) => sheet.id === numericSheetId);
       if (!deletedSheet) return false;
+      if (deletingSheetRef.current) return false;
+      deletingSheetRef.current = true;
 
       void (async () => {
         try {
           if (workspaceId == null) return;
           await deleteSheet(workspaceId, workbook.id, numericSheetId);
-          await onWorkbookMutation?.();
           await onWorkbookStructureChanged?.({
             toolCallId: `ui-delete-sheet:${workbook.id}:${numericSheetId}`,
             kind: "sheet-deleted",
@@ -264,9 +269,21 @@ export function useExcelGridWorkspace({
             sheetNo: deletedSheet.sheetNo,
             order: deletedSheet.order,
           });
+          try {
+            await onWorkbookMutation?.();
+          } catch (error) {
+            console.error("删除 Sheet 后刷新工作簿状态失败:", error);
+          }
+          toast({ message: "Sheet 已删除", variant: "success" });
         } catch (error) {
           console.error("删除 Sheet 失败:", error);
+          toast({
+            message: error instanceof Error ? error.message : "删除 Sheet 失败",
+            variant: "error",
+          });
           await onWorkbookRefresh?.();
+        } finally {
+          deletingSheetRef.current = false;
         }
       })();
       return false;

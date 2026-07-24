@@ -1,5 +1,6 @@
 import * as repo from "../infrastructure/sessionRepository.js";
 import * as runRepo from "../runs/repository.js";
+import { canAutoRecoverRun } from "./recovery.js";
 import { getSessionMessagesPaginated, historyFromRuns } from "./transcript.js";
 
 export async function getSessions(workspaceId: number) {
@@ -43,10 +44,14 @@ export async function getMessages(
   return { messages: transcript.slice(start, end), total: t };
 }
 
-export async function getRuns(workspaceId: number, sessionId: number) {
+export async function getRuns(
+  workspaceId: number,
+  sessionId: number,
+  status?: "recovery_required",
+) {
   const session = await repo.findSession(sessionId, workspaceId);
   if (!session) return [];
-  const runs = await runRepo.findRunsBySession(workspaceId, sessionId);
+  const runs = await runRepo.findRunsBySession(workspaceId, sessionId, status);
   const steps = await Promise.all(
     runs.map(async (run: (typeof runs)[number]) => ({
       ...run,
@@ -54,4 +59,31 @@ export async function getRuns(workspaceId: number, sessionId: number) {
     })),
   );
   return steps;
+}
+
+export async function getRecoveryRuns(workspaceId: number, sessionId: number) {
+  const runs = await runRepo.findRunsBySession(workspaceId, sessionId, "recovery_required");
+  const activeRun = await runRepo.findActiveRun(sessionId);
+  return Promise.all(
+    runs.map(async (run) => {
+      const toolExecutions = await runRepo.findRunToolExecutions(run.id);
+      const recoveryState = await runRepo.findRunRecoveryState(workspaceId, sessionId, run.id);
+      const affected = await runRepo.findRunAffectedEntities(run.id);
+      return {
+        id: run.id,
+        status: run.status,
+        startedAt: run.startedAt,
+        endedAt: run.endedAt,
+        errorMessage: run.errorMessage,
+        lastEventSequence: run.lastEventSequence,
+        affectedWorkbooks: affected.workbookIds,
+        affectedSheets: affected.sheetIds,
+        toolExecutions,
+        canAutoRecover:
+          activeRun == null &&
+          recoveryState != null &&
+          canAutoRecoverRun(recoveryState, toolExecutions),
+      };
+    }),
+  );
 }

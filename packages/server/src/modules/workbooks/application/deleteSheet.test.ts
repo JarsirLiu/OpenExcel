@@ -35,20 +35,17 @@ describe("deleteSheet", () => {
     expect(mockedRepo.deleteSheetAndReindex).not.toHaveBeenCalled();
   });
 
-  it("deletes the last remaining sheet and leaves an empty workbook", async () => {
+  it("blocks deleting the last remaining sheet", async () => {
     mockedRepo.findWorkbookWithSheets.mockResolvedValue({
       id: 1,
       sheets: [{ id: 10, order: 0 }],
     } as any);
-    mockedRepo.deleteSheetAndReindex.mockResolvedValue(undefined as any);
 
     await expect(deleteSheet(1, 1, 10)).resolves.toEqual({
-      success: true,
-      workbookId: 1,
-      sheetId: 10,
-      order: 0,
+      error: "工作簿必须保留至少一个工作表",
+      statusCode: 409,
     });
-    expect(mockedRepo.deleteSheetAndReindex).toHaveBeenCalledWith(1, 10, 1);
+    expect(mockedRepo.deleteSheetAndReindex).not.toHaveBeenCalled();
   });
 
   it("deletes and reindexes remaining sheets", async () => {
@@ -84,6 +81,27 @@ describe("deleteSheet", () => {
 
     await expect(deleteSheet(1, 1, 11)).resolves.toEqual({
       error: "无法删除 Sheet：仍有 1 个图表引用它",
+      statusCode: 409,
+    });
+    expect(mockedRepo.deleteSheetAndReindex).not.toHaveBeenCalled();
+  });
+
+  it("rechecks the last-sheet invariant after waiting for another deletion", async () => {
+    mockedRepo.findWorkbookWithSheets
+      .mockResolvedValueOnce({
+        id: 1,
+        sheets: [
+          { id: 10, sheetNo: 1, order: 0 },
+          { id: 11, sheetNo: 2, order: 1 },
+        ],
+      } as any)
+      .mockResolvedValueOnce({
+        id: 1,
+        sheets: [{ id: 10, sheetNo: 1, order: 0 }],
+      } as any);
+
+    await expect(deleteSheet(1, 1, 11)).resolves.toEqual({
+      error: "工作簿必须保留至少一个工作表",
       statusCode: 409,
     });
     expect(mockedRepo.deleteSheetAndReindex).not.toHaveBeenCalled();

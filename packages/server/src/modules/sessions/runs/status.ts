@@ -5,6 +5,7 @@ export const runStatuses = [
   "failed",
   "persistence_failed",
   "recovery_required",
+  "abandoned",
   "reverted",
 ] as const;
 
@@ -16,6 +17,7 @@ export const terminalRunStatuses = new Set<RunStatus>([
   "failed",
   "persistence_failed",
   "recovery_required",
+  "abandoned",
   "reverted",
 ]);
 
@@ -25,7 +27,8 @@ const allowedTransitions: Record<RunStatus, ReadonlySet<RunStatus>> = {
   cancelled: new Set(["reverted"]),
   failed: new Set(["reverted"]),
   persistence_failed: new Set(),
-  recovery_required: new Set(),
+  recovery_required: new Set(["completed", "abandoned"]),
+  abandoned: new Set(),
   reverted: new Set(),
 };
 

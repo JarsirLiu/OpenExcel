@@ -20,30 +20,35 @@ import { runAgentLoop } from "./agentLoop.js";
 function createModelStream(options: {
   tools: Record<string, { execute: (input: unknown, toolOptions: unknown) => Promise<unknown> }>;
   onStepFinish: (step: unknown) => Promise<void>;
+  onStepStart: (step: unknown) => Promise<void>;
   abortSignal?: AbortSignal;
 }) {
-  return new ReadableStream({
-    async pull(controller) {
-      const toolOutput = await options.tools.readSheetData.execute(
-        { sheetId: 7 },
-        { toolCallId: "call-1", abortSignal: options.abortSignal },
-      );
-      await options.onStepFinish({ toolOutput });
-      controller.enqueue({ type: "text-delta", textDelta: "完成" });
-      controller.close();
+  let resolveDone!: () => void;
+  const done = new Promise<void>((resolve) => {
+    resolveDone = resolve;
+  });
+  const stream = new ReadableStream({
+    start(controller) {
+      void (async () => {
+        await options.onStepStart({ stepNumber: 0 });
+        const toolOutput = await options.tools.readSheetData.execute(
+          { sheetId: 7 },
+          { toolCallId: "call-1", abortSignal: options.abortSignal },
+        );
+        await options.onStepFinish({ toolOutput });
+        controller.enqueue({ type: "text-delta", textDelta: "完成" });
+        controller.close();
+        resolveDone();
+      })();
     },
   });
+  return { stream, done };
 }
 
 function setupUIStreamAdapter() {
   mocks.toUIMessageStream.mockImplementation(
-    (options: {
-      stream: ReadableStream<unknown>;
-      originalMessages: unknown[];
-      onEnd: (event: { messages: unknown[]; isAborted: boolean }) => Promise<void>;
-    }) => {
+    (options: { stream: ReadableStream<unknown>; originalMessages: unknown[] }) => {
       const reader = options.stream.getReader();
-      let ended = false;
 
       return new ReadableStream({
         async pull(controller) {
@@ -53,13 +58,6 @@ function setupUIStreamAdapter() {
             return;
           }
 
-          if (!ended) {
-            ended = true;
-            await options.onEnd({
-              messages: [...options.originalMessages, { role: "assistant", parts: [] }],
-              isAborted: false,
-            });
-          }
           controller.close();
         },
       });
@@ -89,10 +87,38 @@ describe("runAgentLoop", () => {
 
   it("runs tools inside the agent package and exposes completion separately from the UI stream", async () => {
     setupUIStreamAdapter();
-    mocks.streamText.mockImplementation((options: any) => ({
-      stream: createModelStream(options),
-      text: Promise.resolve("完成"),
-    }));
+    mocks.streamText.mockImplementation((options: any) => {
+      const model = createModelStream(options);
+      return {
+        stream: model.stream,
+        text: model.done.then(() => "完成"),
+        responseMessages: model.done.then(() => [
+          {
+            role: "assistant",
+            content: [
+              { type: "text", text: "完成" },
+              {
+                type: "tool-call",
+                toolName: "readSheetData",
+                toolCallId: "call-1",
+                input: { sheetId: 7 },
+              },
+            ],
+          },
+          {
+            role: "tool",
+            content: [
+              {
+                type: "tool-result",
+                toolName: "readSheetData",
+                toolCallId: "call-1",
+                output: { cells: [[1]] },
+              },
+            ],
+          },
+        ]),
+      };
+    });
 
     const eventTypes: string[] = [];
     const persistedTypes: string[] = [];
@@ -119,13 +145,28 @@ describe("runAgentLoop", () => {
     const result = await runAgentLoop(input);
     const reader = result.stream.getReader();
     while (!(await reader.read()).done) {
-      // Drain the transport projection so the loop can reach onEnd.
+      // Drain the transport projection independently from completion.
     }
     const completion = await result.completion;
 
     for (const type of persistedTypes) eventTypes.push(type);
 
     expect(completion).toMatchObject({ status: "completed", text: "完成", isAborted: false });
+    expect(completion.messages).toEqual([
+      expect.objectContaining({
+        role: "user",
+      }),
+      expect.objectContaining({
+        role: "assistant",
+        parts: expect.arrayContaining([
+          expect.objectContaining({
+            type: "tool-readSheetData",
+            state: "output-available",
+            output: { cells: [[1]] },
+          }),
+        ]),
+      }),
+    ]);
     expect(execute).toHaveBeenCalledWith(
       "readSheetData",
       { sheetId: 7 },
@@ -133,6 +174,7 @@ describe("runAgentLoop", () => {
     );
     expect(eventTypes).toEqual([
       "run.started",
+      "step.started",
       "tool.started",
       "tool.finished",
       "step.finished",
@@ -142,5 +184,65 @@ describe("runAgentLoop", () => {
     expect(mocks.streamText).toHaveBeenCalledWith(
       expect.objectContaining({ stopWhen: "loop-finished", tools: expect.any(Object) }),
     );
+  });
+
+  it("completes the run even when the UI stream is never consumed", async () => {
+    setupUIStreamAdapter();
+    mocks.streamText.mockImplementation((options: any) => {
+      const model = createModelStream(options);
+      return { stream: model.stream, text: model.done.then(() => "完成") };
+    });
+
+    const execute = vi.fn().mockResolvedValue({ cells: [[1]] });
+    const input = {
+      modelConfig: { baseUrl: "http://model", apiKey: "test-key", modelName: "test-model" },
+      transcript: [{ role: "user", parts: [{ type: "text", text: "读取数据" }] }],
+      systemPrompt: "你是表格助手",
+      workspace: [],
+      tools: [{ name: "readSheetData", description: "读取", inputSchema: {} }],
+      toolExecutor: { execute },
+      executionContext: {},
+      eventSink: { publish: vi.fn() },
+      persistenceBarrier: { persist: vi.fn() },
+    } as any;
+
+    const result = await runAgentLoop(input);
+    // Wait for completion without consuming the UI stream.
+    const completion = await result.completion;
+
+    expect(completion.status).toBe("completed");
+    expect(execute).toHaveBeenCalled();
+    // The transport stream remains available and unconsumed.
+    expect(result.stream).toBeInstanceOf(ReadableStream);
+  });
+
+  it("continues execution after the UI stream is cancelled mid-flight", async () => {
+    setupUIStreamAdapter();
+    mocks.streamText.mockImplementation((options: any) => {
+      const model = createModelStream(options);
+      return { stream: model.stream, text: model.done.then(() => "完成") };
+    });
+
+    const execute = vi.fn().mockResolvedValue({ cells: [[1]] });
+    const input = {
+      modelConfig: { baseUrl: "http://model", apiKey: "test-key", modelName: "test-model" },
+      transcript: [{ role: "user", parts: [{ type: "text", text: "读取数据" }] }],
+      systemPrompt: "你是表格助手",
+      workspace: [],
+      tools: [{ name: "readSheetData", description: "读取", inputSchema: {} }],
+      toolExecutor: { execute },
+      executionContext: {},
+      eventSink: { publish: vi.fn() },
+      persistenceBarrier: { persist: vi.fn() },
+    } as any;
+
+    const result = await runAgentLoop(input);
+    // Cancel the transport stream before completion.
+    result.stream.cancel();
+
+    // Completion still reaches a terminal state.
+    const completion = await result.completion;
+    expect(completion.status).toBe("completed");
+    expect(execute).toHaveBeenCalled();
   });
 });
