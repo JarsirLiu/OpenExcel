@@ -229,6 +229,39 @@ C4 = B4 * 10
 
 `objectType` 的取值包括 `charts`、`filters`、`tables` 和 `pivotTables`。对象工具只返回模型决策所需的摘要，不返回 OOXML、ECharts option 或完整绘图缓存。当前只有图表和筛选已建模；调用 `tables` 或 `pivotTables` 会明确报告尚未建模，不会返回空数组。后续对象类型必须分别拥有导入、存储和 core 投影边界，不能在一个实现文件中合并成通用 JSON。
 
+### 2.4 `createChart` 与图表写入契约
+
+图表写入工具使用独立的 `ChartSpec` 对象，不把图表配置混入单元格数据。`createChart` 的输入至少包含工作簿、Sheet、图表类型、显式锚点和连续数据源范围：
+
+```json
+{
+  "workbookId": 6,
+  "sheetId": 4,
+  "type": "bar",
+  "title": "销售统计",
+  "anchor": {
+    "kind": "twoCell",
+    "from": { "row": 2, "col": 8 },
+    "to": { "row": 16, "col": 14 }
+  },
+  "sourceRange": {
+    "sheetId": 4,
+    "startRow": 1,
+    "startCol": 1,
+    "endRow": 12,
+    "endCol": 4
+  }
+}
+```
+
+约束如下：
+
+- `anchor` 必须是扁平对象，不能传字符串范围或嵌套 `oneOf`；`twoCell` 适合随行列布局调整，`oneCell` 和 `absolute` 适合需要固定尺寸的场景；
+- 锚点和数据范围的行列号从 1 开始，server 会在进入 core 前转换为 0-based 坐标；图表位置没有随机默认值，调用方必须明确传入锚点；
+- `sourceRange` 必须是连续矩形，系统按 Excel 规则将首行作为系列标题、首列作为分类，并生成实际系列引用，不需要传入具体数据值；
+- 组合图可以额外传入 `seriesTypes`，每个系列只能是 `bar`、`line` 或 `area`；
+- `updateChart` 使用相同的锚点结构，`listCharts` 返回持久化后的锚点和数据引用；图表变更完成后，Web 通过工作簿刷新契约重新读取 ChartSpec。
+
 ## 3. 模块职责
 
 ```text
