@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { convertChatReferenceDataPart } from "./streamChat.js";
+import { convertChatReferenceDataPart } from "./agentLoop.js";
 
 describe("convertChatReferenceDataPart", () => {
   it("turns a resolved reference into model-readable identity text", () => {

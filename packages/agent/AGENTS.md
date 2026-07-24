@@ -48,7 +48,6 @@ The current codebase is intentionally small and focused:
 - `src/runtime/toolAdapter.ts` - Agent tools to AI SDK tools
 - `src/runtime/events.ts` - provider-neutral event sequencing
 - `src/runtime/uiStreamAdapter.ts` - UI message stream transport adapter
-- `src/runtime/streamChat.ts` - package-local bridge retained for existing tests
 
 Tests currently live next to the implementation files.
 
@@ -126,7 +125,7 @@ Agent should only define the AI-facing contract and the execution wrapper.
 
 ### 4.6 Streaming execution
 
-`runtime/streamChat.ts` is the execution wrapper around the AI SDK.
+`runtime/agentLoop.ts` is the execution wrapper around the AI SDK.
 
 It should:
 

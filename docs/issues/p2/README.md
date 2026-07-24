@@ -4,3 +4,4 @@
 
 - [Excel Table 与 PivotTable 对象模型](excel-object-model.md)
 - [FortuneSheet 单元格筛选自动扩展](fortune-sheet-filter-autorange.md)
+- [将单元格选区添加到 AI 对话](chat-cell-selection-reference.md)

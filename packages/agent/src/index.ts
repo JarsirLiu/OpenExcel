@@ -19,11 +19,6 @@ export type {
 } from "./runtime/contracts.js";
 export { formatAIError } from "./runtime/formatAIError.js";
 export {
-  removeEmptyAssistantMessages,
-  type StreamChatInput,
-  streamChat,
-} from "./runtime/streamChat.js";
-export {
   type BudgetableToolSet,
   DEFAULT_READ_SHEET_DATA_BUDGET_TOKENS,
   DEFAULT_TOOL_RESULT_BUDGET_TOKENS,
@@ -48,7 +43,7 @@ export {
   estimateTokens,
   trimMessagesToContextWindow,
 } from "./session/contextWindow.js";
-export { historyFromRuns } from "./session/transcript.js";
+export { historyFromRuns, removeEmptyAssistantMessages } from "./session/transcript.js";
 export {
   buildExcelToolCatalog,
   buildExcelToolContext,

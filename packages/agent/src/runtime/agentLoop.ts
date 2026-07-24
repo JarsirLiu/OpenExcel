@@ -15,6 +15,7 @@ import {
   DEFAULT_OUTPUT_RESERVE_TOKENS,
   trimMessagesToContextWindow,
 } from "../session/contextWindow.js";
+import { removeEmptyAssistantMessages } from "../session/transcript.js";
 import type {
   AgentRunCompletion,
   AgentRunnerInput,
@@ -85,15 +86,6 @@ export function convertChatReferenceDataPart(part: unknown) {
     type: "text" as const,
     text: `[用户明确引用的 Sheet: ${reference.data.workbookName} / ${reference.data.sheetName} (workbookId=${reference.data.workbookId}, sheetId=${reference.data.sheetId}${sheetNumber})]`,
   };
-}
-
-function removeEmptyAssistantMessages(
-  messages: AgentTranscriptMessage[],
-): AgentTranscriptMessage[] {
-  return messages.filter(
-    (message) =>
-      !(message.role === "assistant" && Array.isArray(message.parts) && message.parts.length === 0),
-  );
 }
 
 export interface AgentLoopInput extends Omit<AgentRunnerInput, "workspace" | "transcript"> {

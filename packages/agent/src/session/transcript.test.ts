@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { removeEmptyAssistantMessages } from "./streamChat.js";
+import { removeEmptyAssistantMessages } from "./transcript.js";
 
 describe("removeEmptyAssistantMessages", () => {
   it("removes an empty assistant placeholder left by a failed stream", () => {
