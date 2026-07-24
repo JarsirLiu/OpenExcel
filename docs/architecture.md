@@ -163,6 +163,11 @@ same model, then connect persistence, API, AI tools, and web rendering. Renderin
 complete until an imported or AI-created chart survives export without losing its chart, drawing,
 or relationship parts.
 
+Excel capabilities follow the same boundary. `packages/core` may define provider-neutral capability
+contracts, tool names, descriptions, input schemas, and pure command validation, but it must not
+import `packages/agent` or contain database-backed tool executors. The server maps those contracts
+to the Agent runtime and supplies the concrete execution adapters.
+
 The current FortuneSheet `chart` configuration field is a compatibility projection only. New
 features must not depend on its `any[]` shape. Charts use stable workbook and sheet identities,
 not sheet names, so same-named sheets in different workbooks remain unambiguous.
@@ -175,7 +180,7 @@ runtime design is maintained in [Agent Loop](agent-loop.md).
 Responsibilities:
 
 - Model-facing Agent behavior and session context transformation
-- AI-visible tool contracts and runtime ports
+- Generic tool ports and provider-neutral execution contracts
 - Provider-neutral execution events
 
 It must not depend on HTTP, React, Fastify, Prisma, or concrete workbook
@@ -193,6 +198,8 @@ Responsibilities:
 - Workbook and sheet persistence
 - Session title generation
 - Authentication and workspace authorization
+- Tool visibility, resource-scope authorization, and approval policies
+- Concrete workbook, sheet, and chart tool execution
 
 Uploaded workbook files are stored as immutable source assets. In local development the default
 root is `.data/storage`; production may replace the local storage adapter with S3, MinIO, or
@@ -758,7 +765,7 @@ save system beside full snapshots.
 
 1. Entering a workspace opens a new in-memory draft conversation. The persisted session list is history and is not automatically selected.
 2. User sends one new user message from the draft. Web posts the message, stable workbook/Sheet reference IDs, and an idempotency key to `sessions/draft/chat`; it never submits the full local transcript as the model context. The server creates the persisted `Session`, reads or creates the canonical transcript, stores the initial user message, and starts the stream in one application use case. The initial session name is a deterministic fallback derived from the first user message.
-3. The server resolves references and authorization against the current workspace, then invokes `packages/agent` with the canonical transcript, authorized context, and server-owned runtime ports. Agent context construction, tool-loop control, retries, and recovery follow [Agent Loop](agent-loop.md).
+3. The server resolves references and authorization against the current workspace, filters the core capability catalog into the tools visible for this user and run, then invokes `packages/agent` with the canonical transcript, authorized context, and server-owned runtime ports. Agent context construction, tool-loop control, retries, and recovery follow [Agent Loop](agent-loop.md).
 4. The server persists authoritative run state, transcript updates, tool effects, and recoverable events. Only persisted events are sent through the stream; a transport failure never becomes a persistence decision.
 5. Web renders the server stream and refreshes affected workbook/session state from server versions. The browser does not execute tools, advance the Agent loop, assemble model context, or produce authoritative tool results.
 
