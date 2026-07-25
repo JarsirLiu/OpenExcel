@@ -365,7 +365,7 @@ export async function upsertRunChartSnapshot(data: {
   return prisma.$transaction((tx) => upsertRunChartSnapshotUsing(tx, data));
 }
 
-async function upsertRunChartSnapshotUsing(
+export async function upsertRunChartSnapshotUsing(
   db: RunSnapshotDatabase,
   data: {
     runId: number;

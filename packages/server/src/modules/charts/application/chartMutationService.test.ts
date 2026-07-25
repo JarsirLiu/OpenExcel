@@ -3,30 +3,50 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   getChartRecord: vi.fn(),
+  getChartRecordInTransaction: vi.fn(),
+  buildChartSpec: vi.fn(),
+  createChartInTransaction: vi.fn(),
+  deleteChartInTransaction: vi.fn(),
+  updateChartInTransaction: vi.fn(),
   buildUpdatedChartSpec: vi.fn(),
   persistUpdatedChart: vi.fn(),
   upsertRunChartSnapshot: vi.fn(),
+  upsertRunChartSnapshotUsing: vi.fn(),
   withUndoTrackedMutation: vi.fn(),
+  withUndoTrackedSheetMutationAfterSuccess: vi.fn(),
 }));
 
 vi.mock("./chartService.js", () => ({
-  buildChartSpec: vi.fn(),
+  buildChartSpec: mocks.buildChartSpec,
   buildUpdatedChartSpec: mocks.buildUpdatedChartSpec,
   getChartRecord: mocks.getChartRecord,
+  getChartRecordInTransaction: mocks.getChartRecordInTransaction,
   persistChart: vi.fn(),
-  persistDeletedChart: vi.fn(),
   persistUpdatedChart: mocks.persistUpdatedChart,
+  persistDeletedChart: vi.fn(),
 }));
 
 vi.mock("../../sessions/runs/repository.js", () => ({
   upsertRunChartSnapshot: mocks.upsertRunChartSnapshot,
+  upsertRunChartSnapshotUsing: mocks.upsertRunChartSnapshotUsing,
 }));
 
 vi.mock("../../sessions/runs/undoCheckpoint.js", () => ({
   withUndoTrackedMutation: mocks.withUndoTrackedMutation,
+  withUndoTrackedSheetMutationAfterSuccess: mocks.withUndoTrackedSheetMutationAfterSuccess,
 }));
 
-import { updateChartMutation } from "./chartMutationService.js";
+vi.mock("../infrastructure/chartRepository.js", () => ({
+  createChartInTransaction: mocks.createChartInTransaction,
+  deleteChartInTransaction: mocks.deleteChartInTransaction,
+  updateChartInTransaction: mocks.updateChartInTransaction,
+}));
+
+import {
+  createChartMutation,
+  deleteChartMutation,
+  updateChartMutation,
+} from "./chartMutationService.js";
 
 const previous: ChartSpec = {
   id: "chart-1",
@@ -74,31 +94,108 @@ describe("chartMutationService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.getChartRecord.mockResolvedValue({ spec: previous, order: 4 });
+    mocks.getChartRecordInTransaction.mockResolvedValue({ spec: previous, order: 4 });
+    mocks.buildChartSpec.mockReturnValue(previous);
+    mocks.createChartInTransaction.mockResolvedValue({ id: 1 });
+    mocks.updateChartInTransaction.mockResolvedValue({ id: 1 });
+    mocks.deleteChartInTransaction.mockResolvedValue({ id: 1 });
     mocks.buildUpdatedChartSpec.mockReturnValue(next);
     mocks.persistUpdatedChart.mockResolvedValue(next);
     mocks.withUndoTrackedMutation.mockImplementation(
       async (
         _workspaceId: number,
-        resolveSheetIds: () => Promise<number[]>,
+        resolveSheetIds: number[] | (() => Promise<number[]>),
         mutation: () => Promise<unknown>,
       ) => {
-        await resolveSheetIds();
+        if (typeof resolveSheetIds === "function") await resolveSheetIds();
         return mutation();
       },
     );
+    mocks.withUndoTrackedSheetMutationAfterSuccess.mockImplementation(
+      async (
+        _workspaceId: number,
+        resolveSheetIds: number[] | (() => Promise<number[]>),
+        mutation: (value: unknown) => Promise<unknown>,
+      ) => {
+        if (typeof resolveSheetIds === "function") await resolveSheetIds();
+        return mutation({});
+      },
+    );
+  });
+
+  it("creates the chart and undo snapshot through one transaction for a run", async () => {
+    const tx = { chart: {}, agentRunChartSnapshot: {} };
+    mocks.withUndoTrackedSheetMutationAfterSuccess.mockImplementation(
+      async (
+        _workspaceId: number,
+        _sheetIds: number[],
+        mutation: (value: unknown) => Promise<unknown>,
+      ) => mutation(tx),
+    );
+
+    await createChartMutation(
+      1,
+      {
+        workbookId: "7",
+        sheetId: "11",
+        type: "line",
+        anchor: previous.anchor,
+        series: previous.series,
+      },
+      { runId: 20 },
+    );
+
+    expect(mocks.upsertRunChartSnapshotUsing).toHaveBeenCalledWith(tx, {
+      runId: 20,
+      chartId: previous.id,
+      workbookId: 7,
+      sheetId: 11,
+      sheetIds: [11, 10],
+      order: 0,
+      spec: null,
+    });
+    expect(mocks.createChartInTransaction).toHaveBeenCalledWith(tx, 1, previous);
   });
 
   it("uses the union of previous and next chart dependencies for undo invalidation", async () => {
     await updateChartMutation(1, "chart-1", { series: next.series }, { runId: 20 });
 
-    expect(mocks.upsertRunChartSnapshot).toHaveBeenCalledWith({
+    expect(mocks.upsertRunChartSnapshotUsing).toHaveBeenCalledWith(
+      {},
+      {
+        runId: 20,
+        chartId: "chart-1",
+        workbookId: 7,
+        sheetId: 11,
+        sheetIds: [11, 10, 12],
+        order: 4,
+        spec: JSON.stringify(previous),
+      },
+    );
+    expect(mocks.updateChartInTransaction).toHaveBeenCalledWith({}, 1, "chart-1", next);
+  });
+
+  it("deletes the chart and undo snapshot through one transaction for a run", async () => {
+    const tx = { chart: {}, agentRunChartSnapshot: {} };
+    mocks.withUndoTrackedSheetMutationAfterSuccess.mockImplementation(
+      async (
+        _workspaceId: number,
+        _sheetIds: number[],
+        mutation: (value: unknown) => Promise<unknown>,
+      ) => mutation(tx),
+    );
+
+    await deleteChartMutation(1, "chart-1", { runId: 20 });
+
+    expect(mocks.upsertRunChartSnapshotUsing).toHaveBeenCalledWith(tx, {
       runId: 20,
       chartId: "chart-1",
       workbookId: 7,
       sheetId: 11,
-      sheetIds: [11, 10, 12],
+      sheetIds: [11, 10],
       order: 4,
       spec: JSON.stringify(previous),
     });
+    expect(mocks.deleteChartInTransaction).toHaveBeenCalledWith(tx, 1, "chart-1");
   });
 });

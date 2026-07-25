@@ -54,30 +54,46 @@ export async function findChart(workspaceId: number, chartId: string) {
   });
 }
 
-export async function createChart(workspaceId: number, spec: ChartSpec) {
-  return prisma.$transaction(async (tx) => {
-    const workbookId = parseChartRelationId(spec.workbookId, "workbookId");
-    const workbook = await tx.workbook.findFirst({
-      where: { id: workbookId, workspaceId },
-      select: { id: true },
-    });
-    if (!workbook) return null;
-
-    const { sheetId } = await assertChartReferencesBelongToWorkbook(tx, spec);
-    const maxOrder = await tx.chart.aggregate({
-      where: { workbookId },
-      _max: { order: true },
-    });
-    return tx.chart.create({
-      data: {
-        publicId: spec.id,
-        workbookId,
-        sheetId,
-        order: (maxOrder._max.order ?? -1) + 1,
-        spec: serializeChartSpec(spec),
-      },
-    });
+export async function findChartInTransaction(
+  tx: Prisma.TransactionClient,
+  workspaceId: number,
+  chartId: string,
+) {
+  return tx.chart.findFirst({
+    where: { publicId: chartId, workbook: { workspaceId } },
   });
+}
+
+export async function createChartInTransaction(
+  tx: Prisma.TransactionClient,
+  workspaceId: number,
+  spec: ChartSpec,
+) {
+  const workbookId = parseChartRelationId(spec.workbookId, "workbookId");
+  const workbook = await tx.workbook.findFirst({
+    where: { id: workbookId, workspaceId },
+    select: { id: true },
+  });
+  if (!workbook) return null;
+
+  const { sheetId } = await assertChartReferencesBelongToWorkbook(tx, spec);
+  const maxOrder = await tx.chart.aggregate({
+    where: { workbookId },
+    _max: { order: true },
+  });
+  return tx.chart.create({
+    data: {
+      publicId: spec.id,
+      workbookId,
+      sheetId,
+      order: (maxOrder._max.order ?? -1) + 1,
+      spec: serializeChartSpec(spec),
+    },
+  });
+}
+
+export async function createChart(workspaceId: number, spec: ChartSpec) {
+  return prisma.$transaction((tx) => createChartInTransaction(tx, workspaceId, spec));
 }
 
 export async function createChartsInTransaction(
@@ -134,21 +150,28 @@ export async function createImportedChartsInTransaction(
 }
 
 export async function updateChart(workspaceId: number, chartId: string, spec: ChartSpec) {
-  return prisma.$transaction(async (tx) => {
-    const current = await tx.chart.findFirst({
-      where: { publicId: chartId, workbook: { workspaceId } },
-      select: { id: true, workbookId: true, order: true },
-    });
-    if (!current) return null;
-    if (spec.id !== chartId || spec.workbookId !== String(current.workbookId)) {
-      throw new Error("Chart identity cannot change during update");
-    }
+  return prisma.$transaction((tx) => updateChartInTransaction(tx, workspaceId, chartId, spec));
+}
 
-    const { sheetId } = await assertChartReferencesBelongToWorkbook(tx, spec);
-    return tx.chart.update({
-      where: { id: current.id },
-      data: { sheetId, spec: serializeChartSpec(spec) },
-    });
+export async function updateChartInTransaction(
+  tx: Prisma.TransactionClient,
+  workspaceId: number,
+  chartId: string,
+  spec: ChartSpec,
+) {
+  const current = await tx.chart.findFirst({
+    where: { publicId: chartId, workbook: { workspaceId } },
+    select: { id: true, workbookId: true, order: true },
+  });
+  if (!current) return null;
+  if (spec.id !== chartId || spec.workbookId !== String(current.workbookId)) {
+    throw new Error("Chart identity cannot change during update");
+  }
+
+  const { sheetId } = await assertChartReferencesBelongToWorkbook(tx, spec);
+  return tx.chart.update({
+    where: { id: current.id },
+    data: { sheetId, spec: serializeChartSpec(spec) },
   });
 }
 
@@ -156,4 +179,14 @@ export async function deleteChart(workspaceId: number, chartId: string) {
   const current = await findChart(workspaceId, chartId);
   if (!current) return null;
   return prisma.chart.delete({ where: { id: current.id } });
+}
+
+export async function deleteChartInTransaction(
+  tx: Prisma.TransactionClient,
+  workspaceId: number,
+  chartId: string,
+) {
+  const current = await findChartInTransaction(tx, workspaceId, chartId);
+  if (!current) return null;
+  return tx.chart.delete({ where: { id: current.id } });
 }

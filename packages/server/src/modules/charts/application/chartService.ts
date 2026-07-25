@@ -5,6 +5,7 @@ import {
   chartDependencySheetIds,
   parseChartSpec,
 } from "@openexcel/core";
+import type { Prisma } from "../../../infra/database/prismaTypes.js";
 import { generatePublicId } from "../../../shared/utils/publicId.js";
 import { deserializeChartSpec } from "../domain/chart.js";
 import * as repository from "../infrastructure/chartRepository.js";
@@ -40,6 +41,18 @@ export async function findChartsReferencingSheet(
 
 export async function getChartRecord(workspaceId: number, chartId: string) {
   const record = await repository.findChart(workspaceId, chartId);
+  return toMutationRecord(record);
+}
+
+export async function getChartRecordInTransaction(
+  tx: Prisma.TransactionClient,
+  workspaceId: number,
+  chartId: string,
+) {
+  return toMutationRecord(await repository.findChartInTransaction(tx, workspaceId, chartId));
+}
+
+function toMutationRecord(record: Awaited<ReturnType<typeof repository.findChart>>) {
   if (!record) return null;
   return { spec: deserializeChartSpec(record), order: record.order };
 }

@@ -1,12 +1,22 @@
 import { type ChartSpec, chartDependencySheetIds } from "@openexcel/core";
+import type { Prisma } from "../../../infra/database/prismaTypes.js";
 import * as runRepository from "../../sessions/runs/repository.js";
-import { withUndoTrackedMutation } from "../../sessions/runs/undoCheckpoint.js";
+import {
+  withUndoTrackedMutation,
+  withUndoTrackedSheetMutationAfterSuccess,
+} from "../../sessions/runs/undoCheckpoint.js";
 import { parseChartRelationId } from "../domain/chart.js";
+import {
+  createChartInTransaction,
+  deleteChartInTransaction,
+  updateChartInTransaction,
+} from "../infrastructure/chartRepository.js";
 import {
   buildChartSpec,
   buildUpdatedChartSpec,
   type CreateChartInput,
   getChartRecord,
+  getChartRecordInTransaction,
   persistChart,
   persistDeletedChart,
   persistUpdatedChart,
@@ -38,21 +48,34 @@ export async function createChartMutation(
   context: ChartRunContext = {},
 ) {
   const spec = buildChartSpec(input);
-  return withUndoTrackedMutation(
-    workspaceId,
-    dependencySheetIds([spec]),
-    async () => {
-      if (context.runId != null) {
-        await runRepository.upsertRunChartSnapshot({
-          runId: context.runId,
+  const sheetIds = dependencySheetIds([spec]);
+
+  if (context.runId != null) {
+    return withUndoTrackedSheetMutationAfterSuccess(
+      workspaceId,
+      sheetIds,
+      async (tx: Prisma.TransactionClient) => {
+        await runRepository.upsertRunChartSnapshotUsing(tx, {
+          runId: context.runId as number,
           chartId: spec.id,
           workbookId: parseChartRelationId(spec.workbookId, "workbookId"),
           sheetId: parseChartRelationId(spec.sheetId, "sheetId"),
-          sheetIds: dependencySheetIds([spec]),
+          sheetIds,
           order: 0,
           spec: null,
         });
-      }
+        const created = await createChartInTransaction(tx, workspaceId, spec);
+        if (!created) throw new Error(`Workbook ${spec.workbookId} 不存在`);
+        return created;
+      },
+      context.runId,
+    );
+  }
+
+  return withUndoTrackedMutation(
+    workspaceId,
+    sheetIds,
+    async () => {
       const result = await persistChart(workspaceId, spec);
       if (!result) throw new Error(`Workbook ${spec.workbookId} 不存在`);
       return result;
@@ -70,6 +93,35 @@ export async function updateChartMutation(
   let previous: ChartSpec | null = null;
   let next: ChartSpec | null = null;
   let previousOrder = 0;
+
+  if (context.runId != null) {
+    const current = await getChartRecord(workspaceId, chartId);
+    if (!current) throw new ChartMutationNotFoundError(chartId);
+    const planned = buildUpdatedChartSpec(current.spec, patch);
+    return withUndoTrackedSheetMutationAfterSuccess(
+      workspaceId,
+      dependencySheetIds([current.spec, planned]),
+      async (tx: Prisma.TransactionClient) => {
+        const current = await getChartRecordInTransaction(tx, workspaceId, chartId);
+        if (!current) throw new ChartMutationNotFoundError(chartId);
+        const updated = buildUpdatedChartSpec(current.spec, patch);
+        const sheetIds = dependencySheetIds([current.spec, updated]);
+        await runRepository.upsertRunChartSnapshotUsing(tx, {
+          runId: context.runId as number,
+          chartId: current.spec.id,
+          workbookId: parseChartRelationId(current.spec.workbookId, "workbookId"),
+          sheetId: parseChartRelationId(current.spec.sheetId, "sheetId"),
+          sheetIds,
+          order: current.order,
+          spec: JSON.stringify(current.spec),
+        });
+        const result = await updateChartInTransaction(tx, workspaceId, chartId, updated);
+        if (!result) throw new ChartMutationNotFoundError(chartId);
+        return result;
+      },
+      context.runId,
+    );
+  }
 
   return withUndoTrackedMutation(
     workspaceId,
@@ -105,6 +157,32 @@ export async function deleteChartMutation(
   chartId: string,
   context: ChartRunContext = {},
 ) {
+  if (context.runId != null) {
+    const current = await getChartRecord(workspaceId, chartId);
+    if (!current) throw new ChartMutationNotFoundError(chartId);
+    return withUndoTrackedSheetMutationAfterSuccess(
+      workspaceId,
+      dependencySheetIds([current.spec]),
+      async (tx: Prisma.TransactionClient) => {
+        const current = await getChartRecordInTransaction(tx, workspaceId, chartId);
+        if (!current) throw new ChartMutationNotFoundError(chartId);
+        await runRepository.upsertRunChartSnapshotUsing(tx, {
+          runId: context.runId as number,
+          chartId: current.spec.id,
+          workbookId: parseChartRelationId(current.spec.workbookId, "workbookId"),
+          sheetId: parseChartRelationId(current.spec.sheetId, "sheetId"),
+          sheetIds: dependencySheetIds([current.spec]),
+          order: current.order,
+          spec: JSON.stringify(current.spec),
+        });
+        const deleted = await deleteChartInTransaction(tx, workspaceId, chartId);
+        if (!deleted) throw new ChartMutationNotFoundError(chartId);
+        return { success: true, chartId };
+      },
+      context.runId,
+    );
+  }
+
   let previous: ChartSpec | null = null;
   let previousOrder = 0;
 
@@ -119,17 +197,6 @@ export async function deleteChartMutation(
     },
     async () => {
       if (!previous) throw new ChartMutationNotFoundError(chartId);
-      if (context.runId != null) {
-        await runRepository.upsertRunChartSnapshot({
-          runId: context.runId,
-          chartId: previous.id,
-          workbookId: parseChartRelationId(previous.workbookId, "workbookId"),
-          sheetId: parseChartRelationId(previous.sheetId, "sheetId"),
-          sheetIds: dependencySheetIds([previous]),
-          order: previousOrder,
-          spec: JSON.stringify(previous),
-        });
-      }
       const deleted = await persistDeletedChart(workspaceId, chartId);
       if (!deleted) throw new Error(`Chart ${chartId} 不存在`);
       return { success: true, chartId };

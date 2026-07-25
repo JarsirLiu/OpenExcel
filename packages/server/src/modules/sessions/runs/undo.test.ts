@@ -272,6 +272,68 @@ describe("undoLatestRun", () => {
     expect(mocks.agentRunChartSnapshotDeleteMany).toHaveBeenCalledWith({ where: { runId: 13 } });
   });
 
+  it("should undo sheet and chart changes from the same run together", async () => {
+    mocks.findUndoCheckpointRun.mockResolvedValueOnce({
+      id: 15,
+      inputText: "更新表格并创建图表",
+      steps: [],
+      snapshots: [],
+      chartSnapshots: [
+        { chartId: "chart_1", spec: null },
+        { chartId: "chart_2", spec: null },
+      ],
+    });
+    mocks.transaction.mockImplementationOnce(async (callback: (tx: any) => Promise<any>) =>
+      callback(buildTx()),
+    );
+    mocks.sessionFindFirst.mockResolvedValueOnce({
+      id: 9,
+      undoRunId: 15,
+      chatMessages: JSON.stringify([
+        { role: "user", content: "更新表格并创建图表" },
+        { role: "assistant", content: "已完成" },
+      ]),
+    });
+    mocks.agentRunSheetSnapshotFindMany.mockResolvedValueOnce([
+      {
+        runId: 15,
+        sheetId: 21,
+        uploadedData: "[]",
+        config: null,
+        kind: "restorable",
+        beforeRevision: 3,
+        afterRevision: 4,
+      },
+    ]);
+    mocks.agentRunChartSnapshotFindMany.mockResolvedValueOnce([
+      { runId: 15, chartId: "chart_1", spec: null, sheetId: 21 },
+      { runId: 15, chartId: "chart_2", spec: null, sheetId: 21 },
+    ]);
+    mocks.sheetFindFirst.mockResolvedValueOnce({ id: 21, revision: 4 });
+    mocks.executeSheetCommandInTransaction.mockResolvedValueOnce({ revision: 5 });
+    mocks.chartDeleteMany.mockResolvedValue({ count: 1 });
+    mocks.agentRunSheetSnapshotDeleteMany.mockResolvedValueOnce({ count: 1 });
+    mocks.agentRunChartSnapshotDeleteMany.mockResolvedValueOnce({ count: 2 });
+    mocks.sessionUpdate.mockResolvedValueOnce({ id: 9 });
+    mocks.agentRunUpdate.mockResolvedValueOnce({ id: 15 });
+
+    const result = await undoLatestRun(8, 9);
+
+    expect(result).toEqual({
+      runId: 15,
+      restoredSheetIds: [21],
+      undoneUserText: "更新表格并创建图表",
+    });
+    expect(mocks.executeSheetCommandInTransaction).toHaveBeenCalledOnce();
+    expect(mocks.chartDeleteMany).toHaveBeenCalledTimes(2);
+    expect(mocks.chartDeleteMany).toHaveBeenCalledWith({ where: { publicId: "chart_1" } });
+    expect(mocks.chartDeleteMany).toHaveBeenCalledWith({ where: { publicId: "chart_2" } });
+    expect(mocks.sessionUpdate).toHaveBeenCalledWith({
+      where: { id: 9 },
+      data: { chatMessages: "[]", undoRunId: null },
+    });
+  });
+
   it("should invalidate a checkpoint when its sheet revision has advanced", async () => {
     mocks.findUndoCheckpointRun.mockResolvedValueOnce({
       id: 14,
