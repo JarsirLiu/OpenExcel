@@ -2,7 +2,9 @@ import type { AgentRunCompletion, AgentTranscriptMessage } from "@openexcel/agen
 import { formatAIError } from "@openexcel/agent";
 import { withSessionLock } from "../infrastructure/sessionLock.js";
 import * as sessionRepo from "../infrastructure/sessionRepository.js";
+import { findAgentEventsForCheckpoint } from "./agentEventRepository.js";
 import * as runRepo from "./repository.js";
+import { projectStreamedAssistantMessages } from "./runCheckpointProjector.js";
 import type { AcquiredRunLease } from "./runLease.js";
 import { completeRunAndUpdateUndoCheckpoint } from "./undoCheckpoint.js";
 
@@ -57,7 +59,21 @@ export function createRunFinalizer(options: {
 
   async function finalize(input: RunFinalizationInput) {
     const outcome = outcomeFromInput(input);
-    const messages = input.messages ?? input.completion?.messages;
+    let messages = input.messages ?? input.completion?.messages;
+    if (
+      (!messages || messages.length === (options.lease.transcript?.length ?? 0)) &&
+      (input.status === "cancelled" || input.completion?.status === "cancelled")
+    ) {
+      const streamedMessages = projectStreamedAssistantMessages(
+        await findAgentEventsForCheckpoint(options.lease.run.id),
+      );
+      if (streamedMessages.length > 0) {
+        messages = [
+          ...(options.lease.transcript ?? []),
+          ...streamedMessages,
+        ] as AgentTranscriptMessage[];
+      }
+    }
 
     try {
       if (messages) {

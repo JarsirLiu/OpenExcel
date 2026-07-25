@@ -22,7 +22,7 @@ import type {
   AgentTranscriptMessage,
 } from "../contracts.js";
 import { formatAIError } from "../errors/formatAIError.js";
-import { AgentPersistenceError, createAgentEventEmitter } from "../events/events.js";
+import { AgentPersistenceError, createOrderedAgentEventEmitter } from "../events/events.js";
 import { convertChatReferenceDataPart } from "../stream/referencePart.js";
 import { createUIStreamAdapter } from "../stream/uiStreamAdapter.js";
 import { createAgentToolSet } from "../tools/toolAdapter.js";
@@ -85,9 +85,20 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
     maxUserInputTokens: input.maxUserInputTokens ?? DEFAULT_MAX_USER_INPUT_TOKENS,
     systemPrompt: input.systemPrompt,
   });
-  const createEventEmitter = createAgentEventEmitter({
+  const agentAbortController = new AbortController();
+  if (input.abortSignal?.aborted) {
+    agentAbortController.abort(input.abortSignal.reason);
+  } else {
+    input.abortSignal?.addEventListener(
+      "abort",
+      () => agentAbortController.abort(input.abortSignal?.reason),
+      { once: true },
+    );
+  }
+  const createEventEmitter = createOrderedAgentEventEmitter({
     eventSink: input.eventSink,
     persistenceBarrier: input.persistenceBarrier,
+    abortController: agentAbortController,
   });
   const emitEvent = (type: Parameters<typeof createEventEmitter.emit>[0], payload: unknown) =>
     createEventEmitter.emit(type, payload);
@@ -118,6 +129,9 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
   });
   let terminal = false;
   let loopError: unknown;
+  let streamedText = "";
+  let streamedReasoning = "";
+  let stepIndex = 0;
   let aborted = false;
   const finish = (value: AgentRunCompletion) => {
     if (terminal) return;
@@ -137,15 +151,40 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
     maxOutputTokens: input.outputReserveTokens ?? DEFAULT_OUTPUT_RESERVE_TOKENS,
     maxRetries: input.maxRetries ?? 2,
     timeout: (input.timeout ?? { totalMs: 120_000, chunkMs: 30_000 }) as any,
-    abortSignal: input.abortSignal,
+    abortSignal: agentAbortController.signal,
     onStepFinish: async (step: any) => {
       await emitEvent("step.finished", normalizeStepPayload(step));
       await input.onStepFinish?.(step);
     },
     onStepStart: async (step: any) => {
+      stepIndex = typeof step?.stepNumber === "number" ? step.stepNumber : stepIndex + 1;
       await emitEvent("step.started", {
-        stepNumber: typeof step?.stepNumber === "number" ? step.stepNumber : 0,
+        stepNumber: stepIndex,
       });
+    },
+    onChunk: async ({ chunk }: any) => {
+      if (chunk?.type === "text-delta" && typeof chunk.textDelta === "string") {
+        streamedText += chunk.textDelta;
+        await emitEvent("message.delta", {
+          turnId: input.turnId ?? "unknown",
+          stepIndex,
+          messageId: `${input.turnId ?? "run"}-assistant-${stepIndex}`,
+          partId: `${input.turnId ?? "run"}-text-${stepIndex}`,
+          delta: chunk.textDelta,
+          text: streamedText,
+        });
+      } else if (chunk?.type === "reasoning-delta" && typeof chunk.textDelta === "string") {
+        const delta = chunk.textDelta;
+        streamedReasoning += delta;
+        await emitEvent("reasoning.delta", {
+          turnId: input.turnId ?? "unknown",
+          stepIndex,
+          messageId: `${input.turnId ?? "run"}-assistant-${stepIndex}`,
+          partId: `${input.turnId ?? "run"}-reasoning-${stepIndex}`,
+          delta,
+          text: streamedReasoning,
+        });
+      }
     },
     onFinish: async ({ text }: any) => {
       // Model text generation can finish before tool execution drains.
@@ -178,7 +217,7 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
         (result as { responseMessages?: PromiseLike<unknown> }).responseMessages ??
           Promise.resolve(undefined),
       ]);
-      const isAborted = aborted || input.abortSignal?.aborted === true;
+      const isAborted = aborted || agentAbortController.signal.aborted;
       const messages = appendResponseMessages(baseMessages, responseMessages);
       const finalMessages: AgentTranscriptMessage[] =
         messages.length === persistenceMessages.length &&
@@ -195,6 +234,7 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
         isAborted,
         messageCount: finalMessages.length,
       });
+      await createEventEmitter.flushAndClose();
 
       finish({
         status: loopError ? "failed" : isAborted ? "cancelled" : "completed",

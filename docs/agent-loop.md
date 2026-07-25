@@ -575,6 +575,7 @@ interface ToolExecutor {
 `AgentRunner` 的运行结果必须同时区分两条通道：
 
 - `stream`：面向当前订阅者的实时输出，断开后可以丢失；
+- 模型的 `text-delta` 和 `reasoning-delta` 会先转换为带有 `turnId`、`stepIndex`、`messageId`、`partId` 坐标的 `message.delta` / `reasoning.delta` Agent 事件，再经过 persistence barrier 按 run sequence 持久化；取消时 finalizer 可从已持久化的 message delta 重建已生成的 assistant 文本。
 - `completion`：一次运行的最终结果和持久化完成状态，不能依赖浏览器是否仍连接。
 
 UI stream adapter 只能消费 `stream`，server persistence adapter 必须等待 `completion`，

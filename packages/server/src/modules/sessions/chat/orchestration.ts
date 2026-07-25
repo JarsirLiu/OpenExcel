@@ -163,6 +163,7 @@ export async function streamChat(workspaceId: number, sessionId: number, turn: C
 
     const result = await createAgentRunner({
       modelConfig: config,
+      turnId: turn.message.messageId,
       transcript: resolvedMessages,
       workspace: workspace.workbooks,
       maxRetries: config.maxRetries,

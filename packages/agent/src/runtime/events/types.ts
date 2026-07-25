@@ -1,6 +1,8 @@
 export type AgentEventType =
   | "run.started"
   | "step.started"
+  | "message.delta"
+  | "reasoning.delta"
   | "tool.started"
   | "tool.finished"
   | "step.finished"

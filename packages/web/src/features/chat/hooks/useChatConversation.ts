@@ -9,6 +9,7 @@ import {
   undoLatestRun,
 } from "@/api/chat";
 import type { ChatReferenceTarget } from "../composer/chatReferences";
+import { applyRunEventsToMessages } from "./runEventProjection";
 import {
   findActiveRunCursor,
   type RunRecoveryCursor,
@@ -395,6 +396,11 @@ export function useChatConversation({
           signal: controller.signal,
           onUpdate: (update) => {
             activeRunRef.current = update.cursor;
+            if (update.events.length > 0) {
+              setMessages((currentMessages) =>
+                applyRunEventsToMessages(currentMessages, cursor.runId, update.events),
+              );
+            }
           },
         });
         if (!mountedRef.current || controller.signal.aborted) return;
@@ -402,7 +408,13 @@ export function useChatConversation({
         activeRunRef.current = result.cursor;
         if (result.messages) {
           setMessages((currentMessages) =>
-            mergeRecoveredMessages(currentMessages, result.messages ?? []),
+            mergeRecoveredMessages(
+              currentMessages.filter(
+                (message) =>
+                  typeof message?.id !== "string" || !message.id.startsWith(`run-${cursor.runId}-`),
+              ),
+              result.messages ?? [],
+            ),
           );
         }
         setStreamRecovered(true);

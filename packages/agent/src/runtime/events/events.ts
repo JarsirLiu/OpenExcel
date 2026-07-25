@@ -1,5 +1,9 @@
 export { createAgentEventEmitter } from "./emitter.js";
 export {
+  createOrderedAgentEventEmitter,
+  type OrderedAgentEventEmitter,
+} from "./orderedEmitter.js";
+export {
   createPersistenceBarrier,
   InMemoryPersistenceBarrier,
   NoopPersistenceBarrier,

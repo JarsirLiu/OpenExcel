@@ -62,6 +62,7 @@ export interface CompactionOptions {
 }
 
 export interface AgentRunnerInput {
+  turnId?: string;
   modelConfig: ModelConfig;
   transcript: AgentTranscriptMessage[];
   workspace: WorkspaceWorkbookSummary[];

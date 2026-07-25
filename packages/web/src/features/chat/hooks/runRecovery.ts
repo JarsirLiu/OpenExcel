@@ -5,6 +5,7 @@ import {
   type RunEvent,
   type RunSnapshot,
 } from "@/api/chat";
+import { applyRunEventsToMessages } from "./runEventProjection";
 
 export type RunRecoveryCursor = {
   runId: number;
@@ -73,6 +74,14 @@ export async function recoverRunOnce(
     messages,
     cursor: nextCursor,
   };
+}
+
+export function projectRunRecoveryMessages(
+  messages: any[],
+  runId: number,
+  events: RunEvent[],
+): any[] {
+  return applyRunEventsToMessages(messages, runId, events);
 }
 
 export async function recoverRunUntilTerminal(
