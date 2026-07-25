@@ -2,7 +2,7 @@
 
 - **优先级**：P1
 - **创建日期**：2026-07-24
-- **状态**：Open
+- **状态**：In Progress
 - **范围**：Agent completion、HTTP stream、run 终态、session lease、transcript、事件持久化和恢复
 
 ## 问题
@@ -180,7 +180,7 @@ Undo snapshot 增加统一预算：celldata 数量、JSON 字节数、合并区�
 1. 将 Chart mutation 的旧状态、Undo snapshot、实际写入和 receipt 收口到同一个事务。
 2. 抽取通用 mutation receipt 和 snapshot budget，并补充过期清理。
 3. 将进程内 workspace 锁替换为数据库 workbook 锁。
-4. 实现 stale run recovery worker。
+4. 实现 stale run recovery worker。已完成基础扫描、原子标记 `recovery_required` 和按旧 owner/version 释放 session lease；当前只做安全回收，不自动重放未确认工具。
 5. 增加 `recovery_required` 的诊断、重试恢复和放弃运行入口。
 6. 补充多实例并发、进程中断、重复请求、事件重放和事务回滚集成测试。
 

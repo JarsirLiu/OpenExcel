@@ -2,7 +2,7 @@ import { prisma } from "../../../infra/database/db.js";
 import type { Prisma } from "../../../infra/database/prismaTypes.js";
 import { assertRunStatusTransition, type RunStatus } from "./status.js";
 
-const STALE_RUN_AFTER_MS = 5 * 60 * 1000;
+export const STALE_RUN_AFTER_MS = 5 * 60 * 1000;
 
 export type RunSheetSnapshotKind = "created" | "restorable";
 
@@ -31,6 +31,53 @@ export async function findActiveRun(sessionId: number) {
   return prisma.agentRun.findFirst({
     where: { sessionId, status: "running" },
     orderBy: [{ startedAt: "desc" }, { id: "desc" }],
+  });
+}
+
+export async function findStaleRunningRuns(now = new Date()) {
+  return prisma.agentRun.findMany({
+    where: {
+      status: "running",
+      OR: [
+        { leaseExpiresAt: { lte: now } },
+        { leaseExpiresAt: null, startedAt: { lte: new Date(now.getTime() - STALE_RUN_AFTER_MS) } },
+      ],
+    },
+    select: {
+      id: true,
+      sessionId: true,
+      ownerId: true,
+      sessionVersion: true,
+      session: { select: { workspaceId: true } },
+    },
+    orderBy: { startedAt: "asc" },
+  });
+}
+
+export async function markStaleRunForRecovery(
+  run: { id: number; sessionId: number; ownerId: string | null; sessionVersion: number | null },
+  now = new Date(),
+) {
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.agentRun.updateMany({
+      where: { id: run.id, status: "running" },
+      data: {
+        status: "recovery_required",
+        errorMessage: "运行租约已过期，等待恢复流程检查最后持久化边界",
+        endedAt: now,
+      },
+    });
+    if (updated.count !== 1 || run.ownerId == null || run.sessionVersion == null) return updated;
+
+    await tx.session.updateMany({
+      where: {
+        id: run.sessionId,
+        leaseOwnerId: run.ownerId,
+        version: run.sessionVersion,
+      },
+      data: { leaseOwnerId: null, leaseExpiresAt: null, leaseHeartbeatAt: null },
+    });
+    return updated;
   });
 }
 

@@ -12,6 +12,8 @@ import { createAssetCleanupWorker } from "./modules/assets/application/cleanupAs
 import { authRoutes } from "./modules/auth/api/routes.js";
 import { chartRoutes } from "./modules/charts/api/routes.js";
 import { sessionRoutes } from "./modules/sessions/api/routes.js";
+import { recoverRun } from "./modules/sessions/application/recovery.js";
+import { createRunRecoveryWorker } from "./modules/sessions/runs/runRecoveryWorker.js";
 import { sheetRoutes } from "./modules/sheets/api/routes.js";
 import { workbookRoutes } from "./modules/workbooks/api/routes.js";
 import { workspaceRoutes } from "./modules/workspaces/api/routes.js";
@@ -20,6 +22,11 @@ export async function createApp() {
   const app = Fastify({ logger: { stream: pinoStream, level: "info" } });
   const assets = createAssetService(localAssetStorage);
   const assetCleanup = createAssetCleanupWorker(localAssetStorage);
+  const runRecovery = createRunRecoveryWorker({
+    afterMarked: async (run) => {
+      await recoverRun(run.session.workspaceId, run.sessionId, run.id);
+    },
+  });
   app.decorateRequest("currentUser", null);
 
   app.addHook("onRequest", startTimerHook);
@@ -42,8 +49,13 @@ export async function createApp() {
   await app.register(workspaceRoutes);
   await app.register(workbookRoutes, { assets });
   await app.register(chartRoutes);
-  app.addHook("onReady", async () => assetCleanup.start());
-  app.addHook("onClose", async () => assetCleanup.stop());
+  app.addHook("onReady", async () => {
+    assetCleanup.start();
+    runRecovery.start();
+  });
+  app.addHook("onClose", async () => {
+    await Promise.all([assetCleanup.stop(), runRecovery.stop()]);
+  });
   await app.register(sheetRoutes);
   await app.register(sessionRoutes);
 

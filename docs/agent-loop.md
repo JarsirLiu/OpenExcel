@@ -969,7 +969,7 @@ canonical tool-result transcript 仍由 Agent event/persistence 边界负责，�
 组装后通过 `AgentToolDefinition` 注入，具体执行通过
 `ToolExecutor` 注入；事件通过 `PersistenceBarrier` 确认后才广播；UI stream 与
 运行 completion 已分离。server 的 `agentPersistence` 适配器已接入事件落库、步骤事务落库和工具完成结果回放。
-数据库级 session run lease、有副作用工具事务、事件回放和前端断流恢复已经落地；后续重点是进程异常退出后的 stale run 自动恢复和人工诊断。
+数据库级 session run lease、有副作用工具事务、事件回放和前端断流恢复已经落地；当前 server 已启动独立的 stale-run 扫描器，负责将过期且仍为 `running` 的 run 原子标记为 `recovery_required` 并按旧 owner/version 释放 session lease。它只负责安全诊断和租约回收，不会盲目重放未确认的工具；后续仍需补跨进程接管和自动恢复验证。
 
 - 将 `AgentRunner` 收敛为 facade，模型/工具循环移动到 `runtime/loop/agentLoop.ts`。
 - 在 `runtime/contracts.ts` 定义 `ToolExecutor`、`AgentEventSink`、`PersistenceBarrier`、
