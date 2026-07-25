@@ -1,6 +1,13 @@
 import { prisma } from "../../../infra/database/db.js";
+import type { Prisma } from "../../../infra/database/prismaTypes.js";
 
-const STALE_TOOL_EXECUTION_AFTER_MS = 5 * 60 * 1000;
+type ToolExecutionDatabase = Pick<Prisma.TransactionClient, "agentToolExecution">;
+
+function isUniqueConstraintError(error: unknown): boolean {
+  return (
+    typeof error === "object" && error !== null && (error as { code?: unknown }).code === "P2002"
+  );
+}
 
 export type ToolExecutionClaim = { kind: "execute" } | { kind: "replay"; output: unknown };
 
@@ -34,22 +41,19 @@ function deserialize(value: string): unknown {
   return JSON.parse(value);
 }
 
-function isUniqueConstraintError(error: unknown): boolean {
-  return (
-    typeof error === "object" && error !== null && (error as { code?: unknown }).code === "P2002"
-  );
-}
-
-export async function claimToolExecution(data: {
-  runId: number;
-  toolCallId: string;
-  toolName: string;
-  input: unknown;
-  now?: Date;
-}): Promise<ToolExecutionClaim> {
+export async function claimToolExecutionUsing(
+  db: ToolExecutionDatabase,
+  data: {
+    runId: number;
+    toolCallId: string;
+    toolName: string;
+    input: unknown;
+    now?: Date;
+  },
+): Promise<ToolExecutionClaim> {
   const input = serialize(data.input);
   const now = data.now ?? new Date();
-  let existing = await prisma.agentToolExecution.findUnique({
+  const existing = await db.agentToolExecution.findUnique({
     where: {
       runId_toolCallId: {
         runId: data.runId,
@@ -60,7 +64,7 @@ export async function claimToolExecution(data: {
 
   if (!existing) {
     try {
-      await prisma.agentToolExecution.create({
+      await db.agentToolExecution.create({
         data: {
           runId: data.runId,
           toolCallId: data.toolCallId,
@@ -72,15 +76,13 @@ export async function claimToolExecution(data: {
       });
       return { kind: "execute" };
     } catch (error) {
-      if (!isUniqueConstraintError(error)) throw error;
-      existing = await prisma.agentToolExecution.findUniqueOrThrow({
-        where: {
-          runId_toolCallId: {
-            runId: data.runId,
-            toolCallId: data.toolCallId,
-          },
-        },
-      });
+      // The unique-key race aborts this transaction; do not query with its client.
+      if (isUniqueConstraintError(error)) {
+        throw new ToolExecutionConflictError(
+          `Tool call ${data.toolCallId} is already claimed by another execution`,
+        );
+      }
+      throw error;
     }
   }
 
@@ -97,29 +99,28 @@ export async function claimToolExecution(data: {
     return { kind: "replay", output: deserialize(existing.output) };
   }
 
-  if (
-    existing.status === "running" &&
-    now.getTime() - existing.startedAt.getTime() < STALE_TOOL_EXECUTION_AFTER_MS
-  ) {
-    throw new ToolExecutionConflictError(`Tool call ${data.toolCallId} is already running`);
+  if (existing.status === "running") {
+    throw new ToolExecutionConflictError(
+      `Tool call ${data.toolCallId} is unresolved and requires recovery`,
+    );
   }
 
-  await prisma.agentToolExecution.update({
-    where: { id: existing.id },
-    data: {
-      status: "running",
-      input,
-      startedAt: now,
-      endedAt: null,
-      errorMessage: null,
-      output: null,
-    },
-  });
-  return { kind: "execute" };
+  throw new ToolExecutionConflictError(
+    `Tool call ${data.toolCallId} has unexpected status ${existing.status}`,
+  );
 }
 
-export async function completeToolExecution(runId: number, toolCallId: string, output: unknown) {
-  return prisma.agentToolExecution.update({
+export async function claimToolExecution(data: Parameters<typeof claimToolExecutionUsing>[1]) {
+  return claimToolExecutionUsing(prisma, data);
+}
+
+export async function completeToolExecutionUsing(
+  db: ToolExecutionDatabase,
+  runId: number,
+  toolCallId: string,
+  output: unknown,
+) {
+  return db.agentToolExecution.update({
     where: { runId_toolCallId: { runId, toolCallId } },
     data: {
       status: "completed",
@@ -130,8 +131,17 @@ export async function completeToolExecution(runId: number, toolCallId: string, o
   });
 }
 
-export async function failToolExecution(runId: number, toolCallId: string, error: unknown) {
-  return prisma.agentToolExecution.update({
+export async function completeToolExecution(runId: number, toolCallId: string, output: unknown) {
+  return completeToolExecutionUsing(prisma, runId, toolCallId, output);
+}
+
+export async function failToolExecutionUsing(
+  db: ToolExecutionDatabase,
+  runId: number,
+  toolCallId: string,
+  error: unknown,
+) {
+  return db.agentToolExecution.update({
     where: { runId_toolCallId: { runId, toolCallId } },
     data: {
       status: "failed",
@@ -139,4 +149,8 @@ export async function failToolExecution(runId: number, toolCallId: string, error
       endedAt: new Date(),
     },
   });
+}
+
+export async function failToolExecution(runId: number, toolCallId: string, error: unknown) {
+  return failToolExecutionUsing(prisma, runId, toolCallId, error);
 }

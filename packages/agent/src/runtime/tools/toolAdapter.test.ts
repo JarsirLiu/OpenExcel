@@ -75,4 +75,18 @@ describe("createAgentToolSet", () => {
       expect.objectContaining({ toolCallId: "call-2" }),
     );
   });
+
+  it("rejects tool execution without a provider call id", async () => {
+    const execute = vi.fn();
+    const tools = createAgentToolSet(
+      [{ name: "readSheetData", description: "Read a sheet", inputSchema: z.object({}) }],
+      { execute },
+      undefined,
+    );
+
+    await expect((tools.readSheetData as any).execute({}, {})).rejects.toThrow(
+      "missing toolCallId",
+    );
+    expect(execute).not.toHaveBeenCalled();
+  });
 });

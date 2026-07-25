@@ -7,6 +7,10 @@ import {
 } from "../../sessions/runs/undoCheckpoint.js";
 import { parseChartRelationId } from "../domain/chart.js";
 import {
+  findChartMutationReceipt,
+  recordChartMutationReceipt,
+} from "../infrastructure/chartMutationReceiptRepository.js";
+import {
   createChartInTransaction,
   deleteChartInTransaction,
   updateChartInTransaction,
@@ -23,7 +27,24 @@ import {
   type UpdateChartInput,
 } from "./chartService.js";
 
-export type ChartRunContext = { runId?: number };
+export type ChartRunContext = {
+  runId?: number;
+  db?: Prisma.TransactionClient;
+  mutationId?: string;
+  commandHash?: string;
+};
+
+function receiptInput(context: ChartRunContext) {
+  return context.mutationId && context.commandHash
+    ? { mutationId: context.mutationId, commandHash: context.commandHash }
+    : null;
+}
+
+async function replayReceipt(context: ChartRunContext) {
+  const receipt = receiptInput(context);
+  if (!receipt || !context.db) return null;
+  return findChartMutationReceipt(context.db, receipt.mutationId, receipt.commandHash);
+}
 
 export class ChartMutationNotFoundError extends Error {
   constructor(chartId: string) {
@@ -55,6 +76,15 @@ export async function createChartMutation(
       workspaceId,
       sheetIds,
       async (tx: Prisma.TransactionClient) => {
+        const receipt = receiptInput(context);
+        if (receipt) {
+          const replay = await findChartMutationReceipt(
+            tx,
+            receipt.mutationId,
+            receipt.commandHash,
+          );
+          if (replay !== null) return replay;
+        }
         await runRepository.upsertRunChartSnapshotUsing(tx, {
           runId: context.runId as number,
           chartId: spec.id,
@@ -66,9 +96,18 @@ export async function createChartMutation(
         });
         const created = await createChartInTransaction(tx, workspaceId, spec);
         if (!created) throw new Error(`Workbook ${spec.workbookId} 不存在`);
+        if (receipt) {
+          await recordChartMutationReceipt(tx, {
+            ...receipt,
+            mutation: "create",
+            chartId: spec.id,
+            result: created,
+          });
+        }
         return created;
       },
       context.runId,
+      context.db,
     );
   }
 
@@ -90,6 +129,8 @@ export async function updateChartMutation(
   patch: UpdateChartInput,
   context: ChartRunContext = {},
 ) {
+  const replay = await replayReceipt(context);
+  if (replay !== null) return replay;
   let previous: ChartSpec | null = null;
   let next: ChartSpec | null = null;
   let previousOrder = 0;
@@ -102,6 +143,15 @@ export async function updateChartMutation(
       workspaceId,
       dependencySheetIds([current.spec, planned]),
       async (tx: Prisma.TransactionClient) => {
+        const receipt = receiptInput(context);
+        if (receipt) {
+          const replay = await findChartMutationReceipt(
+            tx,
+            receipt.mutationId,
+            receipt.commandHash,
+          );
+          if (replay !== null) return replay;
+        }
         const current = await getChartRecordInTransaction(tx, workspaceId, chartId);
         if (!current) throw new ChartMutationNotFoundError(chartId);
         const updated = buildUpdatedChartSpec(current.spec, patch);
@@ -117,9 +167,18 @@ export async function updateChartMutation(
         });
         const result = await updateChartInTransaction(tx, workspaceId, chartId, updated);
         if (!result) throw new ChartMutationNotFoundError(chartId);
+        if (receipt) {
+          await recordChartMutationReceipt(tx, {
+            ...receipt,
+            mutation: "update",
+            chartId,
+            result,
+          });
+        }
         return result;
       },
       context.runId,
+      context.db,
     );
   }
 
@@ -157,6 +216,8 @@ export async function deleteChartMutation(
   chartId: string,
   context: ChartRunContext = {},
 ) {
+  const replay = await replayReceipt(context);
+  if (replay !== null) return replay;
   if (context.runId != null) {
     const current = await getChartRecord(workspaceId, chartId);
     if (!current) throw new ChartMutationNotFoundError(chartId);
@@ -164,6 +225,15 @@ export async function deleteChartMutation(
       workspaceId,
       dependencySheetIds([current.spec]),
       async (tx: Prisma.TransactionClient) => {
+        const receipt = receiptInput(context);
+        if (receipt) {
+          const replay = await findChartMutationReceipt(
+            tx,
+            receipt.mutationId,
+            receipt.commandHash,
+          );
+          if (replay !== null) return replay;
+        }
         const current = await getChartRecordInTransaction(tx, workspaceId, chartId);
         if (!current) throw new ChartMutationNotFoundError(chartId);
         await runRepository.upsertRunChartSnapshotUsing(tx, {
@@ -177,9 +247,19 @@ export async function deleteChartMutation(
         });
         const deleted = await deleteChartInTransaction(tx, workspaceId, chartId);
         if (!deleted) throw new ChartMutationNotFoundError(chartId);
-        return { success: true, chartId };
+        const result = { success: true, chartId };
+        if (receipt) {
+          await recordChartMutationReceipt(tx, {
+            ...receipt,
+            mutation: "delete",
+            chartId,
+            result,
+          });
+        }
+        return result;
       },
       context.runId,
+      context.db,
     );
   }
 

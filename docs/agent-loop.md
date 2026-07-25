@@ -830,9 +830,10 @@ model AgentToolExecution {
 
 `AgentEvent` 是流回放日志，`AgentToolExecution` 是工具副作用幂等账本，二者都不能被浏览器写入。
 工具执行记录必须先进入 `running`。当前实现已经在工具执行前占用幂等键，在完成后保存结构化结果；遇到
-`completed` 直接复用结果，参数不一致拒绝执行，短时间内的 `running` 拒绝并发重复调用，超时 `running` 才允许回收。
-当前有副作用的 Sheet、Workbook 和 Chart Agent 工具由各自的 server application/service 管理短事务；
-工具账本通过 mutation receipt 和 stale running 回收保持幂等，不把数据库 transaction 注入 Agent 或通用工具执行上下文。
+`completed` 直接复用结果，参数不一致拒绝执行，`running` 不允许按时间盲目回收。
+当前有副作用的 Sheet、Workbook 和 Chart Agent 工具由各自的 server application/service 在同一事务中执行；
+Sheet 和 Chart mutation receipt 与工具账本一起提交。事务上下文只存在 server 内部适配边界，不能进入
+`packages/agent` 的公共 contract。
 canonical tool-result transcript 仍由 Agent event/persistence 边界负责，后续继续补齐事件回放和持久化失败诊断。
 
 `AgentRun` 至少要能区分以下状态：

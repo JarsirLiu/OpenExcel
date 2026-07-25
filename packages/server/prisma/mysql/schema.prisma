@@ -134,6 +134,18 @@ model Chart {
   @@index([sheetId])
 }
 
+model ChartMutationReceipt {
+  id          Int      @id @default(autoincrement())
+  mutationId  String   @unique
+  commandHash String
+  mutation    String
+  chartId     String
+  result      String   @db.LongText
+  createdAt   DateTime @default(now())
+
+  @@index([chartId, createdAt])
+}
+
 model Workspace {
   id          Int        @id @default(autoincrement())
   publicId    String     @unique

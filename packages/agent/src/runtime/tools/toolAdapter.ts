@@ -36,7 +36,10 @@ export function createAgentToolSet(
         description: definition.description,
         inputSchema: definition.inputSchema,
         execute: async (input: unknown, executeOptions: any) => {
-          const toolCallId = String(executeOptions?.toolCallId ?? "unknown-tool-call");
+          const toolCallId = executeOptions?.toolCallId;
+          if (typeof toolCallId !== "string" || toolCallId.length === 0) {
+            throw new Error(`Tool ${definition.name} execution is missing toolCallId`);
+          }
           await hooks.onToolStart?.({
             toolName: definition.name,
             toolCallId,

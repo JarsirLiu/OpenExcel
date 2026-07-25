@@ -14,6 +14,8 @@ const mocks = vi.hoisted(() => ({
   upsertRunChartSnapshotUsing: vi.fn(),
   withUndoTrackedMutation: vi.fn(),
   withUndoTrackedSheetMutationAfterSuccess: vi.fn(),
+  findChartMutationReceipt: vi.fn(),
+  recordChartMutationReceipt: vi.fn(),
 }));
 
 vi.mock("./chartService.js", () => ({
@@ -40,6 +42,10 @@ vi.mock("../infrastructure/chartRepository.js", () => ({
   createChartInTransaction: mocks.createChartInTransaction,
   deleteChartInTransaction: mocks.deleteChartInTransaction,
   updateChartInTransaction: mocks.updateChartInTransaction,
+}));
+vi.mock("../infrastructure/chartMutationReceiptRepository.js", () => ({
+  findChartMutationReceipt: mocks.findChartMutationReceipt,
+  recordChartMutationReceipt: mocks.recordChartMutationReceipt,
 }));
 
 import {
@@ -101,6 +107,7 @@ describe("chartMutationService", () => {
     mocks.deleteChartInTransaction.mockResolvedValue({ id: 1 });
     mocks.buildUpdatedChartSpec.mockReturnValue(next);
     mocks.persistUpdatedChart.mockResolvedValue(next);
+    mocks.findChartMutationReceipt.mockResolvedValue(null);
     mocks.withUndoTrackedMutation.mockImplementation(
       async (
         _workspaceId: number,
@@ -157,6 +164,86 @@ describe("chartMutationService", () => {
     expect(mocks.createChartInTransaction).toHaveBeenCalledWith(tx, 1, previous);
   });
 
+  it("records and replays a chart mutation without executing it twice", async () => {
+    const tx = { chart: {}, agentRunChartSnapshot: {} };
+    mocks.withUndoTrackedSheetMutationAfterSuccess.mockImplementation(
+      async (
+        _workspaceId: number,
+        _sheetIds: number[],
+        mutation: (value: unknown) => Promise<unknown>,
+      ) => mutation(tx),
+    );
+
+    await createChartMutation(
+      1,
+      {
+        workbookId: "7",
+        sheetId: "11",
+        type: "line",
+        anchor: previous.anchor,
+        series: previous.series,
+      },
+      {
+        runId: 20,
+        db: tx as never,
+        mutationId: "ai:20:call-1",
+        commandHash: "input-1",
+      },
+    );
+    expect(mocks.recordChartMutationReceipt).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({
+        mutationId: "ai:20:call-1",
+        commandHash: "input-1",
+        mutation: "create",
+        chartId: previous.id,
+      }),
+    );
+
+    mocks.findChartMutationReceipt.mockResolvedValue({ id: 1 });
+    mocks.createChartInTransaction.mockClear();
+    const replay = await createChartMutation(
+      1,
+      {
+        workbookId: "7",
+        sheetId: "11",
+        type: "line",
+        anchor: previous.anchor,
+        series: previous.series,
+      },
+      {
+        runId: 20,
+        db: tx as never,
+        mutationId: "ai:20:call-1",
+        commandHash: "input-1",
+      },
+    );
+    expect(replay).toEqual({ id: 1 });
+    expect(mocks.createChartInTransaction).not.toHaveBeenCalled();
+  });
+
+  it("rejects a chart mutation id reused with different input", async () => {
+    mocks.findChartMutationReceipt.mockRejectedValue(new Error("different input"));
+    await expect(
+      createChartMutation(
+        1,
+        {
+          workbookId: "7",
+          sheetId: "11",
+          type: "line",
+          anchor: previous.anchor,
+          series: previous.series,
+        },
+        {
+          runId: 20,
+          db: {} as never,
+          mutationId: "ai:20:call-1",
+          commandHash: "input-2",
+        },
+      ),
+    ).rejects.toThrow("different input");
+  });
+
   it("uses the union of previous and next chart dependencies for undo invalidation", async () => {
     await updateChartMutation(1, "chart-1", { series: next.series }, { runId: 20 });
 
@@ -197,5 +284,33 @@ describe("chartMutationService", () => {
       spec: JSON.stringify(previous),
     });
     expect(mocks.deleteChartInTransaction).toHaveBeenCalledWith(tx, 1, "chart-1");
+  });
+
+  it("replays update and delete receipts before reading a missing chart", async () => {
+    const tx = { chartMutationReceipt: {} };
+    mocks.findChartMutationReceipt.mockResolvedValue({ id: 1 });
+
+    await expect(
+      updateChartMutation(
+        1,
+        "missing-chart",
+        { series: next.series },
+        {
+          runId: 20,
+          db: tx as never,
+          mutationId: "ai:20:update-1",
+          commandHash: "input-1",
+        },
+      ),
+    ).resolves.toEqual({ id: 1 });
+    await expect(
+      deleteChartMutation(1, "missing-chart", {
+        runId: 20,
+        db: tx as never,
+        mutationId: "ai:20:delete-1",
+        commandHash: "input-1",
+      }),
+    ).resolves.toEqual({ id: 1 });
+    expect(mocks.getChartRecord).not.toHaveBeenCalled();
   });
 });

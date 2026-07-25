@@ -101,7 +101,14 @@ export function createConcreteToolExecutor(
       if (!tool || typeof tool.execute !== "function") {
         throw new Error(`Tool ${toolName} is not executable`);
       }
-      const context = toolsContext[toolName];
+      const executionContext = options.context as
+        | { toolContexts?: Record<string, unknown>; db?: unknown }
+        | undefined;
+      const baseContext = executionContext?.toolContexts?.[toolName] ?? toolsContext[toolName];
+      const context =
+        executionContext?.db == null || typeof baseContext !== "object" || baseContext === null
+          ? baseContext
+          : { ...(baseContext as Record<string, unknown>), db: executionContext.db };
       return tool.execute(input, {
         toolCallId: options.toolCallId,
         abortSignal: options.abortSignal,
@@ -143,7 +150,11 @@ export async function streamChat(workspaceId: number, sessionId: number, turn: C
       lease.run.id,
     );
     const toolNames = Object.keys(tools);
-    const executionContext = { toolContexts: toolsContext, resultBudget: toolResultBudget };
+    const executionContext = {
+      toolContexts: toolsContext,
+      resultBudget: toolResultBudget,
+      workspaceId,
+    };
     const concreteToolExecutor = createConcreteToolExecutor(tools, toolsContext);
     const toolExecutor = createIdempotentToolExecutor(lease.run.id, concreteToolExecutor);
 

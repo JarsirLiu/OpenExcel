@@ -1,9 +1,16 @@
-import type { AgentEvent, PersistenceBarrier, ToolExecutor } from "@openexcel/agent";
+import {
+  type AgentEvent,
+  AgentPersistenceError,
+  type PersistenceBarrier,
+  type ToolExecutor,
+} from "@openexcel/agent";
+import { prisma } from "../../../infra/database/db.js";
+import { withWorkspaceUndoLock } from "../infrastructure/workspaceUndoLock.js";
 import { type PersistedAgentStep, persistAgentEvent } from "./agentEventRepository.js";
 import {
-  claimToolExecution,
-  completeToolExecution,
-  failToolExecution,
+  claimToolExecutionUsing,
+  completeToolExecutionUsing,
+  failToolExecutionUsing,
 } from "./toolExecutionRepository.js";
 
 function serializeJson(value: unknown): string | null {
@@ -48,22 +55,45 @@ export function createAgentPersistenceBarrier(runId: number): PersistenceBarrier
 export function createIdempotentToolExecutor(runId: number, executor: ToolExecutor): ToolExecutor {
   return {
     async execute(toolName, input, options) {
-      const claim = await claimToolExecution({
-        runId,
-        toolCallId: options.toolCallId,
-        toolName,
-        input,
-      });
-      if (claim.kind === "replay") return claim.output;
+      const workspaceId =
+        typeof options.context === "object" &&
+        options.context !== null &&
+        typeof (options.context as { workspaceId?: unknown }).workspaceId === "number"
+          ? (options.context as { workspaceId: number }).workspaceId
+          : undefined;
+      const execute = () =>
+        prisma.$transaction(async (tx) => {
+          const claim = await claimToolExecutionUsing(tx, {
+            runId,
+            toolCallId: options.toolCallId,
+            toolName,
+            input,
+          });
+          if (claim.kind === "replay") return { kind: "replay" as const, output: claim.output };
 
-      try {
-        const output = await executor.execute(toolName, input, options);
-        await completeToolExecution(runId, options.toolCallId, output);
-        return output;
-      } catch (error) {
-        await failToolExecution(runId, options.toolCallId, error);
-        throw error;
-      }
+          let output: unknown;
+          try {
+            const context =
+              typeof options.context === "object" && options.context !== null
+                ? { ...(options.context as Record<string, unknown>), db: tx }
+                : { db: tx };
+            output = await executor.execute(toolName, input, { ...options, context });
+          } catch (error) {
+            await failToolExecutionUsing(tx, runId, options.toolCallId, error);
+            return { kind: "failed" as const, error };
+          }
+
+          try {
+            await completeToolExecutionUsing(tx, runId, options.toolCallId, output);
+          } catch (error) {
+            throw new AgentPersistenceError(error);
+          }
+          return { kind: "completed" as const, output };
+        });
+      const result =
+        workspaceId == null ? await execute() : await withWorkspaceUndoLock(workspaceId, execute);
+      if (result.kind === "failed") throw result.error;
+      return result.output;
     },
   };
 }

@@ -128,7 +128,18 @@ export async function withUndoTrackedSheetMutationAfterSuccess<T>(
   sheetIds: number[],
   mutation: (tx: Prisma.TransactionClient) => Promise<T>,
   originRunId?: number,
+  existingTx?: Prisma.TransactionClient,
 ) {
+  if (existingTx) {
+    const result = await mutation(existingTx);
+    await invalidateUndoCheckpointsForSheetsInTransaction(
+      existingTx,
+      workspaceId,
+      sheetIds,
+      originRunId,
+    );
+    return result;
+  }
   return withWorkspaceUndoLock(workspaceId, async () => {
     return prisma.$transaction(async (tx) => {
       const result = await mutation(tx);
