@@ -1,6 +1,6 @@
 import * as repo from "../infrastructure/sessionRepository.js";
 import * as runRepo from "../runs/repository.js";
-import { canAutoRecoverRun } from "./recovery.js";
+import { diagnoseRunRecovery } from "./recovery.js";
 import { getSessionMessagesPaginated, historyFromRuns } from "./transcript.js";
 
 export async function getSessions(workspaceId: number) {
@@ -69,6 +69,20 @@ export async function getRecoveryRuns(workspaceId: number, sessionId: number) {
       const toolExecutions = await runRepo.findRunToolExecutions(run.id);
       const recoveryState = await runRepo.findRunRecoveryState(workspaceId, sessionId, run.id);
       const affected = await runRepo.findRunAffectedEntities(run.id);
+      const diagnosis =
+        recoveryState == null
+          ? {
+              canAutoRecover: false as const,
+              reason: "missing_output" as const,
+              unresolvedToolCallIds: [],
+              failedToolCallIds: [],
+            }
+          : (diagnoseRunRecovery(recoveryState, toolExecutions, activeRun != null) ?? {
+              canAutoRecover: true as const,
+              reason: "safe_to_complete" as const,
+              unresolvedToolCallIds: [],
+              failedToolCallIds: [],
+            });
       return {
         id: run.id,
         status: run.status,
@@ -79,10 +93,8 @@ export async function getRecoveryRuns(workspaceId: number, sessionId: number) {
         affectedWorkbooks: affected.workbookIds,
         affectedSheets: affected.sheetIds,
         toolExecutions,
-        canAutoRecover:
-          activeRun == null &&
-          recoveryState != null &&
-          canAutoRecoverRun(recoveryState, toolExecutions),
+        canAutoRecover: diagnosis.canAutoRecover,
+        diagnosis,
       };
     }),
   );

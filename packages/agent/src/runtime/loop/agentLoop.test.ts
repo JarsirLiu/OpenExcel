@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   convertToModelMessages: vi.fn(async (messages: unknown) => messages),
@@ -66,6 +66,47 @@ function setupUIStreamAdapter() {
 }
 
 describe("runAgentLoop", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("passes retry, timeout, and cancellation policy to the model SDK", async () => {
+    setupUIStreamAdapter();
+    const abortController = new AbortController();
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.close();
+      },
+    });
+    mocks.streamText.mockReturnValue({
+      stream,
+      text: Promise.resolve("完成"),
+      responseMessages: Promise.resolve([]),
+    });
+
+    const result = await runAgentLoop({
+      modelConfig: { baseUrl: "http://model", apiKey: "test-key", modelName: "test-model" },
+      transcript: [{ role: "user", parts: [{ type: "text", text: "继续" }] }],
+      systemPrompt: "你是表格助手",
+      workspace: [],
+      tools: [],
+      toolExecutor: { execute: vi.fn() },
+      maxRetries: 4,
+      timeout: { totalMs: 15_000, chunkMs: 5_000 },
+      abortSignal: abortController.signal,
+    } as any);
+
+    await result.completion;
+
+    expect(mocks.streamText).toHaveBeenCalledWith(
+      expect.objectContaining({
+        maxRetries: 4,
+        timeout: { totalMs: 15_000, chunkMs: 5_000 },
+        abortSignal: abortController.signal,
+      }),
+    );
+  });
+
   it("stops before model execution when the persistence barrier rejects", async () => {
     const execute = vi.fn();
     const input = {

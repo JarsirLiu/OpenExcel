@@ -1083,8 +1083,10 @@ system prompt、模型上下文或工具定义。事件接口按 `sequence > aft
 前端断流恢复和显式 cancel 已落地。Sheet、Workbook 和 Chart 的有副作用工具继续由各自 application/service
 负责短事务，Agent 只通过通用执行端口调用它们。
 
-仍待完成的可靠性增强是：进程异常退出后的 stale run 自动恢复、恢复超时后的人工诊断入口，以及在确认安全后进行的跨进程
-Agent run 接管。这些能力不影响当前单进程运行和断流恢复，不应通过把数据库或具体业务逻辑移入 `packages/agent` 来实现。
+进程异常退出后的恢复入口已经由 server application recovery service 提供：它会先诊断 active run、未完成工具、失败工具、
+缺少终态 transcript 或 session version 冲突；只有所有工具完成且终态 assistant 文本已持久化时才允许自动完成 run。
+未确认的工具副作用不会被自动重放。跨进程 Agent run 接管仍然只在确认旧 lease owner 已失效、且每个工具都能通过
+ledger/receipt 证明安全时进行；否则保持 `recovery_required`，避免重复副作用。
 
 ## 11. 验收标准
 

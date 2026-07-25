@@ -73,6 +73,7 @@ describe("run recovery", () => {
       runId: 7,
       status: "recovery_required",
       canAutoRecover: false,
+      diagnosis: { reason: "unfinished_tool", unresolvedToolCallIds: ["call-1"] },
     });
     expect(mocks.completeRunAndUpdateUndoCheckpoint).not.toHaveBeenCalled();
   });
@@ -89,8 +90,26 @@ describe("run recovery", () => {
       runId: 7,
       status: "recovery_required",
       canAutoRecover: false,
+      diagnosis: { reason: "missing_output" },
     });
     expect(mocks.completeRunAndUpdateUndoCheckpoint).not.toHaveBeenCalled();
+  });
+
+  it("diagnoses a failed tool instead of treating it as safe to replay", async () => {
+    mocks.findRunRecoveryState.mockResolvedValue({
+      id: 7,
+      status: "recovery_required",
+      outputText: "done",
+      session: { version: 4, chatMessages: "[]" },
+    });
+    mocks.findRunToolExecutions.mockResolvedValue([
+      { toolCallId: "call-1", status: "failed", errorMessage: "write failed" },
+    ]);
+
+    await expect(recoverRun(1, 2, 7)).resolves.toMatchObject({
+      canAutoRecover: false,
+      diagnosis: { reason: "failed_tool", failedToolCallIds: ["call-1"] },
+    });
   });
 
   it("returns the same successful result when recovery is requested again", async () => {
