@@ -228,12 +228,6 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
             ])
           : messages;
 
-      // Emit the terminal event only after all steps finish.
-      await emitEvent(loopError ? "run.failed" : isAborted ? "run.cancelled" : "run.completed", {
-        error: loopError ? formatAIError(loopError) : undefined,
-        isAborted,
-        messageCount: finalMessages.length,
-      });
       await createEventEmitter.flushAndClose();
 
       finish({
@@ -244,28 +238,31 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
         isAborted,
       });
     } catch (error) {
+      const isAborted = aborted || agentAbortController.signal.aborted;
+      let flushError: unknown;
+      try {
+        // Abort can reject the SDK promises before queued delta events finish
+        // persisting. Completion must not reach server settlement first.
+        await createEventEmitter.flushAndClose();
+      } catch (errorDuringFlush) {
+        flushError = errorDuringFlush;
+      }
       try {
         await input.onError?.(error);
       } catch (callbackError) {
         console.error("[agentLoop] onError callback failed:", callbackError);
       }
-      if (!(error instanceof AgentPersistenceError)) {
-        try {
-          await emitEvent("run.failed", {
-            error: formatAIError(error),
-            isAborted: false,
-            messageCount: persistenceMessages.length,
-          });
-        } catch {
-          // The completion still settles when the terminal event cannot be persisted.
-        }
-      }
       finish({
-        status: "failed",
-        error,
-        failureKind: error instanceof AgentPersistenceError ? "persistence" : "execution",
+        status: isAborted && flushError == null ? "cancelled" : "failed",
+        error: isAborted && flushError == null ? undefined : (flushError ?? error),
+        failureKind:
+          isAborted && flushError == null
+            ? undefined
+            : flushError instanceof AgentPersistenceError || error instanceof AgentPersistenceError
+              ? "persistence"
+              : "execution",
         messages: baseMessages,
-        isAborted: false,
+        isAborted: isAborted && flushError == null,
       });
     }
   })();

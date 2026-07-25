@@ -89,4 +89,26 @@ describe("createAgentToolSet", () => {
     );
     expect(execute).not.toHaveBeenCalled();
   });
+
+  it("does not start a tool after the agent run is cancelled", async () => {
+    const execute = vi.fn();
+    const controller = new AbortController();
+    controller.abort();
+    const tools = createAgentToolSet(
+      [{ name: "readSheetData", description: "Read a sheet", inputSchema: z.object({}) }],
+      { execute },
+      undefined,
+    );
+
+    await expect(
+      (tools.readSheetData as any).execute(
+        {},
+        {
+          toolCallId: "call-cancelled",
+          abortSignal: controller.signal,
+        },
+      ),
+    ).rejects.toMatchObject({ name: "AbortError" });
+    expect(execute).not.toHaveBeenCalled();
+  });
 });

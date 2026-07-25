@@ -144,7 +144,7 @@ describe("undoLatestRun", () => {
     expect(mocks.workbookDelete).toHaveBeenCalledWith({ where: { id: 21 } });
     expect(mocks.sessionUpdate).toHaveBeenCalledWith({
       where: { id: 5 },
-      data: { chatMessages: "[]", undoRunId: null },
+      data: { undoRunId: null },
     });
     expect(mocks.agentRunUpdate).toHaveBeenCalledWith({
       where: { id: 11 },
@@ -234,7 +234,7 @@ describe("undoLatestRun", () => {
     expect(mocks.sheetDelete).toHaveBeenCalledWith({ where: { id: 77 } });
     expect(mocks.sessionUpdate).toHaveBeenCalledWith({
       where: { id: 6 },
-      data: { chatMessages: "[]", undoRunId: null },
+      data: { undoRunId: null },
     });
   });
 
@@ -330,7 +330,7 @@ describe("undoLatestRun", () => {
     expect(mocks.chartDeleteMany).toHaveBeenCalledWith({ where: { publicId: "chart_2" } });
     expect(mocks.sessionUpdate).toHaveBeenCalledWith({
       where: { id: 9 },
-      data: { chatMessages: "[]", undoRunId: null },
+      data: { undoRunId: null },
     });
   });
 

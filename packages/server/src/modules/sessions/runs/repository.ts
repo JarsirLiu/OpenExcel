@@ -1,6 +1,6 @@
 import { prisma } from "../../../infra/database/db.js";
 import type { Prisma } from "../../../infra/database/prismaTypes.js";
-import { assertRunStatusTransition, type RunStatus } from "./status.js";
+import { assertRunStatusTransition, type RunStatus, terminalRunStatuses } from "./status.js";
 
 export const STALE_RUN_AFTER_MS = 5 * 60 * 1000;
 
@@ -87,6 +87,23 @@ export async function findRunForSession(workspaceId: number, sessionId: number, 
   });
 }
 
+export async function waitForRunSettlement(
+  workspaceId: number,
+  sessionId: number,
+  runId: number,
+  options: { timeoutMs?: number; pollIntervalMs?: number } = {},
+) {
+  const deadline = Date.now() + (options.timeoutMs ?? 5_000);
+  let run = await findRunForSession(workspaceId, sessionId, runId);
+
+  while (run && !terminalRunStatuses.has(run.status as RunStatus) && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, options.pollIntervalMs ?? 25));
+    run = await findRunForSession(workspaceId, sessionId, runId);
+  }
+
+  return run;
+}
+
 export async function findRunReplaySnapshot(workspaceId: number, sessionId: number, runId: number) {
   return prisma.agentRun.findFirst({
     where: { id: runId, sessionId, session: { workspaceId } },
@@ -100,6 +117,7 @@ export async function findRunReplaySnapshot(workspaceId: number, sessionId: numb
       errorMessage: true,
       cancelRequestedAt: true,
       lastEventSequence: true,
+      transcriptSequence: true,
     },
   });
 }
@@ -261,8 +279,28 @@ export async function findRunsBySession(
 
   return prisma.agentRun.findMany({
     where: { sessionId: session.id, ...(status ? { status } : {}) },
-    orderBy: { startedAt: "asc" },
+    // Recovery consumers inspect the first run as the newest run. Keep the
+    // id tie-breaker deterministic when runs start in the same millisecond.
+    orderBy: [{ startedAt: "desc" }, { id: "desc" }],
   });
+}
+
+export async function findLatestRecoverableRun(workspaceId: number, sessionId: number) {
+  const runs = await prisma.agentRun.findMany({
+    where: {
+      sessionId,
+      session: { workspaceId },
+      status: { notIn: ["reverted", "abandoned"] },
+    },
+    select: {
+      id: true,
+      lastEventSequence: true,
+      transcriptSequence: true,
+    },
+    orderBy: [{ startedAt: "desc" }, { id: "desc" }],
+  });
+
+  return runs.find((run) => run.lastEventSequence > run.transcriptSequence)?.id ?? null;
 }
 
 export async function findRunToolExecutions(runId: number) {
@@ -282,7 +320,7 @@ export async function findRunRecoveryState(workspaceId: number, sessionId: numbe
       outputText: true,
       endedAt: true,
       errorMessage: true,
-      session: { select: { chatMessages: true, version: true } },
+      session: { select: { version: true } },
     },
   });
 }

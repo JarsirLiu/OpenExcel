@@ -15,6 +15,7 @@ vi.mock("@/api/chat", () => ({
 
 import {
   advanceRunCursor,
+  findActiveRunCursor,
   RunRecoveryTimeoutError,
   readRunId,
   recoverRunOnce,
@@ -35,6 +36,25 @@ describe("run recovery", () => {
     );
   });
 
+  it("recovers the newest cancelled run after a refresh", async () => {
+    mocks.fetchRuns.mockResolvedValue([
+      { id: 6, status: "cancelled", recoverable: true },
+      { id: 5, status: "running", recoverable: false },
+      { id: 4, status: "cancelled", recoverable: false },
+    ]);
+
+    await expect(findActiveRunCursor(9, 3)).resolves.toEqual({ runId: 6, after: -1 });
+  });
+
+  it("does not recover an older cancelled run when a newer run is completed", async () => {
+    mocks.fetchRuns.mockResolvedValue([
+      { id: 5, status: "completed", recoverable: false },
+      { id: 4, status: "cancelled", recoverable: true },
+    ]);
+
+    await expect(findActiveRunCursor(9, 3)).resolves.toBeNull();
+  });
+
   it("advances the cursor only to the newest event", () => {
     const events = [
       { eventId: "event-2", sequence: 2 },
@@ -47,7 +67,13 @@ describe("run recovery", () => {
 
   it("reads canonical messages only after the run reaches a terminal state", async () => {
     const page = {
-      run: { runId: 7, status: "completed", terminal: true },
+      run: {
+        runId: 7,
+        status: "completed",
+        terminal: true,
+        lastEventSequence: 2,
+        transcriptSequence: 2,
+      },
       events: [{ eventId: "event-2", sequence: 2 }],
       cursor: { after: 2, lastEventSequence: 2 },
       hasMore: false,

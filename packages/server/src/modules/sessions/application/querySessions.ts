@@ -1,7 +1,8 @@
 import * as repo from "../infrastructure/sessionRepository.js";
+import { findLatestSessionCheckpoint } from "../runs/checkpointRepository.js";
 import * as runRepo from "../runs/repository.js";
 import { diagnoseRunRecovery } from "./recovery.js";
-import { getSessionMessagesPaginated, historyFromRuns } from "./transcript.js";
+import { historyFromRuns } from "./transcript.js";
 
 export async function getSessions(workspaceId: number) {
   return repo.findSessionsByWorkspace(workspaceId);
@@ -24,24 +25,30 @@ export async function getMessages(
   sessionId: number,
   limit = 40,
   offset = 0,
-): Promise<{ messages: any[]; total: number }> {
+): Promise<{ messages: any[]; total: number; recoverableRunId: number | null }> {
   const session = await repo.findSession(sessionId, workspaceId);
-  if (!session) return { messages: [], total: 0 };
+  if (!session) return { messages: [], total: 0, recoverableRunId: null };
 
-  const { messages, total } = await getSessionMessagesPaginated(
-    workspaceId,
-    sessionId,
-    limit,
-    offset,
-  );
-  if (messages.length > 0) return { messages, total };
+  const recoverableRunId = await runRepo.findLatestRecoverableRun(workspaceId, sessionId);
+
+  const checkpoint = await findLatestSessionCheckpoint(workspaceId, sessionId);
+  if (checkpoint) {
+    const transcript = checkpoint.transcript as any[];
+    const start = Math.max(0, transcript.length - offset - limit);
+    const end = transcript.length - offset;
+    return {
+      messages: transcript.slice(start, end),
+      total: transcript.length,
+      recoverableRunId,
+    };
+  }
 
   const runs = await runRepo.findRunsBySession(workspaceId, sessionId);
   const transcript = historyFromRuns(runs);
   const t = transcript.length;
   const start = Math.max(0, t - offset - limit);
   const end = t - offset;
-  return { messages: transcript.slice(start, end), total: t };
+  return { messages: transcript.slice(start, end), total: t, recoverableRunId };
 }
 
 export async function getRuns(
@@ -55,6 +62,7 @@ export async function getRuns(
   const steps = await Promise.all(
     runs.map(async (run: (typeof runs)[number]) => ({
       ...run,
+      recoverable: run.lastEventSequence > run.transcriptSequence,
       steps: await runRepo.findStepsByRun(run.id),
     })),
   );

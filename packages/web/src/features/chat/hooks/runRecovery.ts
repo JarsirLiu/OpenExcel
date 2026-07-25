@@ -31,7 +31,10 @@ export async function findActiveRunCursor(
   sessionId: number,
 ): Promise<RunRecoveryCursor | null> {
   const runs = await fetchRuns(workspaceId, sessionId);
-  const activeRun = [...runs].reverse().find((run) => run?.status === "running");
+  // The server returns runs newest-first. Keep the newest run because an
+  // aborted transport may have already removed its temporary assistant UI.
+  const newestRun = runs[0];
+  const activeRun = newestRun?.recoverable === true ? newestRun : null;
   const runId = Number(activeRun?.id);
   return Number.isInteger(runId) && runId > 0 ? { runId, after: -1 } : null;
 }
@@ -64,9 +67,13 @@ export async function recoverRunOnce(
     options,
   );
   const nextCursor = advanceRunCursor(cursor, page.events);
-  const messages = page.run.terminal
-    ? (await fetchMessages(workspaceId, sessionId, 200, 0, options)).messages
-    : null;
+  // A terminal run may still be settling its transcript. Reading the session
+  // messages before the transcript cursor reaches the event cursor can replace
+  // the live event projection with an older snapshot.
+  const messages =
+    page.run.terminal && page.run.transcriptSequence >= page.run.lastEventSequence
+      ? (await fetchMessages(workspaceId, sessionId, 200, 0, options)).messages
+      : null;
 
   return {
     snapshot: page.run,

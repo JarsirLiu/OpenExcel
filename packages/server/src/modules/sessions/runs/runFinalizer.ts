@@ -1,10 +1,16 @@
 import type { AgentRunCompletion, AgentTranscriptMessage } from "@openexcel/agent";
 import { formatAIError } from "@openexcel/agent";
-import { withSessionLock } from "../infrastructure/sessionLock.js";
-import * as sessionRepo from "../infrastructure/sessionRepository.js";
-import { findAgentEventsForCheckpoint } from "./agentEventRepository.js";
+import {
+  findAgentEventsByRun,
+  findAgentEventsForCheckpoint,
+  persistRunLifecycleEvent,
+} from "./agentEventRepository.js";
+import { advanceTranscriptSequence, persistRunCheckpoint } from "./checkpointRepository.js";
 import * as runRepo from "./repository.js";
-import { projectStreamedAssistantMessages } from "./runCheckpointProjector.js";
+import {
+  projectRunCheckpoint,
+  projectStreamedAssistantMessages,
+} from "./runCheckpointProjector.js";
 import type { AcquiredRunLease } from "./runLease.js";
 import { completeRunAndUpdateUndoCheckpoint } from "./undoCheckpoint.js";
 
@@ -60,36 +66,44 @@ export function createRunFinalizer(options: {
   async function finalize(input: RunFinalizationInput) {
     const outcome = outcomeFromInput(input);
     let messages = input.messages ?? input.completion?.messages;
-    if (
-      (!messages || messages.length === (options.lease.transcript?.length ?? 0)) &&
-      (input.status === "cancelled" || input.completion?.status === "cancelled")
-    ) {
+    let allEvents: Awaited<ReturnType<typeof findAgentEventsByRun>> = [];
+    try {
+      allEvents = await findAgentEventsByRun(options.lease.run.id);
+      if (outcome.status !== "recovery_required") {
+        await persistRunLifecycleEvent({
+          runId: options.lease.run.id,
+          type:
+            outcome.status === "completed"
+              ? "run.completed"
+              : outcome.status === "cancelled"
+                ? "run.cancelled"
+                : "run.failed",
+          payload: {
+            error: outcome.errorMessage,
+            isAborted: outcome.status === "cancelled",
+          },
+        });
+        allEvents = await findAgentEventsByRun(options.lease.run.id);
+      }
       const streamedMessages = projectStreamedAssistantMessages(
         await findAgentEventsForCheckpoint(options.lease.run.id),
       );
       if (streamedMessages.length > 0) {
-        messages = [
-          ...(options.lease.transcript ?? []),
-          ...streamedMessages,
-        ] as AgentTranscriptMessage[];
-      }
-    }
-
-    try {
-      if (messages) {
-        const persisted = await withSessionLock(options.sessionId, () =>
-          sessionRepo.updateSessionMessagesWithLease({
-            workspaceId: options.workspaceId,
-            sessionId: options.sessionId,
-            ownerId: options.lease.ownerId,
-            sessionVersion: options.lease.sessionVersion,
-            chatMessages: JSON.stringify(messages),
-          }),
+        // Events are the durable source for streamed text/reasoning in every
+        // terminal state. completion.messages is a transport result and may
+        // omit reasoning even when its deltas were persisted.
+        messages = mergeStreamedAssistantMessages(
+          (messages ?? options.lease.transcript ?? []) as AgentTranscriptMessage[],
+          (options.lease.transcript ?? []) as AgentTranscriptMessage[],
+          streamedMessages,
         );
-        if (!persisted) {
-          outcome.status = "recovery_required";
-          outcome.errorMessage = "运行租约已失效，未覆盖后续会话消息";
-        }
+      }
+      if (allEvents.length > 0 && messages) {
+        const checkpoint = projectRunCheckpoint(allEvents.map(toAgentEvent), messages);
+        await persistRunCheckpoint({ runId: options.lease.run.id, ...checkpoint });
+      }
+      if (messages && allEvents.length > 0) {
+        await advanceTranscriptSequence(options.lease.run.id, allEvents.at(-1)?.sequence ?? 0);
       }
     } catch (error) {
       outcome.status = "recovery_required";
@@ -156,5 +170,52 @@ export function createRunFinalizer(options: {
       finalization ??= finalize(input);
       return finalization;
     },
+  };
+}
+
+function mergeStreamedAssistantMessages(
+  messages: AgentTranscriptMessage[],
+  transcript: AgentTranscriptMessage[],
+  streamed: AgentTranscriptMessage[],
+): AgentTranscriptMessage[] {
+  const prefix = messages.slice(0, transcript.length);
+  const generated = messages.slice(transcript.length);
+  const generatedAssistants = generated.filter((message) => message.role === "assistant");
+  const merged = streamed.map((streamedMessage, index) => {
+    const existing = generatedAssistants[index];
+    if (!existing || existing.role !== "assistant") return streamedMessage;
+    const nonStreamParts = (Array.isArray(existing.parts) ? existing.parts : []).filter(
+      (part: any) => part.type !== "text" && part.type !== "reasoning",
+    );
+    return {
+      ...existing,
+      parts: [
+        ...nonStreamParts,
+        ...(Array.isArray(streamedMessage.parts) ? streamedMessage.parts : []),
+      ],
+    };
+  });
+  return [...prefix, ...generated.filter((message) => message.role !== "assistant"), ...merged];
+}
+
+function toAgentEvent(event: {
+  eventId: string;
+  sequence: number;
+  type: string;
+  occurredAt: Date;
+  payload: string;
+}) {
+  let payload: unknown = null;
+  try {
+    payload = JSON.parse(event.payload);
+  } catch {
+    // Invalid payloads remain in the event log but are excluded from projection.
+  }
+  return {
+    eventId: event.eventId,
+    sequence: event.sequence,
+    type: event.type as import("@openexcel/agent").AgentEvent["type"],
+    occurredAt: event.occurredAt.toISOString(),
+    payload,
   };
 }

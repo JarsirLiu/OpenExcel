@@ -24,6 +24,7 @@ const snapshot = {
   errorMessage: null,
   cancelRequestedAt: null,
   lastEventSequence: 3,
+  transcriptSequence: 3,
 };
 
 describe("run replay queries", () => {
@@ -45,6 +46,8 @@ describe("run replay queries", () => {
       cancelRequested: false,
       terminal: true,
       lastEventSequence: 3,
+      transcriptSequence: 3,
+      recoverable: false,
     });
     expect(mocks.findRunReplaySnapshot).toHaveBeenCalledWith(4, 8, 12);
   });

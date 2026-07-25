@@ -2,12 +2,7 @@ import { useChat } from "@ai-sdk/react";
 import type { SheetChangeDelta } from "@openexcel/core";
 import { DefaultChatTransport } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  cancelRun,
-  fetchMessages as fetchChatMessages,
-  fetchUndoAvailability,
-  undoLatestRun,
-} from "@/api/chat";
+import { cancelRun, fetchMessages as fetchChatMessages, undoLatestRun } from "@/api/chat";
 import type { ChatReferenceTarget } from "../composer/chatReferences";
 import { applyRunEventsToMessages } from "./runEventProjection";
 import {
@@ -62,17 +57,6 @@ function trimMessagesAfterUserTurn(messages: any[], userText: string): any[] {
   throw new Error("会话消息与撤销结果不一致，无法更新本地状态");
 }
 
-function removeEmptyAssistantMessages(messages: any[]): any[] {
-  return messages.filter(
-    (message) =>
-      !(
-        message?.role === "assistant" &&
-        Array.isArray(message.parts) &&
-        message.parts.length === 0
-      ),
-  );
-}
-
 export function applyInitialMessages(currentMessages: any[], loadedMessages: any[]): any[] {
   return currentMessages.length > 0 ? currentMessages : loadedMessages;
 }
@@ -121,6 +105,7 @@ export function useChatConversation({
   workspaceId,
   onDraftSessionCreated,
   initialMessages,
+  initialCanUndo,
   onRunSettled,
   onWorkspaceRefresh,
   onSheetChanged,
@@ -130,6 +115,7 @@ export function useChatConversation({
   workspaceId: number;
   onDraftSessionCreated?: (sessionId: number) => Promise<void> | void;
   initialMessages?: any[];
+  initialCanUndo?: boolean;
   onRunSettled?: () => Promise<void> | void;
   onWorkspaceRefresh?: () => Promise<void> | void;
   onSheetChanged?: SheetChangedHandler;
@@ -138,7 +124,8 @@ export function useChatConversation({
   const messagesRef = useRef<any[]>(initialMessages ?? []);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [hasOlder, setHasOlder] = useState(false);
-  const [canUndo, setCanUndo] = useState(false);
+  const [canUndo, setCanUndo] = useState(initialCanUndo === true);
+  const [recoverableRunId, setRecoverableRunId] = useState<number | null>(null);
   const [streamRecovered, setStreamRecovered] = useState(false);
   const [initialLoaded, setInitialLoaded] = useState(!!initialMessages);
   const [historicalToolCallIds] = useState<Set<string>>(
@@ -157,6 +144,8 @@ export function useChatConversation({
   } | null>(null);
   const wasStreamingRef = useRef(false);
   const loadedOffsetRef = useRef(initialMessages?.length ?? 0);
+  const initialSessionIdRef = useRef(sessionId);
+  const previousSessionIdRef = useRef(sessionId);
   const requestGenerationRef = useRef(0);
   const activeRunRef = useRef<RunRecoveryCursor | null>(null);
   const activeSessionIdRef = useRef<number | null>(sessionId);
@@ -164,10 +153,14 @@ export function useChatConversation({
   const cancellationRequestRef = useRef<{ sessionId: number; runId: number } | null>(null);
   const recoveryControllerRef = useRef<AbortController | null>(null);
   const recoveryInFlightRef = useRef(false);
-  const undoAvailabilityRequestRef = useRef(0);
   const mountedRef = useRef(true);
+
+  useEffect(() => {
+    setCanUndo(sessionId != null && initialCanUndo === true);
+  }, [initialCanUndo, sessionId]);
   const {
     isTransitioning: isDraftSessionTransitioning,
+    consumeCreatedSessionTransition,
     captureDraftResponse,
     beginTransition: beginDraftSessionTransition,
     isSendLocked,
@@ -175,6 +168,11 @@ export function useChatConversation({
     isDraft: sessionId == null,
     onDraftSessionCreated,
   });
+  const captureDraftResponseRef = useRef(captureDraftResponse);
+  captureDraftResponseRef.current = captureDraftResponse;
+  if (sessionId != null) {
+    activeSessionIdRef.current = sessionId;
+  }
 
   const requestRunCancellation = useCallback(
     (runId: number, targetSessionId: number) => {
@@ -197,76 +195,46 @@ export function useChatConversation({
   );
 
   const invalidateUndoAvailability = useCallback(() => {
-    undoAvailabilityRequestRef.current += 1;
     setCanUndo(false);
   }, []);
 
-  const refreshUndoAvailability = useCallback(async () => {
-    const requestId = undoAvailabilityRequestRef.current + 1;
-    undoAvailabilityRequestRef.current = requestId;
-
-    if (sessionId == null) {
-      if (mountedRef.current && requestId === undoAvailabilityRequestRef.current) {
-        setCanUndo(false);
-      }
-      return;
-    }
-
-    try {
-      const result = await fetchUndoAvailability(workspaceId, sessionId);
-      if (mountedRef.current && requestId === undoAvailabilityRequestRef.current) {
-        setCanUndo(result.canUndo);
-      }
-    } catch (error) {
-      if (mountedRef.current && requestId === undoAvailabilityRequestRef.current) {
-        setCanUndo(false);
-      }
-      console.error("[chat] Failed to refresh undo availability:", error);
-    }
-  }, [sessionId, workspaceId]);
-
   const transport = useMemo(() => {
-    const isDraft = sessionId == null;
     return new DefaultChatTransport<any>({
-      api: isDraft
-        ? `/api/workspaces/${workspaceId}/sessions/draft/chat`
-        : `/api/workspaces/${workspaceId}/sessions/${sessionId}/chat`,
+      api: `/api/workspaces/${workspaceId}/sessions/draft/chat`,
       prepareSendMessagesRequest: ({ messages, trigger }) => ({
         body: (() => {
           const turn = prepareChatTurn(messages, trigger);
           cancelRequestedRef.current = false;
           cancellationRequestRef.current = null;
           activeRunRef.current = null;
-          activeSessionIdRef.current = sessionId;
           setStreamRecovered(false);
           return turn;
         })(),
       }),
       fetch: async (input, init) => {
-        const response = await fetch(input, init);
+        const targetSessionId = activeSessionIdRef.current;
+        const target =
+          targetSessionId == null
+            ? input
+            : `/api/workspaces/${workspaceId}/sessions/${targetSessionId}/chat`;
+        const response = await fetch(target, init);
         const runId = readRunId(response);
-        const createdSessionId = captureDraftResponse(response);
-        const targetSessionId = createdSessionId ?? sessionId;
-        if (targetSessionId != null) {
-          activeSessionIdRef.current = targetSessionId;
+        const createdSessionId = captureDraftResponseRef.current(response);
+        const requestSessionId = createdSessionId ?? targetSessionId;
+        if (requestSessionId != null) {
+          activeSessionIdRef.current = requestSessionId;
         }
         if (runId != null) {
           activeRunRef.current = { runId, after: -1 };
-          if (cancelRequestedRef.current && targetSessionId != null) {
-            requestRunCancellation(runId, targetSessionId);
+          if (cancelRequestedRef.current && requestSessionId != null) {
+            requestRunCancellation(runId, requestSessionId);
             beginDraftSessionTransition();
           }
         }
         return response;
       },
     });
-  }, [
-    beginDraftSessionTransition,
-    captureDraftResponse,
-    requestRunCancellation,
-    sessionId,
-    workspaceId,
-  ]);
+  }, [beginDraftSessionTransition, requestRunCancellation, workspaceId]);
 
   const {
     messages,
@@ -276,18 +244,17 @@ export function useChatConversation({
     stop: stopChat,
     error,
   } = useChat({
-    id: `${workspaceId}:${sessionId}`,
+    id: `${workspaceId}:conversation`,
     messages: initialMessages ?? [],
     transport,
     onFinish: async ({ isAbort }) => {
+      // An aborted transport is not a settled run. Leave the live projection
+      // intact; the server cancellation path owns durable settlement.
+      if (isAbort) return;
+
       activeRunRef.current = null;
-      if (!isAbort) {
-        beginDraftSessionTransition();
-      }
       if (!mountedRef.current) return;
-      await onWorkspaceRefresh?.();
       await onRunSettled?.();
-      await refreshUndoAvailability();
     },
   });
 
@@ -302,7 +269,17 @@ export function useChatConversation({
 
     setInitialLoaded(false);
     setHasOlder(false);
+    setRecoverableRunId(null);
     loadedOffsetRef.current = 0;
+    const previousSessionId = previousSessionIdRef.current;
+    const transitionedFromDraft = previousSessionId == null && sessionId != null;
+    const isCreatedDraftSession =
+      transitionedFromDraft && consumeCreatedSessionTransition(sessionId);
+    const switchedSession = previousSessionId != null && previousSessionId !== sessionId;
+    previousSessionIdRef.current = sessionId;
+    if (switchedSession) {
+      setMessages([]);
+    }
 
     const loadInitialMessages = async () => {
       if (sessionId == null) {
@@ -312,16 +289,25 @@ export function useChatConversation({
         return;
       }
 
-      if (initialMessages == null) {
+      if (isCreatedDraftSession) {
+        loadedOffsetRef.current = messagesRef.current.length;
+        if (mountedRef.current && generation === requestGenerationRef.current) {
+          setInitialLoaded(true);
+        }
+        return;
+      }
+
+      if (initialMessages == null || sessionId !== initialSessionIdRef.current) {
         try {
-          const { messages: msgs, total } = await fetchChatMessages(
-            workspaceId,
-            sessionId,
-            PAGE_SIZE,
-            0,
-            { signal: controller.signal },
-          );
+          const {
+            messages: msgs,
+            total,
+            recoverableRunId: nextRecoverableRunId,
+          } = await fetchChatMessages(workspaceId, sessionId, PAGE_SIZE, 0, {
+            signal: controller.signal,
+          });
           if (mountedRef.current && generation === requestGenerationRef.current) {
+            setRecoverableRunId(nextRecoverableRunId);
             const currentToolCallIds = new Set(
               collectWorkbookMutationToolCallIds(messagesRef.current, new Set()),
             );
@@ -357,11 +343,7 @@ export function useChatConversation({
       recoveryControllerRef.current?.abort();
       recoveryControllerRef.current = null;
     };
-  }, [sessionId, workspaceId, initialMessages, setMessages]);
-
-  useEffect(() => {
-    void refreshUndoAvailability();
-  }, [refreshUndoAvailability]);
+  }, [initialMessages, consumeCreatedSessionTransition, sessionId, setMessages, workspaceId]);
 
   useEffect(() => {
     return () => {
@@ -377,8 +359,10 @@ export function useChatConversation({
       requestRunCancellation(run.runId, targetSessionId);
     }
     beginDraftSessionTransition();
-    stopChat();
-  }, [beginDraftSessionTransition, requestRunCancellation, stopChat]);
+    // The cancel endpoint owns stopping the server run. Calling AI SDK stop()
+    // here would discard its in-flight assistant message before the server
+    // can settle and persist the events already shown to the user.
+  }, [beginDraftSessionTransition, requestRunCancellation]);
 
   const isStreaming = status === "submitted" || status === "streaming";
 
@@ -418,14 +402,9 @@ export function useChatConversation({
           );
         }
         setStreamRecovered(true);
-        await onWorkspaceRefresh?.();
-        await onRunSettled?.();
-        await refreshUndoAvailability();
       } catch (recoveryError) {
         if (!controller.signal.aborted) {
           console.error("[chat] Failed to recover disconnected run:", recoveryError);
-          await onWorkspaceRefresh?.();
-          await refreshUndoAvailability();
         }
       } finally {
         if (recoveryControllerRef.current === controller) {
@@ -434,33 +413,24 @@ export function useChatConversation({
         recoveryInFlightRef.current = false;
       }
     },
-    [
-      onRunSettled,
-      onWorkspaceRefresh,
-      refreshUndoAvailability,
-      sessionId,
-      setMessages,
-      workspaceId,
-    ],
+    [sessionId, setMessages, workspaceId],
   );
 
   useEffect(() => {
-    if (sessionId == null || !initialLoaded || isStreaming) return;
+    // The history response identifies the only run whose event log is ahead
+    // of its durable transcript. Normal session entry therefore does not need
+    // a second runs-list request.
+    if (sessionId == null || !initialLoaded || recoverableRunId == null) return;
     let cancelled = false;
 
-    void findActiveRunCursor(workspaceId, sessionId)
-      .then((cursor) => {
-        if (!cancelled && cursor) return recoverActiveRun(cursor);
-        return undefined;
-      })
-      .catch((recoveryError) => {
-        if (!cancelled) console.error("[chat] Failed to inspect active run:", recoveryError);
-      });
+    void recoverActiveRun({ runId: recoverableRunId, after: -1 }).catch((recoveryError) => {
+      if (!cancelled) console.error("[chat] Failed to inspect active run:", recoveryError);
+    });
 
     return () => {
       cancelled = true;
     };
-  }, [initialLoaded, isStreaming, recoverActiveRun, sessionId, workspaceId]);
+  }, [initialLoaded, recoverActiveRun, recoverableRunId, sessionId]);
 
   useEffect(() => {
     onStreamingChange?.(isStreaming);
@@ -481,7 +451,6 @@ export function useChatConversation({
       return;
     }
     handledStreamErrorRef.current = { error, sessionId, workspaceId };
-    setMessages(removeEmptyAssistantMessages);
     let cancelled = false;
     const recover = async () => {
       if (sessionId == null) {
@@ -495,11 +464,6 @@ export function useChatConversation({
         await recoverActiveRun(cursor);
         return;
       }
-
-      // There is no run to replay. Still refresh committed workbook state so
-      // a transport failure cannot hide a completed server-side mutation.
-      await onWorkspaceRefresh?.();
-      await refreshUndoAvailability();
     };
 
     void recover().catch((recoveryError) => {
@@ -510,16 +474,7 @@ export function useChatConversation({
     return () => {
       cancelled = true;
     };
-  }, [
-    beginDraftSessionTransition,
-    error,
-    onWorkspaceRefresh,
-    recoverActiveRun,
-    refreshUndoAvailability,
-    sessionId,
-    setMessages,
-    workspaceId,
-  ]);
+  }, [beginDraftSessionTransition, error, recoverActiveRun, sessionId, setMessages, workspaceId]);
 
   useEffect(() => {
     const toolCallIds = onSheetChanged

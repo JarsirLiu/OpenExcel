@@ -21,45 +21,17 @@ export type RunRecoveryDiagnosis = {
   failedToolCallIds: string[];
 };
 
-function transcriptContainsOutput(chatMessages: string | null, outputText: string | null) {
-  if (!chatMessages || !outputText) return false;
-
-  try {
-    const messages: unknown = JSON.parse(chatMessages);
-    return (
-      Array.isArray(messages) &&
-      messages.some(
-        (message) =>
-          message &&
-          typeof message === "object" &&
-          (message as Record<string, unknown>).role === "assistant" &&
-          Array.isArray((message as Record<string, unknown>).parts) &&
-          ((message as Record<string, unknown>).parts as unknown[]).some(
-            (part) =>
-              part &&
-              typeof part === "object" &&
-              (part as Record<string, unknown>).type === "text" &&
-              (part as Record<string, unknown>).text === outputText,
-          ),
-      )
-    );
-  } catch {
-    return false;
-  }
-}
-
 export function canAutoRecoverRun(
-  run: { outputText: string | null; session: { chatMessages: string | null } },
+  run: { outputText: string | null },
   toolExecutions: readonly RecoveryToolExecution[],
 ) {
   return (
-    toolExecutions.every((execution) => execution.status === "completed") &&
-    transcriptContainsOutput(run.session.chatMessages, run.outputText)
+    toolExecutions.every((execution) => execution.status === "completed") && Boolean(run.outputText)
   );
 }
 
 export function diagnoseRunRecovery(
-  run: { outputText: string | null; session: { chatMessages: string | null } },
+  run: { outputText: string | null },
   toolExecutions: readonly RecoveryToolExecution[],
   activeRun: boolean,
 ): RunRecoveryDiagnosis | null {
@@ -97,15 +69,6 @@ export function diagnoseRunRecovery(
   }
 
   if (!run.outputText) {
-    return {
-      canAutoRecover: false,
-      reason: "missing_output",
-      unresolvedToolCallIds: [],
-      failedToolCallIds: [],
-    };
-  }
-
-  if (!transcriptContainsOutput(run.session.chatMessages, run.outputText)) {
     return {
       canAutoRecover: false,
       reason: "missing_output",

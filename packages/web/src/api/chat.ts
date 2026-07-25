@@ -11,6 +11,8 @@ export type RunSnapshot = {
   cancelRequested: boolean;
   terminal: boolean;
   lastEventSequence: number;
+  transcriptSequence: number;
+  recoverable: boolean;
 };
 
 export type RunEvent = {
@@ -31,13 +33,19 @@ export type RunEventPage = {
   hasMore: boolean;
 };
 
+export type ChatMessagesPage = {
+  messages: any[];
+  total: number;
+  recoverableRunId: number | null;
+};
+
 export async function fetchMessages(
   workspaceId: number,
   sessionId: number,
   limit = 40,
   offset = 0,
   options?: { signal?: AbortSignal },
-): Promise<{ messages: any[]; total: number }> {
+): Promise<ChatMessagesPage> {
   const res = await apiFetch(
     `/workspaces/${workspaceId}/sessions/${sessionId}/messages?limit=${limit}&offset=${offset}`,
     { signal: options?.signal },
@@ -91,17 +99,6 @@ export async function fetchRunEvents(
     { signal: options?.signal },
   );
   if (!res.ok) throw new Error("加载运行事件失败");
-  return res.json();
-}
-
-export async function fetchUndoAvailability(
-  workspaceId: number,
-  sessionId: number,
-): Promise<{ canUndo: boolean }> {
-  const res = await apiFetch(
-    `/workspaces/${workspaceId}/sessions/${sessionId}/runs/undo-availability`,
-  );
-  if (!res.ok) throw new Error("加载撤销状态失败");
   return res.json();
 }
 

@@ -1,23 +1,33 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  updateSessionMessagesWithLease: vi.fn(),
   updateRunWithLease: vi.fn(),
   completeRunAndUpdateUndoCheckpoint: vi.fn(),
   withSessionLock: vi.fn(),
+  findAgentEventsByRun: vi.fn(),
+  findAgentEventsForCheckpoint: vi.fn(),
+  persistRunLifecycleEvent: vi.fn(),
+  persistRunCheckpoint: vi.fn(),
+  advanceTranscriptSequence: vi.fn(),
 }));
 
 vi.mock("../infrastructure/sessionLock.js", () => ({
   withSessionLock: mocks.withSessionLock,
-}));
-vi.mock("../infrastructure/sessionRepository.js", () => ({
-  updateSessionMessagesWithLease: mocks.updateSessionMessagesWithLease,
 }));
 vi.mock("./repository.js", () => ({
   updateRunWithLease: mocks.updateRunWithLease,
 }));
 vi.mock("./undoCheckpoint.js", () => ({
   completeRunAndUpdateUndoCheckpoint: mocks.completeRunAndUpdateUndoCheckpoint,
+}));
+vi.mock("./agentEventRepository.js", () => ({
+  findAgentEventsByRun: mocks.findAgentEventsByRun,
+  findAgentEventsForCheckpoint: mocks.findAgentEventsForCheckpoint,
+  persistRunLifecycleEvent: mocks.persistRunLifecycleEvent,
+}));
+vi.mock("./checkpointRepository.js", () => ({
+  persistRunCheckpoint: mocks.persistRunCheckpoint,
+  advanceTranscriptSequence: mocks.advanceTranscriptSequence,
 }));
 
 import { createRunFinalizer } from "./runFinalizer.js";
@@ -35,17 +45,17 @@ describe("createRunFinalizer", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     mocks.withSessionLock.mockImplementation(async (_sessionId, callback) => callback());
-    mocks.updateSessionMessagesWithLease.mockResolvedValue(true);
     mocks.updateRunWithLease.mockResolvedValue(true);
     mocks.completeRunAndUpdateUndoCheckpoint.mockResolvedValue(undefined);
+    mocks.findAgentEventsByRun.mockResolvedValue([]);
+    mocks.findAgentEventsForCheckpoint.mockResolvedValue([]);
+    mocks.persistRunLifecycleEvent.mockResolvedValue(undefined);
+    mocks.persistRunCheckpoint.mockResolvedValue(true);
+    mocks.advanceTranscriptSequence.mockResolvedValue(true);
   });
 
   it("persists the canonical transcript before the terminal run state", async () => {
     const order: string[] = [];
-    mocks.updateSessionMessagesWithLease.mockImplementation(async () => {
-      order.push("transcript");
-      return true;
-    });
     mocks.completeRunAndUpdateUndoCheckpoint.mockImplementation(async () => {
       order.push("run");
     });
@@ -62,7 +72,7 @@ describe("createRunFinalizer", () => {
       messages: [{ role: "assistant", parts: [{ type: "text", text: "done" }] }],
     });
 
-    expect(order).toEqual(["transcript", "run", "lease"]);
+    expect(order).toEqual(["run", "lease"]);
     expect(mocks.completeRunAndUpdateUndoCheckpoint).toHaveBeenCalledWith(
       1,
       2,
@@ -72,8 +82,118 @@ describe("createRunFinalizer", () => {
     );
   });
 
+  it("persists the checkpoint before canonical transcript and advances its boundary", async () => {
+    const order: string[] = [];
+    mocks.findAgentEventsByRun.mockResolvedValue([
+      {
+        eventId: "message-1",
+        sequence: 4,
+        type: "message.delta",
+        occurredAt: new Date("2026-01-01T00:00:00.000Z"),
+        payload: JSON.stringify({ messageId: "message-1", delta: "done" }),
+      },
+    ]);
+    mocks.persistRunCheckpoint.mockImplementation(async () => {
+      order.push("checkpoint");
+      return true;
+    });
+    mocks.advanceTranscriptSequence.mockImplementation(async () => {
+      order.push("cursor");
+      return true;
+    });
+
+    const finalizer = createRunFinalizer({
+      workspaceId: 1,
+      sessionId: 2,
+      lease: createLease(),
+    });
+    await finalizer.finalize({
+      status: "completed",
+      messages: [{ role: "assistant", parts: [{ type: "text", text: "done" }] }],
+    });
+
+    expect(order).toEqual(["checkpoint", "cursor"]);
+    expect(mocks.persistRunCheckpoint).toHaveBeenCalledWith(
+      expect.objectContaining({ runId: 9, checkpointSequence: 4, reasoning: "", toolState: [] }),
+    );
+    expect(mocks.advanceTranscriptSequence).toHaveBeenCalledWith(9, 4);
+  });
+
+  it("persists text and reasoning from independent streamed events when cancelled", async () => {
+    mocks.findAgentEventsByRun.mockResolvedValue([
+      {
+        eventId: "reasoning-1",
+        sequence: 1,
+        type: "reasoning.delta",
+        occurredAt: new Date("2026-01-01T00:00:00.000Z"),
+        payload: JSON.stringify({
+          messageId: "assistant-1",
+          partId: "reasoning-1",
+          delta: "先分析",
+        }),
+      },
+      {
+        eventId: "message-1",
+        sequence: 2,
+        type: "message.delta",
+        occurredAt: new Date("2026-01-01T00:00:01.000Z"),
+        payload: JSON.stringify({
+          messageId: "assistant-1",
+          partId: "text-1",
+          delta: "结果",
+        }),
+      },
+    ]);
+    mocks.findAgentEventsForCheckpoint.mockResolvedValue([
+      {
+        eventId: "reasoning-1",
+        sequence: 1,
+        type: "reasoning.delta",
+        occurredAt: "2026-01-01T00:00:00.000Z",
+        payload: { messageId: "assistant-1", partId: "reasoning-1", delta: "先分析" },
+      },
+      {
+        eventId: "message-1",
+        sequence: 2,
+        type: "message.delta",
+        occurredAt: "2026-01-01T00:00:01.000Z",
+        payload: { messageId: "assistant-1", partId: "text-1", delta: "结果" },
+      },
+    ]);
+
+    const finalizer = createRunFinalizer({
+      workspaceId: 1,
+      sessionId: 2,
+      lease: createLease(),
+    });
+    await finalizer.finalize({ status: "cancelled", messages: [] });
+
+    expect(mocks.persistRunCheckpoint).toHaveBeenCalledWith(
+      expect.objectContaining({
+        transcript: [
+          {
+            role: "assistant",
+            parts: [
+              { type: "reasoning", text: "先分析" },
+              { type: "text", text: "结果" },
+            ],
+          },
+        ],
+      }),
+    );
+  });
+
   it("uses recovery_required when transcript persistence fails and always releases the lease", async () => {
-    mocks.updateSessionMessagesWithLease.mockRejectedValue(new Error("database unavailable"));
+    mocks.findAgentEventsByRun.mockResolvedValue([
+      {
+        eventId: "message-1",
+        sequence: 1,
+        type: "message.delta",
+        occurredAt: new Date("2026-01-01T00:00:00.000Z"),
+        payload: JSON.stringify({ messageId: "assistant-1", delta: "done" }),
+      },
+    ]);
+    mocks.persistRunCheckpoint.mockRejectedValue(new Error("database unavailable"));
     const release = vi.fn().mockResolvedValue(undefined);
     const finalizer = createRunFinalizer({
       workspaceId: 1,

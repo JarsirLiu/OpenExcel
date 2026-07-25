@@ -23,6 +23,33 @@ describe("createOrderedAgentEventEmitter", () => {
     expect(order).toEqual(["persist:0", "publish:0", "persist:1", "publish:1"]);
   });
 
+  it("flushes events already queued before closing", async () => {
+    const persisted: number[] = [];
+    let releaseFirst: (() => void) | undefined;
+    const firstPersistence = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    const emitter = createOrderedAgentEventEmitter({
+      persistenceBarrier: {
+        persist: async (event) => {
+          if (event.sequence === 0) await firstPersistence;
+          persisted.push(event.sequence);
+        },
+      },
+    });
+
+    const first = emitter.emit("run.started");
+    const second = emitter.emit("message.delta", { delta: "partial" });
+    const flushed = emitter.flushAndClose();
+    await Promise.resolve();
+    expect(persisted).toEqual([]);
+
+    releaseFirst?.();
+    await Promise.all([first, second, flushed]);
+    expect(persisted).toEqual([0, 1]);
+    await expect(emitter.emit("step.started")).rejects.toThrow("closed");
+  });
+
   it("stops accepting events after persistence failure", async () => {
     const abortController = new AbortController();
     const emitter = createOrderedAgentEventEmitter({

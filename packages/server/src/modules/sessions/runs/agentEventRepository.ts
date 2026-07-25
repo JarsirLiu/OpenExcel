@@ -46,6 +46,36 @@ export async function persistAgentEvent(
   });
 }
 
+export async function persistRunLifecycleEvent(data: {
+  runId: number;
+  type: Extract<AgentEvent["type"], "run.completed" | "run.cancelled" | "run.failed">;
+  payload: unknown;
+}) {
+  return prisma.$transaction(async (tx) => {
+    const latest = await tx.agentEvent.findFirst({
+      where: { runId: data.runId },
+      orderBy: { sequence: "desc" },
+      select: { sequence: true },
+    });
+    const sequence = (latest?.sequence ?? -1) + 1;
+    const event = await tx.agentEvent.create({
+      data: {
+        runId: data.runId,
+        eventId: `agent-event-${crypto.randomUUID()}`,
+        sequence,
+        type: data.type,
+        occurredAt: new Date(),
+        payload: JSON.stringify(data.payload),
+      },
+    });
+    await tx.agentRun.updateMany({
+      where: { id: data.runId, lastEventSequence: { lt: sequence } },
+      data: { lastEventSequence: sequence },
+    });
+    return event;
+  });
+}
+
 export async function findAgentEventsByRun(runId: number) {
   return prisma.agentEvent.findMany({
     where: { runId },
@@ -95,6 +125,7 @@ export async function findAgentEventPageForSession(data: {
         clientRequestId: true,
         startedAt: true,
         lastEventSequence: true,
+        transcriptSequence: true,
         endedAt: true,
         outputText: true,
         errorMessage: true,

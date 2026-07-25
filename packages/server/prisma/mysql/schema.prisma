@@ -170,7 +170,6 @@ model Session {
   sheetId      Int?
   name         String
   titleStatus  String   @default("pending")
-  chatMessages String?    @default("[]")
   undoRunId    Int?
   workspace    Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   sheet        Sheet?     @relation(fields: [sheetId], references: [id], onDelete: SetNull)
@@ -201,6 +200,7 @@ model AgentRun {
   leaseExpiresAt DateTime?
   heartbeatAt  DateTime?
   lastEventSequence Int @default(0)
+  transcriptSequence Int @default(0)
   requestPayloadHash String?
   undoInvalidated Boolean                @default(false)
   revertedAt   DateTime?
@@ -210,8 +210,22 @@ model AgentRun {
   toolExecutions AgentToolExecution[]
   snapshots    AgentRunSheetSnapshot[]
   chartSnapshots AgentRunChartSnapshot[]
+  checkpoint    AgentRunCheckpoint?
   startedAt    DateTime                @default(now())
   endedAt      DateTime?
+}
+
+model AgentRunCheckpoint {
+  id                Int      @id @default(autoincrement())
+  runId             Int      @unique
+  checkpointSequence Int
+  transcript        String   @db.LongText
+  reasoning         String   @db.LongText
+  toolState         String   @db.LongText
+  updatedAt         DateTime @updatedAt
+  run               AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId, checkpointSequence])
 }
 
 model AgentStep {

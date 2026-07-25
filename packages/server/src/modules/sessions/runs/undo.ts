@@ -8,12 +8,6 @@ import { withWorkspaceUndoLock } from "../infrastructure/workspaceUndoLock.js";
 import * as repo from "./repository.js";
 import { invalidateUndoCheckpointInTransaction } from "./undoCheckpoint.js";
 
-type ChatMessageLike = {
-  role?: unknown;
-  content?: unknown;
-  parts?: ReadonlyArray<unknown> | null;
-};
-
 type UndoableRunStep = {
   toolName?: string | null;
   input?: string | null;
@@ -72,45 +66,6 @@ function parseToolOutput(
   }
 
   throw new Error(errorMessage);
-}
-
-function extractMessageText(message: ChatMessageLike): string {
-  if (typeof message.content === "string") {
-    return message.content;
-  }
-
-  if (!Array.isArray(message.parts)) {
-    return "";
-  }
-
-  return message.parts
-    .filter((part: any) => part?.type === "text" && typeof part.text === "string")
-    .map((part: any) => part.text)
-    .join("");
-}
-
-function findLatestUserMessageIndex(messages: ChatMessageLike[], userText: string): number {
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const message = messages[index];
-    if (message?.role !== "user") continue;
-    if (extractMessageText(message).trim() === userText.trim()) {
-      return index;
-    }
-  }
-
-  return -1;
-}
-
-function trimMessagesAfterUserTurn(
-  messages: ChatMessageLike[],
-  userText: string,
-): ChatMessageLike[] {
-  const turnStartIndex = findLatestUserMessageIndex(messages, userText);
-  if (turnStartIndex < 0) {
-    throw new Error("会话记录与运行输入不一致，无法撤销");
-  }
-
-  return messages.slice(0, turnStartIndex);
 }
 
 function parseStructuralUndoEffects(steps: UndoableRunStep[]): StructuralUndoEffect[] {
@@ -361,7 +316,7 @@ async function undoLatestRunInternal(workspaceId: number, sessionId: number) {
   const restoreResult = await prisma.$transaction(async (tx) => {
     const session = await tx.session.findFirst({
       where: { id: sessionId, workspaceId },
-      select: { id: true, chatMessages: true, undoRunId: true },
+      select: { id: true, undoRunId: true },
     });
     if (!session) {
       throw new Error("Session not found");
@@ -369,12 +324,6 @@ async function undoLatestRunInternal(workspaceId: number, sessionId: number) {
     if (session.undoRunId !== run.id) {
       throw new Error("当前运行已失效，无法撤销");
     }
-
-    const messages = parseJson<ChatMessageLike[]>(
-      session.chatMessages ?? "[]",
-      "会话消息记录损坏，无法撤销",
-    );
-    const restoredMessages = trimMessagesAfterUserTurn(messages, transcriptInputText);
 
     const restoredSheetIds = await restoreSheetSnapshots(tx, workspaceId, run.id, createdSheetIds);
     if (restoredSheetIds.kind === "conflict") {
@@ -402,10 +351,7 @@ async function undoLatestRunInternal(workspaceId: number, sessionId: number) {
 
     await tx.session.update({
       where: { id: session.id },
-      data: {
-        chatMessages: JSON.stringify(restoredMessages),
-        undoRunId: null,
-      },
+      data: { undoRunId: null },
     });
 
     await tx.agentRun.update({

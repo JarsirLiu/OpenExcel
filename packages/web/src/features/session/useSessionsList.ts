@@ -147,14 +147,10 @@ export function useSessionsList(workspaceId: number | null, initialSessions?: Se
     void refreshSessions({ resetCurrent: true });
   }, [refreshSessions]);
 
-  const handleSelectSession = useCallback(
-    (id: number) => {
-      setCurrentSessionId(id);
-      setHistoryOpen(false);
-      void refreshSessions();
-    },
-    [refreshSessions],
-  );
+  const handleSelectSession = useCallback((id: number) => {
+    setCurrentSessionId(id);
+    setHistoryOpen(false);
+  }, []);
 
   const handleDeleteSession = useCallback(
     async (id: number) => {

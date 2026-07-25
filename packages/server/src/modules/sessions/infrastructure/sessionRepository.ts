@@ -5,7 +5,6 @@ export async function findSessionsByWorkspace(workspaceId: number) {
   return prisma.session.findMany({
     where: {
       workspaceId,
-      chatMessages: { not: "[]" },
     },
     select: {
       id: true,
@@ -20,14 +19,13 @@ export async function findSessionsByWorkspace(workspaceId: number) {
   });
 }
 
-export async function createSession(workspaceId: number, name: string, chatMessages = "[]") {
+export async function createSession(workspaceId: number, name: string) {
   return prisma.session.create({
     data: {
       publicId: generateSessionPublicId(),
       workspaceId,
       name,
       sheetId: null,
-      chatMessages,
     },
   });
 }
@@ -42,7 +40,7 @@ export async function deleteSession(id: number, workspaceId: number) {
 
 export async function updateSession(
   id: number,
-  data: { name?: string; titleStatus?: string; chatMessages?: string },
+  data: { name?: string; titleStatus?: string },
   workspaceId: number,
 ) {
   const session = await prisma.session.findFirst({
@@ -50,25 +48,6 @@ export async function updateSession(
   });
   if (!session) return null;
   return prisma.session.update({ where: { id: session.id }, data });
-}
-
-export async function updateSessionMessagesWithLease(data: {
-  workspaceId: number;
-  sessionId: number;
-  ownerId: string;
-  sessionVersion: number;
-  chatMessages: string;
-}) {
-  const result = await prisma.session.updateMany({
-    where: {
-      id: data.sessionId,
-      workspaceId: data.workspaceId,
-      leaseOwnerId: data.ownerId,
-      version: data.sessionVersion,
-    },
-    data: { chatMessages: data.chatMessages },
-  });
-  return result.count === 1;
 }
 
 export async function updateSessionNameIfUnchanged(

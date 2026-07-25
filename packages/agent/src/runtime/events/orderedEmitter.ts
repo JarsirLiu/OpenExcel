@@ -18,7 +18,6 @@ export function createOrderedAgentEventEmitter(options: {
 
   function assertOpen() {
     if (failure) throw failure;
-    if (closed) throw new Error("Agent event emitter is closed");
   }
 
   function enqueue<T>(operation: () => Promise<T>): Promise<T> {

@@ -11,7 +11,6 @@ type LeaseSession = {
   leaseOwnerId: string | null;
   leaseExpiresAt: Date | null;
   version: number;
-  chatMessages: string | null;
 };
 
 function parseTranscript(value: string | null): unknown[] {
@@ -95,7 +94,6 @@ export async function acquireRunLease(data: {
         leaseOwnerId: true,
         leaseExpiresAt: true,
         version: true,
-        chatMessages: true,
       },
     });
     if (!session) throw new Error("Session not found");
@@ -134,12 +132,13 @@ export async function acquireRunLease(data: {
     });
     if (claimed.count !== 1) throw new SessionBusyError();
 
-    const canonicalTranscript = parseTranscript(session.chatMessages);
-    const transcript = data.appendUserTurn(canonicalTranscript);
-    await tx.session.update({
-      where: { id: data.sessionId },
-      data: { chatMessages: JSON.stringify(transcript) },
+    const previousCheckpoint = await tx.agentRunCheckpoint.findFirst({
+      where: { run: { sessionId: data.sessionId } },
+      orderBy: [{ updatedAt: "desc" }, { runId: "desc" }],
+      select: { transcript: true },
     });
+    const canonicalTranscript = parseTranscript(previousCheckpoint?.transcript ?? null);
+    const transcript = data.appendUserTurn(canonicalTranscript);
 
     const run = await createLeasedRun(tx, {
       sessionId: data.sessionId,

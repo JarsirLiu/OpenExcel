@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   agentRunFindFirst: vi.fn(),
   agentRunUpdateMany: vi.fn(),
   agentRunCreate: vi.fn(),
+  checkpointFindFirst: vi.fn(),
   transaction: vi.fn(),
 }));
 
@@ -43,12 +44,16 @@ describe("acquireRunLease", () => {
           updateMany: mocks.agentRunUpdateMany,
           create: mocks.agentRunCreate,
         },
+        agentRunCheckpoint: { findFirst: mocks.checkpointFindFirst },
       }),
     );
     mocks.agentRunUpdateMany.mockResolvedValue({ count: 0 });
     mocks.sessionUpdateMany.mockResolvedValue({ count: 1 });
     mocks.sessionUpdate.mockResolvedValue({ id: 7 });
     mocks.agentRunCreate.mockResolvedValue({ id: 42, status: "running" });
+    mocks.checkpointFindFirst.mockResolvedValue({
+      transcript: JSON.stringify([{ role: "user", parts: [{ type: "text", text: "old" }] }]),
+    });
   });
 
   it("commits the user turn and run under one lease transaction", async () => {
@@ -58,7 +63,6 @@ describe("acquireRunLease", () => {
       leaseOwnerId: null,
       leaseExpiresAt: null,
       version: 3,
-      chatMessages: JSON.stringify([{ role: "user", parts: [{ type: "text", text: "old" }] }]),
     });
 
     const lease = await acquireRunLease({
@@ -78,10 +82,7 @@ describe("acquireRunLease", () => {
         data: expect.objectContaining({ version: 4 }),
       }),
     );
-    expect(mocks.sessionUpdate).toHaveBeenCalledWith({
-      where: { id: 7 },
-      data: { chatMessages: expect.any(String) },
-    });
+    expect(mocks.sessionUpdate).not.toHaveBeenCalled();
     expect(mocks.agentRunCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
         sessionId: 7,

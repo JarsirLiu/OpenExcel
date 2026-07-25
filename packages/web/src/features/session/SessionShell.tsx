@@ -120,13 +120,12 @@ export function SessionShell({
 
         {currentSessionId != null ? (
           <ChatPanel
-            key={currentSessionId}
             sessionId={currentSessionId}
+            initialCanUndo={currentSession?.undoRunId != null}
             onRunSettled={handleRunSettled}
           />
         ) : (
           <ChatPanel
-            key="draft"
             sessionId={null}
             isDraft
             onDraftSessionCreated={handleDraftSessionCreated}

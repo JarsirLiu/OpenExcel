@@ -5,7 +5,6 @@ import {
   fetchRunEvents,
   fetchRunSnapshot,
   fetchRuns,
-  fetchUndoAvailability,
   undoLatestRun,
 } from "./chat";
 import { generateSessionTitle } from "./sessions";
@@ -233,18 +232,6 @@ describe("fetchRunEvents", () => {
     expect(mockFetch).toHaveBeenCalledWith(
       "/api/workspaces/9/sessions/3/runs/7/events?after=4&limit=50",
       { signal: undefined },
-    );
-  });
-});
-
-describe("fetchUndoAvailability", () => {
-  it("returns the current session undo state", async () => {
-    mockFetch.mockResolvedValue(new Response(JSON.stringify({ canUndo: true }), { status: 200 }));
-
-    await expect(fetchUndoAvailability(9, 3)).resolves.toEqual({ canUndo: true });
-    expect(mockFetch).toHaveBeenCalledWith(
-      "/api/workspaces/9/sessions/3/runs/undo-availability",
-      {},
     );
   });
 });

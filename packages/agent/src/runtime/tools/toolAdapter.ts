@@ -22,6 +22,13 @@ export interface ToolAdapterOptions {
   validateInput?: boolean;
 }
 
+function throwIfAborted(signal: AbortSignal | undefined) {
+  if (!signal?.aborted) return;
+  const error = new Error("Agent run was cancelled");
+  error.name = "AbortError";
+  throw error;
+}
+
 export function createAgentToolSet(
   definitions: readonly AgentToolDefinition[],
   executor: ToolExecutor,
@@ -36,6 +43,7 @@ export function createAgentToolSet(
         description: definition.description,
         inputSchema: definition.inputSchema,
         execute: async (input: unknown, executeOptions: any) => {
+          throwIfAborted(executeOptions?.abortSignal);
           const toolCallId = executeOptions?.toolCallId;
           if (typeof toolCallId !== "string" || toolCallId.length === 0) {
             throw new Error(`Tool ${definition.name} execution is missing toolCallId`);
@@ -71,6 +79,7 @@ export function createAgentToolSet(
           };
 
           try {
+            throwIfAborted(executionOptions.abortSignal);
             const output = await executor.execute(definition.name, input, executionOptions);
             await hooks.onToolFinish?.({
               toolName: definition.name,

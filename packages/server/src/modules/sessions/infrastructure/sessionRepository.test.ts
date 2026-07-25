@@ -25,7 +25,7 @@ describe("sessionRepository", () => {
     await findSessionsByWorkspace(7);
 
     expect(mocks.findMany).toHaveBeenCalledWith({
-      where: { workspaceId: 7, chatMessages: { not: "[]" } },
+      where: { workspaceId: 7 },
       select: {
         id: true,
         publicId: true,

@@ -17,11 +17,7 @@ export async function startDraftChat(workspaceId: number, turn: ChatTurnRequest)
 
   const message = toCanonicalUserMessage(turn);
   const firstUserText = extractMessageText(message);
-  const session = await repo.createSession(
-    workspaceId,
-    fallbackTitleFromPrompt(firstUserText),
-    "[]",
-  );
+  const session = await repo.createSession(workspaceId, fallbackTitleFromPrompt(firstUserText));
 
   try {
     const result = await streamChat(workspaceId, session.id, turn);

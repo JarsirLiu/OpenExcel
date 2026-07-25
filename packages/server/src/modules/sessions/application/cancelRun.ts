@@ -10,7 +10,10 @@ export async function cancelRun(workspaceId: number, sessionId: number, runId: n
     notifyRunCancellation(runId);
   }
 
-  const current = await runRepo.findRunForSession(workspaceId, sessionId, runId);
+  const current =
+    run.status === "running"
+      ? await runRepo.waitForRunSettlement(workspaceId, sessionId, runId)
+      : run;
   if (!current) return null;
   return {
     runId: current.id,

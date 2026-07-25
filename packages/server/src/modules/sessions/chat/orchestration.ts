@@ -1,5 +1,6 @@
 import {
   AgentPersistenceError,
+  type AgentTranscriptMessage,
   buildExcelToolDefinitions,
   buildRunToolContext,
   buildWorkspaceToolContext,
@@ -196,9 +197,14 @@ export async function streamChat(workspaceId: number, sessionId: number, turn: C
         scheduleSessionTitleGeneration(workspaceId, sessionId, inputText);
       })
       .catch(async (error) => {
+        const cancelled = runCancellation.signal.aborted;
         await finalizer.finalize({
-          status: error instanceof AgentPersistenceError ? "recovery_required" : "failed",
-          errorMessage: formatAIError(error),
+          status: cancelled
+            ? "cancelled"
+            : error instanceof AgentPersistenceError
+              ? "recovery_required"
+              : "failed",
+          errorMessage: cancelled ? undefined : formatAIError(error),
           leaseLost,
         });
       })
@@ -208,6 +214,7 @@ export async function streamChat(workspaceId: number, sessionId: number, turn: C
     cancellation?.close();
     await finalizer.finalize({
       status: error instanceof AgentPersistenceError ? "recovery_required" : "failed",
+      messages: transcript as AgentTranscriptMessage[],
       errorMessage: formatAIError(error),
       leaseLost,
     });

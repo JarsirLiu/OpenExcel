@@ -29,7 +29,7 @@
 - `AgentStep` 记录模型步骤、工具名、输入、输出和顺序。
 - workbook、sheet、chart 工具都由 `packages/server` 注册和执行。
 - 工具产生的工作簿修改和撤销快照由服务端持久化。
-- `Session.chatMessages` 保存 AI SDK UI message transcript。
+- `AgentRunCheckpoint` 保存事件投影后的可恢复 transcript。
 - `packages/agent` 负责模型调用、工具循环、上下文预算和 UI stream 转换。
 - `packages/web` 使用 AI SDK React hooks 消费流并渲染消息、工具状态和工作簿刷新。
 
@@ -42,7 +42,7 @@
 - 前端 `useChat` 持有的 `messages[]` 被作为聊天请求体发送到服务端。
 - 服务端目前直接使用这批前端消息构造模型输入。
 - 前端只加载最近一页消息时，这批消息可能不完整。
-- 流结束时如果用这批消息覆盖 `Session.chatMessages`，旧历史会丢失。
+- 流结束时只能通过事件 projector 更新 run checkpoint，不能由 AI SDK 结果直接覆盖历史。
 
 因此当前实现是过渡状态，不能把“前端提交 transcript”视为目标架构。
 
@@ -51,7 +51,7 @@
 当前代码已经完成单轮请求边界的硬切换：
 
 - chat 接口只接受 `{ requestId, message }`，旧的 `{ messages: [] }` 请求直接返回 400，不提供兼容分支。
-- 服务端从 `Session.chatMessages` 读取 canonical transcript，在创建 `AgentRun` 前追加并保存本轮 user message。
+- 服务端从最近一次 run checkpoint 读取 canonical transcript，在创建 `AgentRun` 前追加本轮 user message。
 - `packages/agent` 提供 `AgentRunner` 入口，在包内组装 workspace context、system prompt 和模型上下文。
 - 服务端 chat adapter 只负责资源加载、工具注入、运行记录和流适配；不再向 AgentRunner 传入浏览器历史。
 - 前端仍可用本地 `messages` 做展示和流式状态，但 transport 只发送当前 user turn；`onRunSettled` 不再接收消息数组。
@@ -66,6 +66,7 @@ AgentEvent 和对应 AgentStep；工具账本会对 `(runId, toolCallId)` 做参
   `persistence_failed` 或 `recovery_required`；撤销只允许把已结束运行标记为 `reverted`。
 - `cancelRequestedAt` 是服务端取消意图的持久化标记。取消接口重复调用不会重复执行取消动作，终态运行也不会被改写。
 - `POST .../runs/:runId/cancel` 是唯一的显式取消入口。它先更新数据库，再通知当前进程中的 Agent；Agent 在模型调用和工具执行边界收到 `AbortSignal` 后结束为 `cancelled`。
+- Agent 运行时统一把取消信号传递到模型和工具边界；工具开始执行前再次检查信号，因 abort 导致的模型 promise rejection 仍归类为 `cancelled`，不会覆盖已持久化的部分事件为 `failed`。
 - SSE/HTTP 响应断开不再调用 Agent 的 `AbortController`。AI SDK 的独立消费支路继续驱动服务端运行，连接断开只影响订阅者。
 - 当前取消信号在本进程通过注册表即时唤醒，并周期性读取数据库标记；数据库运行租约和事件回放已经落地。
   进程异常退出后的自动恢复和人工诊断仍属于后续可靠性能力。
@@ -222,7 +223,7 @@ Server route
   └─ 资源授权和请求校验
        ↓
 Session application service
-  ├─ 读取完整 Session.chatMessages
+  ├─ 读取最近 AgentRunCheckpoint.transcript
   ├─ 去重 requestId/messageId
   ├─ 追加本轮 user message
   ├─ 创建 AgentRun
@@ -283,7 +284,7 @@ Browser
 
 上下文裁剪必须保持消息结构合法：assistant 的 tool-call 与对应的 tool
 result 不能被拆开，不能只保留工具结果，也不能把裁剪结果写回
-`Session.chatMessages`。无法在预算内保留完整的一轮时，应删除完整的一轮
+`AgentRunCheckpoint.transcript`。无法在预算内保留完整的一轮时，应删除完整的一轮
 或使用明确标记的服务端摘要；不能随机删除二维表格中的值或静默拼接半条消息。
 
 ## 4. HTTP 请求和流协议
@@ -347,9 +348,18 @@ type AgentEvent =
   | { type: "tool.started"; payload: { toolName: string; toolCallId: string; input: unknown } }
   | { type: "tool.finished"; payload: { toolName: string; toolCallId: string; input: unknown; output?: unknown; error?: unknown } }
   | { type: "step.finished"; payload: StepPayload }
-  | { type: "run.completed"; payload: { error?: undefined; isAborted: false; messageCount: number } }
-  | { type: "run.failed"; payload: { error: AgentError; isAborted: false; messageCount: number } }
-  | { type: "run.cancelled"; payload: { error?: undefined; isAborted: true; messageCount: number } };
+  | { type: "message.delta"; payload: MessageDeltaPayload }
+  | { type: "reasoning.delta"; payload: ReasoningDeltaPayload };
+
+type MessageDeltaPayload = {
+  turnId: string;
+  stepIndex: number;
+  messageId: string;
+  partId: string;
+  delta: string;
+};
+
+type ReasoningDeltaPayload = MessageDeltaPayload;
 
 type StepPayload = {
   stepType: "text" | "tool-call" | "tool-result";
@@ -404,20 +414,11 @@ type PersistedAgentEvent = {
    - `toolCalls?`: 工具调用列表
    - `toolResults?`: 工具结果列表
 
-6. **run.completed**: Agent正常完成时触发
-   - `error`: 必须为undefined或不存在
-   - `isAborted`: 必须为false
-   - `messageCount`: 最终消息数量
-
-7. **run.failed**: Agent执行失败时触发
-   - `error`: 错误详情（格式化后的AgentError）
-   - `isAborted`: 必须为false
-   - `messageCount`: 失败前的消息数量
-
-8. **run.cancelled**: Agent被显式取消时触发
-   - `error`: 可选的取消原因
-   - `isAborted`: 必须为true
-   - `messageCount`: 取消时的消息数量
+6. **运行终态不属于 Agent 内部执行事件**：Agent 通过 `completion.status` 返回
+   `completed`、`failed` 或 `cancelled`；server finalizer 再按统一持久化顺序创建唯一的
+   `run.completed`、`run.failed` 或 `run.cancelled` durable protocol event。它们属于
+   对外事件流的生命周期协议，类似 Eve 的 `turn.cancelled`，但 Agent 不得自行创建这些
+   server durable event，避免 Agent loop、HTTP orchestration 和 finalizer 重复收敛。
 
 **事件顺序和持久化约束**：
 
@@ -426,6 +427,9 @@ type PersistedAgentEvent = {
 - `sequence`在一个run内单调递增，客户端回放时按sequence去重
 - `tool.finished`事件的output/error字段互斥，不能同时存在
 - `step.started`和`step.finished`只保留回放所需的规范化字段，不写入完整 provider request/response
+- 取消事实和取消收敛是两个状态：`run.cancelled` 表示 Agent 已停止；只有 checkpoint、
+  transcript、游标和 lease 都完成后，`AgentRun.status` 才能写为 `cancelled`。收敛失败时
+  保留取消事件并将 run 置为 `recovery_required`。
 
 每个事件通过统一信封传输，并在服务端持久化后才允许进入可恢复流：
 
@@ -716,7 +720,10 @@ GET /api/workspaces/:workspacePublicId/sessions/:sessionPublicId/runs?status=rec
 
 - 通过独立的取消命令或取消接口向服务端发出 cancel intent。
 - 服务端写入取消标记，AgentRunner 在模型调用和工具边界检查取消信号。
-- run 标记为 `cancelled`，保存已确认的服务端步骤；已经提交的 workbook 修改不回滚。
+- Agent 返回 `completion.status = cancelled` 后，server settlement 先 flush 已确认事件，
+  再创建唯一的 `run.cancelled` durable event，投影 checkpoint 和 canonical transcript，
+  最后才将 run 标记为 `cancelled`；checkpoint/transcript 失败时标记为
+  `recovery_required`，已经提交的 workbook 修改不回滚。
 
 客户端连接断开：
 
@@ -784,14 +791,13 @@ model Session {
   sheetId      Int?
   name         String
   titleStatus  String     @default("pending")
-  chatMessages String?    @default("[]")
   undoRunId    Int?
   runs         AgentRun[]
   createdAt    DateTime   @default(now())
 }
 ```
 
-`Session.chatMessages` 是当前 canonical transcript 的存储位置。`AgentRun` 和 `AgentStep` 是执行审计、
+`AgentRunCheckpoint.transcript` 是当前 canonical transcript 的存储位置。`AgentRun` 和 `AgentStep` 是执行审计、
 失败诊断、工具结果和撤销的补充记录，不是让前端重新构造上下文的来源。
 
 事件回放和工具级幂等需要补充持久化记录，但它们不能成为第二份 transcript 事实来源。最小字段契约如下，
@@ -849,7 +855,7 @@ canonical tool-result transcript 仍由 Agent event/persistence 边界负责，�
 当前实现已为 `AgentRun` 增加 `cancelRequestedAt DateTime?`，用于持久化显式取消意图；它不属于 `Session`，也不由浏览器直接修改运行状态。
 
 `AgentRun` 还必须保存或可查询以下运行控制字段：`requestId`、请求体哈希、`ownerId`、`leaseExpiresAt`、
-`heartbeatAt`、`lastEventSequence`、`startedAt`、`endedAt` 和错误分类。`requestId` 在草稿阶段按 workspace
+`heartbeatAt`、`lastEventSequence`、`transcriptSequence`、`startedAt`、`endedAt` 和错误分类。`requestId` 在草稿阶段按 workspace
 和请求命名空间去重，session 创建后继续与 session 关联，不能因为 draft 没有 sessionId 而失去幂等性。
 
 ## 9. 代码模块边界
@@ -1116,7 +1122,7 @@ ledger/receipt 证明安全时进行；否则保持 `recovery_required`，避免
 以下实现不符合本架构：
 
 - `POST /chat` 接收完整前端 `messages[]` 并直接传给模型。
-- 服务端用前端分页消息覆盖 `Session.chatMessages`。
+- 服务端用前端分页消息覆盖服务端 transcript。
 - 前端执行 workbook、sheet 或 chart tool。
 - 前端生成 tool result 再回传给模型。
 - 前端决定 system prompt、工具列表或上下文窗口。

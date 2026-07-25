@@ -12,12 +12,14 @@ import styles from "./ChatPanel.module.css";
 export function ChatPanel({
   sessionId,
   isDraft = false,
+  initialCanUndo = false,
   onDraftSessionCreated,
   onRunSettled,
   onRegenerate,
 }: {
   sessionId: number | null;
   isDraft?: boolean;
+  initialCanUndo?: boolean;
   onDraftSessionCreated?: (sessionId: number) => Promise<void> | void;
   onRunSettled?: (sessionId: number) => Promise<void> | void;
   onRegenerate?: () => void;
@@ -52,6 +54,7 @@ export function ChatPanel({
     workspaceId,
     onDraftSessionCreated,
     initialMessages,
+    initialCanUndo,
     onRunSettled: () => {
       if (sessionId == null) return;
       return onRunSettled?.(sessionId);

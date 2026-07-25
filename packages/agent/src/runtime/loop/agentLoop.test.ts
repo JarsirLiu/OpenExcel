@@ -102,7 +102,7 @@ describe("runAgentLoop", () => {
       expect.objectContaining({
         maxRetries: 4,
         timeout: { totalMs: 15_000, chunkMs: 5_000 },
-        abortSignal: abortController.signal,
+        abortSignal: expect.any(AbortSignal),
       }),
     );
   });
@@ -219,7 +219,6 @@ describe("runAgentLoop", () => {
       "tool.started",
       "tool.finished",
       "step.finished",
-      "run.completed",
     ]);
     expect(publishedTypes).toEqual(eventTypes);
     expect(mocks.streamText).toHaveBeenCalledWith(

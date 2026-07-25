@@ -21,6 +21,7 @@ function toRunSnapshot(run: {
   errorMessage: string | null;
   cancelRequestedAt: Date | null;
   lastEventSequence: number;
+  transcriptSequence: number;
 }) {
   return {
     runId: run.id,
@@ -33,6 +34,8 @@ function toRunSnapshot(run: {
     cancelRequested: run.cancelRequestedAt != null,
     terminal: isRunStatus(run.status) && terminalRunStatuses.has(run.status),
     lastEventSequence: run.lastEventSequence,
+    transcriptSequence: run.transcriptSequence,
+    recoverable: run.lastEventSequence > run.transcriptSequence,
   };
 }
 

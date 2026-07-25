@@ -13,14 +13,15 @@ function eventPart(event: RunEvent): { messageId: string; partId: string; delta:
   if (event.type !== "message.delta" && event.type !== "reasoning.delta") return null;
   if (!event.payload || typeof event.payload !== "object") return null;
   const payload = event.payload as { messageId?: unknown; partId?: unknown; delta?: unknown };
-  if (
-    typeof payload.messageId !== "string" ||
-    typeof payload.partId !== "string" ||
-    typeof payload.delta !== "string"
-  ) {
+  if (typeof payload.messageId !== "string" || typeof payload.delta !== "string") {
     return null;
   }
-  return { messageId: payload.messageId, partId: payload.partId, delta: payload.delta };
+  return {
+    messageId: payload.messageId,
+    partId:
+      typeof payload.partId === "string" ? payload.partId : `${payload.messageId}-${event.type}`,
+    delta: payload.delta,
+  };
 }
 
 function findPart(parts: ProjectedPart[], partId: string, type: ProjectedPart["type"]) {

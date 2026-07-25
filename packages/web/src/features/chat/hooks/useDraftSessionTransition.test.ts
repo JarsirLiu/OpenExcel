@@ -11,8 +11,9 @@ describe("useDraftSessionTransition", () => {
           resolveActivation = resolve;
         }),
     );
-    const { result } = renderHook(() =>
-      useDraftSessionTransition({ isDraft: true, onDraftSessionCreated }),
+    const { result, rerender } = renderHook(
+      ({ isDraft }) => useDraftSessionTransition({ isDraft, onDraftSessionCreated }),
+      { initialProps: { isDraft: true } },
     );
 
     act(() => {
@@ -21,20 +22,18 @@ describe("useDraftSessionTransition", () => {
       );
     });
 
-    expect(onDraftSessionCreated).not.toHaveBeenCalled();
-    expect(result.current.isSendLocked()).toBe(false);
-
-    act(() => {
-      result.current.beginTransition();
-    });
-
     expect(onDraftSessionCreated).toHaveBeenCalledWith(17);
     expect(result.current.isSendLocked()).toBe(true);
+
     expect(result.current.isTransitioning).toBe(true);
 
     await act(async () => {
       resolveActivation?.();
     });
+
+    rerender({ isDraft: false });
+    expect(result.current.isSendLocked()).toBe(false);
+    expect(result.current.isTransitioning).toBe(false);
   });
 
   it("activates the existing session when a duplicate Draft request returns 409", () => {
@@ -76,5 +75,21 @@ describe("useDraftSessionTransition", () => {
     });
 
     errorSpy.mockRestore();
+  });
+
+  it("identifies the session created by the draft response", () => {
+    const { result } = renderHook(() =>
+      useDraftSessionTransition({ isDraft: true, onDraftSessionCreated: vi.fn() }),
+    );
+
+    act(() => {
+      result.current.captureDraftResponse(
+        new Response(null, { headers: { "X-OpenExcel-Session-Id": "51" } }),
+      );
+    });
+
+    expect(result.current.consumeCreatedSessionTransition(51)).toBe(true);
+    expect(result.current.consumeCreatedSessionTransition(51)).toBe(false);
+    expect(result.current.consumeCreatedSessionTransition(52)).toBe(false);
   });
 });
