@@ -1,12 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  cancelRun,
-  fetchMessages,
-  fetchRunEvents,
-  fetchRunSnapshot,
-  fetchRuns,
-  undoLatestRun,
-} from "./chat";
+import { cancelRun, fetchMessages, undoLatestRun } from "./chat";
 import { generateSessionTitle } from "./sessions";
 import {
   createSheet,
@@ -188,17 +181,6 @@ describe("fetchMessages", () => {
   });
 });
 
-describe("fetchRuns", () => {
-  it("returns parsed runs", async () => {
-    const runs = [{ id: 7, status: "completed" }];
-    mockFetch.mockResolvedValue(new Response(JSON.stringify(runs), { status: 200 }));
-
-    const result = await fetchRuns(9, 3);
-    expect(result).toEqual(runs);
-    expect(mockFetch).toHaveBeenCalledWith("/api/workspaces/9/sessions/3/runs", {});
-  });
-});
-
 describe("cancelRun", () => {
   it("posts an explicit cancellation request", async () => {
     const result = { runId: 7, status: "running", cancelRequested: true };
@@ -208,31 +190,6 @@ describe("cancelRun", () => {
     expect(mockFetch).toHaveBeenCalledWith("/api/workspaces/9/sessions/3/runs/7/cancel", {
       method: "POST",
     });
-  });
-});
-
-describe("fetchRunSnapshot", () => {
-  it("loads a run snapshot by session and run id", async () => {
-    const snapshot = { runId: 7, status: "running", terminal: false };
-    mockFetch.mockResolvedValue(new Response(JSON.stringify(snapshot), { status: 200 }));
-
-    await expect(fetchRunSnapshot(9, 3, 7)).resolves.toEqual(snapshot);
-    expect(mockFetch).toHaveBeenCalledWith("/api/workspaces/9/sessions/3/runs/7", {
-      signal: undefined,
-    });
-  });
-});
-
-describe("fetchRunEvents", () => {
-  it("loads events after the supplied cursor", async () => {
-    const page = { run: { runId: 7 }, events: [], cursor: { after: 4 }, hasMore: false };
-    mockFetch.mockResolvedValue(new Response(JSON.stringify(page), { status: 200 }));
-
-    await expect(fetchRunEvents(9, 3, 7, 4, 50)).resolves.toEqual(page);
-    expect(mockFetch).toHaveBeenCalledWith(
-      "/api/workspaces/9/sessions/3/runs/7/events?after=4&limit=50",
-      { signal: undefined },
-    );
   });
 });
 

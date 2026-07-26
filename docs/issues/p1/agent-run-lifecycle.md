@@ -22,7 +22,7 @@
 
 - Agent completion 独立于 UI stream 的消费和断开；
 - server 使用一个可重入的 finalizer，按固定顺序完成 transcript、run 终态和 lease 清理；
-- 事件协议由 Agent 统一生成，server 只负责持久化、发布和回放；
+- 事件协议由 Agent 统一生成，server 只负责持久化、UI stream 适配和内部投影；
 - 持久化失败进入可诊断、可恢复状态，不把失败吞成 completed；
 - 工具副作用、授权、幂等账本、数据库事务和 undo 仍由 server 负责。
 
@@ -132,7 +132,8 @@ sessions/runs/
 
 事件表对 `(runId, sequence)` 和 `(runId, eventId)` 建立唯一约束。事件写入采用幂等语义：相同事件重复写入返回已存在记录；相同 sequence 对应不同 eventId 时判定为协议冲突并停止运行。
 
-事件持久化成功后才能向外发布或交给 UI stream。回放只消费已确认的事件，并按 sequence 排序和去重；回放不能重新执行工具副作用。
+事件持久化成功后才能交给 UI stream。服务端内部投影只消费已确认的事件，并按 sequence 排序和去重；
+投影不能重新执行工具副作用，浏览器不直接读取事件日志。
 
 ### 3. Sheet 和 Chart mutation 事务
 

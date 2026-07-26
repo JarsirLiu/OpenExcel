@@ -848,9 +848,12 @@ The bootstrap command is authenticated and idempotent. The workspace list endpoi
 ### 8.4 Chat APIs
 
 - `GET /api/workspaces/:workspaceId/sessions/:sessionId/messages`
-- `GET /api/workspaces/:workspaceId/sessions/:sessionId/runs`
 - `POST /api/workspaces/:workspaceId/sessions/:sessionId/chat`
+- `POST /api/workspaces/:workspaceId/sessions/:sessionId/runs/:runId/cancel`
 - `POST /api/workspaces/:workspaceId/sessions/:sessionId/runs/undo-latest`
+
+历史会话只通过 `messages` 读取 checkpoint transcript。`AgentEvent` 是服务端内部的事实日志，
+不通过浏览器事件接口回放；浏览器断流只表示当前流订阅消失，不会取消 server-owned run。
 
 ### 8.5 Title APIs
 
@@ -871,10 +874,10 @@ It should load on demand instead of being fetched during workbook bootstrap, so 
 
 The chat API may use SSE or streamed response piping.
 
-The transport layer only carries the server-owned chat run and persisted
-events. It must not become a hidden place for title generation, Agent loop
-control, session refresh logic, or client-provided transcript persistence.
-Reconnect and event replay rules are defined in [Agent Loop](agent-loop.md).
+The transport layer only carries the server-owned chat run and its UI projection. It must not become a
+hidden place for title generation, Agent loop control, session refresh logic, or client-provided transcript
+persistence. Browser disconnects do not cancel a run; the server continues persistence and finalization.
+History is reopened through the messages endpoint, while event replay remains an internal server concern.
 
 ### 9.2 Persistence
 

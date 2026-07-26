@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { useDraftSessionTransition } from "./useDraftSessionTransition";
 
 describe("useDraftSessionTransition", () => {
-  it("locks a persisted draft before asynchronously activating its session", async () => {
+  it("records a persisted draft without activating it during the stream", async () => {
     let resolveActivation: (() => void) | undefined;
     const onDraftSessionCreated = vi.fn(
       () =>
@@ -22,9 +22,15 @@ describe("useDraftSessionTransition", () => {
       );
     });
 
+    expect(onDraftSessionCreated).not.toHaveBeenCalled();
+    expect(result.current.isSendLocked()).toBe(false);
+    expect(result.current.isTransitioning).toBe(false);
+
+    act(() => {
+      result.current.beginTransition();
+    });
     expect(onDraftSessionCreated).toHaveBeenCalledWith(17);
     expect(result.current.isSendLocked()).toBe(true);
-
     expect(result.current.isTransitioning).toBe(true);
 
     await act(async () => {

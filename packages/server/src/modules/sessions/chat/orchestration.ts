@@ -34,6 +34,7 @@ import { type AcquiredRunLease, acquireRunLease } from "../runs/runLease.js";
 import { clearSessionUndoCheckpoint } from "../runs/undoCheckpoint.js";
 import { loadWorkspaceChatContext } from "./context.js";
 import { resolveChatMessageReferences } from "./references.js";
+import { holdStreamOpenUntil } from "./settledStream.js";
 
 export async function loadSessionForChat(sessionId: number, workspaceId: number) {
   const session = await repo.findSession(sessionId, workspaceId);
@@ -186,7 +187,7 @@ export async function streamChat(workspaceId: number, sessionId: number, turn: C
       abortSignal: runCancellation.signal,
     }).run();
 
-    void result.completion
+    const settlement = result.completion
       .then(async (completion) => {
         const generatedMessages = completion.messages?.slice(resolvedMessages.length) ?? [];
         const canonicalMessages = removeEmptyAssistantMessages([
@@ -209,7 +210,13 @@ export async function streamChat(workspaceId: number, sessionId: number, turn: C
         });
       })
       .finally(() => runCancellation.close());
-    return { stream: result.stream, runId: lease.run.id };
+
+    // Do not let the browser observe the end of the stream before the
+    // server-owned checkpoint and run status are durable. This is the
+    // boundary that allows the web client to activate a newly created
+    // session without replacing its live projection with an empty history.
+    const stream = holdStreamOpenUntil(result.stream, settlement);
+    return { stream, runId: lease.run.id };
   } catch (error) {
     cancellation?.close();
     await finalizer.finalize({

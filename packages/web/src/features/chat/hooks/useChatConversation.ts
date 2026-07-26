@@ -4,13 +4,6 @@ import { DefaultChatTransport } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cancelRun, fetchMessages as fetchChatMessages, undoLatestRun } from "@/api/chat";
 import type { ChatReferenceTarget } from "../composer/chatReferences";
-import { applyRunEventsToMessages } from "./runEventProjection";
-import {
-  findActiveRunCursor,
-  type RunRecoveryCursor,
-  readRunId,
-  recoverRunUntilTerminal,
-} from "./runRecovery";
 import { useDraftSessionTransition } from "./useDraftSessionTransition";
 import {
   collectWorkbookMutationToolCallIds,
@@ -61,16 +54,9 @@ export function applyInitialMessages(currentMessages: any[], loadedMessages: any
   return currentMessages.length > 0 ? currentMessages : loadedMessages;
 }
 
-function mergeRecoveredMessages(currentMessages: any[], recoveredMessages: any[]): any[] {
-  const recoveredIds = new Set(
-    recoveredMessages
-      .map((message) => message?.id)
-      .filter((id): id is string => typeof id === "string"),
-  );
-  return [
-    ...currentMessages.filter((message) => !recoveredIds.has(message?.id)),
-    ...recoveredMessages,
-  ];
+function readRunId(response: Response): number | null {
+  const value = Number(response.headers.get("X-OpenExcel-Run-Id"));
+  return Number.isInteger(value) && value > 0 ? value : null;
 }
 
 export function prepareChatTurn(messages: any[], trigger: string) {
@@ -125,8 +111,6 @@ export function useChatConversation({
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [hasOlder, setHasOlder] = useState(false);
   const [canUndo, setCanUndo] = useState(initialCanUndo === true);
-  const [recoverableRunId, setRecoverableRunId] = useState<number | null>(null);
-  const [streamRecovered, setStreamRecovered] = useState(false);
   const [initialLoaded, setInitialLoaded] = useState(!!initialMessages);
   const [historicalToolCallIds] = useState<Set<string>>(
     () =>
@@ -137,22 +121,15 @@ export function useChatConversation({
   const seenWorkbookRefreshToolCallIdsRef = useRef<Set<string>>(new Set());
   const hasPrimedWorkbookMutationHistoryRef = useRef(false);
   const pendingWorkspaceRefreshRef = useRef(false);
-  const handledStreamErrorRef = useRef<{
-    error: unknown;
-    sessionId: number | null;
-    workspaceId: number;
-  } | null>(null);
   const wasStreamingRef = useRef(false);
   const loadedOffsetRef = useRef(initialMessages?.length ?? 0);
   const initialSessionIdRef = useRef(sessionId);
   const previousSessionIdRef = useRef(sessionId);
   const requestGenerationRef = useRef(0);
-  const activeRunRef = useRef<RunRecoveryCursor | null>(null);
+  const activeRunRef = useRef<number | null>(null);
   const activeSessionIdRef = useRef<number | null>(sessionId);
   const cancelRequestedRef = useRef(false);
   const cancellationRequestRef = useRef<{ sessionId: number; runId: number } | null>(null);
-  const recoveryControllerRef = useRef<AbortController | null>(null);
-  const recoveryInFlightRef = useRef(false);
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -207,7 +184,6 @@ export function useChatConversation({
           cancelRequestedRef.current = false;
           cancellationRequestRef.current = null;
           activeRunRef.current = null;
-          setStreamRecovered(false);
           return turn;
         })(),
       }),
@@ -225,10 +201,9 @@ export function useChatConversation({
           activeSessionIdRef.current = requestSessionId;
         }
         if (runId != null) {
-          activeRunRef.current = { runId, after: -1 };
+          activeRunRef.current = runId;
           if (cancelRequestedRef.current && requestSessionId != null) {
             requestRunCancellation(runId, requestSessionId);
-            beginDraftSessionTransition();
           }
         }
         return response;
@@ -248,12 +223,13 @@ export function useChatConversation({
     messages: initialMessages ?? [],
     transport,
     onFinish: async ({ isAbort }) => {
-      // An aborted transport is not a settled run. Leave the live projection
-      // intact; the server cancellation path owns durable settlement.
-      if (isAbort) return;
-
       activeRunRef.current = null;
       if (!mountedRef.current) return;
+      // The server stream closes only after run finalization has persisted the
+      // checkpoint. Transitioning here keeps the live projection mounted
+      // until its durable history is ready, including explicit cancellation.
+      if (sessionId == null) beginDraftSessionTransition();
+      if (isAbort) return;
       await onRunSettled?.();
     },
   });
@@ -269,7 +245,6 @@ export function useChatConversation({
 
     setInitialLoaded(false);
     setHasOlder(false);
-    setRecoverableRunId(null);
     loadedOffsetRef.current = 0;
     const previousSessionId = previousSessionIdRef.current;
     const transitionedFromDraft = previousSessionId == null && sessionId != null;
@@ -299,15 +274,16 @@ export function useChatConversation({
 
       if (initialMessages == null || sessionId !== initialSessionIdRef.current) {
         try {
-          const {
-            messages: msgs,
-            total,
-            recoverableRunId: nextRecoverableRunId,
-          } = await fetchChatMessages(workspaceId, sessionId, PAGE_SIZE, 0, {
-            signal: controller.signal,
-          });
+          const { messages: msgs, total } = await fetchChatMessages(
+            workspaceId,
+            sessionId,
+            PAGE_SIZE,
+            0,
+            {
+              signal: controller.signal,
+            },
+          );
           if (mountedRef.current && generation === requestGenerationRef.current) {
-            setRecoverableRunId(nextRecoverableRunId);
             const currentToolCallIds = new Set(
               collectWorkbookMutationToolCallIds(messagesRef.current, new Set()),
             );
@@ -340,8 +316,6 @@ export function useChatConversation({
       mountedRef.current = false;
       requestGenerationRef.current += 1;
       controller.abort();
-      recoveryControllerRef.current?.abort();
-      recoveryControllerRef.current = null;
     };
   }, [initialMessages, consumeCreatedSessionTransition, sessionId, setMessages, workspaceId]);
 
@@ -356,125 +330,18 @@ export function useChatConversation({
     const run = activeRunRef.current;
     const targetSessionId = activeSessionIdRef.current;
     if (run && targetSessionId != null) {
-      requestRunCancellation(run.runId, targetSessionId);
+      requestRunCancellation(run, targetSessionId);
     }
-    beginDraftSessionTransition();
     // The cancel endpoint owns stopping the server run. Calling AI SDK stop()
     // here would discard its in-flight assistant message before the server
     // can settle and persist the events already shown to the user.
-  }, [beginDraftSessionTransition, requestRunCancellation]);
+  }, [requestRunCancellation]);
 
   const isStreaming = status === "submitted" || status === "streaming";
-
-  const recoverActiveRun = useCallback(
-    async (cursor: RunRecoveryCursor) => {
-      if (recoveryInFlightRef.current || !mountedRef.current || sessionId == null) return;
-
-      recoveryInFlightRef.current = true;
-      const controller = new AbortController();
-      recoveryControllerRef.current = controller;
-      activeRunRef.current = cursor;
-
-      try {
-        const result = await recoverRunUntilTerminal(workspaceId, sessionId, cursor, {
-          signal: controller.signal,
-          onUpdate: (update) => {
-            activeRunRef.current = update.cursor;
-            if (update.events.length > 0) {
-              setMessages((currentMessages) =>
-                applyRunEventsToMessages(currentMessages, cursor.runId, update.events),
-              );
-            }
-          },
-        });
-        if (!mountedRef.current || controller.signal.aborted) return;
-
-        activeRunRef.current = result.cursor;
-        if (result.messages) {
-          setMessages((currentMessages) =>
-            mergeRecoveredMessages(
-              currentMessages.filter(
-                (message) =>
-                  typeof message?.id !== "string" || !message.id.startsWith(`run-${cursor.runId}-`),
-              ),
-              result.messages ?? [],
-            ),
-          );
-        }
-        setStreamRecovered(true);
-      } catch (recoveryError) {
-        if (!controller.signal.aborted) {
-          console.error("[chat] Failed to recover disconnected run:", recoveryError);
-        }
-      } finally {
-        if (recoveryControllerRef.current === controller) {
-          recoveryControllerRef.current = null;
-        }
-        recoveryInFlightRef.current = false;
-      }
-    },
-    [sessionId, setMessages, workspaceId],
-  );
-
-  useEffect(() => {
-    // The history response identifies the only run whose event log is ahead
-    // of its durable transcript. Normal session entry therefore does not need
-    // a second runs-list request.
-    if (sessionId == null || !initialLoaded || recoverableRunId == null) return;
-    let cancelled = false;
-
-    void recoverActiveRun({ runId: recoverableRunId, after: -1 }).catch((recoveryError) => {
-      if (!cancelled) console.error("[chat] Failed to inspect active run:", recoveryError);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [initialLoaded, recoverActiveRun, recoverableRunId, sessionId]);
 
   useEffect(() => {
     onStreamingChange?.(isStreaming);
   }, [isStreaming, onStreamingChange]);
-
-  useEffect(() => {
-    if (!error) {
-      handledStreamErrorRef.current = null;
-      return;
-    }
-    const handledError = handledStreamErrorRef.current;
-    if (
-      handledError &&
-      handledError.error === error &&
-      handledError.sessionId === sessionId &&
-      handledError.workspaceId === workspaceId
-    ) {
-      return;
-    }
-    handledStreamErrorRef.current = { error, sessionId, workspaceId };
-    let cancelled = false;
-    const recover = async () => {
-      if (sessionId == null) {
-        beginDraftSessionTransition();
-        return;
-      }
-
-      const cursor = activeRunRef.current ?? (await findActiveRunCursor(workspaceId, sessionId));
-      if (cancelled) return;
-      if (cursor) {
-        await recoverActiveRun(cursor);
-        return;
-      }
-    };
-
-    void recover().catch((recoveryError) => {
-      if (!cancelled) {
-        console.error("[chat] Failed to recover disconnected run:", recoveryError);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [beginDraftSessionTransition, error, recoverActiveRun, sessionId, setMessages, workspaceId]);
 
   useEffect(() => {
     const toolCallIds = onSheetChanged
@@ -527,7 +394,6 @@ export function useChatConversation({
   const handleSend = useCallback(
     (text: string, references: ChatReferenceTarget[]) => {
       if (!text || isStreaming || isSendLocked()) return;
-      setStreamRecovered(false);
       invalidateUndoAvailability();
       if (references.length === 0) {
         sendMessage({ text });
@@ -595,7 +461,7 @@ export function useChatConversation({
   return {
     messages,
     historicalToolCallIds,
-    error: streamRecovered ? null : error,
+    error,
     canUndo,
     isStreaming,
     isDraftSessionTransitioning,

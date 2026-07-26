@@ -1,6 +1,5 @@
 import { lazy, type ReactNode, Suspense } from "react";
 import {
-  createBrowserRouter,
   type LoaderFunctionArgs,
   Outlet,
   type RouteObject,
@@ -130,5 +129,3 @@ export const routes: RouteObject[] = [
     ],
   },
 ];
-
-export const router = createBrowserRouter(routes);

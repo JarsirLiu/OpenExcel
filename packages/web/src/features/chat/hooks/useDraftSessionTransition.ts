@@ -80,10 +80,9 @@ export function useDraftSessionTransition({
 
       createdSessionIdRef.current = sessionId;
       createdSessionPendingRef.current = true;
-      // The server creates the durable session before opening the event
-      // stream. Activate it at that boundary so the UI never treats an
-      // already-running turn as a draft conversation.
-      beginTransition();
+      // Keep the current conversation mounted until the server-owned stream
+      // has settled. The caller activates the session after that barrier.
+      if (response.status === 409) beginTransition();
       return sessionId;
     },
     [beginTransition, isDraft],

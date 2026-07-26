@@ -7,12 +7,9 @@ export {
   chatTurnRequestSchema,
   parseChatTurnRequest,
 } from "./chatTurn.js";
-export { getRunEventPage, getRunReplaySnapshot } from "./queryRun.js";
 export {
   deleteSession,
   getMessages,
-  getRecoveryRuns,
-  getRuns,
   getSession,
   getSessions,
   renameSession,

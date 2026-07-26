@@ -104,24 +104,6 @@ export async function waitForRunSettlement(
   return run;
 }
 
-export async function findRunReplaySnapshot(workspaceId: number, sessionId: number, runId: number) {
-  return prisma.agentRun.findFirst({
-    where: { id: runId, sessionId, session: { workspaceId } },
-    select: {
-      id: true,
-      status: true,
-      clientRequestId: true,
-      startedAt: true,
-      endedAt: true,
-      outputText: true,
-      errorMessage: true,
-      cancelRequestedAt: true,
-      lastEventSequence: true,
-      transcriptSequence: true,
-    },
-  });
-}
-
 export function isRunStale(startedAt: Date, now = Date.now()) {
   return now - startedAt.getTime() >= STALE_RUN_AFTER_MS;
 }
@@ -266,43 +248,6 @@ export async function findRunUndoState(runId: number) {
   };
 }
 
-export async function findRunsBySession(
-  workspaceId: number,
-  sessionId: number,
-  status?: RunStatus,
-) {
-  const session = await prisma.session.findFirst({
-    where: { id: sessionId, workspaceId },
-    select: { id: true },
-  });
-  if (!session) return [];
-
-  return prisma.agentRun.findMany({
-    where: { sessionId: session.id, ...(status ? { status } : {}) },
-    // Recovery consumers inspect the first run as the newest run. Keep the
-    // id tie-breaker deterministic when runs start in the same millisecond.
-    orderBy: [{ startedAt: "desc" }, { id: "desc" }],
-  });
-}
-
-export async function findLatestRecoverableRun(workspaceId: number, sessionId: number) {
-  const runs = await prisma.agentRun.findMany({
-    where: {
-      sessionId,
-      session: { workspaceId },
-      status: { notIn: ["reverted", "abandoned"] },
-    },
-    select: {
-      id: true,
-      lastEventSequence: true,
-      transcriptSequence: true,
-    },
-    orderBy: [{ startedAt: "desc" }, { id: "desc" }],
-  });
-
-  return runs.find((run) => run.lastEventSequence > run.transcriptSequence)?.id ?? null;
-}
-
 export async function findRunToolExecutions(runId: number) {
   return prisma.agentToolExecution.findMany({
     where: { runId },
@@ -361,13 +306,6 @@ export async function createStep(data: {
 
 export async function updateStep(id: number, data: Record<string, unknown>) {
   return prisma.agentStep.update({ where: { id }, data });
-}
-
-export async function findStepsByRun(runId: number) {
-  return prisma.agentStep.findMany({
-    where: { runId },
-    orderBy: { order: "asc" },
-  });
 }
 
 export async function upsertRunSheetSnapshot(data: {

@@ -1,349 +1,319 @@
-# P0: 中断对话会清空已生成的回复
+# P0: 中断或刷新会清空当前轮回复
 
-本文只定义本问题的专项修复和验收；Agent 事件、completion、终态生产权和持久化边界
-以 [`docs/agent-loop.md`](../../agent-loop.md) 为唯一基础契约。
+本文是本问题的唯一实施方案和验收标准。Agent 的通用执行边界、事件协议、持久化确认和取消分类以 [`docs/agent-loop.md`](../../agent-loop.md) 为基础契约。
 
-本方案参考 `eve` 的 durable session/run、事件重放、取消后 settle 和服务端权威恢复模型，
-但不照搬其“取消时 durable history 只保留已 settle 内容”的取舍。OpenExcel 的要求是：
-凡是已经通过 persistence barrier 写入 `AgentEvent` 的 text、reasoning 和 tool 事件，
-取消后都必须能从服务端恢复；尚未通过 barrier 的内容不对外承诺。
+## 结论
 
-## 问题
+当前问题不是“取消按钮是否调用了 `stop()`”这么简单，而是实时展示和历史加载使用了不同的数据来源：
 
-AI 回复或 reasoning 流式生成时点击“中断”，页面闪烁，已经生成的 text 和 reasoning
-立即消失；刷新后仍可能只看到中断前的旧 transcript。
+```text
+实时展示: AI SDK useChat.messages（浏览器内存）
+事件持久化: AgentEvent
+历史加载: AgentRunCheckpoint.transcript
+```
 
-中断的语义是停止当前 AgentRun，不是删除对话内容。取消请求被接受不等于取消已经
-收敛。只有 server settlement 完成后，前端才以服务端快照替换当前 run 的投影。
+这三者没有统一的投影边界。草稿响应头到达后，前端还会立即把正式 session 激活，导致当前 `ChatPanel` 重建；AI SDK 的内存消息随组件卸载消失，而此时服务端 checkpoint 可能尚未生成，新的历史请求就会返回空消息。
 
-## 根因
+中断的语义必须固定为：
 
-当前消息状态存在多个互相覆盖的来源：
+> 停止当前 AgentRun 的模型和工具执行，保留已经通过持久化确认的 text、reasoning 和 tool 事件；绝不删除本轮已经展示或已经落库的内容。
 
-- AI SDK `useChat.messages` 临时消息；
-- server `Session.chatMessages`；
-- `AgentEvent` 事件日志；
-- `AgentRunCheckpoint`；
-- web run recovery projection；
-- session/workspace refresh 注入的 `initialMessages`。
+## 术语和边界
 
-`useChat.stop()` 可能清理未完成的 assistant 消息，随后 refresh 或初始化逻辑又用旧
-canonical transcript 覆盖当前状态。服务端如果把 abort 当成 `failed`，或者终态写入早于
-事件投影，已经落库的 delta 也无法进入最终 transcript。
+### 临时消息不等于前端上下文
+
+`useChat.messages` 的“临时”有两个历史职责，必须分开处理：
+
+1. 旧实现把它作为请求上下文发送给服务端。这部分已经被单轮请求协议替代，必须删除。
+2. AI SDK 用它承载当前流式 UI。这只是浏览器展示缓存，不能作为持久化权威，但实时渲染仍然需要等价的前端投影状态。
+
+因此不能简单地删除所有前端消息状态。正确做法是删除“前端消息参与 Agent 上下文和恢复决策”的代码，并把实时展示改为消费服务端事件投影。前端不再拼接历史、不再决定模型上下文、不再把 `messages[]` 作为恢复输入。
+
+### Eve 的可借鉴点
+
+Eve 的核心不是“每个 chunk 都由前端请求数据库”，而是：
+
+```text
+durable event stream
+  -> client reducer
+  -> realtime UI
+
+durable event stream
+  -> server/session projection
+  -> history replay
+```
+
+Eve 的 `message.appended`、`reasoning.appended`、`turn.cancelled` 都是同一套有序事件；取消时 reducer 收敛当前未完成 part，不清空已经收到的内容。OpenExcel 应采用同样的事件语义和投影方式，但保留自己的 AgentRun、工具账本和工作簿事务模型。
+
+## 当前根因
+
+### P0-A: 草稿切换卸载了流式 UI
+
+修复前，`useDraftSessionTransition.captureDraftResponse()` 在收到响应头时调用 `beginTransition()`。`useSessionWorkspace.handleDraftSessionCreated()` 随后刷新 session 列表并设置 `currentSessionId`，`SessionShell` 从草稿 `ChatPanel` 切换到正式 session 的 `ChatPanel`。
+
+此时模型流仍在进行，checkpoint 还没有完成。旧 `useChat` 实例被卸载，内存中的 text/reasoning 消失；新实例请求 `/messages`，只能读到尚未生成的旧 checkpoint。
+
+### P0-B: 实时流和历史加载不是同一投影
+
+服务端已将 delta 写入 `AgentEvent`，但 HTTP 返回的 UI stream 仍来自 AI SDK 的 `result.stream`。历史接口只读取 `AgentRunCheckpoint`，而 checkpoint 目前主要由 finalizer 在终态生成。
+
+所以“事件已落库”不代表“历史接口立即可读”。浏览器关闭或进程异常后，stale-run worker 目前还可能只标记 `recovery_required`，没有把事件投影为可读 checkpoint。
+
+### P0-C: 终态投影仍有结构风险
+
+text/reasoning 必须按 `messageId + partId` 聚合，tool 必须按 `toolCallId` 聚合。任何按 assistant 数组下标合并、按全局字符串合并或依赖 `completion.messages` 的实现，都会在多 step、工具调用前后或 reasoning 缺失时串消息或丢消息。
 
 ## 目标架构
 
 ```text
-AgentEvent 事实日志
-    -> AgentRunCheckpoint 可恢复投影
-    -> Session.chatMessages canonical transcript
-    -> web conversation projection
+Agent model/tool loop
+  -> ordered AgentEvent emitter
+  -> persistence barrier
+  -> AgentEvent journal
+  -> publish the same confirmed event to the active stream
+  -> web ConversationStore reducer
+
+AgentEvent journal
+  -> server checkpoint projector
+  -> session history projection
+  -> GET /messages
 ```
 
-- `AgentEvent` 是不可变事实，按 sequence 回放；
-- `AgentRunCheckpoint` 只保存当前 run 的聚合结果；
-- `chatMessages` 只保存已经收敛到 session 的 canonical transcript；
-- web 内存状态只能展示，不是恢复或持久化权威。
+“同一数据源”指同一套有序 AgentEvent 事实和同一套消息投影语义，不指实时流每个 chunk 都重新读取数据库。事件持久化成功后才能发布给当前订阅者；历史加载读取服务端 checkpoint，必要时由服务端先投影 checkpoint 之后的事件。
 
-## 职责边界
+### 权威数据
 
-### Web
+- `AgentEvent`：不可变事实日志，按 `(runId, sequence)` 有序且幂等。
+- `AgentRunCheckpoint`：由事件 projector 生成的可恢复读模型，不是另一份独立事实。
+- `ConversationStore`：前端当前页面的投影缓存，不是权威数据。
+- AI SDK `completion.messages`：本次执行的 transport 结果，不能决定 reasoning、tool state 或历史是否保存。
 
-只负责发送当前输入、建立/关闭流、发送 cancel、渲染 projection，以及在断流/刷新后
-读取 run、checkpoint 和事件。
+### 稳定坐标
 
-`useChat.stop()` 只允许停止 HTTP 订阅，不能删除消息、重置 projection 或把旧
-`initialMessages` 覆盖到活动 run。Web 不判断 Agent 终态，不拼接 canonical transcript，
-不执行工具。
-
-### Agent
-
-只负责模型/工具循环、run-level `AbortSignal`、取消传播、abort error 分类和产生有序
-provider-neutral events。Agent 不依赖 HTTP、React、Prisma 或 session 业务代码。
-
-### Server
-
-负责 cancel intent、run lease/fencing、AgentEvent、checkpoint、transcript、tool ledger
-和恢复服务。取消收尾由独立的 `settleCancelledRun` 负责，不把取消清理散落在
-Agent loop、HTTP orchestration 或通用 transcript 逻辑中。
-
-## 事件协议
-
-事件记录的公共坐标必须保持稳定。`eventId`、`sequence`、`type`、`occurredAt` 属于
-事件记录本身；`runId` 属于数据库事件归属；`turnId`、`stepIndex`、`messageId`、
-`partId`、`toolCallId` 按事件类型放在 payload 中，不把不适用的字段强行放到每种事件上：
+text、reasoning 和 tool 事件必须携带适用的稳定坐标：
 
 ```ts
 {
-  eventId: string,
+  runId: number,
+  turnId: string,
+  stepIndex: number,
+  messageId?: string,
+  partId?: string,
+  toolCallId?: string,
   sequence: number,
-  type: AgentEventType,
-  occurredAt: string,
-  payload: {
-    runId?: string,
-    delta?: string,
-    turnId?: string,
-    stepIndex?: number,
-    messageId?: string,
-    partId?: string,
-    toolCallId?: string
-  }
+  delta?: string
 }
 ```
 
-`AgentEventType` 使用当前协议名称：`tool.started`、`tool.finished`，不另造
-`tool.completed`；工具失败通过 tool ledger 的状态和结果表示，除非协议另行定义独立的
-`tool.failed` 事件。
+- text/reasoning 按 `messageId + partId` 聚合；
+- reasoning 与普通 text 是不同 part，不能压成一个字符串；
+- tool call/result 按 `toolCallId` 聚合；
+- 重复 sequence 只能应用一次；
+- 取消事件只改变生命周期和 part 状态，不删除已有 delta。
 
-约束：
+## 职责划分
 
-- `sequence` 在 run 内单调递增，`(runId, sequence)` 唯一；
-- 生命周期事件只要求 `runId` 和 `sequence`；step 事件要求 `turnId` 和 `stepIndex`；
-  message/reasoning 事件额外要求 `messageId`、`partId`；tool 事件额外要求 `toolCallId`。
-  禁止用空字段填充不适用的坐标；
-- `turnId` 是一次用户输入，`stepIndex` 是该 turn 内的模型步骤；
-- `messageId`、`partId`、`toolCallId` 由 Agent/server 生成，retry/replay 时保持稳定；
-- text 按 `messageId + partId` 聚合；reasoning 独立聚合，不能进入普通 assistant text；
-- tool 按 `toolCallId` 关联，不能与 text/reasoning 串联；
-- 重复事件只能应用一次；事件持久化失败时不得继续模型或工具执行。
+### `packages/agent`
 
-取消事件严格按以下顺序产生：
+- 执行模型/工具循环；
+- 生成 provider-neutral AgentEvent；
+- 传播 AbortSignal；
+- 在 persistence barrier 失败时停止；
+- 不依赖 React、HTTP、Fastify 或 Prisma。
 
-```text
-已产生的 delta/tool events
-  -> emitter flush
-  -> server settlement 写入唯一的 run.cancelled
-  -> emitter flush and close
-```
+### `packages/server`
 
-Agent 只返回 `completion.status = cancelled`，不自行写入 server durable event；server 的
-`settleCancelledRun` 是 `run.cancelled` 这个对外生命周期协议事件的唯一生产者。它类似
-Eve 的 `turn.cancelled`，只负责生命周期收敛；part 由 projector 派生为 `cancelled`，不能
-把取消伪装成正常 `done`。
+- 创建 run、保存 user turn、管理 lease 和 cancel intent；
+- 持久化 AgentEvent；
+- 将已确认事件发布给当前 stream；
+- 运行 checkpoint projector 和 recovery；
+- 保存 run 终态、工具账本和工作簿事务；
+- `/messages` 只返回服务端生成的历史投影。
 
-## 取消协议
+### `packages/web`
 
-`POST /runs/:runId/cancel` 先用数据库条件更新写入取消意图：
+- 发送 `{ requestId, message }` 单轮命令；
+- 消费事件流并通过唯一 ConversationStore 渲染；
+- 保存当前 runId 并发送显式 cancel；
+- 管理折叠、展开、滚动等纯 UI 状态。
 
-```text
-running + cancelRequestedAt IS NULL
-  -> running + cancelRequestedAt
-```
+前端不得：
 
-只有首次成功写入的请求通知当前进程；重复请求幂等，终态 run 不得被改写。
+- 发送完整 `messages[]` 作为模型上下文；
+- 根据本地消息组装下一轮 Agent 输入；
+- 读取 AgentEvent 决定终态；
+- 在 cancel 或 stream finish 后用旧 `/messages` 覆盖活动 run；
+- 因草稿转正式会话而卸载正在输出的 ConversationStore。
 
-请求必须绑定调用方观察到的 run。当前以 `runId` 作为身份；如果同一 session 允许快速
-切换或并发 run，则同时校验 `turnId` 和 run version，防止旧页面取消新 run。
+## 模块拆分约束
 
-取消接口返回：
-
-```ts
-{
-  runId: string,
-  status: "cancel_requested" | "cancelled" | "completed" | "failed" |
-    "recovery_required",
-  terminal: boolean,
-  recoverable: boolean,
-  lastEventSequence: number,
-  checkpointSequence: number,
-  transcriptSequence: number
-}
-```
-
-`cancel_requested` 仅表示取消意图已落库。前端必须继续查询或订阅，直到收到 terminal
-snapshot；不能把 cancel API 返回成功当作取消 settlement 完成。
-
-cancel、completed、failed 只能有一个终态获胜。必须使用数据库条件更新、版本号或 lease
-fencing，不能只依赖进程内 AbortController。HTTP 断开不等于用户取消，断流时 AgentRun
-继续执行。
-
-## `settleCancelledRun` 和 Finalizer
-
-取消 settlement 固定为：
+本问题的修复禁止继续向现有大 hook 或 orchestration 文件追加分支。每个模块只能有一个主要变化原因：
 
 ```text
-1. 获取 run lease / fencing token
-2. 传播 AbortSignal，停止模型和工具
-3. flush 已进入 emitter 的 AgentEvent
-4. 在有限的工具取消超时内等待安全边界退出
-5. 超时或存在未知副作用时进入 `recovery_required`，不得无限等待
-6. 写入唯一的 `run.cancelled` event，并再次 flush/close emitter
-7. 按 sequence 投影 text/reasoning/tool parts
-8. 幂等保存 AgentRunCheckpoint
-9. 在 session lease 下写入 Session.chatMessages
-10. 条件推进 transcriptSequence
-11. 清理 pending tool/input，释放 session active run
-12. 写入 run = cancelled
-13. 释放 run lease
+packages/agent/runtime/events
+  事件协议、sequence、ordered emitter、persistence barrier
+
+packages/agent/runtime/loop
+  模型/工具循环、AbortSignal、completion
+
+server/sessions/runs/eventRepository
+  AgentEvent 的 Prisma 读写
+
+server/sessions/runs/checkpointProjector
+  事件 -> checkpoint 的纯投影和幂等游标
+
+server/sessions/runs/runSettlement
+  cancel/completed/failed 的终态协调和 lease fencing
+
+server/sessions/application
+  session/chat/cancel 业务用例
+
+server/sessions/chat
+  AgentRunner、工具和事件端口的适配
+
+web/chat/conversationStore
+  事件 -> UI 消息的唯一前端投影
+
+web/chat/transport
+  HTTP/SSE 建连、响应头和订阅关闭
+
+web/session
+  session 列表、草稿元数据和会话选择
 ```
 
-正常完成、失败、取消和恢复都使用同一套幂等投影规则，不能让正常完成依赖
-`completion.messages` 来决定是否保存 reasoning。所有终态都必须以已持久化事件为事实来源；
-取消的生命周期收尾由 `settleCancelledRun` 单独拥有。
-
-游标含义固定为：
+依赖方向必须保持为：
 
 ```text
-lastEventSequence  = 已落库的最新事件
-checkpointSequence = 已合并进 AgentRunCheckpoint 的最新事件
-transcriptSequence = 已合并进 Session.chatMessages 的最新事件
+web transport -> web ConversationStore
+server route -> application -> runs/chat adapters
+server adapters -> agent ports
+agent runtime -> abstract ports
+runs repositories -> Prisma
 ```
 
-所有游标只能向前推进。重复 finalizer、多实例恢复或旧 lease owner 都不能重复追加
-delta，也不能用旧 checkpoint 覆盖新 checkpoint。
+禁止以下耦合：
 
-取消收敛后 session 必须回到无 active run 的 idle 状态，才能接受下一轮输入，等价于
-Eve 的 `turn.cancelled -> session.waiting`。
+- `useChatConversation` 同时负责 transport、session 切换、事件投影、取消和 workbook refresh；
+- `orchestration.ts` 同时负责 Agent loop、checkpoint、终态状态机和 HTTP 响应；
+- `runFinalizer.ts` 同时负责事件重建、消息合并、工具账本和 lease 管理；
+- repository 感知 React、AI SDK UI message 或 HTTP；
+- ConversationStore 直接请求数据库 API、决定 run 终态或执行工具；
+- session 切换通过卸载组件来结束 AgentRun。
 
-## 持久化失败
+新增逻辑必须先归属到上述模块之一。若一个文件同时需要修改事件协议、持久化、终态状态和 UI，说明边界错误，应先拆分职责再实现功能。
 
-checkpoint 或 transcript 任一步失败时：
+## 取消和断流协议
 
-- 不得写入 `completed` 或 `cancelled`；
-- 保留已经落库的 AgentEvent；
-- run 进入 `recovery_required` 或 `persistence_failed`；
-- 后续从最后成功游标继续投影；
-- checkpoint 已成功但 transcript 失败时，checkpoint 仍是恢复输入，不能被旧 transcript
-  覆盖；
-- 未确认的工具副作用不得自动重放。
-
-Checkpoint 中的流式 part 必须保留结构，不能把 reasoning 压缩成单个字符串：
-
-```ts
-reasoningParts: Array<{
-  messageId: string;
-  partId: string;
-  stepIndex: number;
-  sequence: number;
-  text: string;
-  status: "streaming" | "cancelled" | "done";
-}>
-```
-
-text parts 使用同样的坐标和状态模型；tool state 至少保留 `toolCallId`、`stepIndex`、
-状态、输入、结果或未知副作用标记。这样多个 step 的 text、reasoning 和 tool 才能独立
-回放。
-
-取消 settlement 必须有有限的工具等待时间。超时后保留事件和工具账本，标记
-`recovery_required`，由恢复流程处理，不能继续假设本次取消已经收敛。
-
-## 工具取消
-
-工具账本区分：
+### 用户点击中断
 
 ```text
-requested | running | committed | failed | cancelled | unknown
+web 保存 runId
+  -> POST /runs/:runId/cancel
+  -> server 持久化 cancelRequestedAt
+  -> AbortSignal 传播到模型和工具
+  -> ordered emitter flush
+  -> 写入唯一 run.cancelled event
+  -> projector 收敛 text/reasoning/tool parts
+  -> 保存 checkpoint
+  -> 更新 transcriptSequence
+  -> run.status = cancelled
+  -> 释放 lease
 ```
 
-- `committed` 的 workbook/sheet/chart 副作用不能因取消回滚；
-- `cancelled` 表示确认未执行；
-- `running`/`unknown` 进入 `recovery_required`；
-- 只有 ledger/receipt 证明未执行时才允许重试；
-- 同一 `(runId, toolCallId)` 重放只能返回原结果，不能重复修改 workbook。
+cancel API 返回成功只表示取消意图已接受，不表示 checkpoint 已完成。前端在等待期间保留当前 ConversationStore，不清空、不重置、不重新加载旧 messages。
 
-## Web 状态收敛
+### 浏览器关闭或网络断开
 
-前端拆成三个职责：
+浏览器断流不等于用户取消。HTTP 订阅可以消失，但 server-owned run 继续执行；如果进程退出，recovery worker 必须从最后一个持久化边界投影事件，不能只标记状态。
 
-```text
-useChatTransport
-  发送请求、建立流、停止 HTTP 订阅
+### 草稿转正式会话
 
-conversationProjection
-  canonical messages + 活动 run events + sequence 去重
+服务端可以在响应头返回正式 sessionId，但前端只能更新会话元数据，不能立即替换正在运行的 ConversationStore。正式 session 的激活必须满足以下之一：
 
-runRecovery
-  查询 run 游标、读取 checkpoint、回放后续 events、读取最终 transcript
-```
+- 当前 run 已完成 checkpoint/finalizer 后再切换；或
+- ConversationStore 按稳定 runId 保持不变，只更新其 sessionId，不触发组件卸载。
 
-取消流程：
+推荐第二种，避免把 UI 生命周期绑定到 session 创建时机。
 
-```text
-保存 runId
-  -> POST cancel(runId[, turnId/version])
-  -> 停止 HTTP 订阅
-  -> 保持当前 projection 不变
-  -> 查询/订阅 terminal snapshot
-  -> 只替换该 run 的 projection
-```
+## 删除和保留清单
 
-停止 HTTP 订阅不代表服务端取消成功；`run.cancelled` 只表示取消事实已记录，确认必须来自
-最终 run 查询中的 `status = cancelled` 及已收敛的 checkpoint/transcript 游标。
+### 必须删除
 
-页面刷新流程：
+- 前端向 chat endpoint 发送完整 `messages[]` 的逻辑；
+- 前端根据 `messages[]` 组装模型上下文的逻辑；
+- 前端 run event recovery、前端事件重放和前端 canonical transcript 合并；
+- cancel 后调用 `useChat.stop()` 导致消息清空的路径；
+- 草稿响应头阶段触发 session 切换并卸载活动流的路径；
+- stream 结束后重新请求 `/messages` 并覆盖当前活动投影的路径；
+- 以 assistant 数组下标合并 streamed messages 的逻辑。
 
-```text
-读取 Session.chatMessages
-  -> 查询 recoverable run
-  -> 读取 AgentRunCheckpoint
-  -> 回放 checkpointSequence 之后的 AgentEvent
-  -> terminal 后重新读取 Session.chatMessages
-```
+### 必须保留但改职责
 
-Checkpoint 是 run 级增量投影，canonical transcript 是 session 级最终对话记录。前端
-在任一时刻只能以 canonical transcript 或 checkpoint 为基准，再应用更高 sequence 的
-事件，禁止把二者完整拼接后重复显示同一段内容。
+- AI SDK transport：只负责发送单轮请求和接收事件流；
+- 前端消息状态：只作为 ConversationStore 的渲染投影；
+- `AgentRunCheckpoint`：只作为 AgentEvent 的服务端读模型；
+- finalizer：只负责终态协调，不能独自承担 transcript 重建；
+- `AgentEvent`：作为实时发布和历史投影的共同事实源。
 
-服务端 `/messages` 的读取优先级必须明确：
+## 分阶段实施
 
-```text
-已收敛的 Session.chatMessages
-  + transcriptSequence 之后仍存在的 recoverable run checkpoint/events
-  -> 一个去重后的服务端 transcript
-```
+### Phase 1: 先修复 P0 时序
 
-不能因为 `Session.chatMessages` 非空就直接返回并忽略 recoverable run；也不能把
-`run.outputText` 作为流式 text/reasoning 的恢复来源。历史接口必须使用
-`messageId + partId + sequence` 投影 text/reasoning，并使用 `toolCallId` 恢复工具状态。
+- 删除 `captureDraftResponse()` 中的立即 `beginTransition()`；
+- 草稿创建只记录 `{ sessionId, runId }`，不触发 `ChatPanel` 替换；
+- cancel 只发送服务端请求，保留当前投影；
+- 增加测试证明草稿响应头到达、cancel 和 stream finish 都不会卸载当前消息状态。
 
-## 实施顺序
+当前状态：已完成。成功草稿响应只记录 session/run 身份；服务端在 UI stream 关闭前等待 checkpoint/finalizer 完成；cancel 只发送服务端取消意图，前端不调用会丢弃内存消息的 `stop()`，也不在取消请求发出时切换会话。本阶段只解决“消息立即消失”，不宣称已经完成统一事件流。
 
-0. 先建立可观测性：为每次取消记录 `runId`、取消时间、最后落库 sequence、checkpoint
-   sequence、transcript sequence 和最终状态，先证明实际失败点。
-1. 确认当前 `runId/turnId/stepIndex/messageId/partId/toolCallId` 在 AgentEvent、checkpoint、
-   tool ledger 和恢复接口中稳定传递；禁止仅依赖 AI SDK `completion.messages`。
-2. 完成 run 终态、lease/fencing、游标和 checkpoint 的数据库条件更新与幂等约束。
-3. 抽出 `settleCancelledRun`，统一取消事件、partial part 收敛、session idle 和 run 终态；
-   cancel API 明确返回 `accepted`/`settled`，不能假装已完成。
-4. 统一 finalizer 的事件投影和持久化顺序，覆盖 completed/cancelled/failed/recovery，
-   并保证 cancel settlement 完成后 HTTP 查询可立即读到结果。
-5. 确认 Agent abort 能停止模型和工具，且不会产生普通 failed；HTTP 断开仍与用户取消分离。
-6. 让 `/messages` 服务端读取 canonical transcript 与 recoverable checkpoint/events 的合并结果，
-   前端只消费该权威快照和事件游标。
-7. 抽出唯一 web conversation projection owner，禁止 refresh/initialMessages 覆盖活动 run。
-8. 删除前端 snapshot/setMessages 等取消补丁，改为消费 terminal snapshot；最后再清理兼容性代码。
+### Phase 2: 建立服务端事件读模型
 
-## 必须通过的测试
+- 统一 AgentEvent payload 坐标和生命周期事件；
+- 让 projector 按 sequence、messageId、partId、toolCallId 幂等消费事件；
+- checkpoint 至少保存 text parts、reasoning parts、tool state 和最后 sequence；
+- finalizer、cancel settlement、stale-run recovery 共用 projector；
+- `/messages` 在返回前补投影 checkpoint 之后的已落库事件。
 
-- text delta 后取消，查询/刷新仍保留 text；
-- reasoning delta 后取消，reasoning 独立保留且不混入 text；
-- text、reasoning、tool 在多个 step 中分别回放且顺序稳定；
-- 取消期间不启动新的模型/tool step；
-- 已提交工具副作用不回滚，未确认工具不自动重放；
-- abort rejection 被识别为 cancelled，不产生普通 failed；
-- cancel 与 completed 并发时只产生一个终态；
-- 旧 run 的 cancel 请求不会影响新 run；
-- cancelled settlement 后 session 回到 idle；
-- finalizer 重复执行不会重复拼接 delta；
-- checkpoint 成功但 transcript 失败后可从游标继续恢复；
-- terminal event 与最后一个 delta 的顺序稳定；
-- cancel 后立即刷新可恢复内容；
-- 正常完成后 reasoning 仍存在，且与 assistant text、tool state 分离；
-- `/messages` 在 canonical transcript 落后时仍能从 checkpoint/events 返回完整恢复结果；
-- HTTP 断开但未 cancel 时 AgentRun 继续执行；
-- 多实例/旧 lease owner 不能覆盖新 checkpoint；
-- 同一 `(runId, toolCallId)` 重放不会重复执行工具。
+### Phase 3: 统一实时和历史投影
+
+- persistence barrier 成功后发布同一个 AgentEvent；
+- server stream 传输事件，而不是另行依赖 AI SDK 临时 UI message；
+- 前端 ConversationStore 只消费事件并使用与服务端一致的 reducer 规则；
+- 历史加载只读取服务端 checkpoint，不再运行前端 recovery 或重新拼接事件。
+
+### Phase 4: 清理过渡代码
+
+- 删除前端 transcript/context/recovery 兼容代码；
+- `useChat` 降为 transport adapter，或替换为轻量事件订阅器；
+- 删除以 `initialMessages` 覆盖活动 run 的逻辑；
+- 删除未被正常历史加载和取消链路使用的 runs/events 浏览器 API；
+- 更新架构文档，保证不存在“前端上下文”和“前端权威消息”两套口径。
+
+## 必须测试
+
+- 草稿响应头到达后 text/reasoning 仍持续显示；
+- text delta 后点击 cancel，当前页面和刷新后的历史一致；
+- reasoning delta 后点击 cancel，reasoning 独立保留；
+- cancel 与 completed 并发时只有一个终态；
+- cancel 后不会再次发送模型请求或重复执行工具；
+- HTTP 断开但未 cancel 时 run 继续并最终可加载；
+- 进程退出后 recovery projector 能从 AgentEvent 生成 checkpoint；
+- checkpoint 写入失败时 run 不伪装为 cancelled/completed；
+- 重复 event/重复 finalizer 不重复拼接 text/reasoning；
+- 多 step、工具调用前后多个 assistant message 顺序稳定；
+- 同一 `toolCallId` 重放不会重复 workbook/sheet/chart 副作用；
+- 正常完成后 reasoning 不因重新加载或状态切换消失；
+- 会话切换只加载目标会话，不会请求或覆盖当前活动 run。
 
 ## 验收标准
 
-只有同时满足以下条件才算修复完成：
+只有同时满足以下条件，P0 才能关闭：
 
-- 点击中断不会删除已经显示的 text 或 reasoning；
-- `cancel_requested` 与最终 `cancelled` 语义明确；
-- 中断 settlement 后查询和刷新结果一致；
+- 点击中断不会清空已经显示的 text、reasoning 或 tool 状态；
+- 刷新页面后显示与中断瞬间已持久化的内容一致；
+- 实时流和历史加载使用同一 AgentEvent 投影语义；
+- 前端不参与 Agent loop、上下文组装、终态决策或权威持久化；
+- 草稿转正式会话不会卸载当前流式投影；
 - text、reasoning、tool call/result 可以独立回放；
-- cancel、completed、failed 不会互相覆盖；
-- 事件、checkpoint、transcript 游标单调且幂等；
 - 持久化失败进入可诊断、可恢复状态；
-- session 在取消后回到 idle；
-- 前端不参与 Agent loop、终态决策或权威 transcript 持久化。
+- 取消、完成、失败不会互相覆盖。
