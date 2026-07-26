@@ -73,6 +73,18 @@ export interface TurnExecutorResult {
 export function executeTurn(input: TurnExecutorInput): Promise<TurnExecutorResult>;
 ```
 
+### 传输协议决策
+
+OpenExcel 明确使用自己的 `AgentEvent` 协议和 NDJSON 传输格式，不使用 AI SDK 的 UI message
+stream 作为前端协议。AI SDK 只作为 `packages/agent` 内部的模型/工具执行引擎；其 provider
+事件必须先转换为带有稳定 `messageId`、`partId`、`toolCallId` 和 run 内 `sequence` 的
+OpenExcel `AgentEvent`，再经过持久化确认和 server stream 发送给 Web。
+
+这不是兼容层，也不是两套并行协议。前端、实时投影、历史 checkpoint 和恢复逻辑都只依赖
+OpenExcel `AgentEvent` 的统一语义。`TurnExecutorResult.stream` 是 AgentEvent 的抽象流，
+HTTP 层由 server 将已确认事件编码为 NDJSON；Agent runtime 不依赖 Fastify、Prisma 或具体
+HTTP response。
+
 `ModelConfig` 和受部署配置约束的 runtime policy 仍可由 server 提供；默认值、策略解释和执行过程由 agent 负责。`AgentRunCompletion` 必须提供 canonical transcript 增量、终态和错误分类，具体生命周期要求见 P1 issue。
 
 工具侧只下沉通用适配能力，不下沉具体执行器：
