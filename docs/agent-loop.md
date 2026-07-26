@@ -278,7 +278,8 @@ Browser
    - 只用于服务端后续的模型准备和事件生成。
 
 3. **Model context**
-   - 在 resolved transcript 的基础上加入 system prompt，并执行上下文预算裁剪。
+   - 在 resolved transcript 的基础上加入 system prompt，并按 [上下文策略文档](context-compaction.md)
+     执行自动压缩或窗口滑动。
    - 只作为本次模型请求的输入。
    - 裁剪不得反向修改 canonical transcript。
 
@@ -289,10 +290,11 @@ Browser
 进入可恢复的持久化边界。模型上下文可以是裁剪后的副本，但不能绕过这条
 顺序直接依赖浏览器内存中的流式消息。
 
-上下文裁剪必须保持消息结构合法：assistant 的 tool-call 与对应的 tool
-result 不能被拆开，不能只保留工具结果，也不能把裁剪结果写回
-`AgentRunCheckpoint.transcript`。无法在预算内保留完整的一轮时，应删除完整的一轮
-或使用明确标记的服务端摘要；不能随机删除二维表格中的值或静默拼接半条消息。
+上下文策略必须保持消息结构合法：assistant 的 tool-call 与对应的 tool result 不能被拆开，
+不能只保留工具结果，也不能把策略结果写回 `AgentRunCheckpoint.transcript`。无法在预算内保留
+完整的一轮时，自动压缩模式应生成独立 context checkpoint；窗口滑动模式应删除该轮的旧上下文。
+不能随机删除二维表格中的值或静默拼接半条消息。两种模式的详细预算、切换和恢复规则见
+`docs/context-compaction.md`。
 
 ## 4. HTTP 请求和流协议
 
@@ -975,7 +977,8 @@ repositories -> Prisma only
 - `AgentRunner` facade、运行生命周期和运行结果。
 - `agentLoop` 对 Vercel AI SDK `streamText`/`ToolLoopAgent` 的内部适配。
 - model-facing message 转换与 system prompt 组装。
-- 上下文窗口裁剪和工具结果预算；软压缩仍属于后续能力。
+- 上下文策略、窗口预算和工具结果预算；自动压缩与窗口滑动的具体设计见
+  `docs/context-compaction.md`。
 - 工具循环、停止条件、模型错误格式化和运行时事件。
 - 面向服务端的 `ToolExecutor`、事件 sink、取消端口和恢复边界。
 
@@ -1113,6 +1116,9 @@ AgentEvent 持久化、显式 cancel 和草稿流生命周期隔离已落地。�
 实时 stream 只传输已确认的 AgentEvent，前端 ConversationStore 已统一实时事件与历史 snapshot 的投影语义；
 stale-run worker 仍只负责租约回收。Sheet、Workbook 和 Chart 的有副作用工具继续由各自
 application/service 负责短事务，Agent 只通过通用执行端口调用它们。
+
+上下文压缩当前仍未启用；运行时使用现有窗口预算裁剪。自动压缩必须先实现独立的 session context checkpoint、
+当前 chat model 复用、workspace revision 失效和 compaction failure phase，不能重新启用旧的按消息数量占位实现。
 
 进程异常退出后的恢复入口已经由 server application recovery service 提供：它会先诊断 active run、未完成工具、失败工具、
 缺少终态 transcript 或 session version 冲突；只有所有工具完成且终态 assistant 文本已持久化时才允许自动完成 run。
