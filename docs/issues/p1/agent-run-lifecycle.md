@@ -2,8 +2,12 @@
 
 - **优先级**：P1
 - **创建日期**：2026-07-24
-- **状态**：Implemented
+- **状态**：基础能力已落地，可靠性增强进行中
 - **范围**：Agent completion、HTTP stream、run 终态、session lease、transcript、事件持久化和恢复
+
+> 本 issue 尚未关闭。Agent completion 与 HTTP/NDJSON 断流解耦、事件持久化确认、租约心跳、集中式
+> finalizer、stale-run 回收和基础恢复入口已经落地；多实例协调、完整恢复决策、事件 payload 版本化和
+> 端到端故障验证仍属于关闭前工作。本文下文中的“当前实现”与“关闭验收条件”必须区分阅读。
 
 ## 问题
 
@@ -40,7 +44,9 @@
 
 ## 生命周期契约
 
-`executeTurn` 返回的 `completion` 必须在 Agent 执行终态确定后完成，不能以客户端消费完 UI stream 作为前置条件。server 负责启动一个受控的异步 finalizer：
+当前 `AgentRunner.run()` 返回的 `completion` 必须在 Agent 执行终态确定后完成，不能以客户端消费完 HTTP
+stream 作为前置条件。P2 runtime 重构完成后，目标入口可以收口为 `executeTurn`，但这不是当前实现名称。
+server 负责启动一个受控的异步 finalizer：
 
 1. 等待 Agent completion；
 2. 合并并持久化 canonical transcript；
@@ -60,15 +66,19 @@ NDJSON stream 只负责向客户端传输已确认的事件。客户端断开不
 - `tool.started`
 - `tool.finished`
 - `step.finished`
+- `message.delta`
+- `reasoning.delta`
 - `run.completed`
 - `run.cancelled`
 - `run.failed`
 
-每个事件必须包含唯一 `eventId`、单调递增的 run 内 `sequence`、UTC 时间和版本化 payload。Agent 先等待 `PersistenceBarrier` 确认，再交给 server event sink；回放按 `sequence` 去重，不能重复执行工具副作用。
+每个事件 envelope 必须包含唯一 `eventId`、单调递增的 run 内 `sequence` 和 UTC 时间。当前实现已经通过
+`PersistenceBarrier` 确认后再交给 server event sink，并按 `sequence` 回放去重；AgentEvent 的 payload
+schema/version 仍需补齐，属于关闭前的协议治理工作。事件回放不能重复执行工具副作用。
 
 `docs/agent-loop.md` 需要补充每类事件的 payload、终态转换、重复事件处理和断点回放规则。前端只消费 AgentEvent NDJSON，不再依赖 AI SDK UI message stream。
 
-## 验收条件
+## 关闭验收条件
 
 - 客户端断流后，run 仍能完成、失败或进入 `recovery_required`，不会永久占用 lease；
 - transcript 持久化失败不会把 run 标记为 `completed`；
@@ -83,21 +93,23 @@ NDJSON stream 只负责向客户端传输已确认的事件。客户端断开不
 
 ### 阶段 1：先固定协议和失败矩阵
 
-- 在 `docs/agent-loop.md` 固化事件 schema、终态转换和持久化顺序；
-- 补充 completion、断流、lease 丢失和持久化失败测试；
-- 明确 `recovery_required` 的查询和恢复入口。
+- `docs/agent-loop.md` 已固化主要事件、终态转换、持久化顺序和恢复边界；payload schema/version
+  仍需继续收口；
+- completion、断流、lease 丢失和持久化失败已有基础测试，仍需补齐真实数据库和端到端故障矩阵；
+- `recovery_required` 已有查询、恢复和放弃入口，但自动恢复只覆盖可证明安全的场景。
 
 ### 阶段 2：解耦 Agent completion 与 HTTP stream
 
-- 让 Agent 内部执行生命周期不依赖 HTTP stream 的结束回调；
-- 让 `completion` 返回 canonical transcript 增量、终态和错误分类；
-- 保持 server AgentEvent stream 只做传输适配。
+- Agent 内部执行生命周期已经不依赖 HTTP stream 的结束回调；
+- 当前 `completion` 返回终态、错误分类和消息结果，canonical transcript 由 server 从已确认事件投影；
+  “明确的 canonical transcript 增量”仍是后续契约收口项；
+- server AgentEvent stream 只做已确认事件的 NDJSON 传输适配。
 
 ### 阶段 3：集中 server finalizer
 
-- 新增单一的 run finalizer，统一 transcript、run、undo checkpoint 和 lease 顺序；
-- 所有终态路径复用同一个 finalizer，并使用 `try/finally` 清理 lease；
-- 持久化失败进入恢复状态并保留诊断信息。
+- 单一的 run finalizer 已统一 transcript、run、undo checkpoint 和 lease 顺序；
+- 所有主要终态路径复用同一个 finalizer，并使用 `try/finally` 清理 lease；
+- 持久化失败进入 `recovery_required` 并保留诊断信息；仍需通过集成测试证明并发和重复触发下的完整性。
 
 ### 阶段 4：事件回放和恢复验证
 
@@ -111,33 +123,35 @@ NDJSON stream 只负责向客户端传输已确认的事件。客户端断开不
 
 ### 1. Agent 运行控制
 
-`packages/agent` 继续只负责模型循环、工具循环、停止条件、重试、事件生成和 completion。租约、权限、数据库、SSE、transcript 和恢复均由 `packages/server` 负责。
+`packages/agent` 继续只负责模型循环、工具循环、停止条件、重试、事件生成和 completion。租约、权限、数据库、HTTP/NDJSON、transcript 和恢复均由 `packages/server` 负责。
 
 server 的运行控制建议逐步收口为以下职责：
 
 ```text
 sessions/runs/
-  runCoordinator.ts       # 启动、取消和恢复运行
+  runLease.ts             # 获取、心跳、释放 session lease
   runFinalizer.ts         # 唯一的终态收口
   runRecoveryWorker.ts    # 扫描过期租约并处理 stale run
-  runEventRepository.ts   # 事件幂等写入和回放
-  runDiagnostics.ts       # recovery_required 查询和人工处理
+  agentEventRepository.ts # 事件幂等写入和回放
+  application/recovery.ts # recovery_required 诊断、恢复和放弃
 ```
 
 所有 run 状态写入都必须带 `runId`、`ownerId` 和 `sessionVersion` 条件。finalizer 可以被多次触发，但只有第一次有效触发可以改变终态；重复触发必须返回已确认的结果，不能重复写 transcript、Undo checkpoint 或释放其他 run 的 lease。
 
-客户端断流只影响 SSE 传输，不影响 server-owned Agent run。进程退出后，recovery worker 扫描租约已过期且仍为 `running` 的 run：能够安全续跑的进入恢复流程，无法判断副作用是否已完成的进入 `recovery_required`，并保留诊断信息。该状态需要提供“重试恢复”和“放弃运行”两个明确的管理入口。
+客户端断流只影响 HTTP/NDJSON 传输，不影响 server-owned Agent run。进程退出后，recovery worker 扫描租约已过期且仍为 `running` 的 run：能够安全续跑的进入恢复流程，无法判断副作用是否已完成的进入 `recovery_required`，并保留诊断信息。该状态需要提供“重试恢复”和“放弃运行”两个明确的管理入口。
 
 ### 2. 事件持久化
 
-事件表对 `(runId, sequence)` 和 `(runId, eventId)` 建立唯一约束。事件写入采用幂等语义：相同事件重复写入返回已存在记录；相同 sequence 对应不同 eventId 时判定为协议冲突并停止运行。
+事件表对 `(runId, sequence)` 建立唯一约束，`eventId` 使用全局唯一约束。事件写入采用幂等语义：相同事件重复写入返回已存在记录；相同 sequence 对应不同 eventId 时判定为协议冲突并停止运行。
 
 事件持久化成功后才能交给 UI stream。服务端内部投影只消费已确认的事件，并按 sequence 排序和去重；
 投影不能重新执行工具副作用，浏览器不直接读取事件日志。
 
 ### 3. Sheet 和 Chart mutation 事务
 
-Sheet 和 Chart 保持各自的领域服务，不合并成一个业务模块；但两者共享统一的 mutation 基础设施：
+Sheet 和 Chart 保持各自的领域服务，不合并成一个业务模块；当前 Agent run 范围内的 Chart mutation
+已经通过 transaction client 将快照、图表变更和 receipt 收口。后续仍需把所有 mutation 路径统一到共享的
+基础设施：
 
 ```text
 workbooks/mutations/
@@ -178,7 +192,7 @@ Undo snapshot 增加统一预算：celldata 数量、JSON 字节数、合并区�
 
 ### 6. 实施顺序
 
-1. 将 Chart mutation 的旧状态、Undo snapshot、实际写入和 receipt 收口到同一个事务。
+1. 验证并补齐所有 Sheet/Chart mutation 路径的旧状态、Undo snapshot、实际写入和 receipt 原子性。
 2. 抽取通用 mutation receipt 和 snapshot budget，并补充过期清理。
 3. 将进程内 workspace 锁替换为数据库 workbook 锁。
 4. 实现 stale run recovery worker。已完成基础扫描、原子标记 `recovery_required` 和按旧 owner/version 释放 session lease；当前只做安全回收，不自动重放未确认工具。
