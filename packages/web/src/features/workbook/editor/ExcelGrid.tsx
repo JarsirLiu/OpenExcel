@@ -184,7 +184,12 @@ export function ExcelGrid({
           hooks={hooks}
         />
         {currentSheet && currentSheetLayout ? (
-          <div ref={chartLayerRef} className={styles.chartLayer}>
+          <div
+            key={`${workbook.id}:${currentSheet.id}`}
+            ref={chartLayerRef}
+            className={styles.chartLayer}
+            data-sheet-id={currentSheet.id}
+          >
             <ChartOverlay
               containerRef={gridRootRef}
               layerRef={chartLayerRef}

@@ -21,6 +21,8 @@ describe("ChartOverlay integration boundary", () => {
     expect(overlaySource).not.toContain("fortune-sheet-overlay");
     expect(overlaySource).not.toContain("fortune-sheet-container");
     expect(viewportSource).toContain("fortune-sheet-container");
+    expect(gridSource).toContain("key={`${workbook.id}:${currentSheet.id}`}");
+    expect(gridSource).toContain("data-sheet-id={currentSheet.id}");
     expect(gridSource).toContain("className={styles.chartLayer}");
     expect(gridSource).toContain("layerRef={chartLayerRef}");
   });
