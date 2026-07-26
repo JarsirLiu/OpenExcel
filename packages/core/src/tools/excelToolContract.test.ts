@@ -36,4 +36,22 @@ describe("Excel tool contract", () => {
       expect(tool.outputSchema.safeParse({}).success).toBe(false);
     }
   });
+
+  it("bounds writeCells range expansion at the shared contract boundary", () => {
+    const result = excelToolSpecs.writeCells.inputSchema.safeParse({
+      sheetId: 1,
+      operations: [
+        {
+          type: "range",
+          startRow: 1,
+          startCol: 1,
+          endRow: 1,
+          endCol: 10_001,
+          value: "x",
+        },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+  });
 });

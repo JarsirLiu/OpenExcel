@@ -195,7 +195,15 @@ export function useChatRun({
     const targetSessionId = activeSessionIdRef.current;
     if (runId != null && targetSessionId != null) {
       requestRunCancellation(runId, targetSessionId);
+      activeRequestControllerRef.current?.abort();
+      activeRequestControllerRef.current = null;
+      activeRunRef.current = null;
+      setIsStreaming(false);
+      return;
     }
+    // The run id is delivered in the response headers. Keep the request alive
+    // until that callback can submit the cancellation for a just-created run.
+    setIsStreaming(false);
   }, [requestRunCancellation]);
 
   return { error, isStreaming, sendMessage, stop };

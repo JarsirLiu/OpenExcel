@@ -3,8 +3,7 @@ export type ToolErrorKind =
   | "execution_failed"
   | "not_found"
   | "permission_denied"
-  | "rate_limit"
-  | "timeout";
+  | "rate_limit";
 
 export interface ToolError {
   kind: ToolErrorKind;
@@ -58,15 +57,6 @@ export class ToolRateLimitError extends Error implements ToolError {
   constructor(public readonly message: string) {
     super(message);
     this.name = "ToolRateLimitError";
-  }
-}
-
-export class ToolTimeoutError extends Error implements ToolError {
-  readonly kind: ToolErrorKind = "timeout";
-  public readonly retryable: boolean = true;
-  constructor(public readonly message: string) {
-    super(message);
-    this.name = "ToolTimeoutError";
   }
 }
 

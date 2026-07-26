@@ -18,21 +18,31 @@ type RunToolContext = {
 type SheetForWorkspace = NonNullable<Awaited<ReturnType<typeof sheetRepo.findSheetForWorkspace>>>;
 type RevisionedResult = { revision: number };
 
+function throwIfAborted(signal: AbortSignal | undefined) {
+  if (!signal?.aborted) return;
+  throw signal.reason instanceof Error ? signal.reason : new Error("工具执行已中断");
+}
+
 export async function runSheetMutation<T extends RevisionedResult>(
   context: RunToolContext,
   sheetId: number,
   mutation: (sheet: SheetForWorkspace, tx: Prisma.TransactionClient) => Promise<T>,
+  abortSignal?: AbortSignal,
 ) {
   const execute = async (tx: Prisma.TransactionClient) => {
+    throwIfAborted(abortSignal);
     const sheet = await tx.sheet.findFirst({
       where: { id: sheetId, workbook: { workspaceId: context.workspaceId } },
       include: { workbook: true },
     });
     if (!sheet) throw new Error(`Sheet ${sheetId} 不存在`);
 
+    throwIfAborted(abortSignal);
     const result = await mutation(sheet, tx);
+    throwIfAborted(abortSignal);
     const snapshot = serializeSheetSnapshot(sheetRecordToSnapshot(sheet));
 
+    throwIfAborted(abortSignal);
     await runRepo.recordRestorableRunSheetSnapshot(tx, {
       runId: context.runId,
       sheetId,
@@ -48,6 +58,7 @@ export async function runSheetMutation<T extends RevisionedResult>(
       context.runId,
     );
 
+    throwIfAborted(abortSignal);
     return result;
   };
 

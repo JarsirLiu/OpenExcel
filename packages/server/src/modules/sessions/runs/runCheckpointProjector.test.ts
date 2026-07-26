@@ -77,7 +77,6 @@ describe("projectStreamedAssistantMessages", () => {
             stepIndex: 1,
             toolCallId: "call-1",
             toolName: "createChart",
-            input: { title: "收入" },
             output: { chartId: 7 },
           },
         },
@@ -94,6 +93,47 @@ describe("projectStreamedAssistantMessages", () => {
             state: "output-available",
             input: { title: "收入" },
             output: { chartId: 7 },
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("closes a pending tool when the run is cancelled", () => {
+    expect(
+      projectStreamedAssistantMessages([
+        {
+          eventId: "tool-start",
+          sequence: 1,
+          type: "tool.started",
+          occurredAt: "",
+          payload: {
+            turnId: "turn-1",
+            toolCallId: "call-1",
+            toolName: "writeCells",
+            input: {},
+          },
+        },
+        {
+          eventId: "run-cancelled",
+          sequence: 2,
+          type: "run.cancelled",
+          occurredAt: "",
+          payload: {},
+        },
+      ]),
+    ).toEqual([
+      {
+        id: "turn-1-assistant",
+        role: "assistant",
+        parts: [
+          {
+            id: "tool-call-1",
+            type: "tool-writeCells",
+            toolCallId: "call-1",
+            state: "output-error",
+            input: {},
+            errorText: "工具执行已中断",
           },
         ],
       },

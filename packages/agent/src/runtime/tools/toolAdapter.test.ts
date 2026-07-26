@@ -162,4 +162,38 @@ describe("createAgentToolSet", () => {
     ).rejects.toMatchObject({ name: "AbortError" });
     expect(execute).not.toHaveBeenCalled();
   });
+
+  it("finishes a started tool when the agent run is cancelled", async () => {
+    const execute = vi.fn(
+      ({ abortSignal }: { abortSignal?: AbortSignal }) =>
+        new Promise<void>((resolve, reject) => {
+          if (!abortSignal) throw new Error("missing abort signal");
+          abortSignal.addEventListener("abort", () => reject(abortSignal.reason), { once: true });
+          void resolve;
+        }),
+    );
+    const onToolFinish = vi.fn();
+    const controller = new AbortController();
+    const tools = createAgentToolSet(
+      [{ name: "writeCells", description: "Write cells", inputSchema: z.object({}) }],
+      { execute },
+      undefined,
+      { onToolFinish },
+    );
+
+    const execution = (tools.writeCells as any).execute(
+      {},
+      { toolCallId: "call-cancel-during-execution", abortSignal: controller.signal },
+    );
+    await Promise.resolve();
+    controller.abort();
+
+    await expect(execution).rejects.toMatchObject({ name: "AbortError" });
+    expect(onToolFinish).toHaveBeenCalledWith({
+      toolName: "writeCells",
+      toolCallId: "call-cancel-during-execution",
+      input: {},
+      error: { kind: "cancelled", message: "工具执行已中断" },
+    });
+  });
 });

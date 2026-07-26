@@ -380,6 +380,8 @@ export type ExcelToolSpec = {
   needsRunContext: boolean;
 };
 
+export const MAX_WRITE_CELLS_PER_CALL = 10_000;
+
 export const excelToolSpecs = {
   createWorkbook: {
     description:
@@ -487,6 +489,23 @@ export const excelToolSpecs = {
           ]),
         )
         .min(1)
+        .superRefine((operations, ctx) => {
+          let cellCount = 0;
+          for (const operation of operations) {
+            cellCount +=
+              operation.type === "cell"
+                ? 1
+                : (operation.endRow - operation.startRow + 1) *
+                  (operation.endCol - operation.startCol + 1);
+            if (cellCount > MAX_WRITE_CELLS_PER_CALL) {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "单次 writeCells 最多写入 10000 个单元格",
+              });
+              return;
+            }
+          }
+        })
         .describe("写入操作列表，支持离散单元格和连续范围"),
     }),
   },

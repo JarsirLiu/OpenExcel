@@ -38,7 +38,6 @@ export {
   ToolNotFoundError,
   ToolPermissionError,
   ToolRateLimitError,
-  ToolTimeoutError,
   toToolError,
 } from "./runtime/tools/errors.js";
 export {

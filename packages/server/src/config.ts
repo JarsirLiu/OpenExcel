@@ -20,7 +20,6 @@ export interface ModelConfig {
   modelName: string;
   maxRetries: number;
   timeoutMs: number;
-  chunkTimeoutMs: number;
   contextWindowTokens: number;
   outputReserveTokens: number;
   maxConversationTurns: number;
@@ -82,7 +81,6 @@ export function createModelConfig(env: NodeJS.ProcessEnv): ModelConfig {
       MAX_MODEL_MAX_RETRIES,
     ),
     timeoutMs: readNonNegativeInt(env, "MODEL_TIMEOUT_MS", 120_000),
-    chunkTimeoutMs: readNonNegativeInt(env, "MODEL_CHUNK_TIMEOUT_MS", 30_000),
     contextWindowTokens: readPositiveInt(env, "MODEL_CONTEXT_WINDOW_TOKENS", 180_000),
     outputReserveTokens: readPositiveInt(env, "MODEL_OUTPUT_RESERVE_TOKENS", 16_000),
     maxConversationTurns: readPositiveInt(

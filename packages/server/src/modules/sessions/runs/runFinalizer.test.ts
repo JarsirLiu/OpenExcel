@@ -109,7 +109,7 @@ describe("createRunFinalizer", () => {
     );
   });
 
-  it("publishes the terminal event only after checkpoint and run state settle", async () => {
+  it("projects the terminal event before run state settles and publishes last", async () => {
     const order: string[] = [];
     const lifecycleEvent = {
       eventId: "run-completed",
@@ -153,7 +153,7 @@ describe("createRunFinalizer", () => {
 
     await finalizer.finalize({ status: "completed" });
 
-    expect(order).toEqual(["checkpoint", "event", "run", "publish"]);
+    expect(order).toEqual(["event", "checkpoint", "run", "publish"]);
   });
 
   it("persists text and reasoning from independent streamed events when cancelled", async () => {
@@ -255,7 +255,7 @@ describe("createRunFinalizer", () => {
 
     await finalizer.finalize({ status: "completed" });
 
-    expect(mocks.persistRunLifecycleEvent).not.toHaveBeenCalled();
+    expect(mocks.persistRunLifecycleEvent).toHaveBeenCalled();
     expect(eventSink.publish).not.toHaveBeenCalled();
     expect(mocks.completeRunAndUpdateUndoCheckpoint).toHaveBeenCalledWith(
       1,

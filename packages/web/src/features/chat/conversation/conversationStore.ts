@@ -81,6 +81,15 @@ export class ConversationStore {
 
     if (event.type === "tool.started" || event.type === "tool.finished") {
       this.#applyToolEvent(event);
+      return;
+    }
+
+    if (
+      event.type === "run.completed" ||
+      event.type === "run.cancelled" ||
+      event.type === "run.failed"
+    ) {
+      this.#closePendingTools(event.type);
     }
   }
 
@@ -143,9 +152,10 @@ export class ConversationStore {
             input: payload.input,
           };
     if (event.type === "tool.finished") {
+      if (payload.input !== undefined) part.input = payload.input;
       part.state = payload.error == null ? "output-available" : "output-error";
       if (payload.error == null) part.output = payload.output;
-      else part.errorText = String(payload.error);
+      else part.errorText = formatToolError(payload.error);
     }
     if (partIndex >= 0) parts[partIndex] = part;
     else parts.push(part);
@@ -159,6 +169,25 @@ export class ConversationStore {
     this.#publish();
   }
 
+  #closePendingTools(type: ChatEvent["type"]) {
+    const errorText = type === "run.cancelled" ? "工具执行已中断" : "运行已终止，工具结果未完成";
+    let changed = false;
+    this.#messages = this.#messages.map((message) => {
+      if (message.role !== "assistant" || !Array.isArray(message.parts)) return message;
+      let messageChanged = false;
+      const parts = message.parts.map((part) => {
+        if (!part || (part.state !== "input-available" && part.state !== "input-streaming")) {
+          return part;
+        }
+        messageChanged = true;
+        changed = true;
+        return { ...part, state: "output-error", errorText };
+      });
+      return messageChanged ? { ...message, parts } : message;
+    });
+    if (changed) this.#publish();
+  }
+
   removeAfterUserMessage(messageId: string) {
     const index = this.#messages.findIndex((message) => message.id === messageId);
     if (index < 0) throw new Error("会话消息与撤销结果不一致，无法更新本地状态");
@@ -169,6 +198,14 @@ export class ConversationStore {
   #publish() {
     for (const listener of this.#listeners) listener();
   }
+}
+
+function formatToolError(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (asRecord(value) && typeof asRecord(value)?.message === "string") {
+    return asRecord(value)?.message as string;
+  }
+  return String(value);
 }
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {

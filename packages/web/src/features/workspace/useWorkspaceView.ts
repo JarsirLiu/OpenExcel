@@ -46,7 +46,6 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
   const [currentSheetIndex, setCurrentSheetIndex] = useState(loadStoredSheetIdx);
   const [referenceCacheRevision, setReferenceCacheRevision] = useState(0);
   const currentWorkbookRef = useRef(currentWorkbook);
-  const currentSheetIndexRef = useRef(currentSheetIndex);
   const requestGenerationRef = useRef(0);
   const refreshControllerRef = useRef<AbortController | null>(null);
 
@@ -112,33 +111,10 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
   }, [currentSheetIndex]);
 
   useEffect(() => {
-    currentSheetIndexRef.current = currentSheetIndex;
-  }, [currentSheetIndex]);
-
-  useEffect(() => {
     if (!currentWorkbook) return;
     const nextIndex = normalizeSheetIndex(currentSheetIndex, currentWorkbook.sheets.length);
     if (nextIndex !== currentSheetIndex) setCurrentSheetIndex(nextIndex);
   }, [currentSheetIndex, currentWorkbook]);
-
-  const chartSheetSignature =
-    currentWorkbook?.charts.map((chart) => `${chart.id}:${chart.sheetId}`).join("|") ?? "";
-
-  useEffect(() => {
-    const workbook = currentWorkbookRef.current;
-    if (!workbook || workbook.charts.length === 0) return;
-    const activeSheet = workbook.sheets[currentSheetIndexRef.current];
-    if (activeSheet && workbook.charts.some((chart) => chart.sheetId === String(activeSheet.id))) {
-      return;
-    }
-
-    const chartSheetIndex = workbook.sheets.findIndex((sheet) =>
-      workbook.charts.some((chart) => chart.sheetId === String(sheet.id)),
-    );
-    if (chartSheetIndex >= 0 && chartSheetIndex !== currentSheetIndexRef.current) {
-      setCurrentSheetIndex(chartSheetIndex);
-    }
-  }, [chartSheetSignature, currentWorkbook?.id]);
 
   const refreshCurrentWorkbook = useCallback(async () => {
     if (!currentWorkbook || workspaceId == null) return;

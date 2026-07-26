@@ -14,7 +14,6 @@ describe("buildRunToolset", () => {
         modelName: "test-model",
         maxRetries: 2,
         timeoutMs: 120_000,
-        chunkTimeoutMs: 30_000,
         contextWindowTokens: 180_000,
         outputReserveTokens: 16_000,
         maxConversationTurns: 20,

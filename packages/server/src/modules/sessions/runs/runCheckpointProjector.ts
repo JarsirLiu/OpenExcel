@@ -12,6 +12,8 @@ type ProjectedMessage = {
   parts: Map<string, ProjectedPart>;
 };
 
+type TerminalRunStatus = "completed" | "cancelled" | "failed";
+
 function payloadOf(event: AgentEvent): EventPayload | null {
   return event.payload && typeof event.payload === "object"
     ? (event.payload as EventPayload)
@@ -21,6 +23,37 @@ function payloadOf(event: AgentEvent): EventPayload | null {
 function stringValue(payload: EventPayload | null, key: string) {
   const value = payload?.[key];
   return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function terminalStatusOf(events: readonly AgentEvent[]): TerminalRunStatus | undefined {
+  const event = [...events]
+    .sort((left, right) => right.sequence - left.sequence)
+    .find(
+      (candidate) =>
+        candidate.type === "run.completed" ||
+        candidate.type === "run.cancelled" ||
+        candidate.type === "run.failed",
+    );
+  return event?.type === "run.completed"
+    ? "completed"
+    : event?.type === "run.cancelled"
+      ? "cancelled"
+      : event?.type === "run.failed"
+        ? "failed"
+        : undefined;
+}
+
+function closePendingTools(messages: Map<string, ProjectedMessage>, status: TerminalRunStatus) {
+  const errorText = status === "cancelled" ? "工具执行已中断" : "运行已终止，工具结果未完成";
+  for (const message of messages.values()) {
+    for (const part of message.parts.values()) {
+      if (part.value.state !== "input-available" && part.value.state !== "input-streaming") {
+        continue;
+      }
+      part.value.state = "output-error";
+      part.value.errorText = errorText;
+    }
+  }
 }
 
 function assistantMessageId(payload: EventPayload | null) {
@@ -84,9 +117,15 @@ function projectToolEvent(messages: Map<string, ProjectedMessage>, event: AgentE
   };
 
   if (event.type === "tool.finished") {
+    if (payload?.input !== undefined) value.input = payload.input;
     value.state = hasError ? "output-error" : "output-available";
-    if (hasError) value.errorText = String(payload?.error);
-    else value.output = payload?.output;
+    if (hasError) {
+      const error = payload?.error;
+      value.errorText =
+        error && typeof error === "object" && typeof (error as EventPayload).message === "string"
+          ? (error as EventPayload).message
+          : String(error);
+    } else value.output = payload?.output;
   }
 
   message.parts.set(partId, {
@@ -108,6 +147,7 @@ function orderedUniqueEvents(events: readonly AgentEvent[]) {
 
 export function projectStreamedAssistantMessages(
   events: readonly AgentEvent[],
+  terminalStatus?: TerminalRunStatus,
 ): AgentTranscriptMessage[] {
   const messages = new Map<string, ProjectedMessage>();
 
@@ -118,6 +158,9 @@ export function projectStreamedAssistantMessages(
       projectToolEvent(messages, event);
     }
   }
+
+  const status = terminalStatus ?? terminalStatusOf(events);
+  if (status) closePendingTools(messages, status);
 
   return [...messages.entries()]
     .sort(([, left], [, right]) => left.firstSequence - right.firstSequence)
@@ -202,12 +245,13 @@ export function projectRunTranscript(
   events: readonly AgentEvent[],
   baseTranscript: readonly AgentTranscriptMessage[],
   fallbackTranscript?: AgentTranscriptMessage[],
+  terminalStatus?: TerminalRunStatus,
 ) {
   const base = [...baseTranscript];
   const userMessage = startedUserMessage(events);
   if (userMessage && !containsMessage(base, userMessage)) base.push(userMessage);
 
-  const streamed = projectStreamedAssistantMessages(events);
+  const streamed = projectStreamedAssistantMessages(events, terminalStatus);
   return streamed.length > 0
     ? mergeProjectedMessages(base, streamed)
     : (fallbackTranscript ?? base);

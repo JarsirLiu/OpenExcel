@@ -225,6 +225,7 @@ export {
   type ExcelToolName,
   type ExcelToolSpec,
   excelToolSpecs,
+  MAX_WRITE_CELLS_PER_CALL,
 } from "./tools/excelToolContract.js";
 export type {
   ColumnDef,

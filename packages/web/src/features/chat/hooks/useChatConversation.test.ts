@@ -146,6 +146,40 @@ describe("ConversationStore", () => {
       ],
     });
   });
+
+  it("closes pending tool cards when the run reaches a terminal state", () => {
+    const store = new ConversationStore();
+
+    store.applyEvent({
+      eventId: "event-tool-start",
+      sequence: 1,
+      type: "tool.started",
+      occurredAt: "2026-07-26T00:00:00.000Z",
+      payload: {
+        messageId: "assistant-1",
+        toolCallId: "call-1",
+        toolName: "writeCells",
+        input: {},
+      },
+    });
+    store.applyEvent({
+      eventId: "event-run-cancelled",
+      sequence: 2,
+      type: "run.cancelled",
+      occurredAt: "2026-07-26T00:00:00.001Z",
+      payload: {},
+    });
+
+    expect(store.messages[0]).toMatchObject({
+      parts: [
+        {
+          type: "tool-writeCells",
+          state: "output-error",
+          errorText: "工具执行已中断",
+        },
+      ],
+    });
+  });
 });
 
 describe("useChatConversation", () => {
