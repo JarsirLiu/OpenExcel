@@ -1,6 +1,13 @@
 import type { AgentEvent } from "@openexcel/agent";
 import { prisma } from "../../../infra/database/db.js";
 
+export class AgentEventConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AgentEventConflictError";
+  }
+}
+
 export interface PersistedAgentStep {
   type: string;
   status: string;
@@ -16,34 +23,83 @@ export async function persistAgentEvent(
   event: AgentEvent,
   step?: PersistedAgentStep,
 ) {
-  return prisma.$transaction(async (tx) => {
-    const persisted = await tx.agentEvent.create({
-      data: {
-        runId,
-        eventId: event.eventId,
-        sequence: event.sequence,
-        type: event.type,
-        occurredAt: new Date(event.occurredAt),
-        payload: JSON.stringify(event.payload),
-      },
-    });
+  const data = eventPersistenceData(runId, event);
 
-    if (step) {
-      await tx.agentStep.create({
-        data: {
-          runId,
-          ...step,
-        },
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const existing = await findExistingEvent(tx, runId, event);
+      if (existing) return existing;
+
+      const persisted = await tx.agentEvent.create({ data });
+
+      if (step) {
+        await tx.agentStep.create({
+          data: {
+            runId,
+            ...step,
+          },
+        });
+      }
+
+      await tx.agentRun.updateMany({
+        where: { id: runId, lastEventSequence: { lt: event.sequence } },
+        data: { lastEventSequence: event.sequence },
       });
-    }
 
-    await tx.agentRun.updateMany({
-      where: { id: runId, lastEventSequence: { lt: event.sequence } },
-      data: { lastEventSequence: event.sequence },
+      return persisted;
     });
+  } catch (error) {
+    if (!isUniqueConstraintError(error)) throw error;
 
-    return persisted;
+    // A concurrent writer may have won either unique constraint. The failed
+    // transaction is over before this lookup so the client remains usable.
+    const existing = await findExistingEvent(prisma, runId, event);
+    if (existing) return existing;
+    throw error;
+  }
+}
+
+function eventPersistenceData(runId: number, event: AgentEvent) {
+  return {
+    runId,
+    eventId: event.eventId,
+    sequence: event.sequence,
+    type: event.type,
+    occurredAt: new Date(event.occurredAt),
+    payload: JSON.stringify(event.payload),
+  };
+}
+
+type AgentEventDatabase = Pick<typeof prisma, "agentEvent">;
+
+async function findExistingEvent(db: AgentEventDatabase, runId: number, event: AgentEvent) {
+  const byEventId = await db.agentEvent.findUnique({ where: { eventId: event.eventId } });
+  const bySequence = await db.agentEvent.findUnique({
+    where: { runId_sequence: { runId, sequence: event.sequence } },
   });
+  const existing = byEventId ?? bySequence;
+  if (!existing) return null;
+
+  const expected = eventPersistenceData(runId, event);
+  if (
+    existing.runId !== expected.runId ||
+    existing.eventId !== expected.eventId ||
+    existing.sequence !== expected.sequence ||
+    existing.type !== expected.type ||
+    existing.occurredAt.getTime() !== expected.occurredAt.getTime() ||
+    existing.payload !== expected.payload
+  ) {
+    throw new AgentEventConflictError(
+      `Agent event conflict for run ${runId}, sequence ${event.sequence}`,
+    );
+  }
+  return existing;
+}
+
+function isUniqueConstraintError(error: unknown): boolean {
+  return (
+    typeof error === "object" && error !== null && (error as { code?: unknown }).code === "P2002"
+  );
 }
 
 export async function persistRunLifecycleEvent(data: {

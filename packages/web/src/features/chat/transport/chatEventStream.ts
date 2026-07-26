@@ -1,4 +1,5 @@
 export type ChatEvent = {
+  runId?: number;
   eventId: string;
   sequence: number;
   type:
@@ -51,19 +52,21 @@ export async function* openChatEventStream(options: {
       for (const line of lines) {
         const trimmed = line.trim();
         if (!trimmed) continue;
-        yield parseChatEvent(trimmed);
+        yield parseChatEvent(trimmed, Number.isInteger(runId) && runId > 0 ? runId : undefined);
       }
       if (done) break;
     }
 
     const trailing = buffer.trim();
-    if (trailing) yield parseChatEvent(trailing);
+    if (trailing) {
+      yield parseChatEvent(trailing, Number.isInteger(runId) && runId > 0 ? runId : undefined);
+    }
   } finally {
     reader.releaseLock();
   }
 }
 
-function parseChatEvent(line: string): ChatEvent {
+function parseChatEvent(line: string, runId?: number): ChatEvent {
   const event = JSON.parse(line) as Partial<ChatEvent>;
   if (
     typeof event.eventId !== "string" ||
@@ -73,5 +76,5 @@ function parseChatEvent(line: string): ChatEvent {
   ) {
     throw new Error("聊天事件流格式无效");
   }
-  return event as ChatEvent;
+  return { ...(event as ChatEvent), ...(runId == null ? {} : { runId }) };
 }

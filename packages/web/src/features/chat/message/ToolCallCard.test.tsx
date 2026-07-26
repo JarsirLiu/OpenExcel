@@ -8,7 +8,6 @@ describe("ToolCallCard", () => {
       <ToolCallCard
         part={{
           type: "tool-readSheetData",
-          toolName: "readSheetData",
           state: "output-available",
           toolCallId: "tool-call-1",
           input: { sheetId: 3 },
@@ -42,7 +41,6 @@ describe("ToolCallCard", () => {
       <ToolCallCard
         part={{
           type: "tool-writeCells",
-          toolName: "writeCells",
           state: "output-available",
           input: { sheetId: 3 },
           output: {

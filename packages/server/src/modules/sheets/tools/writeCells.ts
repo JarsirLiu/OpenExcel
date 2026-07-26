@@ -2,11 +2,8 @@ import {
   type ExcelToolInput,
   type SheetChangeCell,
   type SheetMutation,
-  sheetChangePatchOutputSchema,
   storageIndex,
 } from "@openexcel/core";
-import { runToolContextSchema } from "../../../shared/tools/context.js";
-import { sheetMutationOutputSchema } from "../../../shared/tools/outputSchemas.js";
 import { defineServerTool } from "../../../shared/tools/serverTool.js";
 import { executeSheetCommandInTransaction } from "../application/executeSheetCommand.js";
 import { buildSheetChangePreview } from "../domain/sheetPreview.js";
@@ -42,8 +39,6 @@ function affectedRange(cells: SheetChangeCell) {
 }
 
 export const writeCells = defineServerTool("writeCells", {
-  contextSchema: runToolContextSchema,
-  outputSchema: sheetMutationOutputSchema,
   execute: async (input, options) => {
     const { sheetId, operations } = input;
     return runSheetMutation(options.context, sheetId, async (sheet, tx) => {
@@ -68,7 +63,7 @@ export const writeCells = defineServerTool("writeCells", {
       const { snapshot } = result;
       const commandResult = toSheetToolPatchResult(result);
       const output = {
-        success: true,
+        success: true as const,
         updatedCells: result.changeSummary.changedCellCount,
         ...commandResult,
         preview: buildSheetChangePreview(
@@ -81,7 +76,6 @@ export const writeCells = defineServerTool("writeCells", {
         ),
         sheetInfo: { sheetId: sheet.id, sheetNo: sheet.sheetNo, sheetName: sheet.name },
       };
-      sheetChangePatchOutputSchema.parse(output);
       return output;
     });
   },

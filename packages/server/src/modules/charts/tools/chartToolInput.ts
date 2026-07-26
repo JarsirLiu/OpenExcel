@@ -1,46 +1,19 @@
 import {
   type ChartAnchor,
-  type ChartComboSeriesType,
   type ChartSeriesSpec,
   type ChartSourceRange,
-  type ChartSpec,
   chartSeriesFromSourceRange,
+  type ExcelToolInput,
   type RangeReference,
 } from "@openexcel/core";
 import type { CreateChartInput, UpdateChartInput } from "../application/chartService.js";
 
-type ToolCell = { row: number; col: number };
-type ToolRange = {
-  sheetId: number;
-  startRow: number;
-  startCol: number;
-  endRow: number;
-  endCol: number;
-};
-type ToolAnchor =
-  | {
-      kind: "oneCell";
-      from: ToolCell;
-      widthEmu: number;
-      heightEmu: number;
-    }
-  | { kind: "twoCell"; from: ToolCell; to: ToolCell }
-  | {
-      kind: "absolute";
-      xEmu: number;
-      yEmu: number;
-      widthEmu: number;
-      heightEmu: number;
-    };
-type ToolSeries = {
-  id: string;
-  name?: string;
-  categoryRef?: ToolRange;
-  valueRef: ToolRange;
-  chartType?: NonNullable<ChartSeriesSpec["chartType"]>;
-};
-
-type ToolSourceRange = ToolRange;
+type CreateChartToolInput = ExcelToolInput<"createChart">;
+type UpdateChartToolPatch = ExcelToolInput<"updateChart">["patch"];
+type ToolRange = CreateChartToolInput["sourceRange"];
+type ToolAnchor = CreateChartToolInput["anchor"];
+type ToolCell = NonNullable<ToolAnchor["from"]>;
+type ToolSeries = NonNullable<UpdateChartToolPatch["series"]>[number];
 
 function cell(cell: ToolCell) {
   return { row: cell.row - 1, col: cell.col - 1 };
@@ -55,11 +28,24 @@ function range(reference: ToolRange): RangeReference {
 }
 
 function anchor(input: ToolAnchor): ChartAnchor {
-  if (input.kind === "absolute") return input;
-  if (input.kind === "oneCell") {
-    return { ...input, from: cell(input.from) };
+  if (input.kind === "absolute") {
+    return {
+      kind: "absolute",
+      xEmu: input.xEmu!,
+      yEmu: input.yEmu!,
+      widthEmu: input.widthEmu!,
+      heightEmu: input.heightEmu!,
+    };
   }
-  return { ...input, from: cell(input.from), to: cell(input.to) };
+  if (input.kind === "oneCell") {
+    return {
+      kind: "oneCell",
+      from: cell(input.from!),
+      widthEmu: input.widthEmu!,
+      heightEmu: input.heightEmu!,
+    };
+  }
+  return { kind: "twoCell", from: cell(input.from!), to: cell(input.to!) };
 }
 
 function series(input: ToolSeries): ChartSeriesSpec {
@@ -72,18 +58,7 @@ function series(input: ToolSeries): ChartSeriesSpec {
   };
 }
 
-export function toCreateChartSpec(
-  input: {
-    workbookId: number;
-    sheetId: number;
-    type: ChartSpec["type"];
-    title?: string;
-    anchor: ToolAnchor;
-    sourceRange: ToolSourceRange;
-    seriesTypes?: ChartComboSeriesType[];
-  },
-  id?: string,
-): CreateChartInput {
+export function toCreateChartSpec(input: CreateChartToolInput, id?: string): CreateChartInput {
   const sourceRange: ChartSourceRange = {
     sheetId: String(input.sourceRange.sheetId),
     start: { row: input.sourceRange.startRow - 1, col: input.sourceRange.startCol - 1 },
@@ -101,13 +76,7 @@ export function toCreateChartSpec(
   };
 }
 
-export function toUpdateChartPatch(input: {
-  type?: ChartSpec["type"];
-  title?: string | null;
-  sheetId?: number;
-  anchor?: ToolAnchor;
-  series?: ToolSeries[];
-}): UpdateChartInput {
+export function toUpdateChartPatch(input: UpdateChartToolPatch): UpdateChartInput {
   return {
     type: input.type,
     title: input.title,

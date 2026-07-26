@@ -164,7 +164,7 @@ complete until an imported or AI-created chart survives export without losing it
 or relationship parts.
 
 Excel capabilities follow the same boundary. `packages/core` may define provider-neutral capability
-contracts, tool names, descriptions, input schemas, and pure command validation, but it must not
+contracts, tool names, descriptions, input/output schemas, context scope, and pure command validation, but it must not
 import `packages/agent` or contain database-backed tool executors. The server maps those contracts
 to the Agent runtime and supplies the concrete execution adapters.
 The canonical Excel capability catalog is implemented under `packages/core/src/tools/`; the server
@@ -899,6 +899,12 @@ Persisting a title is a separate write path from persisting the chat run.
 The server remains the authority for transcript and workbook state. The
 transaction boundaries, event durability barriers, and tool idempotency rules
 are maintained in [Agent Loop](agent-loop.md).
+
+Tool contracts are defined once in `packages/core`: name, description, input schema, output schema, and whether the
+tool requires run-scoped context. Server tool definitions derive their input/context/output types from that registry
+and add only authorization, concrete execution, and persistence behavior. The Server registry must contain the
+complete capability set exactly once before any tool can be exposed to the Agent; its execution boundary validates
+input, context, and output before returning a model-visible result.
 
 ### 9.3 Model usage
 

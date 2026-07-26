@@ -18,6 +18,7 @@ export class ConversationStore {
   #messages: ChatMessage[];
   #listeners = new Set<() => void>();
   #seenEventIds = new Set<string>();
+  #seenEventSequences = new Map<string, Set<number>>();
 
   constructor(initialMessages: readonly ChatMessage[] = []) {
     this.#messages = [...initialMessages];
@@ -37,6 +38,7 @@ export class ConversationStore {
   replaceHistory(messages: readonly ChatMessage[]) {
     this.#messages = [...messages];
     this.#seenEventIds.clear();
+    this.#seenEventSequences.clear();
     this.#publish();
   }
 
@@ -52,7 +54,12 @@ export class ConversationStore {
 
   applyEvent(event: ChatEvent) {
     if (this.#seenEventIds.has(event.eventId)) return;
+    const runKey = event.runId == null ? "unscoped" : String(event.runId);
+    const sequences = this.#seenEventSequences.get(runKey) ?? new Set<number>();
+    if (sequences.has(event.sequence)) return;
     this.#seenEventIds.add(event.eventId);
+    sequences.add(event.sequence);
+    this.#seenEventSequences.set(runKey, sequences);
 
     if (event.type === "run.started") {
       const payload = asRecord(event.payload);

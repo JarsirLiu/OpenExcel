@@ -1,12 +1,9 @@
 import {
   type SheetMutation,
-  sheetChangePatchOutputSchema,
   sheetChangeRangeToZeroBased,
   storageIndex,
   toolIndex,
 } from "@openexcel/core";
-import { runToolContextSchema } from "../../../shared/tools/context.js";
-import { sheetMutationOutputSchema } from "../../../shared/tools/outputSchemas.js";
 import { defineServerTool } from "../../../shared/tools/serverTool.js";
 import { executeSheetCommandInTransaction } from "../application/executeSheetCommand.js";
 import { buildSheetChangePreview } from "../domain/sheetPreview.js";
@@ -15,8 +12,6 @@ import { createSheetToolMutationId } from "./sheetToolCommand.js";
 import { toSheetToolPatchResult } from "./sheetToolResult.js";
 
 export const clearCells = defineServerTool("clearCells", {
-  contextSchema: runToolContextSchema,
-  outputSchema: sheetMutationOutputSchema,
   execute: async (input, options) => {
     return runSheetMutation(options.context, input.sheetId, async (sheet, tx) => {
       const mutation: SheetMutation = { type: "clear", operations: input.operations };
@@ -44,7 +39,7 @@ export const clearCells = defineServerTool("clearCells", {
       const { snapshot } = result;
       const commandResult = toSheetToolPatchResult(result);
       const output = {
-        success: true,
+        success: true as const,
         clearedCells: result.changeSummary.changedCellCount,
         ...commandResult,
         preview: buildSheetChangePreview(
@@ -60,7 +55,6 @@ export const clearCells = defineServerTool("clearCells", {
         ),
         sheetInfo: { sheetId: sheet.id, sheetNo: sheet.sheetNo, sheetName: sheet.name },
       };
-      sheetChangePatchOutputSchema.parse(output);
       return output;
     });
   },

@@ -46,8 +46,9 @@ describe("createAgentToolSet", () => {
     });
   });
 
-  it("allows callers to disable adapter-level input validation", async () => {
+  it("returns a model-visible error when adapter input validation fails", async () => {
     const execute = vi.fn().mockResolvedValue({ ok: true });
+    const onToolFinish = vi.fn();
     const tools = createAgentToolSet(
       [
         {
@@ -58,21 +59,21 @@ describe("createAgentToolSet", () => {
       ],
       { execute },
       undefined,
-      {},
-      { validateInput: false },
+      { onToolFinish },
     );
 
-    await (tools.readSheetData as any).execute(
-      { sheetId: "7" },
-      { toolCallId: "call-2", abortSignal: undefined },
-    );
-
-    expect(execute).toHaveBeenCalledWith(
-      expect.objectContaining({
-        toolName: "readSheetData",
-        input: { sheetId: "7" },
-        toolCallId: "call-2",
-      }),
+    await expect(
+      (tools.readSheetData as any).execute(
+        { sheetId: "7" },
+        { toolCallId: "call-2", abortSignal: undefined },
+      ),
+    ).resolves.toMatchObject({
+      isError: true,
+      error: { kind: "validation_failed" },
+    });
+    expect(execute).not.toHaveBeenCalled();
+    expect(onToolFinish).toHaveBeenCalledWith(
+      expect.objectContaining({ toolCallId: "call-2", error: expect.anything() }),
     );
   });
 

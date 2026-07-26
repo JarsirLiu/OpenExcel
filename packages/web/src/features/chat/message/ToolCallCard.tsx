@@ -3,10 +3,6 @@ import styles from "./ToolCallCard.module.css";
 
 const READ_ONLY_TOOLS = new Set(["readSheetData", "findSheetCells", "readSheetObjects"]);
 
-function isStaticToolPart(part: any): boolean {
-  return part.args === undefined && part.input !== undefined;
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -161,12 +157,13 @@ function computeChangedCells(delta: unknown): Set<string> | undefined {
 }
 
 export function ToolCallCard({ part }: { part: any }) {
-  const toolName = part.type.startsWith("tool-") ? part.type.slice(5) : part.toolName;
+  const toolName =
+    typeof part.type === "string" && part.type.startsWith("tool-") ? part.type.slice(5) : "unknown";
   const state = part.state || "input-streaming";
   const isComplete = state === "output-available" || state === "output-error";
   const isError = state === "output-error";
-  const input = isStaticToolPart(part) ? part.input : part.args;
-  const output = isStaticToolPart(part) ? (part as any).output : undefined;
+  const input = part.input;
+  const output = part.output;
   const summary = getToolSummary(toolName, output, input);
   const preview = normalizePreviewData(output?.preview);
   const isReadOnlyTool = READ_ONLY_TOOLS.has(toolName);

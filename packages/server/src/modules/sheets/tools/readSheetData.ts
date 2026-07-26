@@ -7,8 +7,6 @@ import {
   type SheetToolRange,
   sheetToolRangeToA1,
 } from "@openexcel/core";
-import { workspaceToolContextSchema } from "../../../shared/tools/context.js";
-import { sheetReadOutputSchema } from "../../../shared/tools/outputSchemas.js";
 import { defineServerTool } from "../../../shared/tools/serverTool.js";
 import { sheetRecordToSnapshot } from "../../../shared/utils/sheetSnapshot.js";
 import { findSheetForWorkspace } from "../infrastructure/sheetRepository.js";
@@ -37,8 +35,6 @@ function serializeContinuation(continuation: SheetReadContinuation | null) {
 }
 
 export const readSheetData = defineServerTool("readSheetData", {
-  contextSchema: workspaceToolContextSchema,
-  outputSchema: sheetReadOutputSchema,
   execute: async (
     { sheetId, range, continuation }: ReadSheetDataInput,
     { context, resultBudget },

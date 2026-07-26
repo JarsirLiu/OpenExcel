@@ -18,29 +18,24 @@ type CompletedToolPart = {
   toolCallId: string;
   state: "output-available";
   output: unknown;
-  input?: unknown;
-  args?: unknown;
-  toolName?: unknown;
-  type?: unknown;
+  type: string;
+  input: unknown;
 };
 
 function isCompletedToolPart(part: unknown): part is CompletedToolPart {
   if (!isRecord(part)) return false;
   return (
-    typeof part.toolCallId === "string" && part.state === "output-available" && "output" in part
+    typeof part.toolCallId === "string" &&
+    typeof part.type === "string" &&
+    part.type.startsWith("tool-") &&
+    part.state === "output-available" &&
+    "input" in part &&
+    "output" in part
   );
 }
 
 function getToolName(part: CompletedToolPart): string {
-  // ai-sdk v7 static tool: type is "tool-${name}" (e.g. "tool-createSheet")
-  if (typeof part.type === "string" && part.type.startsWith("tool-")) {
-    return part.type.slice("tool-".length);
-  }
-  // ai-sdk v7 dynamic tool or legacy v4 format
-  if (typeof part.toolName === "string") {
-    return part.toolName;
-  }
-  return "";
+  return part.type.slice("tool-".length);
 }
 
 export function collectSheetPatchUpdates(
@@ -78,12 +73,6 @@ export function collectSheetPatchUpdates(
   }
 
   return updates;
-}
-
-function getToolInput(part: CompletedToolPart): Record<string, unknown> | null {
-  if (isRecord(part.input)) return part.input;
-  if (isRecord(part.args)) return part.args;
-  return null;
 }
 
 function isWorkbookCreatedOutput(output: unknown): output is {
@@ -138,7 +127,7 @@ export function collectWorkbookStructureUpdates(
       if (seenToolCallIds.has(part.toolCallId)) continue;
 
       const toolName = getToolName(part);
-      const input = getToolInput(part);
+      const input = isRecord(part.input) ? part.input : null;
 
       if (toolName === "createWorkbook" && isWorkbookCreatedOutput(part.output)) {
         updates.push({

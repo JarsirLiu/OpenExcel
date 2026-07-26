@@ -1,13 +1,10 @@
 import {
   type SheetMutation,
-  sheetChangePatchOutputSchema,
   sheetChangeRangeToZeroBased,
   storageIndex,
   toolIndex,
   toolRangeToA1Ref,
 } from "@openexcel/core";
-import { runToolContextSchema } from "../../../shared/tools/context.js";
-import { sheetMutationOutputSchema } from "../../../shared/tools/outputSchemas.js";
 import { defineServerTool } from "../../../shared/tools/serverTool.js";
 import { executeSheetCommandInTransaction } from "../application/executeSheetCommand.js";
 import { buildSheetChangePreview } from "../domain/sheetPreview.js";
@@ -16,8 +13,6 @@ import { createSheetToolMutationId } from "./sheetToolCommand.js";
 import { toSheetToolPatchResult } from "./sheetToolResult.js";
 
 export const mergeCells = defineServerTool("mergeCells", {
-  contextSchema: runToolContextSchema,
-  outputSchema: sheetMutationOutputSchema,
   execute: async (input, options) => {
     return runSheetMutation(options.context, input.sheetId, async (sheet, tx) => {
       const mutation: SheetMutation = { type: "merge", operations: input.operations };
@@ -36,7 +31,7 @@ export const mergeCells = defineServerTool("mergeCells", {
       const { snapshot } = result;
       const commandResult = toSheetToolPatchResult(result);
       const output = {
-        success: true,
+        success: true as const,
         mergedRanges: input.operations.map((operation) =>
           toolRangeToA1Ref({
             startRow: toolIndex(operation.startRow),
@@ -59,7 +54,6 @@ export const mergeCells = defineServerTool("mergeCells", {
         ),
         sheetInfo: { sheetId: sheet.id, sheetNo: sheet.sheetNo, sheetName: sheet.name },
       };
-      sheetChangePatchOutputSchema.parse(output);
       return output;
     });
   },

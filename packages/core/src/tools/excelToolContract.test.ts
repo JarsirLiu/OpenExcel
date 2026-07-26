@@ -29,4 +29,11 @@ describe("Excel tool contract", () => {
 
     expect(result.success).toBe(false);
   });
+
+  it("requires every model-visible tool to declare a structured output contract", () => {
+    for (const tool of Object.values(excelToolSpecs)) {
+      expect(tool.needsRunContext).toEqual(expect.any(Boolean));
+      expect(tool.outputSchema.safeParse({}).success).toBe(false);
+    }
+  });
 });

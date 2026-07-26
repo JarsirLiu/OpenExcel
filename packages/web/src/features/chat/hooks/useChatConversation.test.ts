@@ -4,6 +4,49 @@ import { ConversationStore } from "../conversation/conversationStore";
 import { useChatConversation } from "./useChatConversation";
 
 describe("ConversationStore", () => {
+  it("deduplicates a repeated sequence even when its event id changes", () => {
+    const store = new ConversationStore();
+
+    store.applyEvent({
+      runId: 7,
+      eventId: "event-1",
+      sequence: 1,
+      type: "message.delta",
+      occurredAt: "2026-07-26T00:00:00.000Z",
+      payload: { messageId: "assistant-1", partId: "text-1", delta: "答" },
+    });
+    store.applyEvent({
+      runId: 7,
+      eventId: "event-replayed-with-new-id",
+      sequence: 1,
+      type: "message.delta",
+      occurredAt: "2026-07-26T00:00:00.000Z",
+      payload: { messageId: "assistant-1", partId: "text-1", delta: "错误" },
+    });
+
+    expect(store.messages.at(-1)?.parts?.[0]).toMatchObject({ text: "答" });
+  });
+
+  it("keeps equal sequences from different runs independent", () => {
+    const store = new ConversationStore();
+
+    for (const [runId, messageId, delta] of [
+      [7, "assistant-7", "甲"],
+      [8, "assistant-8", "乙"],
+    ] as const) {
+      store.applyEvent({
+        runId,
+        eventId: `event-${runId}`,
+        sequence: 1,
+        type: "message.delta",
+        occurredAt: "2026-07-26T00:00:00.000Z",
+        payload: { messageId, partId: `text-${runId}`, delta },
+      });
+    }
+
+    expect(store.messages.map((message) => message.id)).toEqual(["assistant-7", "assistant-8"]);
+  });
+
   it("projects confirmed AgentEvents into one assistant message", () => {
     const store = new ConversationStore([
       { id: "user-1", role: "user", parts: [{ type: "text", text: "你好" }] },

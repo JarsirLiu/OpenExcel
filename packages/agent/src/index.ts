@@ -51,27 +51,18 @@ export {
   toModelSafeJsonValue,
 } from "./runtime/tools/modelSafeJson.js";
 export {
-  type SerializationOptions,
-  type SerializationResult,
-  serializeAndValidate,
-  serializeToolOutput,
-} from "./runtime/tools/outputSerialization.js";
-export {
   createAgentToolSet,
   type ToolAdapterHooks,
-  type ToolAdapterOptions,
 } from "./runtime/tools/toolAdapter.js";
 export {
-  type BudgetableToolSet,
   DEFAULT_READ_SHEET_DATA_BUDGET_TOKENS,
   DEFAULT_TOOL_RESULT_BUDGET_TOKENS,
   DEFAULT_TOOL_RESULT_MAX_TOKENS,
-  type ToolExecutionBudget,
   ToolResultBudget,
   type ToolResultBudgetOptions,
   type ToolResultBudgetSnapshot,
   type ToolResultPolicy,
-  wrapToolSetWithResultBudget,
+  wrapToolExecutorWithResultBudget,
 } from "./runtime/tools/toolResultBudget.js";
 export {
   COMPACTION_CHECKPOINT_MARKER,

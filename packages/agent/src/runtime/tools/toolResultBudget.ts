@@ -1,23 +1,11 @@
 import { estimateTokens } from "../../session/contextWindow.js";
+import type { ToolExecutionRequest, ToolExecutor } from "../contracts.js";
 
 export const DEFAULT_TOOL_RESULT_BUDGET_TOKENS = 32_000;
 export const DEFAULT_TOOL_RESULT_MAX_TOKENS = 8_000;
 export const DEFAULT_READ_SHEET_DATA_BUDGET_TOKENS = 24_000;
 
-type ToolExecute = (input: unknown, options?: unknown) => unknown;
-
 export type ToolResultPolicy = { kind: "generic" } | { kind: "paged-structured" };
-
-export type ToolExecutionBudget = {
-  maxTokens: number;
-  policy: ToolResultPolicy["kind"];
-};
-
-export type BudgetableTool = Record<string, unknown> & {
-  execute?: ToolExecute;
-};
-
-export type BudgetableToolSet = Record<string, BudgetableTool>;
 
 export interface ToolResultBudgetOptions {
   totalTokens?: number;
@@ -53,14 +41,6 @@ interface TruncatedToolResult {
 
 function positiveInt(value: number | undefined, fallback: number): number {
   return Number.isInteger(value) && (value as number) > 0 ? (value as number) : fallback;
-}
-
-function stringify(value: unknown): string {
-  try {
-    return JSON.stringify(value) ?? "";
-  } catch {
-    return String(value);
-  }
 }
 
 function truncateString(value: string, maxTokens: number): string {
@@ -295,59 +275,28 @@ export class ToolResultBudget {
   }
 }
 
-export function wrapToolSetWithResultBudget<T extends BudgetableToolSet>(
-  tools: T,
+export function wrapToolExecutorWithResultBudget(
+  executor: ToolExecutor,
   budget: ToolResultBudget,
-): T {
-  const wrapped = Object.fromEntries(
-    Object.entries(tools).map(([name, tool]) => {
-      if (typeof tool.execute !== "function") return [name, tool];
+): ToolExecutor {
+  return {
+    async execute(request: ToolExecutionRequest) {
+      const reservation = budget.reserve(request.toolName);
+      if (isTruncatedToolResult(reservation)) return reservation;
 
-      const execute = tool.execute;
-      return [
-        name,
-        {
-          ...tool,
-          execute: async (input: unknown, options?: unknown) => {
-            const reservation = budget.reserve(name);
-            if (isTruncatedToolResult(reservation)) return reservation;
-
-            try {
-              const executionOptions =
-                options && typeof options === "object"
-                  ? {
-                      ...(options as Record<string, unknown>),
-                      resultBudget: {
-                        maxTokens: reservation.tokenLimit,
-                        policy: reservation.policy,
-                      } satisfies ToolExecutionBudget,
-                    }
-                  : {
-                      resultBudget: {
-                        maxTokens: reservation.tokenLimit,
-                        policy: reservation.policy,
-                      } satisfies ToolExecutionBudget,
-                    };
-              const result = await execute(input, executionOptions);
-              return budget.finish(reservation, result);
-            } catch (error) {
-              budget.fail(reservation);
-              throw error;
-            }
-          },
-        },
-      ];
-    }),
-  );
-  return wrapped as T;
+      try {
+        const output = await executor.execute(request);
+        return budget.finish(reservation, output);
+      } catch (error) {
+        budget.fail(reservation);
+        throw error;
+      }
+    },
+  };
 }
 
 function isTruncatedToolResult(
   value: Reservation | TruncatedToolResult,
 ): value is TruncatedToolResult {
   return "truncated" in value;
-}
-
-export function serializeToolResult(value: unknown): string {
-  return stringify(value);
 }

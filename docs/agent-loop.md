@@ -33,6 +33,11 @@
 - `packages/agent` 负责模型调用、工具循环、上下文预算和 provider-neutral 事件。
 - `packages/web` 通过 `ConversationStore` 消费确认后的事件并渲染消息、工具状态和工作簿刷新。
 
+Excel 工具契约只有一个来源：`packages/core/src/tools/excelToolContract.ts` 同时声明工具名称、描述、输入
+schema、输出 schema 和 workspace/run 上下文作用域。Server 的 `defineServerTool` 只能绑定具体执行器，不能
+重新声明这些 schema；完整 Registry 在启动/测试时必须精确包含每个 Core 工具一次。每次执行都在 Server
+边界按同一契约校验输入、上下文和输出，之后才交给 Agent 继续模型循环。
+
 当前实现中的旧状态名（例如 `error`、`aborted`）与目标协议中的
 `failed`、`cancelled` 不是可以混用的同义词。迁移时必须在服务端状态边界
 显式映射并补齐诊断字段；新代码不得通过字符串比较偷偷引入第三套状态。
@@ -58,6 +63,8 @@
 
 本阶段已经补齐 AgentEvent 和 AgentToolExecution 的基础服务端持久化。事件持久化适配器会在同一事务中写入
 AgentEvent 和对应 AgentStep；工具账本会对 `(runId, toolCallId)` 做参数校验、完成结果回放和 stale running 回收。
+AgentEvent 以 `(runId, sequence)` 和全局 `eventId` 做内容一致性幂等；重复的同一事件返回已存在记录，
+同一游标对应不同内容则进入可诊断冲突，不能靠唯一键异常作为正常流程。
 本阶段已补齐断流后的 Agent completion 解耦、持久化失败诊断和基础恢复入口；跨进程取消仍通过数据库标记与轮询协作。
 
 ### 1.2 本轮已落地：运行生命周期与取消边界
@@ -150,7 +157,7 @@ Vercel AI SDK 是执行引擎，不是 OpenExcel 的业务边界。OpenExcel 自
 - 具体 workbook/sheet/chart 数据库工具实现。
 - AgentRun、AgentStep 或 transcript 的数据库持久化。
 
-Excel 工具的 provider-neutral capability contract（名称、描述、输入 schema、所需能力和
+Excel 工具的 provider-neutral capability contract（名称、描述、输入/输出 schema、上下文作用域、所需能力和
 资源范围）属于 `packages/core`，不属于 Agent runtime。Agent 只接收 server 根据当前用户和
 workspace 策略过滤后的工具定义；server 必须在执行时重新授权，不能信任模型是否看到了某个工具。
 
@@ -982,7 +989,8 @@ repositories -> Prisma only
 - `runtime/contracts.ts`：`ToolExecutor`、`AgentEventSink`、持久化确认、取消信号和恢复输入接口。
 - server `sessions/chat/agentEventStream.ts`：只负责确认事件的 NDJSON 订阅传输。
 - `runtime/stream/referencePart.ts`：将 `data-chat-reference` part 转换为模型可读的文本。
-- `runtime/tools/toolResultBudget.ts`：工具结果 token 预算和超限截断。
+- `runtime/tools/toolResultBudget.ts`：工具结果预算必须包在 `ToolExecutor` 边界，确保所有模型可见工具的结果
+  都经过统一预算处理；不能只包装未被 Agent loop 使用的 Server ToolSet。
 - `runtime/errors/formatAIError.ts`：模型错误到用户可读消息的格式化。
 - `session/context.ts`、`session/transcript.ts`：model-facing context 和 transcript 转换。
 

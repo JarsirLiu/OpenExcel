@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { chartSpecSchema } from "../chart/chartModel.js";
+import { sheetChangePatchOutputSchema } from "../chat/sheetChange.js";
 
 const writeCellValueSchema = z.union([z.string(), z.number(), z.boolean()]);
 const writeFormulaSchema = z
@@ -206,10 +208,176 @@ const chartCreateSchema = z
     }
   });
 
+const workbookSummaryOutputSchema = z.object({
+  id: z.number().int().positive(),
+  name: z.string(),
+});
+
+const sheetSummaryOutputSchema = z.object({
+  id: z.number().int().positive(),
+  sheetNo: z.number().int().positive(),
+  name: z.string(),
+});
+
+const sheetReadOutputSchema = z.object({
+  workbook: workbookSummaryOutputSchema,
+  sheet: sheetSummaryOutputSchema,
+  range: z.string().min(1),
+  values: z.array(z.array(z.union([z.string(), z.number(), z.boolean(), z.null()]))),
+  formulaPatterns: z.array(
+    z.object({
+      ranges: z.array(z.string().min(1)),
+      formulaR1C1: z.string().min(1),
+    }),
+  ),
+  formulaExceptions: z.array(
+    z.object({
+      cell: z.string().min(1),
+      formula: z.string().min(1),
+    }),
+  ),
+  merges: z.array(
+    z.object({
+      range: z.string().min(1),
+      anchor: z.string().min(1),
+      rowSpan: z.number().int().positive(),
+      colSpan: z.number().int().positive(),
+      clipped: z.boolean().optional(),
+      anchorValue: z.union([z.string(), z.number(), z.boolean(), z.null()]).optional(),
+    }),
+  ),
+  continuation: z
+    .object({
+      requestedRange: z.string().min(1),
+      nextRow: z.number().int().positive(),
+      nextCol: z.number().int().positive(),
+    })
+    .nullable(),
+});
+
+const sheetCellMatchesOutputSchema = z.object({
+  workbook: workbookSummaryOutputSchema,
+  sheet: sheetSummaryOutputSchema,
+  matches: z.array(
+    z.object({
+      range: z.string().min(1),
+      count: z.number().int().positive(),
+      reason: z.string().min(1),
+    }),
+  ),
+});
+
+const sheetObjectOutputSchema = z.object({
+  workbook: workbookSummaryOutputSchema,
+  sheet: sheetSummaryOutputSchema,
+  objectType: z.enum(["charts", "filters", "tables", "pivotTables"]),
+  objects: z.array(
+    z.union([
+      z.object({
+        kind: z.literal("chart"),
+        id: z.string().min(1),
+        type: z.enum(["bar", "line", "pie", "area", "scatter", "combo"]),
+        title: z.string().nullable(),
+        anchor: z.string().min(1),
+        series: z.array(
+          z.object({
+            id: z.string().min(1),
+            name: z.string().nullable(),
+            categoryRange: z.string().nullable(),
+            valueRange: z.string().min(1),
+            chartType: z.enum(["bar", "line", "pie", "area", "scatter"]).nullable(),
+          }),
+        ),
+      }),
+      z.object({
+        kind: z.literal("filter"),
+        range: z.string().min(1),
+      }),
+    ]),
+  ),
+});
+
+const sheetMutationOutputSchema = sheetChangePatchOutputSchema.extend({
+  success: z.literal(true),
+  updatedCells: z.number().int().nonnegative().optional(),
+  clearedCells: z.number().int().nonnegative().optional(),
+  mergedRanges: z.array(z.string().min(1)).optional(),
+  unmergedRanges: z.array(z.string().min(1)).optional(),
+  preview: z
+    .object({
+      sheetId: z.number().int().positive(),
+      sheetName: z.string().min(1),
+      range: z.object({
+        startRow: z.number().int().positive(),
+        endRow: z.number().int().positive(),
+        startCol: z.number().int().positive(),
+        endCol: z.number().int().positive(),
+      }),
+      rows: z.array(
+        z.object({
+          row: z.number().int().positive(),
+          values: z.array(z.string()),
+        }),
+      ),
+      merges: z.array(
+        z.object({
+          startRow: z.number().int().positive(),
+          startCol: z.number().int().positive(),
+          endRow: z.number().int().positive(),
+          endCol: z.number().int().positive(),
+          clipped: z.boolean(),
+        }),
+      ),
+      truncated: z.boolean(),
+    })
+    .optional(),
+  previewLabel: z.string().optional(),
+});
+
+const workbookCreatedOutputSchema = z.object({
+  id: z.number().int().positive(),
+  publicId: z.string().min(1),
+  name: z.string(),
+  order: z.number().int().nonnegative(),
+  sheets: z.number().int().positive(),
+  initialSheet: z.object({
+    id: z.number().int().positive(),
+    sheetNo: z.number().int().positive(),
+    name: z.string(),
+    order: z.number().int().nonnegative(),
+  }),
+});
+
+const sheetCreatedOutputSchema = z.object({
+  workbookId: z.number().int().positive(),
+  id: z.number().int().positive(),
+  sheetNo: z.number().int().positive(),
+  name: z.string(),
+  order: z.number().int().nonnegative(),
+});
+
+const chartCreatedOutputSchema = z.object({
+  success: z.literal(true),
+  chartId: z.string().min(1),
+  workbookId: z.number().int().positive(),
+  sheetId: z.number().int().positive(),
+});
+
+const chartUpdatedOutputSchema = z.object({
+  success: z.literal(true),
+  chartId: z.string().min(1),
+});
+
+const chartDeletedOutputSchema = z.object({
+  success: z.literal(true),
+  chartId: z.string().min(1),
+});
+
 export type ExcelToolSpec = {
   description: string;
   inputSchema: z.ZodTypeAny;
-  needsRunContext?: boolean;
+  outputSchema: z.ZodTypeAny;
+  needsRunContext: boolean;
 };
 
 export const excelToolSpecs = {
@@ -217,6 +385,7 @@ export const excelToolSpecs = {
     description:
       "新建一个工作簿，并同时创建第一个 Sheet。仅在用户明确要求创建新工作簿时使用。可选地传入初始工作簿名称、初始 Sheet 名称，或者从已有 Sheet 复制初始结构。",
     needsRunContext: true,
+    outputSchema: workbookCreatedOutputSchema,
     inputSchema: z.object({
       name: z.string().trim().min(1).optional().describe("工作簿名称"),
       sheetName: z.string().trim().min(1).optional().describe("初始 Sheet 名称"),
@@ -232,6 +401,7 @@ export const excelToolSpecs = {
     description:
       "在指定工作簿中创建一个新的 Sheet。仅在用户明确要求新增 Sheet 时使用。可选地传入名称，或者从已有 Sheet 复制初始结构。",
     needsRunContext: true,
+    outputSchema: sheetCreatedOutputSchema,
     inputSchema: z.object({
       workbookId: z.coerce.number().int().positive().describe("工作簿 ID"),
       name: z.string().trim().min(1).optional().describe("Sheet 名称"),
@@ -253,6 +423,8 @@ export const excelToolSpecs = {
         .optional()
         .describe("上一次读取返回的 continuation；传入后继续同一目标范围"),
     }),
+    needsRunContext: false,
+    outputSchema: sheetReadOutputSchema,
   },
   findSheetCells: {
     description:
@@ -262,6 +434,8 @@ export const excelToolSpecs = {
       range: sheetDataRangeSchema.optional().describe("搜索范围，例如 A1:Z100；默认已使用区域"),
       query: sheetCellQuerySchema,
     }),
+    needsRunContext: false,
+    outputSchema: sheetCellMatchesOutputSchema,
   },
   readSheetObjects: {
     description:
@@ -270,11 +444,14 @@ export const excelToolSpecs = {
       sheetId: z.coerce.number().int().positive().describe("Sheet ID"),
       objectType: z.enum(["charts", "filters", "tables", "pivotTables"]),
     }),
+    needsRunContext: false,
+    outputSchema: sheetObjectOutputSchema,
   },
   writeCells: {
     description:
       "批量写入单元格内容。使用 operations 数组，支持 cell 离散写入和 range 连续区域填充同一个值或公式。value 可以是字符串、数字或布尔值；写公式时传入 formula，并且只有已知结果时才提供 value 作为缓存显示值。行号和列号都从 1 开始；该工具不修改样式、筛选、图表或其他 Excel 对象，也不负责通用公式重算；清空内容请使用 clearCells。",
     needsRunContext: true,
+    outputSchema: sheetMutationOutputSchema,
     inputSchema: z.object({
       sheetId: z.coerce.number().describe("Sheet ID"),
       operations: z
@@ -317,6 +494,7 @@ export const excelToolSpecs = {
     description:
       "清空单元格内容，不修改单元格的非内容属性。使用 operations 数组，cell 用于清空离散单格，range 用于清空连续区域。行号和列号都从 1 开始；如果要写入内容，请使用 writeCells。",
     needsRunContext: true,
+    outputSchema: sheetMutationOutputSchema,
     inputSchema: z.object({
       sheetId: z.coerce.number().describe("Sheet ID"),
       operations: z
@@ -344,6 +522,7 @@ export const excelToolSpecs = {
     description:
       "合并指定范围的单元格。使用 operations 数组，每项都是一个 range；合并后只有左上角单元格保留内容，范围内其他单元格的内容会被清除。该工具只处理合并状态和单元格内容，不修改样式或其他 Excel 对象；行号和列号都从 1 开始。",
     needsRunContext: true,
+    outputSchema: sheetMutationOutputSchema,
     inputSchema: z.object({
       sheetId: z.coerce.number().describe("Sheet ID"),
       operations: z
@@ -364,6 +543,7 @@ export const excelToolSpecs = {
     description:
       "取消指定范围内的单元格合并。使用 operations 数组，每项都是一个 range；取消后每个单元格独立，但不会恢复合并时已清除的非左上角内容。该工具不修改样式或其他 Excel 对象；行号和列号都从 1 开始。",
     needsRunContext: true,
+    outputSchema: sheetMutationOutputSchema,
     inputSchema: z.object({
       sheetId: z.coerce.number().describe("Sheet ID"),
       operations: z
@@ -384,12 +564,14 @@ export const excelToolSpecs = {
     description:
       '在工作簿中创建真实 Excel 图表。传入一个连续数据源矩形范围即可，系统会按 Excel 规则将首行作为系列标题、首列作为分类并生成多个系列；单行和单列范围也支持。anchor 必须是扁平对象，推荐使用 twoCell，例如 { kind: "twoCell", from: { row: 2, col: 8 }, to: { row: 16, col: 14 } }，不要传字符串范围或嵌套 oneOf。创建组合图时可额外传入 seriesTypes 指定每个系列为 bar、line 或 area，但不需要传入具体数据值。图表、系列和引用会作为独立对象保存，并可随工作簿导出为 XLSX；行列号从 1 开始，Sheet ID 必须是真实 ID。',
     needsRunContext: true,
+    outputSchema: chartCreatedOutputSchema,
     inputSchema: chartCreateSchema,
   },
   updateChart: {
     description:
       "修改已存在的真实 Excel 图表。只传入需要修改的字段；删除标题时传 null。不会把 ECharts 配置写入工作簿。",
     needsRunContext: true,
+    outputSchema: chartUpdatedOutputSchema,
     inputSchema: z.object({
       chartId: z.string().trim().min(1),
       patch: z.object({
@@ -404,11 +586,14 @@ export const excelToolSpecs = {
   deleteChart: {
     description: "删除指定的真实 Excel 图表，不修改图表引用的单元格数据。",
     needsRunContext: true,
+    outputSchema: chartDeletedOutputSchema,
     inputSchema: z.object({ chartId: z.string().trim().min(1) }),
   },
   listCharts: {
     description: "列出指定工作簿中的真实 Excel 图表及其数据引用。",
     inputSchema: z.object({ workbookId: z.coerce.number().int().positive() }),
+    needsRunContext: false,
+    outputSchema: z.array(chartSpecSchema),
   },
 } satisfies Record<string, ExcelToolSpec>;
 

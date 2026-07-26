@@ -16,7 +16,9 @@ describe("collectSheetPatchUpdates", () => {
         parts: [
           {
             toolCallId: "tool-1",
+            type: "tool-writeCells",
             state: "output-available",
+            input: { sheetId: 11 },
             output: {
               sheetInfo: { sheetId: 11, sheetNo: 2, sheetName: "Budget" },
               changeSummary: { changedCellCount: 1, rangeOperationCount: 0 },
@@ -33,7 +35,9 @@ describe("collectSheetPatchUpdates", () => {
         parts: [
           {
             toolCallId: "tool-2",
+            type: "tool-writeCells",
             state: "output-available",
+            input: { sheetId: 12 },
             output: {
               sheetInfo: { sheetId: 12, sheetNo: 3, sheetName: "Plan" },
               changeSummary: { changedCellCount: 0, rangeOperationCount: 0 },
@@ -63,7 +67,9 @@ describe("collectSheetPatchUpdates", () => {
         parts: [
           {
             toolCallId: "tool-3",
+            type: "tool-writeCells",
             state: "output-available",
+            input: { sheetId: 13 },
             output: {
               sheetInfo: { sheetId: 13, sheetNo: 4, sheetName: "Invalid" },
               changeSummary: { changedCellCount: 0, rangeOperationCount: 0 },
@@ -89,7 +95,9 @@ describe("collectSheetPatchUpdates", () => {
         parts: [
           {
             toolCallId: "tool-4",
+            type: "tool-clearCells",
             state: "output-available",
+            input: { sheetId: 14 },
             output: {
               sheetInfo: { sheetId: 14, sheetNo: 5, sheetName: "Clear" },
               changeSummary: { changedCellCount: 4, rangeOperationCount: 0 },
@@ -133,7 +141,7 @@ describe("collectWorkbookStructureUpdates", () => {
         parts: [
           {
             toolCallId: "tool-5",
-            toolName: "createWorkbook",
+            type: "tool-createWorkbook",
             state: "output-available",
             input: { sourceSheetId: 9 },
             output: {
@@ -151,9 +159,9 @@ describe("collectWorkbookStructureUpdates", () => {
         parts: [
           {
             toolCallId: "tool-6",
-            toolName: "createSheet",
+            type: "tool-createSheet",
             state: "output-available",
-            args: { workbookId: 21 },
+            input: { workbookId: 21 },
             output: {
               workbookId: 21,
               id: 89,
@@ -227,8 +235,9 @@ describe("collectWorkbookStructureUpdates", () => {
         parts: [
           {
             toolCallId: "tool-7",
-            toolName: "createWorkbook",
+            type: "tool-createWorkbook",
             state: "output-available",
+            input: {},
             output: {
               id: 22,
               name: "Broken",
@@ -255,7 +264,9 @@ describe("collectWorkbookMutationToolCallIds", () => {
         parts: [
           {
             toolCallId: "tool-10",
+            type: "tool-clearCells",
             state: "output-available",
+            input: { sheetId: 31 },
             output: {
               sheetInfo: { sheetId: 31, sheetNo: 1, sheetName: "Sheet1" },
               changeSummary: { changedCellCount: 1, rangeOperationCount: 0 },
@@ -267,8 +278,9 @@ describe("collectWorkbookMutationToolCallIds", () => {
           },
           {
             toolCallId: "tool-11",
-            toolName: "createSheet",
+            type: "tool-createSheet",
             state: "output-available",
+            input: {},
             output: {
               workbookId: 7,
               id: 32,
@@ -294,8 +306,9 @@ describe("collectWorkbookMutationToolCallIds", () => {
         parts: [
           {
             toolCallId: "tool-12",
-            toolName: "createWorkbook",
+            type: "tool-createWorkbook",
             state: "output-available",
+            input: {},
             output: {
               id: 41,
               name: "Budget",
@@ -320,7 +333,9 @@ describe("collectWorkbookRefreshToolCallIds", () => {
         parts: [
           {
             toolCallId: "tool-sheet",
+            type: "tool-writeCells",
             state: "output-available",
+            input: { sheetId: 31 },
             output: {
               sheetInfo: { sheetId: 31, sheetNo: 1, sheetName: "Sheet1" },
               changeSummary: { changedCellCount: 1, rangeOperationCount: 0 },
@@ -331,6 +346,7 @@ describe("collectWorkbookRefreshToolCallIds", () => {
             toolCallId: "tool-chart",
             type: "tool-updateChart",
             state: "output-available",
+            input: { chartId: "chart-1" },
             output: { success: true },
           },
         ],
@@ -352,7 +368,9 @@ describe("useSheetPatchSync", () => {
         parts: [
           {
             toolCallId: "historical-tool",
+            type: "tool-writeCells",
             state: "output-available",
+            input: { sheetId: 31 },
             output: {
               sheetInfo: { sheetId: 31, sheetNo: 1, sheetName: "Sheet1" },
               changeSummary: { changedCellCount: 1, rangeOperationCount: 0 },
@@ -369,7 +387,9 @@ describe("useSheetPatchSync", () => {
         parts: [
           {
             toolCallId: "new-tool",
+            type: "tool-writeCells",
             state: "output-available",
+            input: { sheetId: 31 },
             output: {
               sheetInfo: { sheetId: 31, sheetNo: 1, sheetName: "Sheet1" },
               changeSummary: { changedCellCount: 1, rangeOperationCount: 0 },
@@ -407,7 +427,9 @@ describe("useSheetPatchSync", () => {
         parts: [
           {
             toolCallId: "historical-tool",
+            type: "tool-writeCells",
             state: "output-available",
+            input: { sheetId: 31 },
             output: {
               sheetInfo: { sheetId: 31, sheetNo: 1, sheetName: "Sheet1" },
               changeSummary: { changedCellCount: 1, rangeOperationCount: 0 },
@@ -424,7 +446,9 @@ describe("useSheetPatchSync", () => {
         parts: [
           {
             toolCallId: "live-tool",
+            type: "tool-writeCells",
             state: "output-available",
+            input: { sheetId: 31 },
             output: {
               sheetInfo: { sheetId: 31, sheetNo: 1, sheetName: "Sheet1" },
               changeSummary: { changedCellCount: 1, rangeOperationCount: 0 },
@@ -458,7 +482,9 @@ describe("useSheetPatchSync", () => {
         parts: [
           {
             toolCallId: "current-tool",
+            type: "tool-writeCells",
             state: "output-available",
+            input: { sheetId: 31 },
             output: {
               sheetInfo: { sheetId: 31, sheetNo: 1, sheetName: "Sheet1" },
               changeSummary: { changedCellCount: 1, rangeOperationCount: 0 },
@@ -473,7 +499,9 @@ describe("useSheetPatchSync", () => {
       parts: [
         {
           toolCallId: "older-tool",
+          type: "tool-writeCells",
           state: "output-available",
+          input: { sheetId: 31 },
           output: {
             sheetInfo: { sheetId: 31, sheetNo: 1, sheetName: "Sheet1" },
             changeSummary: { changedCellCount: 1, rangeOperationCount: 0 },

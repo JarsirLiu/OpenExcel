@@ -20,10 +20,6 @@ export interface ToolAdapterHooks {
   }) => void | Promise<void>;
 }
 
-export interface ToolAdapterOptions {
-  validateInput?: boolean;
-}
-
 function throwIfAborted(signal: AbortSignal | undefined) {
   if (!signal?.aborted) return;
   const error = new Error("Agent run was cancelled");
@@ -52,7 +48,6 @@ export function createAgentToolSet(
   executor: ToolExecutor,
   executionContext: unknown,
   hooks: ToolAdapterHooks = {},
-  adapterOptions: ToolAdapterOptions = {},
 ): ToolSet {
   const tools = Object.fromEntries(
     definitions.map((definition) => [
@@ -72,23 +67,21 @@ export function createAgentToolSet(
             input,
           });
 
-          if (adapterOptions.validateInput !== false && definition.inputSchema) {
-            const validationResult = validateToolInput(
-              definition.inputSchema,
+          const validationResult = validateToolInput(
+            definition.inputSchema,
+            input,
+            definition.name,
+          );
+          if (!validationResult.success && validationResult.error) {
+            await hooks.onToolFinish?.({
+              toolName: definition.name,
+              toolCallId,
               input,
-              definition.name,
-            );
-            if (!validationResult.success && validationResult.error) {
-              await hooks.onToolFinish?.({
-                toolName: definition.name,
-                toolCallId,
-                input,
-                error: validationResult.error,
-              });
-              return toolErrorResult(validationResult.error);
-            }
-            input = validationResult.data;
+              error: validationResult.error,
+            });
+            return toolErrorResult(validationResult.error);
           }
+          input = validationResult.data;
 
           const executionOptions = {
             toolName: definition.name,

@@ -1,5 +1,12 @@
 import { type ExcelToolInput, type ExcelToolName, excelToolSpecs } from "@openexcel/core";
 import type { z } from "zod";
+import type { Prisma } from "../../infra/database/prismaTypes.js";
+import {
+  type RunToolContext,
+  runToolContextSchema,
+  type WorkspaceToolContext,
+  workspaceToolContextSchema,
+} from "./context.js";
 
 export type ToolResultBudgetContext = {
   maxTokens: number;
@@ -8,49 +15,64 @@ export type ToolResultBudgetContext = {
 
 export type ServerToolExecutionOptions<Context> = {
   context: Context;
+  db?: Prisma.TransactionClient;
   toolCallId?: string;
   abortSignal?: AbortSignal;
   resultBudget?: ToolResultBudgetContext;
 };
 
-export type ServerToolDefinition<Name extends ExcelToolName = ExcelToolName, Output = unknown> = {
+export type ServerToolContext<Name extends ExcelToolName> =
+  (typeof excelToolSpecs)[Name]["needsRunContext"] extends true
+    ? RunToolContext
+    : WorkspaceToolContext;
+
+type ServerToolOutput<Name extends ExcelToolName> = z.output<
+  (typeof excelToolSpecs)[Name]["outputSchema"]
+>;
+
+export type ServerToolDefinition<Name extends ExcelToolName = ExcelToolName> = {
   name: Name;
+  description: (typeof excelToolSpecs)[Name]["description"];
+  inputSchema: (typeof excelToolSpecs)[Name]["inputSchema"];
+  contextScope: "run" | "workspace";
+  contextSchema: z.ZodTypeAny;
+  outputSchema: (typeof excelToolSpecs)[Name]["outputSchema"];
+  execute(
+    input: ExcelToolInput<Name>,
+    options: ServerToolExecutionOptions<ServerToolContext<Name>>,
+  ): Promise<ServerToolOutput<Name>>;
+};
+
+/** Runtime view used after a heterogeneous manifest has been validated. */
+export type ServerToolRuntimeDefinition = {
+  name: ExcelToolName;
   description: string;
   inputSchema: z.ZodTypeAny;
+  contextScope: "run" | "workspace";
   contextSchema: z.ZodTypeAny;
   outputSchema: z.ZodTypeAny;
-  execute: (input: unknown, options?: unknown) => Promise<Output>;
+  execute(input: unknown, options: ServerToolExecutionOptions<unknown>): Promise<unknown>;
 };
 
-type ServerToolConfig<Context, Output, Name extends ExcelToolName> = {
-  contextSchema: z.ZodType<Context>;
-  outputSchema: z.ZodTypeAny;
+type ServerToolConfig<Name extends ExcelToolName> = {
   execute: (
     input: ExcelToolInput<Name>,
-    options: ServerToolExecutionOptions<Context>,
-  ) => Promise<Output>;
+    options: ServerToolExecutionOptions<ServerToolContext<Name>>,
+  ) => Promise<ServerToolOutput<Name>>;
 };
 
-export function defineServerTool<const Name extends ExcelToolName, Context, Output>(
+export function defineServerTool<const Name extends ExcelToolName>(
   name: Name,
-  config: ServerToolConfig<Context, Output, Name>,
-): ServerToolDefinition<Name, Output> {
+  config: ServerToolConfig<Name>,
+): ServerToolDefinition<Name> {
   const spec = excelToolSpecs[name];
   return {
     name,
     description: spec.description,
     inputSchema: spec.inputSchema,
-    contextSchema: config.contextSchema,
-    outputSchema: config.outputSchema,
-    execute: async (input, options) => {
-      const executionOptions =
-        options && typeof options === "object"
-          ? (options as ServerToolExecutionOptions<unknown>)
-          : { context: undefined };
-      return config.execute(input as ExcelToolInput<Name>, {
-        ...executionOptions,
-        context: executionOptions.context as Context,
-      });
-    },
+    contextScope: spec.needsRunContext ? "run" : "workspace",
+    contextSchema: spec.needsRunContext ? runToolContextSchema : workspaceToolContextSchema,
+    outputSchema: spec.outputSchema,
+    execute: config.execute,
   };
 }

@@ -6,11 +6,12 @@ import {
   type ToolExecutor,
   ToolResultBudget,
   toModelSafeJsonValue,
-  wrapToolSetWithResultBudget,
+  wrapToolExecutorWithResultBudget,
 } from "@openexcel/agent";
 import type { ExcelToolName } from "@openexcel/core";
 import { buildExcelToolCatalog } from "@openexcel/core";
 import { loadModelConfig } from "../../../config.js";
+import type { Prisma } from "../../../infra/database/prismaTypes.js";
 import {
   buildToolContexts,
   type ServerToolRegistry,
@@ -76,8 +77,6 @@ export function buildRunToolset(
     toolPolicies: { readSheetData: { kind: "paged-structured" } },
   });
 
-  const tools = wrapToolSetWithResultBudget(serverToolRegistry, toolResultBudget);
-
   const toolsContext = buildToolContexts(workspaceId, runId);
   const toolDefinitions = Object.values(serverToolRegistry).map(
     ({ name, description, inputSchema }) => ({
@@ -87,7 +86,7 @@ export function buildRunToolset(
     }),
   );
 
-  return { tools, toolResultBudget, toolsContext, toolDefinitions };
+  return { toolResultBudget, toolsContext, toolDefinitions };
 }
 
 export function createConcreteToolExecutor(
@@ -107,7 +106,11 @@ export function createConcreteToolExecutor(
         throw new Error(`Tool ${toolName} is not executable`);
       }
       const executionContext = requestContext as
-        | { toolContexts?: Record<string, unknown>; db?: unknown }
+        | {
+            toolContexts?: Record<string, unknown>;
+            db?: Prisma.TransactionClient;
+            resultBudget?: { maxTokens: number; policy: "generic" | "paged-structured" };
+          }
         | undefined;
       const baseContext = executionContext?.toolContexts?.[toolName] ?? toolsContext[tool.name];
       const parsedInput = tool.inputSchema.safeParse(input);
@@ -126,16 +129,12 @@ export function createConcreteToolExecutor(
             .join("; ")}`,
         );
       }
-      const context =
-        executionContext?.db == null ||
-        typeof parsedContext.data !== "object" ||
-        parsedContext.data === null
-          ? parsedContext.data
-          : { ...(parsedContext.data as Record<string, unknown>), db: executionContext.db };
       const output = await tool.execute(parsedInput.data, {
         toolCallId,
         abortSignal,
-        context,
+        context: parsedContext.data,
+        db: executionContext?.db,
+        resultBudget: executionContext?.resultBudget,
       });
       const parsedOutput = tool.outputSchema.safeParse(output);
       if (!parsedOutput.success) {
@@ -182,7 +181,7 @@ export async function streamChat(workspaceId: number, sessionId: number, turn: C
       runCancellation.abort(new Error("Agent run lease lost"));
     });
 
-    const { tools, toolResultBudget, toolsContext, toolDefinitions } = buildRunToolset(
+    const { toolResultBudget, toolsContext, toolDefinitions } = buildRunToolset(
       config,
       workspaceId,
       lease.run.id,
@@ -193,8 +192,11 @@ export async function streamChat(workspaceId: number, sessionId: number, turn: C
       resultBudget: toolResultBudget,
       workspaceId,
     };
-    const concreteToolExecutor = createConcreteToolExecutor(tools, toolsContext);
-    const toolExecutor = createIdempotentToolExecutor(lease.run.id, concreteToolExecutor);
+    const concreteToolExecutor = createConcreteToolExecutor(serverToolRegistry, toolsContext);
+    const toolExecutor = wrapToolExecutorWithResultBudget(
+      createIdempotentToolExecutor(lease.run.id, concreteToolExecutor),
+      toolResultBudget,
+    );
 
     const workspace = await loadWorkspaceChatContext(workspaceId);
     const resolvedMessages = resolveChatMessageReferences(transcript, workspace.workbooks);
