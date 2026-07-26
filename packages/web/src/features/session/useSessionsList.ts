@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { deleteSession, fetchSessions, type Session } from "@/api/sessions";
-import { usePendingSessionTitleRefresh } from "./usePendingSessionTitleRefresh";
 
 type RefreshMode = "background" | "authoritative";
 
 type RefreshOptions = {
   mode?: RefreshMode;
   resetCurrent?: boolean;
-  preserveCurrent?: boolean;
 };
 
 type ActiveRefresh = {
@@ -117,13 +115,6 @@ export function useSessionsList(workspaceId: number | null, initialSessions?: Se
           setSessions(list);
           if (options?.resetCurrent) {
             setCurrentSessionId(null);
-          } else if (!options?.preserveCurrent) {
-            setCurrentSessionId((prev) => {
-              if (prev !== null && list.some((session) => session.id === prev)) {
-                return prev;
-              }
-              return list[0]?.id ?? null;
-            });
           }
           return list;
         }
@@ -136,16 +127,10 @@ export function useSessionsList(workspaceId: number | null, initialSessions?: Se
     [workspaceId],
   );
 
-  usePendingSessionTitleRefresh({
-    hasPendingTitle: sessions.some((session) => session.titleStatus === "pending"),
-    refreshSessions: (options) => refreshSessions({ ...options, mode: "background" }),
-  });
-
   const handleNewSession = useCallback(() => {
     setCurrentSessionId(null);
     setHistoryOpen(false);
-    void refreshSessions({ resetCurrent: true });
-  }, [refreshSessions]);
+  }, []);
 
   const handleSelectSession = useCallback((id: number) => {
     setCurrentSessionId(id);
@@ -166,12 +151,10 @@ export function useSessionsList(workspaceId: number | null, initialSessions?: Se
   );
 
   const visibleSessions = workspaceReady ? sessions : [];
-  const visibleCurrentSessionId =
-    workspaceReady &&
-    currentSessionId != null &&
-    sessions.some((session) => session.id === currentSessionId)
-      ? currentSessionId
-      : null;
+  // The selected session is independent from the sidebar cache. A concurrent
+  // or temporarily stale list response must not replace the active conversation
+  // and cause its local stream projection to be cleared.
+  const visibleCurrentSessionId = workspaceReady ? currentSessionId : null;
 
   return {
     sessions: visibleSessions,

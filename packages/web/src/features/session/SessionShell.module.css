@@ -31,3 +31,7 @@
   max-height: 300px;
   overflow-y: auto;
 }
+
+.sessionError {
+  padding: 8px 12px 0;
+}

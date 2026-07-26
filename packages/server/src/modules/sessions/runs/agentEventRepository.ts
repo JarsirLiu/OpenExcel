@@ -83,9 +83,9 @@ export async function findAgentEventsByRun(runId: number) {
   });
 }
 
-export async function findAgentEventsForCheckpoint(runId: number) {
+export async function findAgentEventsForProjection(runId: number, afterSequence = -1) {
   const events = await prisma.agentEvent.findMany({
-    where: { runId, type: { in: ["message.delta", "reasoning.delta"] } },
+    where: { runId, sequence: { gt: afterSequence } },
     orderBy: { sequence: "asc" },
   });
   return events.map((event) => ({

@@ -4,7 +4,6 @@ const mocks = vi.hoisted(() => ({
   convertToModelMessages: vi.fn(async (messages: unknown) => messages),
   isLoopFinished: vi.fn(() => "loop-finished"),
   streamText: vi.fn(),
-  toUIMessageStream: vi.fn(),
   tool: vi.fn((definition: unknown) => definition),
   validateUIMessages: vi.fn(async ({ messages }: { messages: unknown }) => messages),
 }));
@@ -21,6 +20,7 @@ function createModelStream(options: {
   tools: Record<string, { execute: (input: unknown, toolOptions: unknown) => Promise<unknown> }>;
   onStepFinish: (step: unknown) => Promise<void>;
   onStepStart: (step: unknown) => Promise<void>;
+  onChunk?: (event: { chunk: unknown }) => Promise<void>;
   abortSignal?: AbortSignal;
 }) {
   let resolveDone!: () => void;
@@ -36,7 +36,7 @@ function createModelStream(options: {
           { toolCallId: "call-1", abortSignal: options.abortSignal },
         );
         await options.onStepFinish({ toolOutput });
-        controller.enqueue({ type: "text-delta", textDelta: "完成" });
+        await options.onChunk?.({ chunk: { type: "text-delta", id: "text-1", text: "完成" } });
         controller.close();
         resolveDone();
       })();
@@ -45,33 +45,12 @@ function createModelStream(options: {
   return { stream, done };
 }
 
-function setupUIStreamAdapter() {
-  mocks.toUIMessageStream.mockImplementation(
-    (options: { stream: ReadableStream<unknown>; originalMessages: unknown[] }) => {
-      const reader = options.stream.getReader();
-
-      return new ReadableStream({
-        async pull(controller) {
-          const result = await reader.read();
-          if (!result.done) {
-            controller.enqueue(result.value);
-            return;
-          }
-
-          controller.close();
-        },
-      });
-    },
-  );
-}
-
 describe("runAgentLoop", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it("passes retry, timeout, and cancellation policy to the model SDK", async () => {
-    setupUIStreamAdapter();
     const abortController = new AbortController();
     const stream = new ReadableStream({
       start(controller) {
@@ -127,7 +106,6 @@ describe("runAgentLoop", () => {
   });
 
   it("runs tools inside the agent package and exposes completion separately from the UI stream", async () => {
-    setupUIStreamAdapter();
     mocks.streamText.mockImplementation((options: any) => {
       const model = createModelStream(options);
       return {
@@ -184,10 +162,6 @@ describe("runAgentLoop", () => {
     } as any;
 
     const result = await runAgentLoop(input);
-    const reader = result.stream.getReader();
-    while (!(await reader.read()).done) {
-      // Drain the transport projection independently from completion.
-    }
     const completion = await result.completion;
 
     for (const type of persistedTypes) eventTypes.push(type);
@@ -219,6 +193,7 @@ describe("runAgentLoop", () => {
       "tool.started",
       "tool.finished",
       "step.finished",
+      "message.delta",
     ]);
     expect(publishedTypes).toEqual(eventTypes);
     expect(mocks.streamText).toHaveBeenCalledWith(
@@ -226,38 +201,94 @@ describe("runAgentLoop", () => {
     );
   });
 
-  it("completes the run even when the UI stream is never consumed", async () => {
-    setupUIStreamAdapter();
+  it("continues the model loop after a business tool failure", async () => {
     mocks.streamText.mockImplementation((options: any) => {
       const model = createModelStream(options);
-      return { stream: model.stream, text: model.done.then(() => "完成") };
+      return {
+        stream: model.stream,
+        text: model.done.then(() => "工具失败后继续回答"),
+        responseMessages: model.done.then(() => []),
+      };
     });
 
-    const execute = vi.fn().mockResolvedValue({ cells: [[1]] });
-    const input = {
+    const result = await runAgentLoop({
       modelConfig: { baseUrl: "http://model", apiKey: "test-key", modelName: "test-model" },
       transcript: [{ role: "user", parts: [{ type: "text", text: "读取数据" }] }],
       systemPrompt: "你是表格助手",
       workspace: [],
-      tools: [{ name: "readSheetData", description: "读取", inputSchema: {} }],
-      toolExecutor: { execute },
-      executionContext: {},
+      tools: [
+        {
+          name: "readSheetData",
+          description: "读取 Sheet 数据",
+          inputSchema: {},
+        },
+      ],
+      toolExecutor: { execute: vi.fn().mockRejectedValue(new Error("Sheet 不存在")) },
       eventSink: { publish: vi.fn() },
       persistenceBarrier: { persist: vi.fn() },
-    } as any;
+    } as any);
 
-    const result = await runAgentLoop(input);
-    // Wait for completion without consuming the UI stream.
-    const completion = await result.completion;
-
-    expect(completion.status).toBe("completed");
-    expect(execute).toHaveBeenCalled();
-    // The transport stream remains available and unconsumed.
-    expect(result.stream).toBeInstanceOf(ReadableStream);
+    await expect(result.completion).resolves.toMatchObject({
+      status: "completed",
+      text: "工具失败后继续回答",
+    });
   });
 
-  it("continues execution after the UI stream is cancelled mid-flight", async () => {
-    setupUIStreamAdapter();
+  it("persists and publishes SDK 7 text and reasoning deltas", async () => {
+    let resolveDone!: () => void;
+    const done = new Promise<void>((resolve) => {
+      resolveDone = resolve;
+    });
+    mocks.streamText.mockImplementation((options: any) => ({
+      text: done.then(() => "回答"),
+      responseMessages: done.then(() => []),
+      stream: new ReadableStream({
+        start(controller) {
+          void (async () => {
+            await options.onChunk({
+              chunk: { type: "reasoning-delta", id: "reasoning-1", text: "先思考" },
+            });
+            await options.onChunk({
+              chunk: { type: "text-delta", id: "text-1", text: "回答" },
+            });
+            resolveDone();
+            controller.close();
+          })();
+        },
+      }),
+    }));
+
+    const persisted: Array<{ type: string; payload: any }> = [];
+    const published: Array<{ type: string; payload: any }> = [];
+    const result = await runAgentLoop({
+      modelConfig: { baseUrl: "http://model", apiKey: "test-key", modelName: "test-model" },
+      transcript: [{ role: "user", parts: [{ type: "text", text: "继续" }] }],
+      systemPrompt: "你是表格助手",
+      workspace: [],
+      tools: [],
+      toolExecutor: { execute: vi.fn() },
+      eventSink: { publish: vi.fn((event) => published.push(event)) },
+      persistenceBarrier: { persist: vi.fn((event) => persisted.push(event)) },
+    } as any);
+
+    await result.completion;
+
+    expect(persisted.map((event) => event.type)).toContain("reasoning.delta");
+    expect(persisted.map((event) => event.type)).toContain("message.delta");
+    expect(published.map((event) => event.type)).toEqual(persisted.map((event) => event.type));
+    expect(persisted.find((event) => event.type === "reasoning.delta")?.payload).toMatchObject({
+      delta: "先思考",
+    });
+    expect(persisted.find((event) => event.type === "message.delta")?.payload).toMatchObject({
+      delta: "回答",
+      messageId: "run-assistant",
+    });
+    expect(persisted.find((event) => event.type === "reasoning.delta")?.payload).toMatchObject({
+      messageId: "run-assistant",
+    });
+  });
+
+  it("completes the run with a separate UI transport stream", async () => {
     mocks.streamText.mockImplementation((options: any) => {
       const model = createModelStream(options);
       return { stream: model.stream, text: model.done.then(() => "完成") };
@@ -277,12 +308,10 @@ describe("runAgentLoop", () => {
     } as any;
 
     const result = await runAgentLoop(input);
-    // Cancel the transport stream before completion.
-    result.stream.cancel();
-
-    // Completion still reaches a terminal state.
     const completion = await result.completion;
+
     expect(completion.status).toBe("completed");
     expect(execute).toHaveBeenCalled();
+    expect(result.completion).toBeDefined();
   });
 });

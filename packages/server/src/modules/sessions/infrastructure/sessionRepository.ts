@@ -61,9 +61,39 @@ export async function updateSessionNameIfUnchanged(
       id,
       workspaceId,
       name: { in: expectedNames },
-      titleStatus: "pending",
+      titleStatus: { not: "manual" },
     },
     data: { name, titleStatus: "generated" },
+  });
+  return result.count > 0;
+}
+
+export async function prepareSessionTitle(id: number, workspaceId: number, fallbackName: string) {
+  const result = await prisma.session.updateMany({
+    where: {
+      id,
+      workspaceId,
+      name: "新对话",
+      titleStatus: { not: "manual" },
+    },
+    data: { name: fallbackName, titleStatus: "pending" },
+  });
+  return result.count > 0;
+}
+
+export async function finalizeSessionTitleFallback(
+  id: number,
+  workspaceId: number,
+  fallbackName: string,
+) {
+  const result = await prisma.session.updateMany({
+    where: {
+      id,
+      workspaceId,
+      name: { in: ["新对话", fallbackName] },
+      titleStatus: "pending",
+    },
+    data: { name: fallbackName, titleStatus: "generated" },
   });
   return result.count > 0;
 }

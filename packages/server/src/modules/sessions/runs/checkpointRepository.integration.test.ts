@@ -21,8 +21,7 @@ describe("checkpointRepository (SQLite)", () => {
       CREATE TABLE "AgentRun" (
         "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
         "status" TEXT NOT NULL,
-        "lastEventSequence" INTEGER NOT NULL DEFAULT 0,
-        "transcriptSequence" INTEGER NOT NULL DEFAULT 0
+        "lastEventSequence" INTEGER NOT NULL DEFAULT -1
       );
     `);
     await database.prisma.$executeRawUnsafe(`
@@ -38,7 +37,7 @@ describe("checkpointRepository (SQLite)", () => {
       );
     `);
     await database.prisma.$executeRawUnsafe(
-      `INSERT INTO "AgentRun" ("status", "lastEventSequence", "transcriptSequence") VALUES ('running', 4, 0)`,
+      `INSERT INTO "AgentRun" ("status", "lastEventSequence") VALUES ('running', 4)`,
     );
   });
 
@@ -74,14 +73,15 @@ describe("checkpointRepository (SQLite)", () => {
     });
   });
 
-  it("advances the transcript boundary only within the persisted event range", async () => {
-    await expect(repository.advanceTranscriptSequence(1, 5)).resolves.toBe(false);
-    await expect(repository.advanceTranscriptSequence(1, 4)).resolves.toBe(true);
-    await expect(repository.advanceTranscriptSequence(1, 3)).resolves.toBe(false);
-
-    const runs = await database.prisma.$queryRaw<
-      { transcriptSequence: number }[]
-    >`SELECT "transcriptSequence" FROM "AgentRun" WHERE "id" = 1`;
-    expect(runs[0]?.transcriptSequence).toBe(4);
+  it("keeps the checkpoint boundary monotonic", async () => {
+    await expect(
+      repository.persistRunCheckpoint({
+        runId: 1,
+        checkpointSequence: 4,
+        transcript: [],
+        reasoning: "",
+        toolState: [],
+      }),
+    ).resolves.toBe(true);
   });
 });

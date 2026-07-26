@@ -48,7 +48,7 @@ The current codebase is intentionally small and focused:
 - `src/runtime/tools/toolAdapter.ts` - Agent tools to AI SDK tools
 - `src/runtime/tools/toolResultBudget.ts` - tool result token budgets and truncation
 - `src/runtime/events/events.ts` - provider-neutral event sequencing
-- `src/runtime/stream/uiStreamAdapter.ts` - UI message stream transport adapter
+- UI message stream transport 已由 server 的 AgentEvent NDJSON 订阅取代；Agent 只产生 provider-neutral 事件
 - `src/runtime/stream/referencePart.ts` - chat reference conversion
 - `src/runtime/errors/formatAIError.ts` - model error formatting
 

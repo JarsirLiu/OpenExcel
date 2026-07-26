@@ -8,13 +8,11 @@ import { createMentionSuggestion, type WorkbookSource } from "./SheetMentionList
 
 export function useChatComposer({
   isStreaming,
-  isSendDisabled = false,
   onSend,
   referenceCacheRevision,
   workspaceId,
 }: {
   isStreaming: boolean;
-  isSendDisabled?: boolean;
   onSend: (text: string, references: ChatReferenceTarget[]) => void;
   referenceCacheRevision: number;
   workspaceId: number;
@@ -70,12 +68,12 @@ export function useChatComposer({
     const editor = editorRef.current;
     if (isMentionOpenRef.current) return;
     const text = editor?.getText().trim() ?? "";
-    if (!text || isStreaming || isSendDisabled) return;
+    if (!text || isStreaming) return;
     const references = extractChatReferences(editor?.getJSON());
     editor?.commands.clearContent();
     editor?.commands.focus();
     onSend(text, references);
-  }, [isSendDisabled, isStreaming, onSend]);
+  }, [isStreaming, onSend]);
 
   const editor = useEditor({
     extensions: [

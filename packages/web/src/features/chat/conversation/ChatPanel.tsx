@@ -11,28 +11,23 @@ import styles from "./ChatPanel.module.css";
 
 export function ChatPanel({
   sessionId,
-  isDraft = false,
   initialCanUndo = false,
-  onDraftSessionCreated,
-  onRunSettled,
   onRegenerate,
 }: {
   sessionId: number | null;
-  isDraft?: boolean;
   initialCanUndo?: boolean;
-  onDraftSessionCreated?: (sessionId: number) => Promise<void> | void;
-  onRunSettled?: (sessionId: number) => Promise<void> | void;
   onRegenerate?: () => void;
 }) {
   const {
     workspaceId,
-    initialMessages,
     onWorkspaceRefresh,
     onSheetChanged,
     onUndoComplete,
     onAttachExcel,
     referenceCacheRevision,
     onNavigateSheet,
+    createSession,
+    activateSession,
   } = useSessionInfra();
 
   const {
@@ -40,7 +35,6 @@ export function ChatPanel({
     error,
     canUndo,
     isStreaming,
-    isDraftSessionTransitioning,
     initialLoaded,
     historicalToolCallIds,
     loadingOlder,
@@ -52,13 +46,9 @@ export function ChatPanel({
   } = useChatConversation({
     sessionId,
     workspaceId,
-    onDraftSessionCreated,
-    initialMessages,
+    onCreateSession: createSession,
+    onSessionActivated: activateSession,
     initialCanUndo,
-    onRunSettled: () => {
-      if (sessionId == null) return;
-      return onRunSettled?.(sessionId);
-    },
     onWorkspaceRefresh,
     onSheetChanged,
   });
@@ -108,7 +98,7 @@ export function ChatPanel({
         messages={messages}
         isStreaming={isStreaming}
         onRegenerate={onRegenerate}
-        onUndo={!isDraft && canUndo ? handleUndo : undefined}
+        onUndo={sessionId != null && canUndo ? handleUndo : undefined}
         isUndoing={isUndoing}
         loadingOlder={loadingOlder}
         hasOlder={hasOlder}
@@ -145,7 +135,6 @@ export function ChatPanel({
       <ChatComposer
         ref={composerRef}
         isStreaming={isStreaming}
-        isSendDisabled={isDraftSessionTransitioning}
         onSend={sendMessage}
         onStop={stop}
         onAttachExcel={onAttachExcel}

@@ -2,14 +2,14 @@
 
 - **优先级**：P1
 - **创建日期**：2026-07-24
-- **状态**：In Progress
+- **状态**：Implemented
 - **范围**：Agent completion、HTTP stream、run 终态、session lease、transcript、事件持久化和恢复
 
 ## 问题
 
 当前 Agent 的运行完成、UI stream 结束和 server run finalize 通过回调链连接：
 
-1. `packages/agent/src/runtime/loop/agentLoop.ts` 通过 `uiStreamAdapter` 的 `onEnd` 推动 completion；Agent 执行完成不应依赖客户端是否继续消费 HTTP stream。
+1. `packages/agent/src/runtime/loop/agentLoop.ts` 的 completion 曾与 UI stream 结束耦合；Agent 执行完成不应依赖客户端是否继续消费 HTTP stream。
 2. `packages/server/src/modules/sessions/chat/orchestration.ts` 在多个回调中分别记录终态、持久化 transcript、更新 undo checkpoint 和释放 lease，失败路径难以证明完整。
 3. 事件协议只有部分生命周期事件，`step.started`、工具请求和工具结果的语义、payload、顺序和回放规则没有统一定义。
 4. 客户端断流、lease 丢失、事件持久化失败和 transcript 持久化失败时，需要明确区分“运行已完成”和“等待恢复”。
@@ -22,7 +22,7 @@
 
 - Agent completion 独立于 UI stream 的消费和断开；
 - server 使用一个可重入的 finalizer，按固定顺序完成 transcript、run 终态和 lease 清理；
-- 事件协议由 Agent 统一生成，server 只负责持久化、UI stream 适配和内部投影；
+- 事件协议由 Agent 统一生成，server 只负责持久化、NDJSON 订阅和内部投影；
 - 持久化失败进入可诊断、可恢复状态，不把失败吞成 completed；
 - 工具副作用、授权、幂等账本、数据库事务和 undo 仍由 server 负责。
 
@@ -49,7 +49,7 @@
 5. 无论成功或失败，都在 `finally` 中释放 lease；
 6. finalizer 具备幂等保护，重复触发不能重复覆盖 transcript、终态或 undo checkpoint。
 
-UI stream 只负责向客户端传输已确认的事件和展示消息。客户端断开不能取消 server-owned Agent run；显式取消必须通过 server 的 cancel API 和 abort signal 完成。
+NDJSON stream 只负责向客户端传输已确认的事件。客户端断开不能取消 server-owned Agent run；显式取消必须通过 server 的 cancel API 和 abort signal 完成。
 
 ## 事件协议
 
@@ -66,7 +66,7 @@ UI stream 只负责向客户端传输已确认的事件和展示消息。客户�
 
 每个事件必须包含唯一 `eventId`、单调递增的 run 内 `sequence`、UTC 时间和版本化 payload。Agent 先等待 `PersistenceBarrier` 确认，再交给 server event sink；回放按 `sequence` 去重，不能重复执行工具副作用。
 
-`docs/agent-loop.md` 需要补充每类事件的 payload、终态转换、重复事件处理和断点回放规则。本 issue 不改变前端 UI message stream 的外部格式。
+`docs/agent-loop.md` 需要补充每类事件的 payload、终态转换、重复事件处理和断点回放规则。前端只消费 AgentEvent NDJSON，不再依赖 AI SDK UI message stream。
 
 ## 验收条件
 
@@ -87,11 +87,11 @@ UI stream 只负责向客户端传输已确认的事件和展示消息。客户�
 - 补充 completion、断流、lease 丢失和持久化失败测试；
 - 明确 `recovery_required` 的查询和恢复入口。
 
-### 阶段 2：解耦 Agent completion 与 UI stream
+### 阶段 2：解耦 Agent completion 与 HTTP stream
 
-- 让 Agent 内部执行生命周期不依赖 `uiStreamAdapter.onEnd`；
+- 让 Agent 内部执行生命周期不依赖 HTTP stream 的结束回调；
 - 让 `completion` 返回 canonical transcript 增量、终态和错误分类；
-- 保持 UI stream adapter 只做传输适配。
+- 保持 server AgentEvent stream 只做传输适配。
 
 ### 阶段 3：集中 server finalizer
 
@@ -191,4 +191,4 @@ Undo snapshot 增加统一预算：celldata 数量、JSON 字节数、合并区�
 
 - 本 issue 不实现 compaction；该能力仍按现有 P2 计划禁用；
 - 本 issue 不移动 Excel/Chart 具体工具到 `packages/agent`；
-- 本 issue 不改变前端 UI message stream 格式。
+- 本 issue 将前端传输收敛为 AgentEvent NDJSON，不再维护第二套 UI message stream 格式。

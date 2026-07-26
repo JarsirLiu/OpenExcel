@@ -21,10 +21,8 @@ import type {
   AgentRunResult,
   AgentTranscriptMessage,
 } from "../contracts.js";
-import { formatAIError } from "../errors/formatAIError.js";
 import { AgentPersistenceError, createOrderedAgentEventEmitter } from "../events/events.js";
 import { convertChatReferenceDataPart } from "../stream/referencePart.js";
-import { createUIStreamAdapter } from "../stream/uiStreamAdapter.js";
 import { createAgentToolSet } from "../tools/toolAdapter.js";
 
 export interface AgentLoopInput extends Omit<AgentRunnerInput, "workspace" | "transcript"> {
@@ -102,12 +100,26 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
   });
   const emitEvent = (type: Parameters<typeof createEventEmitter.emit>[0], payload: unknown) =>
     createEventEmitter.emit(type, payload);
+  // A model run is one assistant turn in the UI. Individual model steps may
+  // contribute text, reasoning, and tool parts, but they must not become
+  // separate assistant message entities.
+  const assistantMessageId = `${input.turnId ?? "run"}-assistant`;
   const tools = createAgentToolSet(input.tools, input.toolExecutor, input.executionContext, {
     onToolStart: async (event) => {
-      await createEventEmitter.emit("tool.started", event);
+      await createEventEmitter.emit("tool.started", {
+        ...event,
+        turnId: input.turnId,
+        stepIndex,
+        messageId: assistantMessageId,
+      });
     },
     onToolFinish: async (event) => {
-      await createEventEmitter.emit("tool.finished", event);
+      await createEventEmitter.emit("tool.finished", {
+        ...event,
+        turnId: input.turnId,
+        stepIndex,
+        messageId: assistantMessageId,
+      });
     },
   });
   const validatedMessages = await validateUIMessages({
@@ -121,6 +133,7 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
   await emitEvent("run.started", {
     droppedMessages: contextWindow.droppedMessages,
     droppedTurns: contextWindow.droppedTurns,
+    userMessage: normalizedMessages.at(-1),
   });
 
   let resolveCompletion!: (completion: AgentRunCompletion) => void;
@@ -133,6 +146,7 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
   let streamedReasoning = "";
   let stepIndex = 0;
   let aborted = false;
+  let failurePhase: "model" | "persistence" | undefined;
   const finish = (value: AgentRunCompletion) => {
     if (terminal) return;
     terminal = true;
@@ -162,24 +176,24 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
         stepNumber: stepIndex,
       });
     },
-    onChunk: async ({ chunk }: any) => {
-      if (chunk?.type === "text-delta" && typeof chunk.textDelta === "string") {
-        streamedText += chunk.textDelta;
+    onChunk: async ({ chunk }: { chunk: any }) => {
+      if (chunk.type === "text-delta") {
+        streamedText += chunk.text;
         await emitEvent("message.delta", {
           turnId: input.turnId ?? "unknown",
           stepIndex,
-          messageId: `${input.turnId ?? "run"}-assistant-${stepIndex}`,
+          messageId: assistantMessageId,
           partId: `${input.turnId ?? "run"}-text-${stepIndex}`,
-          delta: chunk.textDelta,
+          delta: chunk.text,
           text: streamedText,
         });
-      } else if (chunk?.type === "reasoning-delta" && typeof chunk.textDelta === "string") {
-        const delta = chunk.textDelta;
+      } else if (chunk.type === "reasoning-delta") {
+        const delta = chunk.text;
         streamedReasoning += delta;
         await emitEvent("reasoning.delta", {
           turnId: input.turnId ?? "unknown",
           stepIndex,
-          messageId: `${input.turnId ?? "run"}-assistant-${stepIndex}`,
+          messageId: assistantMessageId,
           partId: `${input.turnId ?? "run"}-reasoning-${stepIndex}`,
           delta,
           text: streamedReasoning,
@@ -196,17 +210,12 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
     },
     onError: async (error: unknown) => {
       loopError = error;
+      failurePhase = "model";
       await input.onError?.(error);
     },
   });
 
-  const stream = createUIStreamAdapter({
-    stream: result.stream,
-    tools,
-    originalMessages: persistenceMessages as unknown as AgentTranscriptMessage[],
-  });
-
-  // Completion is independent of the UI stream and waits for all tool steps.
+  // Completion drives the durable event stream and waits for all tool steps.
   const baseMessages = persistenceMessages as unknown as AgentTranscriptMessage[];
   void (async () => {
     try {
@@ -236,6 +245,8 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
         error: loopError,
         messages: finalMessages,
         isAborted,
+        failurePhase: loopError ? failurePhase : undefined,
+        failureStepIndex: loopError ? stepIndex : undefined,
       });
     } catch (error) {
       const isAborted = aborted || agentAbortController.signal.aborted;
@@ -263,9 +274,21 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
               : "execution",
         messages: baseMessages,
         isAborted: isAborted && flushError == null,
+        failurePhase:
+          isAborted && flushError == null
+            ? undefined
+            : flushError instanceof AgentPersistenceError || error instanceof AgentPersistenceError
+              ? "persistence"
+              : (failurePhase ?? "model"),
+        failureStepIndex:
+          isAborted && flushError == null
+            ? undefined
+            : failurePhase === "model"
+              ? stepIndex
+              : undefined,
       });
     }
   })();
 
-  return { stream, completion };
+  return { completion };
 }

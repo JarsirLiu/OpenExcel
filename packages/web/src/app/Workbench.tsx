@@ -49,8 +49,6 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
       session: routeData?.sessions
         ? {
             sessions: routeData.sessions,
-            messages: routeData.messages,
-            messageTotal: routeData.messageTotal,
           }
         : undefined,
     }),
@@ -239,7 +237,6 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
         style={{ width: "var(--chat-sidebar-width)" }}
         sessionWorkspace={session}
         onNavigateSheet={handleNavigateSheet}
-        initialMessages={domainInitial.session?.messages}
       />
     </div>
   );

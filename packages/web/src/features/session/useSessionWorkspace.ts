@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useRef } from "react";
-import type { Session } from "@/api/sessions";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { createSession as createSessionRequest, type Session } from "@/api/sessions";
 import { useSessionsList } from "./useSessionsList";
 
 export function useSessionWorkspace(
   workspaceId: number | null,
   onUndoComplete?: () => Promise<void> | void,
-  initial?: { sessions: Session[]; messages?: unknown[]; messageTotal?: number },
+  initial?: { sessions: Session[] },
 ) {
   const {
     sessions,
@@ -15,17 +15,12 @@ export function useSessionWorkspace(
     historyOpen,
     setHistoryOpen,
     refreshSessions,
-    handleNewSession: listNewSession,
     handleSelectSession: listSelectSession,
     handleDeleteSession: listDeleteSession,
   } = useSessionsList(workspaceId, initial?.sessions);
+  const [isCreatingSession, setIsCreatingSession] = useState(false);
+  const [sessionError, setSessionError] = useState<Error | undefined>();
   const initialSeededRef = useRef(false);
-  const currentSessionIdRef = useRef(currentSessionId);
-
-  useEffect(() => {
-    currentSessionIdRef.current = currentSessionId;
-  }, [currentSessionId]);
-
   // Seed initial sessions from route loader
   useEffect(() => {
     if (!initial || initialSeededRef.current) return;
@@ -40,31 +35,47 @@ export function useSessionWorkspace(
     if (workspaceId == null) {
       // Workspace unmounted — no-op, sessions will reset on next mount
     } else if (prevWorkspaceIdRef.current != null && prevWorkspaceIdRef.current !== workspaceId) {
+      setSessionError(undefined);
       refreshSessions({ resetCurrent: true });
     }
     prevWorkspaceIdRef.current = workspaceId;
   }, [workspaceId, refreshSessions]);
 
-  const handleDraftSessionCreated = useCallback(
-    async (sessionId: number) => {
-      const shouldActivate = currentSessionIdRef.current == null;
-      const list = await refreshSessions({
-        mode: "authoritative",
-        resetCurrent: shouldActivate,
-      });
-      if (shouldActivate && list.some((session) => session.id === sessionId)) {
-        setCurrentSessionId(sessionId);
-      }
+  const createSession = useCallback(async () => {
+    if (workspaceId == null) throw new Error("当前工作区不可用");
+    const session = await createSessionRequest(workspaceId);
+    setSessions((current) => [session, ...current.filter((item) => item.id !== session.id)]);
+    return session;
+  }, [setSessions, workspaceId]);
+
+  const activateSession = useCallback(
+    (sessionId: number) => {
+      setCurrentSessionId(sessionId);
+      setHistoryOpen(false);
     },
-    [refreshSessions, setCurrentSessionId],
+    [setCurrentSessionId, setHistoryOpen],
   );
 
   const handleNewSession = useCallback(() => {
-    listNewSession();
-  }, [listNewSession]);
+    if (isCreatingSession) return;
+
+    setIsCreatingSession(true);
+    setSessionError(undefined);
+    void createSession()
+      .then((session) => {
+        activateSession(session.id);
+      })
+      .catch((error) => {
+        setSessionError(error instanceof Error ? error : new Error(String(error)));
+      })
+      .finally(() => {
+        setIsCreatingSession(false);
+      });
+  }, [activateSession, createSession, isCreatingSession]);
 
   const handleSelectSession = useCallback(
     (id: number) => {
+      setSessionError(undefined);
       listSelectSession(id);
     },
     [listSelectSession],
@@ -77,19 +88,8 @@ export function useSessionWorkspace(
     [listDeleteSession],
   );
 
-  const handleRunSettled = useCallback(
-    async (_sessionId: number) => {
-      try {
-        await refreshSessions();
-      } catch (error) {
-        console.error("[session] Failed to refresh sessions after chat settlement:", error);
-      }
-    },
-    [refreshSessions],
-  );
-
   const handleUndoComplete = useCallback(async () => {
-    await refreshSessions({ mode: "authoritative", preserveCurrent: true });
+    await refreshSessions({ mode: "authoritative" });
     await onUndoComplete?.();
   }, [onUndoComplete, refreshSessions]);
 
@@ -99,11 +99,13 @@ export function useSessionWorkspace(
     historyOpen,
     setHistoryOpen,
     refreshSessions,
-    handleDraftSessionCreated,
-    handleRunSettled,
+    createSession,
+    activateSession,
     handleNewSession,
     handleSelectSession,
     handleDeleteSession,
     handleUndoComplete,
+    isCreatingSession,
+    sessionError,
   };
 }

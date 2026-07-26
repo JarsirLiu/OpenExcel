@@ -1,98 +1,244 @@
 import type { AgentEvent, AgentTranscriptMessage } from "@openexcel/agent";
 
-type StreamedPart = {
-  messageId: string;
-  partId: string;
-  type: "text" | "reasoning";
-  sequence: number;
-  text: string;
+type EventPayload = Record<string, unknown>;
+
+type ProjectedPart = {
+  firstSequence: number;
+  value: Record<string, unknown>;
 };
 
-function streamedPart(event: AgentEvent): StreamedPart | null {
-  if (event.type !== "message.delta" && event.type !== "reasoning.delta") return null;
-  if (!event.payload || typeof event.payload !== "object") return null;
+type ProjectedMessage = {
+  firstSequence: number;
+  parts: Map<string, ProjectedPart>;
+};
 
-  const payload = event.payload as {
-    delta?: unknown;
-    messageId?: unknown;
-    partId?: unknown;
-  };
-  if (typeof payload.delta !== "string" || typeof payload.messageId !== "string") return null;
+function payloadOf(event: AgentEvent): EventPayload | null {
+  return event.payload && typeof event.payload === "object"
+    ? (event.payload as EventPayload)
+    : null;
+}
 
+function stringValue(payload: EventPayload | null, key: string) {
+  const value = payload?.[key];
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function assistantMessageId(payload: EventPayload | null) {
+  return (
+    stringValue(payload, "messageId") ?? `${stringValue(payload, "turnId") ?? "run"}-assistant`
+  );
+}
+
+function upsertMessage(messages: Map<string, ProjectedMessage>, id: string, sequence: number) {
+  const existing = messages.get(id);
+  if (existing) return existing;
+  const created = { firstSequence: sequence, parts: new Map<string, ProjectedPart>() };
+  messages.set(id, created);
+  return created;
+}
+
+function projectDelta(messages: Map<string, ProjectedMessage>, event: AgentEvent) {
+  const payload = payloadOf(event);
+  const delta = stringValue(payload, "delta");
+  if (delta == null) return;
+
+  const messageId = assistantMessageId(payload);
   const partId =
-    typeof payload.partId === "string" ? payload.partId : `${payload.messageId}-${event.type}`;
-  return {
-    messageId: payload.messageId,
-    partId,
-    type: event.type === "reasoning.delta" ? "reasoning" : "text",
-    sequence: event.sequence,
-    text: payload.delta,
+    stringValue(payload, "partId") ??
+    `${messageId}-${event.type === "reasoning.delta" ? "reasoning" : "text"}`;
+  const message = upsertMessage(messages, messageId, event.sequence);
+  const existing = message.parts.get(partId);
+  if (existing) {
+    existing.value.text = `${String(existing.value.text ?? "")}${delta}`;
+    return;
+  }
+
+  message.parts.set(partId, {
+    firstSequence: event.sequence,
+    value: {
+      id: partId,
+      type: event.type === "reasoning.delta" ? "reasoning" : "text",
+      text: delta,
+    },
+  });
+}
+
+function projectToolEvent(messages: Map<string, ProjectedMessage>, event: AgentEvent) {
+  if (event.type !== "tool.started" && event.type !== "tool.finished") return;
+  const payload = payloadOf(event);
+  const toolCallId = stringValue(payload, "toolCallId");
+  const toolName = stringValue(payload, "toolName");
+  if (toolCallId == null || toolName == null) return;
+
+  const messageId = assistantMessageId(payload);
+  const message = upsertMessage(messages, messageId, event.sequence);
+  const partId = `tool-${toolCallId}`;
+  const existing = message.parts.get(partId);
+  const hasError = payload?.error != null;
+  const value = existing?.value ?? {
+    id: partId,
+    type: `tool-${toolName}`,
+    toolCallId,
+    state: "input-available",
+    input: payload?.input,
   };
+
+  if (event.type === "tool.finished") {
+    value.state = hasError ? "output-error" : "output-available";
+    if (hasError) value.errorText = String(payload?.error);
+    else value.output = payload?.output;
+  }
+
+  message.parts.set(partId, {
+    firstSequence: existing?.firstSequence ?? event.sequence,
+    value,
+  });
+}
+
+function orderedUniqueEvents(events: readonly AgentEvent[]) {
+  const seen = new Set<number>();
+  return [...events]
+    .sort((left, right) => left.sequence - right.sequence)
+    .filter((event) => {
+      if (seen.has(event.sequence)) return false;
+      seen.add(event.sequence);
+      return true;
+    });
 }
 
 export function projectStreamedAssistantMessages(
   events: readonly AgentEvent[],
 ): AgentTranscriptMessage[] {
-  const messages = new Map<
-    string,
-    {
-      firstSequence: number;
-      parts: Map<string, { firstSequence: number; type: "text" | "reasoning"; text: string }>;
-    }
-  >();
+  const messages = new Map<string, ProjectedMessage>();
 
-  for (const event of [...events].sort((left, right) => left.sequence - right.sequence)) {
-    const part = streamedPart(event);
-    if (!part) continue;
-    const message = messages.get(part.messageId) ?? {
-      firstSequence: part.sequence,
-      parts: new Map(),
-    };
-    const existingPart = message.parts.get(part.partId);
-    if (existingPart) existingPart.text += part.text;
-    else
-      message.parts.set(part.partId, {
-        firstSequence: part.sequence,
-        type: part.type,
-        text: part.text,
-      });
-    messages.set(part.messageId, message);
+  for (const event of orderedUniqueEvents(events)) {
+    if (event.type === "message.delta" || event.type === "reasoning.delta") {
+      projectDelta(messages, event);
+    } else {
+      projectToolEvent(messages, event);
+    }
   }
 
-  return [...messages.values()]
-    .sort((left, right) => left.firstSequence - right.firstSequence)
-    .map((message) =>
-      [...message.parts.values()]
-        .sort((left, right) => left.firstSequence - right.firstSequence)
-        .filter((part) => part.text.length > 0)
-        .map((part) => ({ type: part.type, text: part.text })),
-    )
-    .filter((parts) => parts.length > 0)
-    .map((message) => ({
+  return [...messages.entries()]
+    .sort(([, left], [, right]) => left.firstSequence - right.firstSequence)
+    .map(([id, message]) => ({
+      id,
       role: "assistant",
-      parts: message,
-    }));
+      parts: [...message.parts.values()]
+        .sort((left, right) => left.firstSequence - right.firstSequence)
+        .map((part) => part.value),
+    }))
+    .filter((message) => message.parts.length > 0);
+}
+
+function startedUserMessage(events: readonly AgentEvent[]) {
+  const event = orderedUniqueEvents(events).find((candidate) => candidate.type === "run.started");
+  const payload = payloadOf(event ?? ({} as AgentEvent));
+  const message = payload?.userMessage;
+  return message && typeof message === "object" ? (message as AgentTranscriptMessage) : null;
+}
+
+function containsMessage(
+  messages: readonly AgentTranscriptMessage[],
+  candidate: AgentTranscriptMessage,
+) {
+  if (typeof candidate.id !== "string") return false;
+  return messages.some((message) => message.id === candidate.id);
+}
+
+function mergeProjectedMessages(
+  base: AgentTranscriptMessage[],
+  projected: AgentTranscriptMessage[],
+) {
+  for (const next of projected) {
+    const messageIndex = base.findIndex((message) => message.id === next.id);
+    if (messageIndex < 0) {
+      base.push(next);
+      continue;
+    }
+
+    const current = base[messageIndex];
+    if (current.role !== "assistant" || !Array.isArray(current.parts)) {
+      base.push(next);
+      continue;
+    }
+
+    const parts = current.parts.map((part) => ({ ...part })) as Record<string, unknown>[];
+    for (const nextPart of Array.isArray(next.parts) ? next.parts : []) {
+      const partId =
+        typeof nextPart.id === "string"
+          ? nextPart.id
+          : typeof nextPart.toolCallId === "string"
+            ? `tool-${nextPart.toolCallId}`
+            : undefined;
+      const partIndex =
+        partId == null
+          ? -1
+          : parts.findIndex(
+              (part) =>
+                part.id === partId ||
+                (typeof part.toolCallId === "string" && `tool-${part.toolCallId}` === partId),
+            );
+
+      if (partIndex < 0) {
+        parts.push(nextPart as Record<string, unknown>);
+        continue;
+      }
+
+      const currentPart = parts[partIndex];
+      if (nextPart.type === "text" || nextPart.type === "reasoning") {
+        currentPart.text = `${String(currentPart.text ?? "")}${String(nextPart.text ?? "")}`;
+      } else {
+        parts[partIndex] = nextPart as Record<string, unknown>;
+      }
+    }
+    base[messageIndex] = { ...current, parts };
+  }
+  return base;
+}
+
+/** Builds the canonical transcript from the same durable events used by history replay. */
+export function projectRunTranscript(
+  events: readonly AgentEvent[],
+  baseTranscript: readonly AgentTranscriptMessage[],
+  fallbackTranscript?: AgentTranscriptMessage[],
+) {
+  const base = [...baseTranscript];
+  const userMessage = startedUserMessage(events);
+  if (userMessage && !containsMessage(base, userMessage)) base.push(userMessage);
+
+  const streamed = projectStreamedAssistantMessages(events);
+  return streamed.length > 0
+    ? mergeProjectedMessages(base, streamed)
+    : (fallbackTranscript ?? base);
 }
 
 export function projectRunCheckpoint(
   events: readonly AgentEvent[],
   transcript: AgentTranscriptMessage[],
+  base?: Pick<
+    import("./checkpointRepository.js").RunCheckpoint,
+    "checkpointSequence" | "reasoning" | "toolState"
+  >,
 ) {
-  let reasoning = "";
-  const toolState: unknown[] = [];
-
-  for (const event of events) {
-    if (event.type === "reasoning.delta" && event.payload && typeof event.payload === "object") {
-      const delta = (event.payload as { delta?: unknown }).delta;
-      if (typeof delta === "string") reasoning += delta;
-      continue;
+  let reasoning = base?.reasoning ?? "";
+  const toolState: unknown[] = [...(base?.toolState ?? [])];
+  for (const event of orderedUniqueEvents(events)) {
+    const payload = payloadOf(event);
+    if (event.type === "reasoning.delta") {
+      const delta = stringValue(payload, "delta");
+      if (delta != null) reasoning += delta;
     }
-    if (event.type !== "message.delta")
+    if (event.type === "tool.started" || event.type === "tool.finished") {
       toolState.push({ type: event.type, payload: event.payload });
+    }
   }
 
   return {
-    checkpointSequence: events.at(-1)?.sequence ?? 0,
+    checkpointSequence: events.reduce(
+      (max, event) => Math.max(max, event.sequence),
+      base?.checkpointSequence ?? -1,
+    ),
     transcript,
     reasoning,
     toolState,

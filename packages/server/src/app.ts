@@ -35,7 +35,7 @@ export async function createApp() {
 
   await app.register(cors, {
     origin: true,
-    exposedHeaders: ["X-OpenExcel-Session-Id", "X-OpenExcel-Session-Name", "X-OpenExcel-Run-Id"],
+    exposedHeaders: ["X-OpenExcel-Run-Id"],
   });
   await app.register(multipart, {
     limits: {

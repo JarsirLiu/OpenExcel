@@ -40,6 +40,7 @@ export type AgentTimeoutConfiguration =
 export type AgentRunStatus = "completed" | "cancelled" | "failed";
 
 export type AgentFailureKind = "execution" | "persistence";
+export type AgentFailurePhase = "model" | "persistence";
 
 export interface AgentRunCompletion {
   status: AgentRunStatus;
@@ -48,10 +49,12 @@ export interface AgentRunCompletion {
   messages?: AgentTranscriptMessage[];
   isAborted: boolean;
   failureKind?: AgentFailureKind;
+  failurePhase?: AgentFailurePhase;
+  failureStepIndex?: number;
 }
 
 export interface AgentRunResult {
-  stream: ReadableStream<any>;
+  /** Completion is independent from the HTTP subscriber. Events are emitted through AgentEventSink. */
   completion: Promise<AgentRunCompletion>;
 }
 

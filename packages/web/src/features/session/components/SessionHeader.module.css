@@ -94,6 +94,15 @@
   opacity: 0.85;
 }
 
+.plusBtnSolid:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.plusBtnLoading {
+  pointer-events: none;
+}
+
 .plusBtnIcon {
   display: inline-flex;
   align-items: center;

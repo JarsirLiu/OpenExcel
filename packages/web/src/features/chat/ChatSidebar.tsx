@@ -21,7 +21,6 @@ export function ChatSidebar({
   style,
   sessionWorkspace,
   onNavigateSheet,
-  initialMessages,
 }: {
   onWorkspaceRefresh?: () => Promise<void> | void;
   onSheetChanged?: (
@@ -37,7 +36,6 @@ export function ChatSidebar({
   style?: React.CSSProperties;
   sessionWorkspace: SessionWorkspaceState;
   onNavigateSheet?: (sheetId: number) => void;
-  initialMessages?: unknown[];
 }) {
   return (
     <div className={styles.sidebar} style={style}>
@@ -51,7 +49,6 @@ export function ChatSidebar({
         currentUser={currentUser}
         onLogout={onLogout}
         onNavigateSheet={onNavigateSheet}
-        initialMessages={initialMessages}
       />
     </div>
   );

@@ -21,6 +21,14 @@ export async function fetchSessions(
   return res.json();
 }
 
+export async function createSession(workspaceId: number): Promise<Session> {
+  const res = await apiFetch(`/workspaces/${workspaceId}/sessions`, {
+    method: "POST",
+  });
+  if (!res.ok) throw new Error(await readErrorMessage(res, "创建会话失败"));
+  return res.json();
+}
+
 export async function deleteSession(workspaceId: number, id: number): Promise<void> {
   const res = await apiFetch(`/workspaces/${workspaceId}/sessions/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error("删除会话失败");

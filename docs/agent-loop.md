@@ -29,20 +29,20 @@
 - `AgentStep` 记录模型步骤、工具名、输入、输出和顺序。
 - workbook、sheet、chart 工具都由 `packages/server` 注册和执行。
 - 工具产生的工作簿修改和撤销快照由服务端持久化。
-- `AgentRunCheckpoint` 保存事件投影后的可恢复 transcript。
-- `packages/agent` 负责模型调用、工具循环、上下文预算和 UI stream 转换。
-- `packages/web` 使用 AI SDK React hooks 消费流并渲染消息、工具状态和工作簿刷新。
+- `AgentRunCheckpoint` 保存事件投影后的可恢复 transcript 和 `checkpointSequence` 游标。
+- `packages/agent` 负责模型调用、工具循环、上下文预算和 provider-neutral 事件。
+- `packages/web` 通过 `ConversationStore` 消费确认后的事件并渲染消息、工具状态和工作簿刷新。
 
 当前实现中的旧状态名（例如 `error`、`aborted`）与目标协议中的
 `failed`、`cancelled` 不是可以混用的同义词。迁移时必须在服务端状态边界
 显式映射并补齐诊断字段；新代码不得通过字符串比较偷偷引入第三套状态。
 
-当前单轮请求边界已经切换，但实时展示和历史投影仍未完全统一：
+当前单轮请求、实时展示和历史投影已经统一到 AgentEvent：
 
 - transport 已只发送当前 user turn；前端 `messages[]` 不再是模型上下文。
-- `useChat.messages` 仍是 AI SDK 的浏览器内存展示状态，不能作为持久化权威。
-- 服务端 AgentEvent 已具备增量持久化基础，但实时 UI stream 与 AgentEvent 仍是两条生成路径。
-- 历史接口读取 checkpoint；checkpoint 尚未做到每个持久化边界都可立即读取，stale-run recovery 也尚未自动完成事件投影。
+- `ConversationStore` 是 AgentEvent 到 UI 消息的唯一前端投影，不是持久化权威。
+- 服务端只在 persistence barrier 成功后发布 AgentEvent，实时流和历史 checkpoint 使用同一事件语义。
+- 历史接口只读取 checkpoint；恢复流程会从最后 checkpoint 游标继续投影已落库事件。
 
 “临时消息”不是“前端仍然组装上下文”的同义词。当前必须删除前端上下文和恢复职责，保留展示所需的状态；目标是让展示状态由与历史相同的 AgentEvent 投影语义驱动。
 
@@ -54,7 +54,7 @@
 - 服务端从最近一次 run checkpoint 读取 canonical transcript，在创建 `AgentRun` 前追加本轮 user message。
 - `packages/agent` 提供 `AgentRunner` 入口，在包内组装 workspace context、system prompt 和模型上下文。
 - 服务端 chat adapter 只负责资源加载、工具注入、运行记录和流适配；不再向 AgentRunner 传入浏览器历史。
-- 前端 transport 只发送当前 user turn；当前本地 `messages` 仅是过渡期展示状态，`onRunSettled` 不再接收消息数组，也不能用它覆盖服务端历史。
+- 前端只发送当前 user turn，`ConversationStore` 只保存当前页面的事件投影，不能覆盖服务端历史。
 
 本阶段已经补齐 AgentEvent 和 AgentToolExecution 的基础服务端持久化。事件持久化适配器会在同一事务中写入
 AgentEvent 和对应 AgentStep；工具账本会对 `(runId, toolCallId)` 做参数校验、完成结果回放和 stale running 回收。
@@ -81,7 +81,7 @@ AgentEvent 和对应 AgentStep；工具账本会对 `(runId, toolCallId)` 做参
 - 收集用户明确选择的 workbook、sheet 引用 ID。
 - 生成本次请求的 `requestId` 或幂等键。
 - 展示用户消息、assistant 文本、reasoning、tool call 和 tool result。
-- 消费后端的 UI message stream 或 Agent event stream。
+- 消费后端确认后的 AgentEvent NDJSON stream。
 - 在后端工具事件确认后刷新工作簿。
 - 连接断开后重新读取服务端 transcript、run 和工作簿状态。
 - 管理输入框、滚动、展开状态和其他纯 UI 状态。
@@ -95,8 +95,8 @@ AgentEvent 和对应 AgentStep；工具账本会对 `(runId, toolCallId)` 做参
 - 将本地 `messages[]` 作为服务端 transcript 的权威副本。
 - 根据本地消息决定 Agent 是否继续下一步。
 
-`useChat` 可以继续保留，但它在前端只能作为流式 UI 状态容器和渲染适配器，不能成为 Agent
-状态机或会话数据库。
+前端不使用 AI SDK React 消息状态承载 Agent 流；`ConversationStore` 是唯一消息投影入口，不能成为
+Agent 状态机或会话数据库。
 
 ### 2.2 Server 负责什么
 
@@ -129,7 +129,7 @@ AgentEvent 和对应 AgentStep；工具账本会对 `(runId, toolCallId)` 做参
 - 通用工具调用协议、工具循环和停止条件；不拥有 Excel 工具目录或业务权限。
 - 模型限流错误分类、指数退避和单次运行的重试预算。
 - 把工具请求交给注入的 `ToolExecutor`，接收结果后继续循环。
-- 产出与传输无关的 Agent 事件，以及可选的 AI SDK UI stream 适配。
+- 产出与传输无关的 Agent 事件；HTTP 传输由 server 适配。
 
 Agent 包使用 Vercel AI SDK 作为内部模型执行引擎。当前实现使用
 `streamText`、`stopWhen` 和 AI SDK 的多步工具执行能力；后续可以在不改变
@@ -170,7 +170,7 @@ packages/agent/src/
 │  ├─ loop/                # 一次运行的 facade 和模型/工具 loop
 │  ├─ tools/               # 通用 tool contract -> AI SDK ToolSet
 │  ├─ events/              # provider-neutral AgentEvent 和序列
-│  ├─ stream/              # Agent 输出 -> AI SDK UI message stream
+│  ├─ stream/              # Agent 输出的 provider-specific 辅助转换
 │  ├─ contracts.ts         # Agent 输入、端口和运行结果协议
 │  └─ model/               # provider/model resolver
 ├─ prompt/
@@ -193,8 +193,8 @@ packages/agent/src/
   server 不直接把 AI SDK `ToolSet` 传入 AgentRunner。
 - `events.ts` 只定义事件结构和事件序列，不落数据库，也不发送 HTTP。
 - `retryPolicy.ts` 只决定 provider/Agent 调用是否可重试，不执行工具、不修改 run 状态。
-- `uiStreamAdapter.ts` 只负责传输格式转换；UI stream 不是 canonical transcript，也不是
-  Agent 状态机。
+- server 的 `agentEventStream.ts` 只负责确认事件的 HTTP 订阅传输；事件流不是 canonical transcript，
+  也不是 Agent 状态机。
 - `session/` 和 `prompt/` 中的 context/prompt 构造必须保持纯函数，不读取数据库或浏览器状态。
 - Excel capability contract、工具名称、输入 schema、所需能力和资源范围属于
   `packages/core`；Agent runtime 不拥有 Excel 工具目录，也不导入 `packages/core` 的业务模块。
@@ -209,7 +209,7 @@ AgentRunner
 ```
 
 `AgentRunner` 可以依赖 `agentLoop`，但 `agentLoop` 不能反向依赖 server；
-`uiStreamAdapter` 只能被需要 UI stream 的 server transport 使用，Agent 核心不能依赖 React。
+Agent 核心只依赖抽象的 `AgentEventSink` 和 `PersistenceBarrier`，不能依赖 React 或 HTTP。
 
 ## 3. 目标数据流
 
@@ -224,7 +224,7 @@ Server route
        ↓
 Session application service
   ├─ 读取最近 AgentRunCheckpoint.transcript
-  ├─ 去重 requestId/messageId
+  ├─ 去重 requestId/message.id
   ├─ 追加本轮 user message
   ├─ 创建 AgentRun
   └─ 保存完整 canonical transcript
@@ -300,7 +300,7 @@ type ChatTurnRequest = {
 };
 
 type UserTurnInput = {
-  messageId: string;
+  id: string;
   role: "user";
   parts: Array<
     | { type: "text"; text: string }
@@ -311,30 +311,32 @@ type UserTurnInput = {
 
 这是一个独立的请求 DTO，不直接复用 AI SDK `UIMessage`。服务端必须使用运行时 schema 校验：
 
-- `requestId`、`messageId` 非空且长度受限；`requestId` 在同一 workspace/session 内唯一。
+- `requestId`、`message.id` 非空且长度受限；`requestId` 在同一 workspace/session 内唯一。
 - `role` 必须是 `user`；parts 只允许文本和受限的引用 part。
 - 引用只能携带稳定的 workbook/sheet 公共 ID，不接受名称、TipTap 节点、模型消息或客户端权限字段。
 - 服务端拒绝 assistant、system、tool-call、tool-result、reasoning 等客户端伪造 part。
 - 相同 `requestId` 重试时必须校验请求体哈希；相同 ID 配不同内容返回冲突，不能覆盖原请求。
 
-服务端负责生成 canonical message 的时间、来源和运行关联字段。前端的 `messageId` 只用于本轮去重，
-不能成为权限、工具结果或历史内容的权威来源。
+`message.id` 是消息实体的稳定标识，前端实时投影、服务端 canonical transcript 和历史回放统一使用它。
+`messageId` 只出现在 AgentEvent payload 中，表示事件作用于哪个消息；它不是另一套消息实体标识。
+服务端仍负责权限、引用解析、运行关联和 canonical transcript 的持久化，不能把客户端请求当作完整历史。
 
-草稿会话和已存在会话可以继续使用现有两个 HTTP 路径，但必须采用相同的单轮请求契约：
+前端的空白新对话只是尚未激活会话的本地 UI 状态。第一次发送前先创建正式 `Session`，随后所有聊天请求都使用正式会话路径；不存在 draft chat 双轨：
 
 ```http
-POST /api/workspaces/:workspacePublicId/sessions/draft/chat
+POST /api/workspaces/:workspacePublicId/sessions
 POST /api/workspaces/:workspacePublicId/sessions/:sessionPublicId/chat
 ```
 
-`Idempotency-Key` 或请求体中的 `requestId` 必须覆盖草稿和已存在会话，而不是只覆盖草稿创建。
+创建会话只创建会话记录，不启动 Agent、不创建 Run。`requestId` 只约束正式 chat turn；重试时必须校验请求体哈希，相同 ID 配不同内容返回冲突，不能覆盖原请求。
 
 ### 4.2 流式响应
 
-当前仍可以使用 AI SDK UI message stream 作为传输适配，但它不是历史事实源：
+OpenExcel 的实时响应直接传输 persistence barrier 确认后的 AgentEvent，不再使用 AI SDK UI
+message stream 作为第二条事实流：
 
-- stream 是当前订阅者的展示传输；事件持久化和历史投影必须独立完成。
-- 前端只消费和渲染 stream，不把 AI SDK 临时 `messages` 作为上下文或恢复输入。
+- 实时 UI 和历史投影都消费同一套有序 AgentEvent；checkpoint 是事件日志的服务端读模型。
+- 前端只消费 AgentEvent 并通过 ConversationStore 渲染，不把 AI SDK 临时 `messages` 作为上下文或恢复输入。
 - `originalMessages` 等 AI SDK 参数不能成为前端历史覆盖数据库的理由。
 - 浏览器断流只表示当前 UI 订阅消失；客户端不能因此取消 run，也不能把本地消息重新提交为权威 transcript。
 
@@ -345,8 +347,8 @@ Prisma 或 HTTP 字段；server 持久化适配器负责补充 run 身份、序�
 type AgentEvent =
   | { type: "run.started"; payload: { droppedMessages: number; droppedTurns: number } }
   | { type: "step.started"; payload: { stepNumber: number } }
-  | { type: "tool.started"; payload: { toolName: string; toolCallId: string; input: unknown } }
-  | { type: "tool.finished"; payload: { toolName: string; toolCallId: string; input: unknown; output?: unknown; error?: unknown } }
+  | { type: "tool.started"; payload: ToolEventPayload }
+  | { type: "tool.finished"; payload: ToolEventPayload }
   | { type: "step.finished"; payload: StepPayload }
   | { type: "message.delta"; payload: MessageDeltaPayload }
   | { type: "reasoning.delta"; payload: ReasoningDeltaPayload };
@@ -360,6 +362,17 @@ type MessageDeltaPayload = {
 };
 
 type ReasoningDeltaPayload = MessageDeltaPayload;
+
+type ToolEventPayload = {
+  turnId: string;
+  stepIndex: number;
+  messageId: string;
+  toolName: string;
+  toolCallId: string;
+  input: unknown;
+  output?: unknown;
+  error?: unknown;
+};
 
 type StepPayload = {
   stepType: "text" | "tool-call" | "tool-result";
@@ -402,6 +415,8 @@ type PersistedAgentEvent = {
    - `input`: 工具输入参数
    - `output?`: 成功时的工具输出（与error互斥）
    - `error?`: 失败时的错误信息（与output互斥）
+   - 工具业务失败会作为模型可消费的结构化 tool result 返回，模型可以继续下一步或解释失败；
+     取消和事件/运行持久化失败仍然立即终止 Agent run。
 
 4. **step.started**: 模型步骤开始前触发，只携带步骤序号，不携带 provider request、workspace 数据或完整消息
    - `stepNumber`: 当前模型步骤序号
@@ -416,7 +431,9 @@ type PersistedAgentEvent = {
 
 6. **运行终态不属于 Agent 内部执行事件**：Agent 通过 `completion.status` 返回
    `completed`、`failed` 或 `cancelled`；server finalizer 再按统一持久化顺序创建唯一的
-   `run.completed`、`run.failed` 或 `run.cancelled` durable protocol event。它们属于
+   `run.completed`、`run.failed` 或 `run.cancelled` durable protocol event。`run.failed`
+   必须保留 `failurePhase` 和可选的 `failureStepIndex`，用于区分模型继续生成失败与
+   事件持久化失败。它们属于
    对外事件流的生命周期协议，类似 Eve 的 `turn.cancelled`，但 Agent 不得自行创建这些
    server durable event，避免 Agent loop、HTTP orchestration 和 finalizer 重复收敛。
 
@@ -443,11 +460,20 @@ type PersistenceBarrier = {
 };
 ```
 
-`sequence` 在一个 run 内单调递增，`eventId` 全局唯一。客户端按 `sequence` 去重，不按到达次数追加
-消息。事件必须包含足够的工具输入、工具结果或错误信息，使服务端可以重建运行状态；敏感数据按日志策略
+`messageId` 表示一次用户 turn 对应的唯一 assistant 消息实体，整个 Agent run 内保持不变。
+模型的多个 `step` 只能通过不同的 `partId`（例如不同 step 的文本或 reasoning part）区分；
+tool.started/tool.finished 也必须携带同一个 `messageId`，这样实时投影和历史投影才能把文本、
+思考过程、多个工具卡片及最终回答组合成一条助手消息。`stepIndex` 仅用于执行顺序和诊断，
+不能作为 assistant 消息 ID 的一部分。
+
+`sequence` 在一个 run 内单调递增，`eventId` 全局唯一。HTTP 事件信封同时携带 `runId`，客户端按
+`(runId, sequence)` 去重，不按到达次数追加消息；不能把不同 run 的局部 sequence 当成全局游标。
+事件必须包含足够的工具输入、工具结果或错误信息，使服务端可以重建运行状态；敏感数据按日志策略
 脱敏，不能为了回放把未授权 workbook 数据直接暴露给浏览器。
 
-UI message stream 只是当前浏览器的订阅，不是历史加载接口，也不是把 Agent loop 下放到浏览器。
+事件 sequence 从 `0` 开始。`lastEventSequence` 是事件日志已落库的最大序号，
+`checkpointSequence` 是消息投影已完成的最大序号；首次 checkpoint 的游标必须为 `-1`。
+checkpoint 内容和游标必须在同一个数据库事务中提交。浏览器断流只影响订阅，不取消 server-owned run。
 目标状态是 persistence barrier 成功后发布同一个 AgentEvent，前端 ConversationStore 按事件投影；
 历史由服务端使用同一事件语义生成 checkpoint。浏览器关闭、网络断开或组件卸载时，订阅可以结束，
 但不能触发 run cancel；Agent 继续使用服务端的 AbortSignal、事件持久化和 checkpoint/finalizer
@@ -472,7 +498,7 @@ POST /api/workspaces/:workspacePublicId/sessions/:sessionPublicId/runs/:runId/ca
 
 1. 路由完成 workspace/session 授权和请求校验。
 2. 服务端取得 session 运行租约，再读取完整 transcript。
-3. 服务端检查 requestId/messageId，已处理的请求直接返回已有运行结果或冲突信息。
+3. 服务端检查 `requestId` 和 `message.id`，已处理的请求直接返回已有运行结果或冲突信息。
 4. 服务端在同一事务中追加本轮用户消息、创建 `AgentRun(status = running)` 和初始运行事件。
 5. 服务端提交事务后，解析引用、完成资源授权，并创建 AgentRunner 所需的上下文和端口。
 6. `packages/agent` 根据服务端提供的完整 transcript 和已授权上下文生成 model context。
@@ -571,11 +597,11 @@ interface ToolExecutor {
 
 `AgentRunner` 的运行结果必须同时区分两条通道：
 
-- `stream`：面向当前订阅者的实时输出，断开后可以丢失；
+- `eventStream`：面向当前订阅者的已确认 AgentEvent，断开后只丢失订阅，不影响持久化；
 - 模型的 `text-delta` 和 `reasoning-delta` 会先转换为带有 `turnId`、`stepIndex`、`messageId`、`partId` 坐标的 `message.delta` / `reasoning.delta` Agent 事件，再经过 persistence barrier 按 run sequence 持久化；取消时 finalizer 可从已持久化的 message delta 重建已生成的 assistant 文本。
 - `completion`：一次运行的最终结果和持久化完成状态，不能依赖浏览器是否仍连接。
 
-UI stream adapter 只能消费 `stream`，server persistence adapter 必须等待 `completion`，
+server event stream 只能传输已确认事件，server persistence adapter 必须等待 `completion`，
 不能通过等待 HTTP response 结束来判断 Agent 是否已经完成。
 
 每一个循环边界都遵循同一顺序：
@@ -834,7 +860,7 @@ canonical tool-result transcript 仍由 Agent event/persistence 边界负责，�
 当前实现已为 `AgentRun` 增加 `cancelRequestedAt DateTime?`，用于持久化显式取消意图；它不属于 `Session`，也不由浏览器直接修改运行状态。
 
 `AgentRun` 还必须保存或可查询以下运行控制字段：`requestId`、请求体哈希、`ownerId`、`leaseExpiresAt`、
-`heartbeatAt`、`lastEventSequence`、`transcriptSequence`、`startedAt`、`endedAt` 和错误分类。`requestId` 在草稿阶段按 workspace
+`heartbeatAt`、`lastEventSequence`、`startedAt`、`endedAt` 和错误分类。`requestId` 在草稿阶段按 workspace
 和请求命名空间去重，session 创建后继续与 session 关联，不能因为 draft 没有 sessionId 而失去幂等性。
 
 ## 9. 代码模块边界
@@ -862,7 +888,8 @@ repositories -> Prisma only
 - `packages/server/.../sessions/chat`：AgentRunner 的 server 适配，不实现 loop 或 projector；
 - `packages/web/.../conversationStore`：事件到 UI 消息的唯一前端投影；
 - `packages/web/.../transport`：建立/关闭请求流，不处理 session 业务；
-- `packages/web/.../session`：会话列表、草稿元数据和选择，不持有 Agent 消息投影。
+- `packages/web/.../session`：会话列表、草稿元数据和选择，不持有 Agent 消息投影；
+  不以标题后台任务为理由轮询会话列表。
 
 以下文件不得继续成为职责汇聚点：`useChatConversation.ts`、`orchestration.ts`、`runFinalizer.ts`。
 如果新增逻辑需要同时修改事件协议、数据库投影、终态状态和 UI，必须先拆成独立模块，并通过窄接口连接；不得以回调、共享可变 ref 或通用 `any` 参数绕过边界。
@@ -890,7 +917,7 @@ repositories -> Prisma only
 - 会话轮次用例。
 - canonical transcript 读取、追加和去重。
 - run 生命周期编排。
-- requestId/messageId 请求哈希和冲突处理。
+- requestId/message.id 请求哈希和冲突处理。
 - session 运行租约、stale run 接管和恢复决策。
 - 标题和撤销等独立用例。
 
@@ -938,7 +965,7 @@ repositories -> Prisma only
 - `runtime/retryPolicy.ts`：规划中的错误分类、Retry-After、指数退避、抖动和预算模块，当前仍由 AI SDK 配置承载。
 - `runtime/events/events.ts`：provider-neutral 事件和事件序列生成，不负责落库或发送 HTTP。
 - `runtime/contracts.ts`：`ToolExecutor`、`AgentEventSink`、持久化确认、取消信号和恢复输入接口。
-- `runtime/stream/uiStreamAdapter.ts`：只负责 AI SDK UI message stream 传输适配。
+- server `sessions/chat/agentEventStream.ts`：只负责确认事件的 NDJSON 订阅传输。
 - `runtime/stream/referencePart.ts`：将 `data-chat-reference` part 转换为模型可读的文本。
 - `runtime/tools/toolResultBudget.ts`：工具结果 token 预算和超限截断。
 - `runtime/errors/formatAIError.ts`：模型错误到用户可读消息的格式化。
@@ -983,7 +1010,7 @@ repositories -> Prisma only
 组装后通过 `AgentToolDefinition` 注入，具体执行通过
 `ToolExecutor` 注入；事件通过 `PersistenceBarrier` 确认后才广播；UI stream 与
 运行 completion 已分离。server 的 `agentPersistence` 适配器已接入事件落库、步骤事务落库和工具完成结果回放。
-数据库级 session run lease、有副作用工具事务、服务端事件投影和浏览器断流隔离已经落地；当前 server 已启动独立的 stale-run 扫描器，负责将过期且仍为 `running` 的 run 原子标记为 `recovery_required` 并按旧 owner/version 释放 session lease。它只负责安全诊断和租约回收，不会盲目重放未确认的工具；后续仍需补跨进程接管和自动恢复验证。
+数据库级 session run lease、有副作用工具事务、服务端事件投影和浏览器断流隔离已经落地；当前 server 已启动独立的 stale-run 扫描器，负责将过期且仍为 `running` 的 run 原子标记为 `recovery_required`、按旧 owner/version 释放 session lease，并调用 recovery projector 收敛已落库事件。它不会盲目重放未确认的工具；工具账本无法证明安全时仍保留 `recovery_required`。
 
 - 将 `AgentRunner` 收敛为 facade，模型/工具循环移动到 `runtime/loop/agentLoop.ts`。
 - 在 `runtime/contracts.ts` 定义 `ToolExecutor`、`AgentEventSink`、`PersistenceBarrier`、
@@ -992,8 +1019,8 @@ repositories -> Prisma only
   在 Agent 包内部完成 Agent tool contract 到 Vercel AI SDK tool set 的转换。
 - 保留 Vercel AI SDK 作为底层执行引擎，第一阶段继续使用 `streamText + stopWhen`；
   未来切换 `ToolLoopAgent` 时不得改变 OpenExcel 对外 contract。
-- 将 provider-neutral `AgentEvent` 与 AI SDK UI stream 适配分离；UI stream 只能由
-  `runtime/stream/uiStreamAdapter.ts` 负责。
+- 将 provider-neutral `AgentEvent` 与 HTTP 传输分离；NDJSON stream 只能由 server
+  `sessions/chat/agentEventStream.ts` 负责。
 - 任何 Agent event sink 或持久化确认失败都必须让运行停止，禁止仅记录日志后继续执行。
 - 为 AgentRunner、agentLoop、toolAdapter、事件顺序、取消和持久化 barrier 增加包内测试，
   测试不得依赖 server 数据库或 HTTP。
@@ -1031,7 +1058,7 @@ Agent loop 必须停止；释放只清理自己持有的 lease，不能清理后
 ### Phase 2：前端切换单轮请求
 
 - transport 只发送本次 user message、引用 ID 和 requestId。
-- `onRunSettled(finishedMessages)` 不再参与持久化，只触发 session 元数据刷新。
+- stream finish 不再触发消息或会话重新加载；会话元数据由独立的会话流程更新。
 - 删除前端把完整 `messages[]` 当作服务端事实来源、模型上下文或恢复输入的代码路径。
 - 暂时保留本地消息状态用于展示；该状态必须被视为 projection cache，不能在 stream finish、cancel 或 session refresh 后被旧历史覆盖。
 - 草稿 session 响应头到达时只记录 session/run 身份，不得卸载正在运行的 ConversationStore。
@@ -1058,8 +1085,10 @@ state 不依赖订阅生命周期。OpenExcel 的目标不是让浏览器直接�
 
 当前进度：Agent 内核边界、数据库级 session lease、Sheet/Workbook/Chart 工具的幂等事务、基础
 AgentEvent 持久化、显式 cancel 和草稿流生命周期隔离已落地。成功草稿流会在服务端 checkpoint/finalizer
-完成后才关闭，避免前端以未完成的历史覆盖当前投影。实时事件流、增量 checkpoint projector 和
-stale-run 事件投影仍是 P0 后续工作。Sheet、Workbook 和 Chart 的有副作用工具继续由各自
+完成后才关闭，避免前端以未完成的历史覆盖当前投影。服务端增量 checkpoint projector 已落地：finalizer
+和 `GET .../messages` 在同一事件投影边界上收敛 text/reasoning/tool parts，并按 sequence 单调推进。
+实时 stream 只传输已确认的 AgentEvent，前端 ConversationStore 已统一实时事件与历史 snapshot 的投影语义；
+stale-run worker 仍只负责租约回收。Sheet、Workbook 和 Chart 的有副作用工具继续由各自
 application/service 负责短事务，Agent 只通过通用执行端口调用它们。
 
 进程异常退出后的恢复入口已经由 server application recovery service 提供：它会先诊断 active run、未完成工具、失败工具、

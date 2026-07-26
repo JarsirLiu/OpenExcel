@@ -5,7 +5,7 @@ describe("chat turn contract", () => {
   const request = {
     requestId: "request-1",
     message: {
-      messageId: "message-1",
+      id: "message-1",
       role: "user" as const,
       parts: [{ type: "text" as const, text: "读取当前工作簿" }],
     },

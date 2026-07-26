@@ -200,7 +200,6 @@ model AgentRun {
   leaseExpiresAt DateTime?
   heartbeatAt  DateTime?
   lastEventSequence Int @default(0)
-  transcriptSequence Int @default(0)
   requestPayloadHash String?
   undoInvalidated Boolean                @default(false)
   revertedAt   DateTime?

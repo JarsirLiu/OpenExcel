@@ -1,14 +1,17 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { Session } from "@/api/sessions";
 import { useSessionWorkspace } from "./useSessionWorkspace";
 
 const mocks = vi.hoisted(() => ({
+  createSession: vi.fn(),
   deleteSession: vi.fn(),
   fetchSessions: vi.fn(),
   generateSessionTitle: vi.fn(),
 }));
 
 vi.mock("@/api/sessions", () => ({
+  createSession: mocks.createSession,
   deleteSession: mocks.deleteSession,
   fetchSessions: mocks.fetchSessions,
   generateSessionTitle: mocks.generateSessionTitle,
@@ -17,39 +20,77 @@ vi.mock("@/api/sessions", () => ({
 describe("useSessionWorkspace", () => {
   const emptyInitial = {
     sessions: [],
-    messages: [],
-    messageTotal: 0,
   };
 
   beforeEach(() => {
     sessionStorage.clear();
+    mocks.createSession.mockReset();
     mocks.deleteSession.mockReset();
     mocks.fetchSessions.mockReset();
     mocks.generateSessionTitle.mockReset();
     mocks.fetchSessions.mockResolvedValue([]);
   });
 
-  it("attaches a server-created session to the draft", async () => {
-    mocks.fetchSessions.mockResolvedValue([
-      {
-        id: 5,
-        publicId: "session-5",
-        sheetId: null,
-        name: "你好",
-        createdAt: "2026-07-14T00:00:00.000Z",
-      },
-    ]);
+  it("creates and activates a formal session without refreshing the list", async () => {
+    const session = {
+      id: 5,
+      publicId: "session-5",
+      sheetId: null,
+      name: "新对话",
+      createdAt: "2026-07-14T00:00:00.000Z",
+    };
+    mocks.createSession.mockResolvedValue(session);
     const { result } = renderHook(() => useSessionWorkspace(1, undefined, emptyInitial));
 
+    let created: Session | undefined;
     await act(async () => {
-      await result.current.handleDraftSessionCreated(5);
+      created = await result.current.createSession();
+      result.current.activateSession(5);
     });
 
-    await waitFor(() => {
-      expect(result.current.currentSessionId).toBe(5);
-    });
+    expect(created).toEqual(session);
+    expect(result.current.currentSessionId).toBe(5);
+    expect(mocks.fetchSessions).not.toHaveBeenCalled();
 
     expect(result.current.sessions.map((session) => session.id)).toEqual([5]);
+  });
+
+  it("creates and activates a formal session when starting a new chat", async () => {
+    const session = {
+      id: 7,
+      publicId: "session-7",
+      sheetId: null,
+      name: "新对话",
+      createdAt: "2026-07-14T00:00:00.000Z",
+    };
+    mocks.createSession.mockResolvedValue(session);
+    const { result } = renderHook(() =>
+      useSessionWorkspace(1, undefined, {
+        sessions: [{ ...session, id: 6, publicId: "session-6", name: "旧会话" }],
+      }),
+    );
+
+    act(() => {
+      result.current.handleNewSession();
+    });
+
+    await waitFor(() => expect(result.current.currentSessionId).toBe(7));
+    expect(mocks.createSession).toHaveBeenCalledWith(1);
+    expect(result.current.sessions.map((item) => item.id)).toEqual([7, 6]);
+    expect(result.current.isCreatingSession).toBe(false);
+  });
+
+  it("exposes a creation error when starting a new chat fails", async () => {
+    mocks.createSession.mockRejectedValue(new Error("服务不可用"));
+    const { result } = renderHook(() => useSessionWorkspace(1, undefined, emptyInitial));
+
+    act(() => {
+      result.current.handleNewSession();
+    });
+
+    await waitFor(() => expect(result.current.sessionError?.message).toBe("服务不可用"));
+    expect(result.current.currentSessionId).toBeNull();
+    expect(result.current.isCreatingSession).toBe(false);
   });
 
   it("shares one in-flight session refresh across concurrent callers", async () => {
@@ -72,8 +113,8 @@ describe("useSessionWorkspace", () => {
     let firstRefresh: Promise<unknown> | undefined;
     let secondRefresh: Promise<unknown> | undefined;
     act(() => {
-      firstRefresh = result.current.refreshSessions({ preserveCurrent: true });
-      secondRefresh = result.current.refreshSessions({ preserveCurrent: true });
+      firstRefresh = result.current.refreshSessions();
+      secondRefresh = result.current.refreshSessions();
     });
 
     expect(mocks.fetchSessions).toHaveBeenCalledTimes(1);
@@ -86,42 +127,29 @@ describe("useSessionWorkspace", () => {
     expect(result.current.sessions).toEqual([session]);
   });
 
-  it("replaces a stale background refresh before activating a newly created draft", async () => {
-    const session = {
-      id: 7,
-      publicId: "session-7",
+  it("keeps the selected session when a list refresh temporarily omits it", async () => {
+    const selected = {
+      id: 12,
+      publicId: "session-12",
       sheetId: null,
-      name: "新建会话",
+      name: "当前会话",
       createdAt: "2026-07-14T00:00:00.000Z",
     };
-    let resolveBackgroundRefresh: ((sessions: (typeof session)[]) => void) | undefined;
-    let backgroundSignal: AbortSignal | undefined;
-    mocks.fetchSessions
-      .mockImplementationOnce((_workspaceId: number, options?: { signal?: AbortSignal }) => {
-        backgroundSignal = options?.signal;
-        return new Promise<(typeof session)[]>((resolve) => {
-          resolveBackgroundRefresh = resolve;
-        });
-      })
-      .mockResolvedValueOnce([session]);
-    const { result } = renderHook(() => useSessionWorkspace(1, undefined, emptyInitial));
+    mocks.fetchSessions.mockResolvedValue([]);
+    const { result } = renderHook(() =>
+      useSessionWorkspace(1, undefined, { sessions: [selected] }),
+    );
 
-    let activateDraft: Promise<void> | undefined;
     act(() => {
-      void result.current.refreshSessions({ preserveCurrent: true });
-      activateDraft = result.current.handleDraftSessionCreated(7);
+      result.current.handleSelectSession(selected.id);
     });
-
-    expect(mocks.fetchSessions).toHaveBeenCalledTimes(2);
-    expect(backgroundSignal?.aborted).toBe(true);
+    expect(result.current.currentSessionId).toBe(selected.id);
 
     await act(async () => {
-      resolveBackgroundRefresh?.([]);
-      await activateDraft;
+      await result.current.refreshSessions();
     });
 
-    expect(result.current.sessions).toEqual([session]);
-    expect(result.current.currentSessionId).toBe(7);
+    expect(result.current.currentSessionId).toBe(selected.id);
   });
 
   it("opens a project on a new draft instead of selecting history", async () => {

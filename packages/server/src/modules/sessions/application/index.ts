@@ -7,6 +7,7 @@ export {
   chatTurnRequestSchema,
   parseChatTurnRequest,
 } from "./chatTurn.js";
+export { createSession } from "./createSession.js";
 export {
   deleteSession,
   getMessages,
@@ -15,5 +16,4 @@ export {
   renameSession,
 } from "./querySessions.js";
 export { abandonRun, recoverRun } from "./recovery.js";
-export { startDraftChat } from "./startDraftChat.js";
 export { generateSessionTitleForSession } from "./title.js";

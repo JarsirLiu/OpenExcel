@@ -12,6 +12,7 @@ type Props = {
   currentSessionId: number | null;
   onToggleHistory: () => void;
   onNewSession: () => void;
+  isCreatingSession?: boolean;
   currentUser: CurrentUser;
   onLogout: () => void;
   presentationMode?: boolean;
@@ -112,6 +113,7 @@ export function SessionHeader({
   currentSessionId,
   onToggleHistory,
   onNewSession,
+  isCreatingSession = false,
   currentUser,
   onLogout,
   presentationMode = false,
@@ -128,10 +130,15 @@ export function SessionHeader({
             <div onClick={onToggleHistory} className={styles.pillBtn} title={t("history", "历史")}>
               {t("history", "历史")}
             </div>
-            <div
+            <button
+              type="button"
               onClick={onNewSession}
-              className={`${styles.pillBtn} ${styles.plusBtn} ${styles.plusBtnSolid}`}
+              className={`${styles.pillBtn} ${styles.plusBtn} ${styles.plusBtnSolid} ${
+                isCreatingSession ? styles.plusBtnLoading : ""
+              }`}
               title={t("new_chat", "新建对话")}
+              aria-label={t("new_chat", "新建对话")}
+              disabled={isCreatingSession}
             >
               <span className={styles.plusBtnIcon}>
                 <svg
@@ -147,7 +154,7 @@ export function SessionHeader({
                   <line x1="3" y1="12" x2="21" y2="12" />
                 </svg>
               </span>
-            </div>
+            </button>
           </>
         )}
         <UserMenu currentUser={currentUser} onLogout={onLogout} />

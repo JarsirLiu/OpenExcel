@@ -12,6 +12,7 @@ export type {
   AgentEventSink,
   AgentEventType,
   AgentFailureKind,
+  AgentFailurePhase,
   AgentRunCompletion,
   AgentRunResult,
   AgentTimeoutConfiguration,

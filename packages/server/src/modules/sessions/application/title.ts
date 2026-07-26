@@ -35,10 +35,14 @@ export async function generateSessionTitleForSession(
   const session = await repo.findSession(sessionId, workspaceId);
   if (!session) throw new Error("会话不存在");
   const initialTitle = options.initialTitle ?? "新对话";
-  if (session.titleStatus && session.titleStatus !== "pending") {
+  if (session.titleStatus === "manual") {
     return session.name;
   }
-  if (session.name !== "新对话" && session.name !== initialTitle) {
+  if (
+    session.titleStatus !== "pending" &&
+    session.name !== "新对话" &&
+    session.name !== initialTitle
+  ) {
     return session.name;
   }
 
@@ -47,7 +51,12 @@ export async function generateSessionTitleForSession(
   return withSessionLock(sessionId, async () => {
     const latestSession = await repo.findSession(sessionId, workspaceId);
     if (!latestSession) throw new Error("会话不存在");
-    if (latestSession.titleStatus && latestSession.titleStatus !== "pending") {
+    if (
+      latestSession.titleStatus === "manual" ||
+      (latestSession.titleStatus !== "pending" &&
+        latestSession.name !== "新对话" &&
+        latestSession.name !== initialTitle)
+    ) {
       return latestSession.name;
     }
     if (latestSession.name !== "新对话" && latestSession.name !== initialTitle) {
@@ -56,7 +65,7 @@ export async function generateSessionTitleForSession(
     const updated = await repo.updateSessionNameIfUnchanged(
       sessionId,
       workspaceId,
-      [...new Set(["新对话", initialTitle])],
+      [...new Set(["新对话", initialTitle, latestSession.name])],
       title,
     );
     if (updated) return title;
@@ -73,10 +82,31 @@ export function scheduleSessionTitleGeneration(
 ) {
   if (!firstUserText.trim()) return;
 
-  void generateSessionTitleForSession(workspaceId, sessionId, firstUserText, {
-    initialTitle: fallbackTitleFromPrompt(firstUserText),
-  }).catch((error) => {
-    console.error(`[session] Failed to update title for session ${sessionId}:`, error);
+  const fallbackTitle = fallbackTitleFromPrompt(firstUserText);
+
+  void (async () => {
+    try {
+      const prepared = await repo.prepareSessionTitle(sessionId, workspaceId, fallbackTitle);
+      if (!prepared) return;
+
+      const config: ModelConfig = loadModelConfig();
+      const title = await generateTitle(resolveModelForPurpose(config, "title"), firstUserText);
+      await withSessionLock(sessionId, () =>
+        repo.updateSessionNameIfUnchanged(sessionId, workspaceId, ["新对话", fallbackTitle], title),
+      );
+    } catch (error) {
+      try {
+        await repo.finalizeSessionTitleFallback(sessionId, workspaceId, fallbackTitle);
+      } catch (fallbackError) {
+        console.error(
+          `[session] Failed to finalize fallback title for session ${sessionId}:`,
+          fallbackError,
+        );
+      }
+      console.error(`[session] Failed to update title for session ${sessionId}:`, error);
+    }
+  })().catch((error) => {
+    console.error(`[session] Failed to prepare title for session ${sessionId}:`, error);
   });
 }
 

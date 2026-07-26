@@ -34,16 +34,17 @@ export async function findRunCheckpoint(runId: number) {
 }
 
 export async function findLatestSessionCheckpoint(workspaceId: number, sessionId: number) {
-  const checkpoint = await prisma.agentRunCheckpoint.findFirst({
+  const run = await prisma.agentRun.findFirst({
     where: {
-      run: {
-        sessionId,
-        session: { workspaceId },
-        status: { not: "reverted" },
-      },
+      sessionId,
+      session: { workspaceId },
+      status: { not: "reverted" },
+      checkpoint: { isNot: null },
     },
-    orderBy: [{ updatedAt: "desc" }, { runId: "desc" }],
+    orderBy: [{ startedAt: "desc" }, { id: "desc" }],
+    select: { checkpoint: true },
   });
+  const checkpoint = run?.checkpoint;
   if (!checkpoint) return null;
   return {
     runId: checkpoint.runId,
@@ -54,7 +55,30 @@ export async function findLatestSessionCheckpoint(workspaceId: number, sessionId
   } satisfies RunCheckpoint;
 }
 
-/** Writes a checkpoint only when it advances the durable projection boundary. */
+export async function findLatestSessionRun(workspaceId: number, sessionId: number) {
+  return prisma.agentRun.findFirst({
+    where: {
+      sessionId,
+      session: { workspaceId },
+      status: { not: "reverted" },
+    },
+    select: { id: true, lastEventSequence: true },
+    orderBy: [{ startedAt: "desc" }, { id: "desc" }],
+  });
+}
+
+export async function findRunProjectionState(
+  workspaceId: number,
+  sessionId: number,
+  runId: number,
+) {
+  return prisma.agentRun.findFirst({
+    where: { id: runId, sessionId, session: { workspaceId }, status: { not: "reverted" } },
+    select: { id: true, lastEventSequence: true },
+  });
+}
+
+/** Writes the checkpoint with a monotonic per-run projection boundary. */
 export async function persistRunCheckpoint(checkpoint: RunCheckpoint) {
   try {
     return await writeCheckpoint(checkpoint);
@@ -62,16 +86,7 @@ export async function persistRunCheckpoint(checkpoint: RunCheckpoint) {
     // A concurrent first insert can win the unique runId constraint. Retry as
     // a guarded update outside the failed transaction (required by Postgres).
     if (!isUniqueConstraintError(error)) throw error;
-    const result = await prisma.agentRunCheckpoint.updateMany({
-      where: { runId: checkpoint.runId, checkpointSequence: { lt: checkpoint.checkpointSequence } },
-      data: {
-        checkpointSequence: checkpoint.checkpointSequence,
-        transcript: encode(checkpoint.transcript),
-        reasoning: checkpoint.reasoning,
-        toolState: encode(checkpoint.toolState),
-      },
-    });
-    return result.count === 1;
+    return updateCheckpoint(checkpoint);
   }
 }
 
@@ -102,22 +117,28 @@ async function writeCheckpoint(checkpoint: RunCheckpoint) {
         toolState: encode(checkpoint.toolState),
       },
     });
-    return result.count === 1;
+    if (result.count !== 1) return false;
+    return true;
+  });
+}
+
+async function updateCheckpoint(checkpoint: RunCheckpoint) {
+  return prisma.$transaction(async (tx) => {
+    const result = await tx.agentRunCheckpoint.updateMany({
+      where: { runId: checkpoint.runId, checkpointSequence: { lt: checkpoint.checkpointSequence } },
+      data: {
+        checkpointSequence: checkpoint.checkpointSequence,
+        transcript: encode(checkpoint.transcript),
+        reasoning: checkpoint.reasoning,
+        toolState: encode(checkpoint.toolState),
+      },
+    });
+    if (result.count !== 1) return false;
+
+    return true;
   });
 }
 
 function isUniqueConstraintError(error: unknown): error is { code: "P2002" } {
   return typeof error === "object" && error !== null && "code" in error && error.code === "P2002";
-}
-
-export async function advanceTranscriptSequence(runId: number, sequence: number) {
-  const result = await prisma.agentRun.updateMany({
-    where: {
-      id: runId,
-      transcriptSequence: { lt: sequence },
-      lastEventSequence: { gte: sequence },
-    },
-    data: { transcriptSequence: sequence },
-  });
-  return result.count === 1;
 }

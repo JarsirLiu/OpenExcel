@@ -1,5 +1,6 @@
 import type { SheetChangeDelta, SheetChangeVersion } from "@openexcel/core";
 import { createContext, useContext } from "react";
+import type { Session } from "@/api/sessions";
 
 type SheetChangedHandler = (
   sheetId: number,
@@ -15,7 +16,8 @@ type SessionInfra = {
   onSheetChanged?: SheetChangedHandler;
   onUndoComplete?: () => Promise<void> | void;
   onNavigateSheet?: (sheetId: number) => void;
-  initialMessages?: unknown[];
+  createSession: () => Promise<Session>;
+  activateSession: (sessionId: number) => void;
 };
 
 const ctx = createContext<SessionInfra | null>(null);

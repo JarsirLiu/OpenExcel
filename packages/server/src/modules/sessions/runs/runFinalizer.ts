@@ -1,16 +1,9 @@
-import type { AgentRunCompletion, AgentTranscriptMessage } from "@openexcel/agent";
+import type { AgentEventSink, AgentRunCompletion, AgentTranscriptMessage } from "@openexcel/agent";
 import { formatAIError } from "@openexcel/agent";
-import {
-  findAgentEventsByRun,
-  findAgentEventsForCheckpoint,
-  persistRunLifecycleEvent,
-} from "./agentEventRepository.js";
-import { advanceTranscriptSequence, persistRunCheckpoint } from "./checkpointRepository.js";
+import { findAgentEventsByRun, persistRunLifecycleEvent } from "./agentEventRepository.js";
+import { persistRunCheckpoint } from "./checkpointRepository.js";
 import * as runRepo from "./repository.js";
-import {
-  projectRunCheckpoint,
-  projectStreamedAssistantMessages,
-} from "./runCheckpointProjector.js";
+import { projectRunCheckpoint, projectRunTranscript } from "./runCheckpointProjector.js";
 import type { AcquiredRunLease } from "./runLease.js";
 import { completeRunAndUpdateUndoCheckpoint } from "./undoCheckpoint.js";
 
@@ -18,7 +11,6 @@ type FinalizerStatus = "completed" | "cancelled" | "failed" | "recovery_required
 
 export interface RunFinalizationInput {
   completion?: AgentRunCompletion;
-  messages?: AgentTranscriptMessage[];
   status?: FinalizerStatus;
   outputText?: string | null;
   errorMessage?: string;
@@ -30,6 +22,8 @@ function outcomeFromInput(input: RunFinalizationInput) {
     return {
       status: "recovery_required" as const,
       errorMessage: input.errorMessage ?? "运行租约丢失，等待恢复器检查",
+      failurePhase: undefined,
+      failureStepIndex: undefined,
     };
   }
 
@@ -37,6 +31,8 @@ function outcomeFromInput(input: RunFinalizationInput) {
     return {
       status: "recovery_required" as const,
       errorMessage: "运行事件持久化失败，需要恢复后再继续",
+      failurePhase: "persistence" as const,
+      failureStepIndex: undefined,
     };
   }
 
@@ -46,6 +42,8 @@ function outcomeFromInput(input: RunFinalizationInput) {
       outputText: input.completion.status === "completed" ? input.completion.text || null : null,
       errorMessage:
         input.completion.status === "failed" ? formatAIError(input.completion.error) : undefined,
+      failurePhase: input.completion.failurePhase,
+      failureStepIndex: input.completion.failureStepIndex,
     };
   }
 
@@ -53,6 +51,8 @@ function outcomeFromInput(input: RunFinalizationInput) {
     status: input.status ?? "failed",
     outputText: input.outputText,
     errorMessage: input.errorMessage,
+    failurePhase: undefined,
+    failureStepIndex: undefined,
   };
 }
 
@@ -60,17 +60,27 @@ export function createRunFinalizer(options: {
   workspaceId: number;
   sessionId: number;
   lease: AcquiredRunLease;
+  eventSink?: AgentEventSink;
 }) {
   let finalization: Promise<void> | undefined;
 
   async function finalize(input: RunFinalizationInput) {
     const outcome = outcomeFromInput(input);
-    let messages = input.messages ?? input.completion?.messages;
     let allEvents: Awaited<ReturnType<typeof findAgentEventsByRun>> = [];
+    let lifecycleEvent: Awaited<ReturnType<typeof persistRunLifecycleEvent>> | undefined;
     try {
       allEvents = await findAgentEventsByRun(options.lease.run.id);
+      if (allEvents.length > 0) {
+        const durableEvents = allEvents.map(toAgentEvent);
+        const transcript = projectRunTranscript(
+          durableEvents,
+          (options.lease.transcript ?? []) as AgentTranscriptMessage[],
+        );
+        const checkpoint = projectRunCheckpoint(durableEvents, transcript);
+        await persistRunCheckpoint({ runId: options.lease.run.id, ...checkpoint });
+      }
       if (outcome.status !== "recovery_required") {
-        await persistRunLifecycleEvent({
+        lifecycleEvent = await persistRunLifecycleEvent({
           runId: options.lease.run.id,
           type:
             outcome.status === "completed"
@@ -81,29 +91,12 @@ export function createRunFinalizer(options: {
           payload: {
             error: outcome.errorMessage,
             isAborted: outcome.status === "cancelled",
+            ...(outcome.failurePhase ? { failurePhase: outcome.failurePhase } : {}),
+            ...(outcome.failureStepIndex == null
+              ? {}
+              : { failureStepIndex: outcome.failureStepIndex }),
           },
         });
-        allEvents = await findAgentEventsByRun(options.lease.run.id);
-      }
-      const streamedMessages = projectStreamedAssistantMessages(
-        await findAgentEventsForCheckpoint(options.lease.run.id),
-      );
-      if (streamedMessages.length > 0) {
-        // Events are the durable source for streamed text/reasoning in every
-        // terminal state. completion.messages is a transport result and may
-        // omit reasoning even when its deltas were persisted.
-        messages = mergeStreamedAssistantMessages(
-          (messages ?? options.lease.transcript ?? []) as AgentTranscriptMessage[],
-          (options.lease.transcript ?? []) as AgentTranscriptMessage[],
-          streamedMessages,
-        );
-      }
-      if (allEvents.length > 0 && messages) {
-        const checkpoint = projectRunCheckpoint(allEvents.map(toAgentEvent), messages);
-        await persistRunCheckpoint({ runId: options.lease.run.id, ...checkpoint });
-      }
-      if (messages && allEvents.length > 0) {
-        await advanceTranscriptSequence(options.lease.run.id, allEvents.at(-1)?.sequence ?? 0);
       }
     } catch (error) {
       outcome.status = "recovery_required";
@@ -127,6 +120,8 @@ export function createRunFinalizer(options: {
       );
       if (updated === false) {
         await markRecoveryRequired("运行租约已失效，等待恢复器检查");
+      } else if (lifecycleEvent) {
+        await options.eventSink?.publish(toAgentEvent(lifecycleEvent));
       }
     } catch (error) {
       console.error(`[session] Failed to finalize run ${options.lease.run.id}:`, error);
@@ -171,31 +166,6 @@ export function createRunFinalizer(options: {
       return finalization;
     },
   };
-}
-
-function mergeStreamedAssistantMessages(
-  messages: AgentTranscriptMessage[],
-  transcript: AgentTranscriptMessage[],
-  streamed: AgentTranscriptMessage[],
-): AgentTranscriptMessage[] {
-  const prefix = messages.slice(0, transcript.length);
-  const generated = messages.slice(transcript.length);
-  const generatedAssistants = generated.filter((message) => message.role === "assistant");
-  const merged = streamed.map((streamedMessage, index) => {
-    const existing = generatedAssistants[index];
-    if (!existing || existing.role !== "assistant") return streamedMessage;
-    const nonStreamParts = (Array.isArray(existing.parts) ? existing.parts : []).filter(
-      (part: any) => part.type !== "text" && part.type !== "reasoning",
-    );
-    return {
-      ...existing,
-      parts: [
-        ...nonStreamParts,
-        ...(Array.isArray(streamedMessage.parts) ? streamedMessage.parts : []),
-      ],
-    };
-  });
-  return [...prefix, ...generated.filter((message) => message.role !== "assistant"), ...merged];
 }
 
 function toAgentEvent(event: {

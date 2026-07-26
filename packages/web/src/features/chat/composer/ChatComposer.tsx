@@ -19,7 +19,6 @@ export type ChatComposerHandle = {
 
 type ChatComposerProps = {
   isStreaming: boolean;
-  isSendDisabled?: boolean;
   onSend: (text: string, references: ChatReferenceTarget[]) => void;
   onStop: () => void;
   onAttachExcel: (files: File[]) => Promise<void> | void;
@@ -67,20 +66,11 @@ const AttachIcon = () => (
 const PLACEHOLDERS = ["使用 @ 来引用表格", "让 AI 来帮你修改表格"];
 
 export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(function ChatComposer(
-  {
-    isStreaming,
-    isSendDisabled = false,
-    onSend,
-    onStop,
-    onAttachExcel,
-    referenceCacheRevision,
-    workspaceId,
-  },
+  { isStreaming, onSend, onStop, onAttachExcel, referenceCacheRevision, workspaceId },
   ref,
 ) {
   const { editor, editorText, handleSend, setText } = useChatComposer({
     isStreaming,
-    isSendDisabled,
     onSend,
     referenceCacheRevision,
     workspaceId,
@@ -154,7 +144,6 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
           <div className={styles.spacer} />
           <button
             type="button"
-            disabled={isSendDisabled}
             onClick={() => (isStreaming ? onStop() : handleSend())}
             className={styles.sendBtn}
           >

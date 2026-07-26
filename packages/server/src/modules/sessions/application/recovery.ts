@@ -1,4 +1,5 @@
 import * as runRepo from "../runs/repository.js";
+import { projectRunCheckpointForRun } from "../runs/sessionCheckpointProjector.js";
 import { completeRunAndUpdateUndoCheckpoint } from "../runs/undoCheckpoint.js";
 
 type RecoveryToolExecution = {
@@ -89,6 +90,8 @@ export async function recoverRun(workspaceId: number, sessionId: number, runId: 
   if (run.status !== "recovery_required") {
     return { runId: run.id, status: run.status, canAutoRecover: false };
   }
+
+  await projectRunCheckpointForRun(workspaceId, sessionId, runId);
 
   const toolExecutions = await runRepo.findRunToolExecutions(runId);
   const activeRun = await runRepo.findActiveRun(sessionId);

@@ -1,6 +1,7 @@
 import type { SheetChangeDelta, SheetChangeVersion } from "@openexcel/core";
 import { useEffect, useRef } from "react";
 import type { Session } from "@/api/sessions";
+import { Alert } from "@/components/ui/Alert/Alert";
 import { ChatPanel } from "@/features/chat/conversation/ChatPanel";
 import { t } from "@/lib/i18n";
 import { SessionHeader } from "./components/SessionHeader";
@@ -19,12 +20,14 @@ type Props = {
   currentSessionId: number | null;
   historyOpen: boolean;
   setHistoryOpen: (next: boolean) => void;
-  handleDraftSessionCreated: (sessionId: number) => Promise<void> | void;
-  handleRunSettled: (sessionId: number) => Promise<void>;
+  createSession: () => Promise<Session>;
+  activateSession: (sessionId: number) => void;
   handleNewSession: () => void;
   handleSelectSession: (id: number) => void;
   handleDeleteSession: (id: number) => Promise<void>;
   handleUndoComplete: () => Promise<void>;
+  isCreatingSession: boolean;
+  sessionError?: Error;
   onAttachExcel: (files: File[]) => Promise<void> | void;
   onWorkspaceRefresh?: () => Promise<void> | void;
   onSheetChanged?: (
@@ -36,7 +39,6 @@ type Props = {
   currentUser: CurrentUser;
   onLogout: () => void;
   onNavigateSheet?: (sheetId: number) => void;
-  initialMessages?: unknown[];
 };
 
 export function SessionShell({
@@ -45,12 +47,14 @@ export function SessionShell({
   currentSessionId,
   historyOpen,
   setHistoryOpen,
-  handleDraftSessionCreated,
-  handleRunSettled,
+  createSession,
+  activateSession,
   handleNewSession,
   handleSelectSession,
   handleDeleteSession,
   handleUndoComplete,
+  isCreatingSession,
+  sessionError,
   onAttachExcel,
   onWorkspaceRefresh,
   onSheetChanged,
@@ -58,7 +62,6 @@ export function SessionShell({
   currentUser,
   onLogout,
   onNavigateSheet,
-  initialMessages,
 }: Props) {
   const historyRef = useRef<HTMLDivElement>(null);
 
@@ -94,7 +97,8 @@ export function SessionShell({
         onSheetChanged,
         onUndoComplete: handleUndoComplete,
         onNavigateSheet,
-        initialMessages,
+        createSession,
+        activateSession,
       }}
     >
       <div className={styles.container}>
@@ -102,10 +106,17 @@ export function SessionShell({
           sessionName={currentSession?.name ?? t("ai_chat", "AI 对话")}
           currentSessionId={currentSessionId}
           onToggleHistory={() => setHistoryOpen(!historyOpen)}
-          onNewSession={() => void handleNewSession()}
+          onNewSession={handleNewSession}
+          isCreatingSession={isCreatingSession}
           currentUser={currentUser}
           onLogout={onLogout}
         />
+
+        {sessionError && (
+          <div className={styles.sessionError}>
+            <Alert variant="error">{sessionError.message}</Alert>
+          </div>
+        )}
 
         {historyOpen && (
           <div ref={historyRef} className={styles.historyPanel}>
@@ -122,15 +133,9 @@ export function SessionShell({
           <ChatPanel
             sessionId={currentSessionId}
             initialCanUndo={currentSession?.undoRunId != null}
-            onRunSettled={handleRunSettled}
           />
         ) : (
-          <ChatPanel
-            sessionId={null}
-            isDraft
-            onDraftSessionCreated={handleDraftSessionCreated}
-            onRunSettled={handleRunSettled}
-          />
+          <ChatPanel sessionId={null} />
         )}
       </div>
     </SessionShellProvider>

@@ -65,6 +65,7 @@ async function createLeasedRun(
       sessionVersion: data.sessionVersion,
       leaseExpiresAt: data.leaseExpiresAt,
       heartbeatAt: data.heartbeatAt,
+      lastEventSequence: -1,
       requestPayloadHash: data.requestPayloadHash,
     },
   });
@@ -132,12 +133,16 @@ export async function acquireRunLease(data: {
     });
     if (claimed.count !== 1) throw new SessionBusyError();
 
-    const previousCheckpoint = await tx.agentRunCheckpoint.findFirst({
-      where: { run: { sessionId: data.sessionId } },
-      orderBy: [{ updatedAt: "desc" }, { runId: "desc" }],
-      select: { transcript: true },
+    const previousRun = await tx.agentRun.findFirst({
+      where: {
+        sessionId: data.sessionId,
+        status: { not: "reverted" },
+        checkpoint: { isNot: null },
+      },
+      orderBy: [{ startedAt: "desc" }, { id: "desc" }],
+      select: { checkpoint: { select: { transcript: true } } },
     });
-    const canonicalTranscript = parseTranscript(previousCheckpoint?.transcript ?? null);
+    const canonicalTranscript = parseTranscript(previousRun?.checkpoint?.transcript ?? null);
     const transcript = data.appendUserTurn(canonicalTranscript);
 
     const run = await createLeasedRun(tx, {

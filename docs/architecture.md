@@ -673,7 +673,10 @@ The following boundaries must remain explicit:
 - Chat state must not own workbook state
 - Workbook state must not own session state
 - Excel grid persistence must not live in the layout shell
-- Title refresh must not force a chat rerender path
+- Title generation is a server-owned background metadata task. The web client
+  must not poll the session list to observe it or make it part of chat/run
+  rendering; session metadata is refreshed only by explicit session actions or
+  normal workspace navigation.
 - Session list refresh must not reset the workbook view
 - Tool output parsing must not be repeated in multiple components
 - Local editor state must not be the source of truth for persisted messages
@@ -763,8 +766,8 @@ save system beside full snapshots.
 
 ### 7.2 Chat flow
 
-1. Entering a workspace opens a new in-memory draft conversation. The persisted session list is history and is not automatically selected.
-2. User sends one new user message from the draft. Web posts the message, stable workbook/Sheet reference IDs, and an idempotency key to `sessions/draft/chat`; it never submits the full local transcript as the model context. The server creates the persisted `Session`, reads or creates the canonical transcript, stores the initial user message, and starts the stream in one application use case. The initial session name is a deterministic fallback derived from the first user message.
+1. Entering a workspace opens a new local conversation view. The persisted session list is history and is not automatically selected.
+2. User sends one new user message without an active session. Web first calls `POST /sessions` to create the formal `Session`, then posts the message, stable workbook/Sheet reference IDs, and an idempotency key to `sessions/:sessionId/chat`; it never submits the full local transcript as the model context. Session creation and chat execution are separate use cases.
 3. The server resolves references and authorization against the current workspace, filters the core capability catalog into the tools visible for this user and run, then invokes `packages/agent` with the canonical transcript, authorized context, and server-owned runtime ports. Agent context construction, tool-loop control, retries, and recovery follow [Agent Loop](agent-loop.md).
 4. The server persists authoritative run state, transcript updates, tool effects, and recoverable events. Only persisted events are sent through the stream; a transport failure never becomes a persistence decision.
 5. Web renders the server stream and refreshes affected workbook/session state from server versions. The browser does not execute tools, advance the Agent loop, assemble model context, or produce authoritative tool results.
@@ -841,7 +844,7 @@ The bootstrap command is authenticated and idempotent. The workspace list endpoi
 ### 8.3 Session APIs
 
 - `GET /api/workspaces/:workspaceId/sessions`
-- `POST /api/workspaces/:workspaceId/sessions/draft/chat`
+- `POST /api/workspaces/:workspaceId/sessions`
 - `DELETE /api/workspaces/:workspaceId/sessions/:id`
 - `PATCH /api/workspaces/:workspaceId/sessions/:id`
 

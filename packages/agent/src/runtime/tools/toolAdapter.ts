@@ -1,5 +1,6 @@
 import { type ToolSet, tool } from "ai";
 import type { AgentToolDefinition, AgentToolExecutionOptions, ToolExecutor } from "../contracts.js";
+import { AgentPersistenceError } from "../events/types.js";
 import { toToolError } from "./errors.js";
 import { validateToolInput } from "./inputValidation.js";
 
@@ -27,6 +28,22 @@ function throwIfAborted(signal: AbortSignal | undefined) {
   const error = new Error("Agent run was cancelled");
   error.name = "AbortError";
   throw error;
+}
+
+function isAbortError(error: unknown, signal: AbortSignal | undefined) {
+  return signal?.aborted || (error instanceof Error && error.name === "AbortError");
+}
+
+function toolErrorResult(error: ReturnType<typeof toToolError>) {
+  return {
+    isError: true,
+    error: {
+      kind: error.kind,
+      message: error.message,
+      ...(error.details ? { details: error.details } : {}),
+      ...(error.retryable != null ? { retryable: error.retryable } : {}),
+    },
+  };
 }
 
 export function createAgentToolSet(
@@ -67,7 +84,7 @@ export function createAgentToolSet(
                 input,
                 error: validationResult.error,
               });
-              throw validationResult.error;
+              return toolErrorResult(validationResult.error);
             }
             input = validationResult.data;
           }
@@ -89,6 +106,12 @@ export function createAgentToolSet(
             });
             return output;
           } catch (error) {
+            if (
+              isAbortError(error, executionOptions.abortSignal) ||
+              error instanceof AgentPersistenceError
+            ) {
+              throw error;
+            }
             const toolError = toToolError(error);
             await hooks.onToolFinish?.({
               toolName: definition.name,
@@ -96,7 +119,10 @@ export function createAgentToolSet(
               input,
               error: toolError,
             });
-            throw toolError;
+            // A business/tool failure is a model-visible tool result. The
+            // model must be allowed to explain the failure or choose another
+            // step; only cancellation and persistence failures abort the run.
+            return toolErrorResult(toolError);
           }
         },
       } as any),

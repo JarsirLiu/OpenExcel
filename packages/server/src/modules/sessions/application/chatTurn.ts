@@ -20,7 +20,7 @@ const referencePartSchema = z.strictObject({
 export const chatTurnRequestSchema = z.strictObject({
   requestId: z.string().trim().min(1).max(200),
   message: z.strictObject({
-    messageId: z.string().trim().min(1).max(200),
+    id: z.string().trim().min(1).max(200),
     role: z.literal("user"),
     parts: z
       .array(z.union([textPartSchema, referencePartSchema]))
@@ -37,7 +37,7 @@ export function parseChatTurnRequest(input: unknown): ChatTurnRequest {
 
 export function toCanonicalUserMessage(request: ChatTurnRequest) {
   return {
-    id: request.message.messageId,
+    id: request.message.id,
     role: request.message.role,
     parts: request.message.parts,
   };

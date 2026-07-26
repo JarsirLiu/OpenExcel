@@ -76,6 +76,36 @@ describe("createAgentToolSet", () => {
     );
   });
 
+  it("returns a model-visible error result when tool execution fails", async () => {
+    const execute = vi.fn().mockRejectedValue(new Error("Sheet 不存在"));
+    const onToolFinish = vi.fn();
+    const tools = createAgentToolSet(
+      [
+        {
+          name: "readSheetData",
+          description: "Read a sheet",
+          inputSchema: z.object({ sheetId: z.number() }),
+        },
+      ],
+      { execute },
+      undefined,
+      { onToolFinish },
+    );
+
+    await expect(
+      (tools.readSheetData as any).execute(
+        { sheetId: 7 },
+        { toolCallId: "call-tool-error", abortSignal: undefined },
+      ),
+    ).resolves.toEqual({
+      isError: true,
+      error: { kind: "execution_failed", message: "Sheet 不存在", retryable: false },
+    });
+    expect(onToolFinish).toHaveBeenCalledWith(
+      expect.objectContaining({ toolCallId: "call-tool-error", error: expect.anything() }),
+    );
+  });
+
   it("rejects tool execution without a provider call id", async () => {
     const execute = vi.fn();
     const tools = createAgentToolSet(

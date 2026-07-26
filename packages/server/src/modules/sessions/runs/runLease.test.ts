@@ -7,7 +7,6 @@ const mocks = vi.hoisted(() => ({
   agentRunFindFirst: vi.fn(),
   agentRunUpdateMany: vi.fn(),
   agentRunCreate: vi.fn(),
-  checkpointFindFirst: vi.fn(),
   transaction: vi.fn(),
 }));
 
@@ -41,18 +40,20 @@ describe("acquireRunLease", () => {
           update: mocks.sessionUpdate,
         },
         agentRun: {
+          findFirst: mocks.agentRunFindFirst,
           updateMany: mocks.agentRunUpdateMany,
           create: mocks.agentRunCreate,
         },
-        agentRunCheckpoint: { findFirst: mocks.checkpointFindFirst },
       }),
     );
     mocks.agentRunUpdateMany.mockResolvedValue({ count: 0 });
     mocks.sessionUpdateMany.mockResolvedValue({ count: 1 });
     mocks.sessionUpdate.mockResolvedValue({ id: 7 });
     mocks.agentRunCreate.mockResolvedValue({ id: 42, status: "running" });
-    mocks.checkpointFindFirst.mockResolvedValue({
-      transcript: JSON.stringify([{ role: "user", parts: [{ type: "text", text: "old" }] }]),
+    mocks.agentRunFindFirst.mockResolvedValue({
+      checkpoint: {
+        transcript: JSON.stringify([{ role: "user", parts: [{ type: "text", text: "old" }] }]),
+      },
     });
   });
 

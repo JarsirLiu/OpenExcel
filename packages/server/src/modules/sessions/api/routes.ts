@@ -1,5 +1,4 @@
 import { formatAIError } from "@openexcel/agent";
-import { consumeStream, pipeUIMessageStreamToResponse } from "ai";
 import type { FastifyInstance } from "fastify";
 import {
   resolveSessionIdForRequest,
@@ -8,7 +7,8 @@ import {
 import { SheetRevisionConflictError } from "../../sheets/domain/errors.js";
 import { type ChatTurnRequest, parseChatTurnRequest } from "../application/chatTurn.js";
 import * as application from "../application/index.js";
-import { DraftRequestConflictError, SessionBusyError } from "../domain/sessionErrors.js";
+import { pipeAgentEventStreamToResponse } from "../chat/agentEventStream.js";
+import { SessionBusyError } from "../domain/sessionErrors.js";
 
 function isDatabaseError(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false;
@@ -48,50 +48,18 @@ export async function sessionRoutes(app: FastifyInstance) {
     },
   );
 
-  app.post<{
-    Params: { workspacePublicId: string };
-    Body: unknown;
-  }>("/api/workspaces/:workspacePublicId/sessions/draft/chat", async (req, reply) => {
-    const workspaceId = await resolveWorkspaceIdForRequest(
-      req,
-      req.params.workspacePublicId,
-      reply,
-    );
-    if (workspaceId == null) return;
-
-    let turn: ChatTurnRequest;
-    try {
-      turn = parseChatTurnRequest(req.body);
-    } catch {
-      return reply.status(400).send({ error: "聊天请求格式无效" });
-    }
-    try {
-      const result = await application.startDraftChat(workspaceId, turn);
-
-      // The stream is written directly to the raw response after hijacking;
-      // Fastify reply headers would otherwise be skipped.
-      reply.raw.setHeader("X-OpenExcel-Session-Id", String(result.session.id));
-      reply.raw.setHeader("X-OpenExcel-Session-Name", encodeURIComponent(result.session.name));
-      reply.raw.setHeader("X-OpenExcel-Run-Id", String(result.runId));
-      reply.hijack();
-      pipeUIMessageStreamToResponse({
-        response: reply.raw,
-        stream: result.stream,
-        consumeSseStream: consumeStream,
-      });
-    } catch (error) {
-      if (error instanceof SessionBusyError) {
-        return reply.status(error.statusCode).send({ error: error.message });
-      }
-      if (error instanceof DraftRequestConflictError) {
-        reply.header("X-OpenExcel-Session-Id", String(error.sessionId));
-        return reply.status(error.statusCode).send({ error: error.message });
-      }
-      const errorMessage = isDatabaseError(error) ? "数据库繁忙，请稍后重试" : formatAIError(error);
-      console.error(`[session] Failed to start draft chat: ${errorMessage}`);
-      if (!reply.sent) return reply.status(502).send({ error: errorMessage });
-    }
-  });
+  app.post<{ Params: { workspacePublicId: string } }>(
+    "/api/workspaces/:workspacePublicId/sessions",
+    async (req, reply) => {
+      const workspaceId = await resolveWorkspaceIdForRequest(
+        req,
+        req.params.workspacePublicId,
+        reply,
+      );
+      if (workspaceId == null) return;
+      return application.createSession(workspaceId);
+    },
+  );
 
   app.delete<{ Params: { workspacePublicId: string; sessionPublicId: string } }>(
     "/api/workspaces/:workspacePublicId/sessions/:sessionPublicId",
@@ -294,11 +262,16 @@ export async function sessionRoutes(app: FastifyInstance) {
     try {
       const result = await application.streamChat(ids.workspaceId, sessionId, turn);
       reply.raw.setHeader("X-OpenExcel-Run-Id", String(result.runId));
+      reply.raw.setHeader("Content-Type", "application/x-ndjson; charset=utf-8");
+      reply.raw.setHeader("Cache-Control", "no-cache, no-transform");
+      reply.raw.setHeader("Connection", "keep-alive");
+      reply.raw.setHeader("X-Accel-Buffering", "no");
       reply.hijack();
-      pipeUIMessageStreamToResponse({
-        response: reply.raw,
-        stream: result.stream,
-        consumeSseStream: consumeStream,
+      void pipeAgentEventStreamToResponse(result.stream, reply.raw).catch((streamError) => {
+        if (!reply.raw.destroyed) {
+          console.error(`[session] Failed to write chat event stream: ${String(streamError)}`);
+          reply.raw.destroy(streamError instanceof Error ? streamError : undefined);
+        }
       });
     } catch (error) {
       if (error instanceof SessionBusyError) {

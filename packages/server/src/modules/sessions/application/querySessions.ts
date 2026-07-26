@@ -1,5 +1,6 @@
 import * as repo from "../infrastructure/sessionRepository.js";
-import { findLatestSessionCheckpoint } from "../runs/checkpointRepository.js";
+import { findLatestSessionCheckpoint, findLatestSessionRun } from "../runs/checkpointRepository.js";
+import { projectRunCheckpointForRun } from "../runs/sessionCheckpointProjector.js";
 
 export async function getSessions(workspaceId: number) {
   return repo.findSessionsByWorkspace(workspaceId);
@@ -25,6 +26,11 @@ export async function getMessages(
 ): Promise<{ messages: any[]; total: number }> {
   const session = await repo.findSession(sessionId, workspaceId);
   if (!session) return { messages: [], total: 0 };
+
+  const latestRun = await findLatestSessionRun(workspaceId, sessionId);
+  if (latestRun) {
+    await projectRunCheckpointForRun(workspaceId, sessionId, latestRun.id);
+  }
 
   const checkpoint = await findLatestSessionCheckpoint(workspaceId, sessionId);
   const transcript = checkpoint?.transcript as any[] | undefined;

@@ -29,7 +29,7 @@
 - `runtime/loop` 负责模型/工具循环；
 - `runtime/tools` 负责把 `AgentToolDefinition` 和注入的 `ToolExecutor` 适配成 provider tool set；
 - `runtime/events` 负责事件 schema、序列和发射；
-- `runtime/stream` 只负责 UI stream 传输适配；
+- server chat stream 只负责 AgentEvent NDJSON 传输适配；
 - Agent 不读取数据库，不依赖 HTTP/Fastify/Prisma，不执行具体 Excel/Chart 副作用。
 - Agent 不拥有 Excel 工具目录、用户权限或审批状态，只消费 server 过滤后的通用工具定义。
 
@@ -96,7 +96,7 @@ export function executeTurn(input: TurnExecutorInput): Promise<TurnExecutorResul
 - `executeTurn` 的公开 contract 不暴露 AI SDK `ToolSet`；
 - Agent、server 和端到端测试通过，覆盖取消、超时、工具失败、持久化失败和断流；
 - 每个迁移提交都通过 `pnpm typecheck` 及受影响包测试；
-- 前端 UI message stream 格式和已有 chat API 行为保持不变。
+- 前端只消费 AgentEvent NDJSON，实时和历史消息使用统一事件投影语义。
 
 ## 分阶段实施
 

@@ -1,12 +1,10 @@
 import {
   AgentPersistenceError,
-  type AgentTranscriptMessage,
   buildExcelToolDefinitions,
   buildRunToolContext,
   buildWorkspaceToolContext,
   createAgentRunner,
   formatAIError,
-  removeEmptyAssistantMessages,
   type ToolExecutor,
   ToolResultBudget,
   wrapToolSetWithResultBudget,
@@ -32,9 +30,9 @@ import { registerRunCancellation } from "../runs/cancellation.js";
 import { createRunFinalizer } from "../runs/runFinalizer.js";
 import { type AcquiredRunLease, acquireRunLease } from "../runs/runLease.js";
 import { clearSessionUndoCheckpoint } from "../runs/undoCheckpoint.js";
+import { createAgentEventStream } from "./agentEventStream.js";
 import { loadWorkspaceChatContext } from "./context.js";
 import { resolveChatMessageReferences } from "./references.js";
-import { holdStreamOpenUntil } from "./settledStream.js";
 
 export async function loadSessionForChat(sessionId: number, workspaceId: number) {
   const session = await repo.findSession(sessionId, workspaceId);
@@ -133,7 +131,13 @@ export async function streamChat(workspaceId: number, sessionId: number, turn: C
     config.modelName,
   );
   const transcript = lease.transcript as Array<Record<string, unknown>>;
-  const finalizer = createRunFinalizer({ workspaceId, sessionId, lease });
+  const eventStream = createAgentEventStream();
+  const finalizer = createRunFinalizer({
+    workspaceId,
+    sessionId,
+    lease,
+    eventSink: eventStream.sink,
+  });
   let cancellation: ReturnType<typeof registerRunCancellation> | undefined;
   let leaseLost = false;
 
@@ -165,7 +169,7 @@ export async function streamChat(workspaceId: number, sessionId: number, turn: C
 
     const result = await createAgentRunner({
       modelConfig: config,
-      turnId: turn.message.messageId,
+      turnId: turn.message.id,
       transcript: resolvedMessages,
       workspace: workspace.workbooks,
       maxRetries: config.maxRetries,
@@ -181,6 +185,7 @@ export async function streamChat(workspaceId: number, sessionId: number, turn: C
       toolExecutor,
       executionContext,
       persistenceBarrier: createAgentPersistenceBarrier(lease.run.id),
+      eventSink: eventStream.sink,
       prepareStep: async () => ({
         activeTools: toolNames.filter((name) => !toolResultBudget.isToolExhausted(name)) as any,
       }),
@@ -189,13 +194,7 @@ export async function streamChat(workspaceId: number, sessionId: number, turn: C
 
     const settlement = result.completion
       .then(async (completion) => {
-        const generatedMessages = completion.messages?.slice(resolvedMessages.length) ?? [];
-        const canonicalMessages = removeEmptyAssistantMessages([
-          ...transcript,
-          ...generatedMessages,
-        ]);
-        await finalizer.finalize({ completion, messages: canonicalMessages, leaseLost });
-        scheduleSessionTitleGeneration(workspaceId, sessionId, inputText);
+        await finalizer.finalize({ completion, leaseLost });
       })
       .catch(async (error) => {
         const cancelled = runCancellation.signal.aborted;
@@ -209,22 +208,26 @@ export async function streamChat(workspaceId: number, sessionId: number, turn: C
           leaseLost,
         });
       })
-      .finally(() => runCancellation.close());
+      .finally(() => {
+        scheduleSessionTitleGeneration(workspaceId, sessionId, inputText);
+        runCancellation.close();
+      });
 
-    // Do not let the browser observe the end of the stream before the
-    // server-owned checkpoint and run status are durable. This is the
-    // boundary that allows the web client to activate a newly created
-    // session without replacing its live projection with an empty history.
-    const stream = holdStreamOpenUntil(result.stream, settlement);
-    return { stream, runId: lease.run.id };
+    void settlement.then(
+      () => eventStream.close(),
+      (error) => eventStream.fail(error),
+    );
+
+    return { stream: eventStream.stream, runId: lease.run.id };
   } catch (error) {
     cancellation?.close();
+    eventStream.fail(error);
     await finalizer.finalize({
       status: error instanceof AgentPersistenceError ? "recovery_required" : "failed",
-      messages: transcript as AgentTranscriptMessage[],
       errorMessage: formatAIError(error),
       leaseLost,
     });
+    scheduleSessionTitleGeneration(workspaceId, sessionId, inputText);
     throw error;
   }
 }
