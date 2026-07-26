@@ -1,3 +1,4 @@
+import { type ModelSafeJsonValue, toModelSafeJsonValue } from "@openexcel/agent";
 import { prisma } from "../../../infra/database/db.js";
 import type { Prisma } from "../../../infra/database/prismaTypes.js";
 
@@ -19,6 +20,10 @@ export class ToolExecutionConflictError extends Error {
 }
 
 function serialize(value: unknown): string {
+  return serializeJsonValue(toModelSafeJsonValue(value));
+}
+
+function serializeJsonValue(value: ModelSafeJsonValue): string {
   if (
     value === null ||
     typeof value === "string" ||
@@ -27,14 +32,14 @@ function serialize(value: unknown): string {
   ) {
     return JSON.stringify(value);
   }
-  if (Array.isArray(value)) return `[${value.map(serialize).join(",")}]`;
+  if (Array.isArray(value)) return `[${value.map(serializeJsonValue).join(",")}]`;
   if (typeof value === "object") {
-    return `{${Object.entries(value as Record<string, unknown>)
+    return `{${Object.entries(value as Record<string, ModelSafeJsonValue>)
       .sort(([left], [right]) => left.localeCompare(right))
-      .map(([key, entry]) => `${JSON.stringify(key)}:${serialize(entry)}`)
+      .map(([key, entry]) => `${JSON.stringify(key)}:${serializeJsonValue(entry)}`)
       .join(",")}}`;
   }
-  throw new Error("Tool execution value is not JSON serializable");
+  throw new Error("Tool execution value is not a model-safe JSON value");
 }
 
 function deserialize(value: string): unknown {

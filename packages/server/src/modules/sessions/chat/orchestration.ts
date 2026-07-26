@@ -7,6 +7,7 @@ import {
   formatAIError,
   type ToolExecutor,
   ToolResultBudget,
+  toModelSafeJsonValue,
   wrapToolSetWithResultBudget,
 } from "@openexcel/agent";
 import { loadModelConfig } from "../../../config.js";
@@ -109,11 +110,12 @@ export function createConcreteToolExecutor(
         executionContext?.db == null || typeof baseContext !== "object" || baseContext === null
           ? baseContext
           : { ...(baseContext as Record<string, unknown>), db: executionContext.db };
-      return tool.execute(input, {
+      const output = await tool.execute(input, {
         toolCallId: options.toolCallId,
         abortSignal: options.abortSignal,
         context,
       });
+      return toModelSafeJsonValue(output);
     },
   };
 }

@@ -314,4 +314,42 @@ describe("runAgentLoop", () => {
     expect(execute).toHaveBeenCalled();
     expect(result.completion).toBeDefined();
   });
+
+  it("passes the actual SDK error to the error callback", async () => {
+    const providerError = Object.assign(new Error("provider rejected continuation"), {
+      statusCode: 400,
+      responseBody: JSON.stringify({ error: { message: "invalid tool message" } }),
+    });
+
+    mocks.streamText.mockImplementation((options: any) => {
+      void options.onError({ error: providerError });
+      return {
+        stream: new ReadableStream({
+          start(controller) {
+            controller.close();
+          },
+        }),
+        text: Promise.reject(providerError),
+        responseMessages: Promise.reject(providerError),
+      };
+    });
+
+    const onError = vi.fn();
+    const result = await runAgentLoop({
+      modelConfig: { baseUrl: "http://model", apiKey: "test-key", modelName: "test-model" },
+      transcript: [{ role: "user", parts: [{ type: "text", text: "继续" }] }],
+      systemPrompt: "你是表格助手",
+      workspace: [],
+      tools: [],
+      toolExecutor: { execute: vi.fn() },
+      onError,
+    } as any);
+
+    await expect(result.completion).resolves.toMatchObject({
+      status: "failed",
+      error: providerError,
+      failurePhase: "model",
+    });
+    expect(onError).toHaveBeenCalledWith(providerError);
+  });
 });

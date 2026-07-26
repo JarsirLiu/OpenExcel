@@ -144,17 +144,9 @@ export function useChatRun({
             ) {
               if (event.type === "run.failed") {
                 const payload = asRecord(event.payload);
-                const rawMessage =
-                  typeof payload?.error === "string" && payload.error.trim().length > 0
-                    ? payload.error
-                    : "对话执行失败";
-                const message =
-                  payload?.failurePhase === "model" &&
-                  typeof payload.failureStepIndex === "number" &&
-                  payload.failureStepIndex > 0
-                    ? `${rawMessage}（工具调用完成后未能继续生成最终回复）`
-                    : rawMessage;
-                setError(new Error(message));
+                if (typeof payload?.error === "string" && payload.error.trim().length > 0) {
+                  setError(new Error(payload.error));
+                }
               }
               activeRunRef.current = null;
               setIsStreaming(false);

@@ -76,6 +76,26 @@ describe("createAgentToolSet", () => {
     );
   });
 
+  it("normalizes executor output before it enters the AI SDK loop", async () => {
+    const tools = createAgentToolSet(
+      [{ name: "createChart", description: "Create a chart", inputSchema: z.object({}) }],
+      {
+        execute: vi.fn().mockResolvedValue({
+          chartId: "chart-1",
+          createdAt: new Date("2026-07-26T08:00:00.000Z"),
+        }),
+      },
+      undefined,
+    );
+
+    await expect(
+      (tools.createChart as any).execute({}, { toolCallId: "call-chart", abortSignal: undefined }),
+    ).resolves.toEqual({
+      chartId: "chart-1",
+      createdAt: "2026-07-26T08:00:00.000Z",
+    });
+  });
+
   it("returns a model-visible error result when tool execution fails", async () => {
     const execute = vi.fn().mockRejectedValue(new Error("Sheet 不存在"));
     const onToolFinish = vi.fn();

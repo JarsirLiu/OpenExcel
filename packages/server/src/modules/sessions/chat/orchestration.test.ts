@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { buildRunToolset } from "./orchestration.js";
+import { describe, expect, it, vi } from "vitest";
+import { buildRunToolset, createConcreteToolExecutor } from "./orchestration.js";
 
 describe("buildRunToolset", () => {
   it("binds run-scoped tools to the active run", () => {
@@ -26,5 +26,27 @@ describe("buildRunToolset", () => {
     expect(toolsContext.readSheetData).toEqual({ workspaceId: 3 });
     expect(toolsContext.createChart).toEqual({ runId: 19, workspaceId: 3 });
     expect(toolsContext.writeCells).toEqual({ runId: 19, workspaceId: 3 });
+  });
+
+  it("normalizes concrete tool output before the idempotent executor persists it", async () => {
+    const execute = vi.fn().mockResolvedValue({
+      chartId: "chart-1",
+      createdAt: new Date("2026-07-26T08:00:00.000Z"),
+    });
+    const executor = createConcreteToolExecutor(
+      { createChart: { execute } } as any,
+      { createChart: { workspaceId: 3 } } as any,
+    );
+
+    await expect(
+      executor.execute(
+        "createChart",
+        {},
+        { toolCallId: "call-1", context: {}, abortSignal: undefined },
+      ),
+    ).resolves.toEqual({
+      chartId: "chart-1",
+      createdAt: "2026-07-26T08:00:00.000Z",
+    });
   });
 });

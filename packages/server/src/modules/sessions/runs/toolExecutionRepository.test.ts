@@ -18,7 +18,7 @@ vi.mock("../../../infra/database/db.js", () => ({
   },
 }));
 
-import { claimToolExecution } from "./toolExecutionRepository.js";
+import { claimToolExecution, completeToolExecution } from "./toolExecutionRepository.js";
 
 describe("claimToolExecution", () => {
   beforeEach(() => {
@@ -63,5 +63,24 @@ describe("claimToolExecution", () => {
         now,
       }),
     ).resolves.toEqual({ kind: "execute" });
+  });
+
+  it("stores Date values as the same JSON shape used by replay", async () => {
+    mocks.update.mockResolvedValue({});
+
+    await completeToolExecution(9, "call-1", {
+      chartId: "chart-1",
+      createdAt: new Date("2026-07-26T08:00:00.000Z"),
+    });
+
+    expect(mocks.update).toHaveBeenCalledWith({
+      where: { runId_toolCallId: { runId: 9, toolCallId: "call-1" } },
+      data: {
+        status: "completed",
+        output: '{"chartId":"chart-1","createdAt":"2026-07-26T08:00:00.000Z"}',
+        errorMessage: null,
+        endedAt: expect.any(Date),
+      },
+    });
   });
 });

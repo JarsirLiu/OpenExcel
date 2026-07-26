@@ -208,7 +208,7 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
       aborted = true;
       await input.onAbort?.(event);
     },
-    onError: async (error: unknown) => {
+    onError: async ({ error }: { error: unknown }) => {
       loopError = error;
       failurePhase = "model";
       await input.onError?.(error);

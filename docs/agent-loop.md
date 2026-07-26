@@ -591,6 +591,15 @@ interface ToolExecutor {
 }
 ```
 
+`ToolExecutor.execute` 返回的结果必须是模型可消费的纯 JSON 值：`null`、字符串、有限数字、
+布尔值、数组或普通对象。`Date`、`BigInt`、Prisma 实体、类实例、函数和循环引用不得越过
+Agent/server 适配边界。server 的具体工具可以在数据库层使用 Prisma 返回值，但必须在工具
+适配器中转换为面向模型的 DTO；Agent 适配器还会执行一次统一的 JSON 规范化，保证工具结果、
+事件输出、幂等账本和 replay 使用同一数据形状。
+
+工具业务成功与模型 continuation 成功是两个独立阶段：工作簿事务提交成功后，若工具结果
+不是合法模型 JSON，Agent 应报告 Agent/协议执行错误，而不能把已成功的工作簿工具标记为业务失败。
+
 `context` 是 Agent 不解释的不透明执行上下文。server 可以在自己的适配器中把它实现为
 `{ workspaceId, runId }`，但这些字段不能进入 Agent 包的通用 contract，也不能让 Agent
 根据这些字段执行授权判断。授权和具体 ID 语义始终属于 server。

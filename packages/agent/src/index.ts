@@ -47,6 +47,10 @@ export {
   validateToolInput,
 } from "./runtime/tools/inputValidation.js";
 export {
+  type ModelSafeJsonValue,
+  toModelSafeJsonValue,
+} from "./runtime/tools/modelSafeJson.js";
+export {
   type SerializationOptions,
   type SerializationResult,
   serializeAndValidate,

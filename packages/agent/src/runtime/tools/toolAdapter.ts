@@ -3,6 +3,7 @@ import type { AgentToolDefinition, AgentToolExecutionOptions, ToolExecutor } fro
 import { AgentPersistenceError } from "../events/types.js";
 import { toToolError } from "./errors.js";
 import { validateToolInput } from "./inputValidation.js";
+import { toModelSafeJsonValue } from "./modelSafeJson.js";
 
 export interface ToolAdapterHooks {
   onToolStart?: (event: {
@@ -97,7 +98,9 @@ export function createAgentToolSet(
 
           try {
             throwIfAborted(executionOptions.abortSignal);
-            const output = await executor.execute(definition.name, input, executionOptions);
+            const output = toModelSafeJsonValue(
+              await executor.execute(definition.name, input, executionOptions),
+            );
             await hooks.onToolFinish?.({
               toolName: definition.name,
               toolCallId,

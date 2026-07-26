@@ -2,6 +2,7 @@ import { excelToolSpecs, runToolContextSchema } from "@openexcel/agent";
 import type { Prisma } from "../../../infra/database/prismaTypes.js";
 import { updateChartMutation } from "../application/chartMutationService.js";
 import { toUpdateChartPatch } from "./chartToolInput.js";
+import { toUpdateChartToolResult } from "./chartToolResult.js";
 
 export const updateChart = {
   ...excelToolSpecs.updateChart,
@@ -19,7 +20,7 @@ export const updateChart = {
       toolCallId?: string;
     },
   ) => {
-    return updateChartMutation(
+    const result = await updateChartMutation(
       context.workspaceId,
       input.chartId,
       toUpdateChartPatch(input.patch),
@@ -30,5 +31,6 @@ export const updateChart = {
         commandHash: JSON.stringify(input),
       },
     );
+    return toUpdateChartToolResult(result, input.chartId);
   },
 };
