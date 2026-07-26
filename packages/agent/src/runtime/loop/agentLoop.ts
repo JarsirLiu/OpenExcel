@@ -83,6 +83,7 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
     maxUserInputTokens: input.maxUserInputTokens ?? DEFAULT_MAX_USER_INPUT_TOKENS,
     systemPrompt: input.systemPrompt,
   });
+  const timeout = input.timeout ?? { totalMs: 120_000, toolMs: 120_000 };
   const agentAbortController = new AbortController();
   if (input.abortSignal?.aborted) {
     agentAbortController.abort(input.abortSignal.reason);
@@ -104,15 +105,22 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
   // contribute text, reasoning, and tool parts, but they must not become
   // separate assistant message entities.
   const assistantMessageId = `${input.turnId ?? "run"}-assistant`;
+  const startedToolCallIds = new Set<string>();
+  const emitToolStarted = async (event: {
+    toolName: string;
+    toolCallId: string;
+    input?: unknown;
+  }) => {
+    if (startedToolCallIds.has(event.toolCallId)) return;
+    startedToolCallIds.add(event.toolCallId);
+    await createEventEmitter.emit("tool.started", {
+      ...event,
+      turnId: input.turnId,
+      stepIndex,
+      messageId: assistantMessageId,
+    });
+  };
   const tools = createAgentToolSet(input.tools, input.toolExecutor, input.executionContext, {
-    onToolStart: async (event) => {
-      await createEventEmitter.emit("tool.started", {
-        ...event,
-        turnId: input.turnId,
-        stepIndex,
-        messageId: assistantMessageId,
-      });
-    },
     onToolFinish: async (event) => {
       await createEventEmitter.emit("tool.finished", {
         ...event,
@@ -164,7 +172,7 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
     stopWhen: isLoopFinished(),
     maxOutputTokens: input.outputReserveTokens ?? DEFAULT_OUTPUT_RESERVE_TOKENS,
     maxRetries: input.maxRetries ?? 2,
-    timeout: (input.timeout ?? { totalMs: 120_000, chunkMs: 30_000 }) as any,
+    timeout: timeout as any,
     abortSignal: agentAbortController.signal,
     onStepFinish: async (step: any) => {
       await emitEvent("step.finished", normalizeStepPayload(step));
@@ -177,7 +185,9 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
       });
     },
     onChunk: async ({ chunk }: { chunk: any }) => {
-      if (chunk.type === "text-delta") {
+      if (chunk.type === "tool-input-start") {
+        await emitToolStarted({ toolName: chunk.toolName, toolCallId: chunk.id });
+      } else if (chunk.type === "text-delta") {
         streamedText += chunk.text;
         await emitEvent("message.delta", {
           turnId: input.turnId ?? "unknown",

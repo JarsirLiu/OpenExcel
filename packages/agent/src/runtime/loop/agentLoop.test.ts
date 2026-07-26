@@ -31,6 +31,9 @@ function createModelStream(options: {
     start(controller) {
       void (async () => {
         await options.onStepStart({ stepNumber: 0 });
+        await options.onChunk?.({
+          chunk: { type: "tool-input-start", id: "call-1", toolName: "readSheetData" },
+        });
         const toolOutput = await options.tools.readSheetData.execute(
           { sheetId: 7 },
           { toolCallId: "call-1", abortSignal: options.abortSignal },

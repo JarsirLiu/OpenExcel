@@ -91,30 +91,32 @@ export function createAgentToolSet(
             context: executionContext,
           };
 
+          let finished = false;
+          const finish = async (event: { output?: unknown; error?: unknown }) => {
+            if (finished) return;
+            finished = true;
+            await hooks.onToolFinish?.({
+              toolName: definition.name,
+              toolCallId,
+              input,
+              ...event,
+            });
+          };
+
           try {
             throwIfAborted(executionOptions.abortSignal);
             const output = toModelSafeJsonValue(await executor.execute(executionOptions));
-            await hooks.onToolFinish?.({
-              toolName: definition.name,
-              toolCallId,
-              input,
-              output,
-            });
+            await finish({ output });
             return output;
           } catch (error) {
-            if (
-              isAbortError(error, executionOptions.abortSignal) ||
-              error instanceof AgentPersistenceError
-            ) {
+            const cancelled = isAbortError(error, executionOptions.abortSignal);
+            if (cancelled) {
+              await finish({ error: { kind: "cancelled", message: "工具执行已中断" } });
               throw error;
             }
             const toolError = toToolError(error);
-            await hooks.onToolFinish?.({
-              toolName: definition.name,
-              toolCallId,
-              input,
-              error: toolError,
-            });
+            await finish({ error: toolError });
+            if (error instanceof AgentPersistenceError) throw error;
             // A business/tool failure is a model-visible tool result. The
             // model must be allowed to explain the failure or choose another
             // step; only cancellation and persistence failures abort the run.

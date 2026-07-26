@@ -74,6 +74,7 @@ AgentEvent 以 `(runId, sequence)` 和全局 `eventId` 做内容一致性幂等�
 - `cancelRequestedAt` 是服务端取消意图的持久化标记。取消接口重复调用不会重复执行取消动作，终态运行也不会被改写。
 - `POST .../runs/:runId/cancel` 是唯一的显式取消入口。它先更新数据库，再通知当前进程中的 Agent；Agent 在模型调用和工具执行边界收到 `AbortSignal` 后结束为 `cancelled`。
 - Agent 运行时统一把取消信号传递到模型和工具边界；工具开始执行前再次检查信号，因 abort 导致的模型 promise rejection 仍归类为 `cancelled`，不会覆盖已持久化的部分事件为 `failed`。
+- 工具执行使用 Agent 统一的 `AbortSignal`；工具等待预算交给 AI SDK 的 `toolMs`，不在工具适配器中使用脱离底层执行的 `Promise.race`。Server 工具应在数据库事务和大范围展开等边界检查该信号，取消后不得提交未完成的副作用。
 - SSE/HTTP 响应断开不再调用 Agent 的 `AbortController`。AI SDK 的独立消费支路继续驱动服务端运行，连接断开只影响订阅者。
 - 当前取消信号在本进程通过注册表即时唤醒，并周期性读取数据库标记；数据库运行租约和服务端事件投影已经落地。
   进程异常退出后的自动恢复和人工诊断仍属于后续可靠性能力。
@@ -413,7 +414,7 @@ type PersistedAgentEvent = {
    - `droppedMessages`: 因token预算裁剪丢弃的消息数
    - `droppedTurns`: 因token预算裁剪丢弃的完整轮次数
 
-2. **tool.started**: 工具开始执行时触发，用于持久化工具调用意图
+2. **tool.started**: AI SDK 产生 `tool-input-start` 时触发，用于在模型仍在生成工具参数时持久化工具调用意图；它不等待工具执行，也不由 `tool.execute` 兜底补发
    - `toolName`: 工具名称
    - `toolCallId`: 工具调用唯一ID（用于幂等）
    - `input`: 工具输入参数
@@ -452,6 +453,10 @@ type PersistedAgentEvent = {
 - 持久化失败时，Agent必须立即停止执行，不允许仅记录日志后继续
 - `sequence`在一个run内单调递增，客户端回放时按sequence去重
 - `tool.finished`事件的output/error字段互斥，不能同时存在
+- 已经发出 `tool.started` 的工具，无论成功、业务失败还是显式取消，都必须发出对应的
+  `tool.finished`；只有尚未开始执行的工具可以没有工具终态事件。终态投影还必须把
+  运行结束时残留的 pending 工具卡片收敛为错误态，不能在历史中继续显示为运行中。
+- 工具等待超时由 AI SDK 作为工具错误交还模型，属于工具失败而不是对话失败；只有运行取消或事件持久化失败才终止 Agent loop。
 - `step.started`和`step.finished`只保留回放所需的规范化字段，不写入完整 provider request/response
 - 取消事实和取消收敛是两个状态：`run.cancelled` 表示 Agent 已停止；只有 checkpoint、
   transcript、游标和 lease 都完成后，`AgentRun.status` 才能写为 `cancelled`。收敛失败时

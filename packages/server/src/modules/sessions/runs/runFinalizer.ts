@@ -66,19 +66,21 @@ export function createRunFinalizer(options: {
 
   async function finalize(input: RunFinalizationInput) {
     const outcome = outcomeFromInput(input);
+    console.info(
+      "[session.run]",
+      JSON.stringify({
+        at: new Date().toISOString(),
+        phase: "finalize_started",
+        runId: options.lease.run.id,
+        status: outcome.status,
+        error: outcome.errorMessage,
+      }),
+    );
     let allEvents: Awaited<ReturnType<typeof findAgentEventsByRun>> = [];
     let lifecycleEvent: Awaited<ReturnType<typeof persistRunLifecycleEvent>> | undefined;
     try {
       allEvents = await findAgentEventsByRun(options.lease.run.id);
-      if (allEvents.length > 0) {
-        const durableEvents = allEvents.map(toAgentEvent);
-        const transcript = projectRunTranscript(
-          durableEvents,
-          (options.lease.transcript ?? []) as AgentTranscriptMessage[],
-        );
-        const checkpoint = projectRunCheckpoint(durableEvents, transcript);
-        await persistRunCheckpoint({ runId: options.lease.run.id, ...checkpoint });
-      }
+      let projectionEvents = allEvents.map(toAgentEvent);
       if (outcome.status !== "recovery_required") {
         lifecycleEvent = await persistRunLifecycleEvent({
           runId: options.lease.run.id,
@@ -97,6 +99,16 @@ export function createRunFinalizer(options: {
               : { failureStepIndex: outcome.failureStepIndex }),
           },
         });
+        if (lifecycleEvent) projectionEvents = [...projectionEvents, toAgentEvent(lifecycleEvent)];
+      }
+
+      if (projectionEvents.length > 0) {
+        const transcript = projectRunTranscript(
+          projectionEvents,
+          (options.lease.transcript ?? []) as AgentTranscriptMessage[],
+        );
+        const checkpoint = projectRunCheckpoint(projectionEvents, transcript);
+        await persistRunCheckpoint({ runId: options.lease.run.id, ...checkpoint });
       }
     } catch (error) {
       outcome.status = "recovery_required";
@@ -122,6 +134,15 @@ export function createRunFinalizer(options: {
         await markRecoveryRequired("运行租约已失效，等待恢复器检查");
       } else if (lifecycleEvent) {
         await options.eventSink?.publish(toAgentEvent(lifecycleEvent));
+        console.info(
+          "[session.run]",
+          JSON.stringify({
+            at: new Date().toISOString(),
+            phase: "terminal_published",
+            runId: options.lease.run.id,
+            status: outcome.status,
+          }),
+        );
       }
     } catch (error) {
       console.error(`[session] Failed to finalize run ${options.lease.run.id}:`, error);

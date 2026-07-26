@@ -213,7 +213,7 @@ export async function streamChat(workspaceId: number, sessionId: number, turn: C
       maxUserInputTokens: config.maxUserInputTokens,
       timeout: {
         totalMs: config.timeoutMs,
-        chunkMs: config.chunkTimeoutMs,
+        toolMs: config.timeoutMs,
       },
       tools: toolDefinitions,
       toolCatalog: buildExcelToolCatalog(toolDefinitions.map((tool) => tool.name)),

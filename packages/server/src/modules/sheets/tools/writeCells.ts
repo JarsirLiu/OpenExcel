@@ -61,33 +61,11 @@ function affectedRange(cells: SheetChangeCell) {
 export const writeCells = defineServerTool("writeCells", {
   execute: async (input, options) => {
     const { sheetId, operations } = input;
-    console.info(
-      "[session.tool.writeCells]",
-      JSON.stringify({
-        at: new Date().toISOString(),
-        phase: "started",
-        runId: options.context.runId,
-        toolCallId: options.toolCallId,
-        sheetId,
-        operationCount: operations.length,
-      }),
-    );
     return runSheetMutation(
       { ...options.context, db: options.db },
       sheetId,
       async (sheet, tx) => {
         const cells = expandOperations(operations, options.abortSignal);
-        console.info(
-          "[session.tool.writeCells]",
-          JSON.stringify({
-            at: new Date().toISOString(),
-            phase: "expanded",
-            runId: options.context.runId,
-            toolCallId: options.toolCallId,
-            sheetId,
-            cellCount: cells.length,
-          }),
-        );
         const mutation: SheetMutation = { type: "write", cells };
         const result = await executeSheetCommandInTransaction(tx, options.context.workspaceId, {
           kind: "mutation",
@@ -121,18 +99,6 @@ export const writeCells = defineServerTool("writeCells", {
           ),
           sheetInfo: { sheetId: sheet.id, sheetNo: sheet.sheetNo, sheetName: sheet.name },
         };
-        console.info(
-          "[session.tool.writeCells]",
-          JSON.stringify({
-            at: new Date().toISOString(),
-            phase: "mutation_finished",
-            runId: options.context.runId,
-            toolCallId: options.toolCallId,
-            sheetId,
-            updatedCells: output.updatedCells,
-            revision: output.revision,
-          }),
-        );
         return output;
       },
       options.abortSignal,
