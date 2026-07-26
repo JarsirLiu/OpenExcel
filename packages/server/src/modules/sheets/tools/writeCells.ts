@@ -1,5 +1,6 @@
 import {
   type ExcelToolInput,
+  MAX_WRITE_CELLS_PER_CALL,
   type SheetChangeCell,
   type SheetMutation,
   storageIndex,
@@ -13,15 +14,34 @@ import { toSheetToolPatchResult } from "./sheetToolResult.js";
 
 type WriteOperation = ExcelToolInput<"writeCells">["operations"][number];
 
-function expandOperations(operations: WriteOperation[]): SheetChangeCell[] {
+function expandOperations(
+  operations: WriteOperation[],
+  abortSignal?: AbortSignal,
+): SheetChangeCell[] {
   const cells: SheetChangeCell[] = [];
   for (const operation of operations) {
+    if (abortSignal?.aborted) {
+      throw abortSignal.reason instanceof Error ? abortSignal.reason : new Error("工具执行已中断");
+    }
     if (operation.type === "cell") {
+      if (cells.length >= MAX_WRITE_CELLS_PER_CALL) {
+        throw new Error("单次 writeCells 最多写入 10000 个单元格");
+      }
       cells.push(operation);
       continue;
     }
+    const rangeSize =
+      (operation.endRow - operation.startRow + 1) * (operation.endCol - operation.startCol + 1);
+    if (cells.length + rangeSize > MAX_WRITE_CELLS_PER_CALL) {
+      throw new Error("单次 writeCells 最多写入 10000 个单元格");
+    }
     for (let row = operation.startRow; row <= operation.endRow; row++) {
       for (let col = operation.startCol; col <= operation.endCol; col++) {
+        if (abortSignal?.aborted) {
+          throw abortSignal.reason instanceof Error
+            ? abortSignal.reason
+            : new Error("工具执行已中断");
+        }
         cells.push({ row, col, value: operation.value, formula: operation.formula });
       }
     }
@@ -41,42 +61,81 @@ function affectedRange(cells: SheetChangeCell) {
 export const writeCells = defineServerTool("writeCells", {
   execute: async (input, options) => {
     const { sheetId, operations } = input;
-    return runSheetMutation(options.context, sheetId, async (sheet, tx) => {
-      const cells = expandOperations(operations);
-      const mutation: SheetMutation = { type: "write", cells };
-      const result = await executeSheetCommandInTransaction(tx, options.context.workspaceId, {
-        kind: "mutation",
-        mutationId: createSheetToolMutationId(
-          options.context.runId,
-          "writeCells",
-          options.toolCallId,
-        ),
+    console.info(
+      "[session.tool.writeCells]",
+      JSON.stringify({
+        at: new Date().toISOString(),
+        phase: "started",
+        runId: options.context.runId,
+        toolCallId: options.toolCallId,
         sheetId,
-        baseRevision: sheet.revision,
-        mutation,
-      });
-      const ranges = cells.map(affectedRange);
-      const minRow = Math.min(...ranges.map((range) => range.startRow));
-      const maxRow = Math.max(...ranges.map((range) => range.endRow));
-      const minCol = Math.min(...ranges.map((range) => range.startCol));
-      const maxCol = Math.max(...ranges.map((range) => range.endCol));
-      const { snapshot } = result;
-      const commandResult = toSheetToolPatchResult(result);
-      const output = {
-        success: true as const,
-        updatedCells: result.changeSummary.changedCellCount,
-        ...commandResult,
-        preview: buildSheetChangePreview(
-          snapshot.celldata,
-          sheet.name,
+        operationCount: operations.length,
+      }),
+    );
+    return runSheetMutation(
+      { ...options.context, db: options.db },
+      sheetId,
+      async (sheet, tx) => {
+        const cells = expandOperations(operations, options.abortSignal);
+        console.info(
+          "[session.tool.writeCells]",
+          JSON.stringify({
+            at: new Date().toISOString(),
+            phase: "expanded",
+            runId: options.context.runId,
+            toolCallId: options.toolCallId,
+            sheetId,
+            cellCount: cells.length,
+          }),
+        );
+        const mutation: SheetMutation = { type: "write", cells };
+        const result = await executeSheetCommandInTransaction(tx, options.context.workspaceId, {
+          kind: "mutation",
+          mutationId: createSheetToolMutationId(
+            options.context.runId,
+            "writeCells",
+            options.toolCallId,
+          ),
           sheetId,
-          storageIndex(minRow),
-          storageIndex(maxRow),
-          { startCol: storageIndex(minCol), endCol: storageIndex(maxCol) },
-        ),
-        sheetInfo: { sheetId: sheet.id, sheetNo: sheet.sheetNo, sheetName: sheet.name },
-      };
-      return output;
-    });
+          baseRevision: sheet.revision,
+          mutation,
+        });
+        const ranges = cells.map(affectedRange);
+        const minRow = Math.min(...ranges.map((range) => range.startRow));
+        const maxRow = Math.max(...ranges.map((range) => range.endRow));
+        const minCol = Math.min(...ranges.map((range) => range.startCol));
+        const maxCol = Math.max(...ranges.map((range) => range.endCol));
+        const { snapshot } = result;
+        const commandResult = toSheetToolPatchResult(result);
+        const output = {
+          success: true as const,
+          updatedCells: result.changeSummary.changedCellCount,
+          ...commandResult,
+          preview: buildSheetChangePreview(
+            snapshot.celldata,
+            sheet.name,
+            sheetId,
+            storageIndex(minRow),
+            storageIndex(maxRow),
+            { startCol: storageIndex(minCol), endCol: storageIndex(maxCol) },
+          ),
+          sheetInfo: { sheetId: sheet.id, sheetNo: sheet.sheetNo, sheetName: sheet.name },
+        };
+        console.info(
+          "[session.tool.writeCells]",
+          JSON.stringify({
+            at: new Date().toISOString(),
+            phase: "mutation_finished",
+            runId: options.context.runId,
+            toolCallId: options.toolCallId,
+            sheetId,
+            updatedCells: output.updatedCells,
+            revision: output.revision,
+          }),
+        );
+        return output;
+      },
+      options.abortSignal,
+    );
   },
 });
