@@ -62,14 +62,12 @@ describe("agent persistence adapters", () => {
     const execute = vi.fn();
     const executor = createIdempotentToolExecutor(9, { execute });
 
-    const output = await executor.execute(
-      "createChart",
-      { workbookId: "7", sheetId: "11", type: "line" },
-      {
-        toolCallId: "call-1",
-        context: {},
-      },
-    );
+    const output = await executor.execute({
+      toolName: "createChart",
+      input: { workbookId: "7", sheetId: "11", type: "line" },
+      toolCallId: "call-1",
+      context: {},
+    });
 
     expect(output).toEqual({ value: 7 });
     expect(execute).not.toHaveBeenCalled();
@@ -82,14 +80,24 @@ describe("agent persistence adapters", () => {
     const executor = createIdempotentToolExecutor(9, { execute });
 
     await expect(
-      executor.execute("writeCells", { sheetId: 3 }, { toolCallId: "call-1", context: {} }),
+      executor.execute({
+        toolName: "writeCells",
+        input: { sheetId: 3 },
+        toolCallId: "call-1",
+        context: {},
+      }),
     ).resolves.toEqual({ ok: true });
     expect(mocks.completeToolExecutionUsing).toHaveBeenCalledWith({}, 9, "call-1", { ok: true });
 
     const failure = new Error("tool failed");
     execute.mockRejectedValueOnce(failure);
     await expect(
-      executor.execute("writeCells", { sheetId: 3 }, { toolCallId: "call-2", context: {} }),
+      executor.execute({
+        toolName: "writeCells",
+        input: { sheetId: 3 },
+        toolCallId: "call-2",
+        context: {},
+      }),
     ).rejects.toThrow("tool failed");
     expect(mocks.failToolExecutionUsing).toHaveBeenCalledWith({}, 9, "call-2", failure);
   });
@@ -101,14 +109,12 @@ describe("agent persistence adapters", () => {
     const execute = vi.fn().mockResolvedValue(output);
     const executor = createIdempotentToolExecutor(9, { execute });
 
-    const result = executor.execute(
-      "createChart",
-      { sheetId: 11 },
-      {
-        toolCallId: "call-3",
-        context: {},
-      },
-    );
+    const result = executor.execute({
+      toolName: "createChart",
+      input: { sheetId: 11 },
+      toolCallId: "call-3",
+      context: {},
+    });
     await expect(result).rejects.toBeInstanceOf(AgentPersistenceError);
     await expect(result).rejects.toThrow("ledger unavailable");
 

@@ -1,3 +1,4 @@
+import type { Prisma } from "../../../infra/database/prismaTypes.js";
 import {
   buildBlankSheetInitialization,
   buildSourceSheetInitialization,
@@ -11,8 +12,9 @@ export async function createSheet(
   workbookId: number,
   name?: string,
   sourceSheetId?: number,
+  db?: Prisma.TransactionClient,
 ) {
-  const workbook = await repo.findWorkbookWithSheets(workbookId, workspaceId);
+  const workbook = await repo.findWorkbookWithSheets(workbookId, workspaceId, db);
   if (!workbook) return null;
 
   const sourceSheet =
@@ -29,16 +31,19 @@ export async function createSheet(
     ? buildSourceSheetInitialization(sourceSheet)
     : buildBlankSheetInitialization();
 
-  const sheet = await repo.createSheet({
-    workbookId,
-    sheetNo: nextSheetNo,
-    name: nextName,
-    order: nextOrder,
-    columns: payload.columns,
-    merges: payload.merges,
-    uploadedData: payload.uploadedData,
-    config: payload.config,
-  });
+  const sheet = await repo.createSheet(
+    {
+      workbookId,
+      sheetNo: nextSheetNo,
+      name: nextName,
+      order: nextOrder,
+      columns: payload.columns,
+      merges: payload.merges,
+      uploadedData: payload.uploadedData,
+      config: payload.config,
+    },
+    db,
+  );
 
   return { workbookId, id: sheet.id, sheetNo: sheet.sheetNo, name: sheet.name, order: sheet.order };
 }

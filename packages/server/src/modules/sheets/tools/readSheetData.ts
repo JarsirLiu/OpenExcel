@@ -1,9 +1,5 @@
-import {
-  estimateTokens,
-  excelToolSpecs,
-  type ToolExecutionBudget,
-  workspaceToolContextSchema,
-} from "@openexcel/agent";
+import { estimateTokens } from "@openexcel/agent";
+import type { ExcelToolInput } from "@openexcel/core";
 import {
   parseSheetToolRange,
   projectSheetData,
@@ -11,20 +7,15 @@ import {
   type SheetToolRange,
   sheetToolRangeToA1,
 } from "@openexcel/core";
+import { workspaceToolContextSchema } from "../../../shared/tools/context.js";
+import { sheetReadOutputSchema } from "../../../shared/tools/outputSchemas.js";
+import { defineServerTool } from "../../../shared/tools/serverTool.js";
 import { sheetRecordToSnapshot } from "../../../shared/utils/sheetSnapshot.js";
 import { findSheetForWorkspace } from "../infrastructure/sheetRepository.js";
 
 const MAX_CELLS_PER_READ = 4_000;
 
-type ReadSheetDataInput = {
-  sheetId: number;
-  range?: string;
-  continuation?: {
-    requestedRange: string;
-    nextRow: number;
-    nextCol: number;
-  };
-};
+type ReadSheetDataInput = ExcelToolInput<"readSheetData">;
 
 function toCoreContinuation(
   continuation: ReadSheetDataInput["continuation"],
@@ -45,15 +36,12 @@ function serializeContinuation(continuation: SheetReadContinuation | null) {
   };
 }
 
-export const readSheetData = {
-  ...excelToolSpecs.readSheetData,
+export const readSheetData = defineServerTool("readSheetData", {
   contextSchema: workspaceToolContextSchema,
+  outputSchema: sheetReadOutputSchema,
   execute: async (
     { sheetId, range, continuation }: ReadSheetDataInput,
-    {
-      context,
-      resultBudget,
-    }: { context: { workspaceId: number }; resultBudget?: ToolExecutionBudget },
+    { context, resultBudget },
   ) => {
     const sheet = await findSheetForWorkspace(sheetId, context.workspaceId);
     if (!sheet) throw new Error(`Sheet ${sheetId} 不存在`);
@@ -88,4 +76,4 @@ export const readSheetData = {
 
     return result;
   },
-};
+});

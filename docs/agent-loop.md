@@ -565,6 +565,11 @@ contract、当前用户可见性、资源范围和 server-owned executor 映射�
 - `AgentEventSink`、持久化确认端口、取消信号和恢复输入；
 - 上下文、步骤、工具调用、累计等待和总运行时预算。
 
+Excel 工具的 `AgentToolDefinition[]` 和 system prompt 中的工具目录必须由 server 从同一份
+`packages/core` capability contract 生成后一起注入；`packages/agent` 不得自行维护第二份
+Excel 工具 schema、名称或目录。server 运行时可以根据授权策略传入完整目录的子集，但每个
+进入 Agent 的工具定义都必须同时存在于 server 的已校验执行注册表中。
+
 最小输入协议的职责形态如下，具体 TypeScript 名称可以调整，但不能退回到直接传入
 AI SDK `ToolSet` 或 server callback：
 
@@ -573,7 +578,8 @@ type AgentRunnerInput = {
   modelConfig: ModelConfig;
   transcript: AgentTranscriptMessage[];
   workspace: WorkspaceWorkbookSummary[];
-  enabledTools: string[];
+  tools: AgentToolDefinition[];
+  toolCatalog: string;
   toolExecutor: ToolExecutor;
   eventSink?: AgentEventSink;
   persistenceBarrier?: PersistenceBarrier;

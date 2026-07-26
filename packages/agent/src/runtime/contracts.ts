@@ -16,14 +16,16 @@ export interface AgentToolDefinition {
   inputSchema: z.ZodTypeAny;
 }
 
-export interface AgentToolExecutionOptions {
+export interface ToolExecutionRequest {
+  toolName: string;
   toolCallId: string;
+  input: unknown;
   abortSignal?: AbortSignal;
   context: unknown;
 }
 
 export interface ToolExecutor {
-  execute(toolName: string, input: unknown, options: AgentToolExecutionOptions): Promise<unknown>;
+  execute(request: ToolExecutionRequest): Promise<unknown>;
 }
 
 export type { AgentEvent, AgentEventSink, AgentEventType, PersistenceBarrier };
@@ -69,6 +71,7 @@ export interface AgentRunnerInput {
   modelConfig: ModelConfig;
   transcript: AgentTranscriptMessage[];
   workspace: WorkspaceWorkbookSummary[];
+  toolCatalog: string;
   tools: readonly AgentToolDefinition[];
   toolExecutor: ToolExecutor;
   executionContext?: unknown;

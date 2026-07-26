@@ -1,19 +1,21 @@
 import {
   AgentPersistenceError,
-  buildExcelToolDefinitions,
-  buildRunToolContext,
-  buildWorkspaceToolContext,
   createAgentRunner,
   formatAIError,
+  type ToolExecutionRequest,
   type ToolExecutor,
   ToolResultBudget,
   toModelSafeJsonValue,
   wrapToolSetWithResultBudget,
 } from "@openexcel/agent";
+import type { ExcelToolName } from "@openexcel/core";
+import { buildExcelToolCatalog } from "@openexcel/core";
 import { loadModelConfig } from "../../../config.js";
-import { chartTools } from "../../charts/tools/index.js";
-import { excelTools } from "../../sheets/tools/index.js";
-import { workbookTools } from "../../workbooks/tools/index.js";
+import {
+  buildToolContexts,
+  type ServerToolRegistry,
+  type ToolContextMap,
+} from "../../../shared/tools/registry.js";
 import {
   appendChatTurn,
   type ChatTurnRequest,
@@ -34,6 +36,7 @@ import { clearSessionUndoCheckpoint } from "../runs/undoCheckpoint.js";
 import { createAgentEventStream } from "./agentEventStream.js";
 import { loadWorkspaceChatContext } from "./context.js";
 import { resolveChatMessageReferences } from "./references.js";
+import { serverToolRegistry } from "./toolRegistry.js";
 
 export async function loadSessionForChat(sessionId: number, workspaceId: number) {
   const session = await repo.findSession(sessionId, workspaceId);
@@ -73,49 +76,76 @@ export function buildRunToolset(
     toolPolicies: { readSheetData: { kind: "paged-structured" } },
   });
 
-  const tools = wrapToolSetWithResultBudget(
-    { ...workbookTools, ...excelTools, ...chartTools } as any,
-    toolResultBudget,
+  const tools = wrapToolSetWithResultBudget(serverToolRegistry, toolResultBudget);
+
+  const toolsContext = buildToolContexts(workspaceId, runId);
+  const toolDefinitions = Object.values(serverToolRegistry).map(
+    ({ name, description, inputSchema }) => ({
+      name,
+      description,
+      inputSchema,
+    }),
   );
 
-  const toolsContext = {
-    ...buildWorkspaceToolContext(workspaceId),
-    ...buildRunToolContext(runId, workspaceId),
-  };
-
-  return { tools, toolResultBudget, toolsContext };
+  return { tools, toolResultBudget, toolsContext, toolDefinitions };
 }
 
 export function createConcreteToolExecutor(
-  tools: ReturnType<typeof buildRunToolset>["tools"],
-  toolsContext: ReturnType<typeof buildRunToolset>["toolsContext"],
+  tools: ServerToolRegistry,
+  toolsContext: ToolContextMap,
 ): ToolExecutor {
   return {
-    execute: async (
-      toolName: string,
-      input: unknown,
-      options: { toolCallId: string; abortSignal?: AbortSignal; context: unknown },
-    ) => {
-      const tool = (
-        tools as Record<string, { execute?: (value: unknown, options: unknown) => unknown }>
-      )[toolName];
-      if (!tool || typeof tool.execute !== "function") {
+    execute: async ({
+      toolName,
+      input,
+      toolCallId,
+      abortSignal,
+      context: requestContext,
+    }: ToolExecutionRequest) => {
+      const tool = tools[toolName as ExcelToolName];
+      if (!tool) {
         throw new Error(`Tool ${toolName} is not executable`);
       }
-      const executionContext = options.context as
+      const executionContext = requestContext as
         | { toolContexts?: Record<string, unknown>; db?: unknown }
         | undefined;
-      const baseContext = executionContext?.toolContexts?.[toolName] ?? toolsContext[toolName];
+      const baseContext = executionContext?.toolContexts?.[toolName] ?? toolsContext[tool.name];
+      const parsedInput = tool.inputSchema.safeParse(input);
+      if (!parsedInput.success) {
+        throw new Error(
+          `${toolName}: 输入参数验证失败: ${parsedInput.error.issues
+            .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
+            .join("; ")}`,
+        );
+      }
+      const parsedContext = tool.contextSchema.safeParse(baseContext);
+      if (!parsedContext.success) {
+        throw new Error(
+          `${toolName}: 执行上下文验证失败: ${parsedContext.error.issues
+            .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
+            .join("; ")}`,
+        );
+      }
       const context =
-        executionContext?.db == null || typeof baseContext !== "object" || baseContext === null
-          ? baseContext
-          : { ...(baseContext as Record<string, unknown>), db: executionContext.db };
-      const output = await tool.execute(input, {
-        toolCallId: options.toolCallId,
-        abortSignal: options.abortSignal,
+        executionContext?.db == null ||
+        typeof parsedContext.data !== "object" ||
+        parsedContext.data === null
+          ? parsedContext.data
+          : { ...(parsedContext.data as Record<string, unknown>), db: executionContext.db };
+      const output = await tool.execute(parsedInput.data, {
+        toolCallId,
+        abortSignal,
         context,
       });
-      return toModelSafeJsonValue(output);
+      const parsedOutput = tool.outputSchema.safeParse(output);
+      if (!parsedOutput.success) {
+        throw new Error(
+          `${toolName}: 输出结果验证失败: ${parsedOutput.error.issues
+            .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
+            .join("; ")}`,
+        );
+      }
+      return toModelSafeJsonValue(parsedOutput.data);
     },
   };
 }
@@ -152,12 +182,12 @@ export async function streamChat(workspaceId: number, sessionId: number, turn: C
       runCancellation.abort(new Error("Agent run lease lost"));
     });
 
-    const { tools, toolResultBudget, toolsContext } = buildRunToolset(
+    const { tools, toolResultBudget, toolsContext, toolDefinitions } = buildRunToolset(
       config,
       workspaceId,
       lease.run.id,
     );
-    const toolNames = Object.keys(tools);
+    const toolNames = Object.keys(serverToolRegistry) as ExcelToolName[];
     const executionContext = {
       toolContexts: toolsContext,
       resultBudget: toolResultBudget,
@@ -183,13 +213,14 @@ export async function streamChat(workspaceId: number, sessionId: number, turn: C
         totalMs: config.timeoutMs,
         chunkMs: config.chunkTimeoutMs,
       },
-      tools: buildExcelToolDefinitions(),
+      tools: toolDefinitions,
+      toolCatalog: buildExcelToolCatalog(toolDefinitions.map((tool) => tool.name)),
       toolExecutor,
       executionContext,
       persistenceBarrier: createAgentPersistenceBarrier(lease.run.id),
       eventSink: eventStream.sink,
       prepareStep: async () => ({
-        activeTools: toolNames.filter((name) => !toolResultBudget.isToolExhausted(name)) as any,
+        activeTools: toolNames.filter((name) => !toolResultBudget.isToolExhausted(name)),
       }),
       abortSignal: runCancellation.signal,
     }).run();

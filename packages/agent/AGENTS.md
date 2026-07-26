@@ -17,7 +17,7 @@ It owns:
 - prompt assembly
 - model-facing workspace context assembly from server-provided authorized data
 - canonical transcript normalization/reconstruction helpers
-- tool schema and tool catalog definitions
+- generic tool definitions supplied by the server and the AI SDK tool adapter
 - AgentRunner and the complete model/tool execution loop
 - context-window trimming, token budgets, retry/backoff policy, and stop conditions
 - provider-neutral Agent events and stream adapters
@@ -41,7 +41,6 @@ The current codebase is intentionally small and focused:
 - `src/prompt/systemPrompt.ts` - system prompt construction
 - `src/session/context.ts` - workspace context assembly for model input
 - `src/session/transcript.ts` - transcript helpers
-- `src/tools/*` - tool schema, catalog, and Excel tool definitions
 - `src/runtime/loop/agentRunner.ts` - public facade and lifecycle assembly
 - `src/runtime/loop/agentLoop.ts` - complete model/tool loop
 - `src/runtime/contracts.ts` - provider-neutral runtime ports and results
@@ -114,17 +113,20 @@ They should not become a second persistence layer.
 
 ### 4.5 Tool schema and catalog
 
-The `tools/` folder defines the AI-visible spreadsheet tool surface.
+The canonical Excel tool surface belongs to `packages/core`. The server filters and composes
+that capability contract into the generic `AgentToolDefinition[]` and matching model-facing
+catalog before invoking this package. Agent owns only the generic adapter that converts those
+definitions into AI SDK tools.
 
 Rules:
 
-- keep tool schemas strict and explicit
-- keep tool names stable once they are used by the server
+- preserve the schemas and names supplied by the server
+- keep the generic tool adapter strict about tool call IDs and execution requests
 - prefer adding a new tool over silently changing the meaning of an existing one
 - do not leak transport or route details into tool definitions
 
 If a tool needs a server-side implementation, the server remains responsible for executing it.
-Agent should only define the AI-facing contract and the execution wrapper.
+Agent should only define the generic AI-facing execution wrapper.
 
 ### 4.6 Streaming execution
 

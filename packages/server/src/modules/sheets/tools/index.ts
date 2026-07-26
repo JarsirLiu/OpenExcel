@@ -1,1 +1,1 @@
-export { excelTools } from "./manifest.js";
+export { excelToolManifest } from "./manifest.js";

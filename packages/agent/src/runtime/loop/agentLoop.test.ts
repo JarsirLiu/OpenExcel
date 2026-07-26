@@ -183,9 +183,12 @@ describe("runAgentLoop", () => {
       }),
     ]);
     expect(execute).toHaveBeenCalledWith(
-      "readSheetData",
-      { sheetId: 7 },
-      expect.objectContaining({ context: { workbookId: 1 }, toolCallId: "call-1" }),
+      expect.objectContaining({
+        toolName: "readSheetData",
+        input: { sheetId: 7 },
+        context: { workbookId: 1 },
+        toolCallId: "call-1",
+      }),
     );
     expect(eventTypes).toEqual([
       "run.started",

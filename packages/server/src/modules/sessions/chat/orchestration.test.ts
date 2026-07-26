@@ -1,4 +1,9 @@
+import { type ExcelToolName, excelToolSpecs } from "@openexcel/core";
 import { describe, expect, it, vi } from "vitest";
+import { z } from "zod";
+import type { ServerToolRegistry } from "../../../shared/tools/registry.js";
+import { buildToolContexts, createServerToolRegistry } from "../../../shared/tools/registry.js";
+import { defineServerTool } from "../../../shared/tools/serverTool.js";
 import { buildRunToolset, createConcreteToolExecutor } from "./orchestration.js";
 
 describe("buildRunToolset", () => {
@@ -33,20 +38,67 @@ describe("buildRunToolset", () => {
       chartId: "chart-1",
       createdAt: new Date("2026-07-26T08:00:00.000Z"),
     });
-    const executor = createConcreteToolExecutor(
-      { createChart: { execute } } as any,
-      { createChart: { workspaceId: 3 } } as any,
+    const fakeManifest = (Object.keys(excelToolSpecs) as ExcelToolName[]).map((name) =>
+      defineServerTool(name, {
+        contextSchema: z.unknown(),
+        outputSchema: z.unknown(),
+        execute: async (input, options) => (name === "createChart" ? execute(input, options) : {}),
+      }),
     );
+    const registry = createServerToolRegistry(fakeManifest) as ServerToolRegistry;
+    const contexts = buildToolContexts(3, 19);
 
     await expect(
-      executor.execute(
-        "createChart",
-        {},
-        { toolCallId: "call-1", context: {}, abortSignal: undefined },
-      ),
+      createConcreteToolExecutor(registry, contexts).execute({
+        toolName: "createChart",
+        input: {
+          workbookId: 1,
+          sheetId: 10,
+          type: "line",
+          anchor: {
+            kind: "oneCell",
+            from: { row: 1, col: 1 },
+            widthEmu: 1000,
+            heightEmu: 1000,
+          },
+          sourceRange: {
+            sheetId: 10,
+            startRow: 1,
+            startCol: 1,
+            endRow: 2,
+            endCol: 1,
+          },
+        },
+        toolCallId: "call-1",
+        context: {},
+        abortSignal: undefined,
+      }),
     ).resolves.toEqual({
       chartId: "chart-1",
       createdAt: "2026-07-26T08:00:00.000Z",
     });
+  });
+
+  it("rejects invalid tool input before invoking the concrete executor", async () => {
+    const execute = vi.fn();
+    const fakeManifest = (Object.keys(excelToolSpecs) as ExcelToolName[]).map((name) =>
+      defineServerTool(name, {
+        contextSchema: z.unknown(),
+        outputSchema: z.unknown(),
+        execute,
+      }),
+    );
+    const registry = createServerToolRegistry(fakeManifest);
+    const contexts = buildToolContexts(3, 19);
+
+    await expect(
+      createConcreteToolExecutor(registry, contexts).execute({
+        toolName: "readSheetData",
+        input: {},
+        toolCallId: "call-1",
+        context: {},
+      }),
+    ).rejects.toThrow("readSheetData: 输入参数验证失败");
+    expect(execute).not.toHaveBeenCalled();
   });
 });

@@ -1,5 +1,5 @@
 import { type ToolSet, tool } from "ai";
-import type { AgentToolDefinition, AgentToolExecutionOptions, ToolExecutor } from "../contracts.js";
+import type { AgentToolDefinition, ToolExecutor } from "../contracts.js";
 import { AgentPersistenceError } from "../events/types.js";
 import { toToolError } from "./errors.js";
 import { validateToolInput } from "./inputValidation.js";
@@ -90,17 +90,17 @@ export function createAgentToolSet(
             input = validationResult.data;
           }
 
-          const executionOptions: AgentToolExecutionOptions = {
+          const executionOptions = {
+            toolName: definition.name,
             toolCallId,
+            input,
             abortSignal: executeOptions?.abortSignal,
             context: executionContext,
           };
 
           try {
             throwIfAborted(executionOptions.abortSignal);
-            const output = toModelSafeJsonValue(
-              await executor.execute(definition.name, input, executionOptions),
-            );
+            const output = toModelSafeJsonValue(await executor.execute(executionOptions));
             await hooks.onToolFinish?.({
               toolName: definition.name,
               toolCallId,

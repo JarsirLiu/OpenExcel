@@ -212,17 +212,6 @@ export type ExcelToolSpec = {
   needsRunContext?: boolean;
 };
 
-export const workspaceToolContextSchema = z.object({
-  workspaceId: z.coerce.number().int().positive(),
-});
-
-export const runToolContextSchema = workspaceToolContextSchema.extend({
-  runId: z.coerce.number().int().positive(),
-});
-
-export type WorkspaceToolContext = z.infer<typeof workspaceToolContextSchema>;
-export type RunToolContext = z.infer<typeof runToolContextSchema>;
-
 export const excelToolSpecs = {
   createWorkbook: {
     description:
@@ -424,3 +413,7 @@ export const excelToolSpecs = {
 } satisfies Record<string, ExcelToolSpec>;
 
 export type ExcelToolName = keyof typeof excelToolSpecs;
+
+export type ExcelToolInput<Name extends ExcelToolName> = z.infer<
+  (typeof excelToolSpecs)[Name]["inputSchema"]
+>;

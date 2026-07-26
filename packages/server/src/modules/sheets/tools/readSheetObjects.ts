@@ -1,16 +1,15 @@
-import { excelToolSpecs, workspaceToolContextSchema } from "@openexcel/agent";
-import { projectSheetObjects, type SheetObjectType } from "@openexcel/core";
+import { projectSheetObjects } from "@openexcel/core";
+import { workspaceToolContextSchema } from "../../../shared/tools/context.js";
+import { sheetObjectOutputSchema } from "../../../shared/tools/outputSchemas.js";
+import { defineServerTool } from "../../../shared/tools/serverTool.js";
 import { deserializeSheet } from "../../../shared/utils/sheetSerialization.js";
 import { listCharts } from "../../charts/application/chartService.js";
 import { findSheetForWorkspace, findSheetsForWorkbook } from "../infrastructure/sheetRepository.js";
 
-export const readSheetObjects = {
-  ...excelToolSpecs.readSheetObjects,
+export const readSheetObjects = defineServerTool("readSheetObjects", {
   contextSchema: workspaceToolContextSchema,
-  execute: async (
-    { sheetId, objectType }: { sheetId: number; objectType: SheetObjectType },
-    { context }: { context: { workspaceId: number } },
-  ) => {
+  outputSchema: sheetObjectOutputSchema,
+  execute: async ({ sheetId, objectType }, { context }) => {
     const sheet = await findSheetForWorkspace(sheetId, context.workspaceId);
     if (!sheet) throw new Error(`Sheet ${sheetId} 不存在`);
     const charts =
@@ -37,4 +36,4 @@ export const readSheetObjects = {
       ),
     };
   },
-};
+});

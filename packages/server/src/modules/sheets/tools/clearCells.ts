@@ -1,25 +1,23 @@
-import { excelToolSpecs, runToolContextSchema } from "@openexcel/agent";
 import {
-  type SheetChangeClearOperation,
   type SheetMutation,
   sheetChangePatchOutputSchema,
   sheetChangeRangeToZeroBased,
   storageIndex,
   toolIndex,
 } from "@openexcel/core";
+import { runToolContextSchema } from "../../../shared/tools/context.js";
+import { sheetMutationOutputSchema } from "../../../shared/tools/outputSchemas.js";
+import { defineServerTool } from "../../../shared/tools/serverTool.js";
 import { executeSheetCommandInTransaction } from "../application/executeSheetCommand.js";
 import { buildSheetChangePreview } from "../domain/sheetPreview.js";
 import { runSheetMutation } from "./runSheetMutation.js";
 import { createSheetToolMutationId } from "./sheetToolCommand.js";
 import { toSheetToolPatchResult } from "./sheetToolResult.js";
 
-export const clearCells = {
-  ...excelToolSpecs.clearCells,
+export const clearCells = defineServerTool("clearCells", {
   contextSchema: runToolContextSchema,
-  execute: async (
-    input: { sheetId: number; operations: SheetChangeClearOperation[] },
-    options: { context: { runId: number; workspaceId: number }; toolCallId?: string },
-  ) => {
+  outputSchema: sheetMutationOutputSchema,
+  execute: async (input, options) => {
     return runSheetMutation(options.context, input.sheetId, async (sheet, tx) => {
       const mutation: SheetMutation = { type: "clear", operations: input.operations };
       const result = await executeSheetCommandInTransaction(tx, options.context.workspaceId, {
@@ -66,4 +64,4 @@ export const clearCells = {
       return output;
     });
   },
-};
+});

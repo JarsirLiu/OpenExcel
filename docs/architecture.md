@@ -167,6 +167,9 @@ Excel capabilities follow the same boundary. `packages/core` may define provider
 contracts, tool names, descriptions, input schemas, and pure command validation, but it must not
 import `packages/agent` or contain database-backed tool executors. The server maps those contracts
 to the Agent runtime and supplies the concrete execution adapters.
+The canonical Excel capability catalog is implemented under `packages/core/src/tools/`; the server
+composition root derives both the AI-visible definitions and the model-facing catalog from that
+same source before injecting them into `packages/agent`.
 
 The current FortuneSheet `chart` configuration field is a compatibility projection only. New
 features must not depend on its `any[]` shape. Charts use stable workbook and sheet identities,

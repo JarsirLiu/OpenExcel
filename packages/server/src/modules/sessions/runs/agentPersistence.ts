@@ -54,37 +54,37 @@ export function createAgentPersistenceBarrier(runId: number): PersistenceBarrier
 
 export function createIdempotentToolExecutor(runId: number, executor: ToolExecutor): ToolExecutor {
   return {
-    async execute(toolName, input, options) {
+    async execute(request) {
       const workspaceId =
-        typeof options.context === "object" &&
-        options.context !== null &&
-        typeof (options.context as { workspaceId?: unknown }).workspaceId === "number"
-          ? (options.context as { workspaceId: number }).workspaceId
+        typeof request.context === "object" &&
+        request.context !== null &&
+        typeof (request.context as { workspaceId?: unknown }).workspaceId === "number"
+          ? (request.context as { workspaceId: number }).workspaceId
           : undefined;
       const execute = () =>
         prisma.$transaction(async (tx) => {
           const claim = await claimToolExecutionUsing(tx, {
             runId,
-            toolCallId: options.toolCallId,
-            toolName,
-            input,
+            toolCallId: request.toolCallId,
+            toolName: request.toolName,
+            input: request.input,
           });
           if (claim.kind === "replay") return { kind: "replay" as const, output: claim.output };
 
           let output: unknown;
           try {
             const context =
-              typeof options.context === "object" && options.context !== null
-                ? { ...(options.context as Record<string, unknown>), db: tx }
+              typeof request.context === "object" && request.context !== null
+                ? { ...(request.context as Record<string, unknown>), db: tx }
                 : { db: tx };
-            output = await executor.execute(toolName, input, { ...options, context });
+            output = await executor.execute({ ...request, context });
           } catch (error) {
-            await failToolExecutionUsing(tx, runId, options.toolCallId, error);
+            await failToolExecutionUsing(tx, runId, request.toolCallId, error);
             return { kind: "failed" as const, error };
           }
 
           try {
-            await completeToolExecutionUsing(tx, runId, options.toolCallId, output);
+            await completeToolExecutionUsing(tx, runId, request.toolCallId, output);
           } catch (error) {
             throw new AgentPersistenceError(error);
           }

@@ -1,3 +1,4 @@
+import type { Prisma } from "../../../infra/database/prismaTypes.js";
 import { normalizeSheetName, normalizeWorkbookName } from "../domain/creation.js";
 import * as repo from "../infrastructure/workbookRepository.js";
 
@@ -20,14 +21,18 @@ export async function createWorkbook(
   name?: string,
   sheetName?: string,
   sourceSheetId?: number,
+  db?: Prisma.TransactionClient,
 ): Promise<CreateWorkbookResult> {
   const workbookName = normalizeWorkbookName(name);
   const initialSheetName = normalizeSheetName(sheetName, 1);
 
-  return repo.createWorkbookWithInitialSheet({
-    workspaceId,
-    workbookName,
-    initialSheetName,
-    sourceSheetId,
-  });
+  return repo.createWorkbookWithInitialSheet(
+    {
+      workspaceId,
+      workbookName,
+      initialSheetName,
+      sourceSheetId,
+    },
+    db,
+  );
 }

@@ -1,11 +1,10 @@
-import { excelToolSpecs, workspaceToolContextSchema } from "@openexcel/agent";
+import { workspaceToolContextSchema } from "../../../shared/tools/context.js";
+import { chartListOutputSchema } from "../../../shared/tools/outputSchemas.js";
+import { defineServerTool } from "../../../shared/tools/serverTool.js";
 import { listCharts as listChartsUseCase } from "../application/chartService.js";
 
-export const listCharts = {
-  ...excelToolSpecs.listCharts,
+export const listCharts = defineServerTool("listCharts", {
   contextSchema: workspaceToolContextSchema,
-  execute: async (
-    input: { workbookId: number },
-    { context }: { context: { workspaceId: number } },
-  ) => listChartsUseCase(context.workspaceId, input.workbookId),
-};
+  outputSchema: chartListOutputSchema,
+  execute: async (input, { context }) => listChartsUseCase(context.workspaceId, input.workbookId),
+});

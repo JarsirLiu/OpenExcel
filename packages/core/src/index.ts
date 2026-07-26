@@ -214,6 +214,18 @@ export type {
   SheetReadPage,
 } from "./sheetTools/sheetReadPager.js";
 export { planSheetReadPage, sheetToolRangeToA1 } from "./sheetTools/sheetReadPager.js";
+export { EXCEL_TOOL_CAPABILITY_BOUNDARY } from "./tools/capabilities.js";
+export {
+  buildExcelToolCatalog,
+  buildExcelToolDefinitions,
+  type ExcelToolDefinition,
+} from "./tools/catalog.js";
+export {
+  type ExcelToolInput,
+  type ExcelToolName,
+  type ExcelToolSpec,
+  excelToolSpecs,
+} from "./tools/excelToolContract.js";
 export type {
   ColumnDef,
   InitConfig,

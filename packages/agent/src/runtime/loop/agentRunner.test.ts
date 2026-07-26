@@ -21,6 +21,7 @@ describe("AgentRunner", () => {
       modelConfig: { modelName: "test-model" } as never,
       transcript,
       workspace: [{ id: 1, name: "预算", sheets: [{ id: 2, name: "Sheet1", sheetNo: 1 }] }],
+      toolCatalog: "- **readSheetData**: 读取",
       tools: [{ name: "readSheetData", description: "读取", inputSchema: {} as never }],
       toolExecutor: { execute: vi.fn() },
     });

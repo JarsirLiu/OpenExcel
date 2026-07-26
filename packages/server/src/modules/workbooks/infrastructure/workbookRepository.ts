@@ -22,8 +22,12 @@ export async function findWorkbooksWithSheets(workspaceId: number) {
   });
 }
 
-export async function findWorkbookWithSheets(id: number, workspaceId: number) {
-  const workbook = await prisma.workbook.findFirst({
+export async function findWorkbookWithSheets(
+  id: number,
+  workspaceId: number,
+  db: Prisma.TransactionClient = prisma,
+) {
+  const workbook = await db.workbook.findFirst({
     where: { id, workspaceId },
     include: {
       sheets: { orderBy: { order: "asc" } },
@@ -37,13 +41,16 @@ export async function findWorkbook(id: number, workspaceId: number) {
   return prisma.workbook.findFirst({ where: { id, workspaceId } });
 }
 
-export async function createWorkbookWithInitialSheet(input: {
-  workspaceId: number;
-  workbookName: string;
-  initialSheetName: string;
-  sourceSheetId?: number;
-}) {
-  return prisma.$transaction(async (tx) => {
+export async function createWorkbookWithInitialSheet(
+  input: {
+    workspaceId: number;
+    workbookName: string;
+    initialSheetName: string;
+    sourceSheetId?: number;
+  },
+  db?: Prisma.TransactionClient,
+) {
+  const execute = async (tx: Prisma.TransactionClient) => {
     await tx.workspace.update({
       where: { id: input.workspaceId },
       data: { updatedAt: new Date() },
@@ -107,20 +114,25 @@ export async function createWorkbookWithInitialSheet(input: {
         order: initialSheet.order,
       },
     };
-  });
+  };
+
+  return db ? execute(db) : prisma.$transaction(execute);
 }
 
-export async function createSheet(data: {
-  workbookId: number;
-  sheetNo: number;
-  name: string;
-  order: number;
-  columns: string;
-  merges: string;
-  uploadedData: string;
-  config?: string;
-}) {
-  return prisma.sheet.create({
+export async function createSheet(
+  data: {
+    workbookId: number;
+    sheetNo: number;
+    name: string;
+    order: number;
+    columns: string;
+    merges: string;
+    uploadedData: string;
+    config?: string;
+  },
+  db: Prisma.TransactionClient = prisma,
+) {
+  return db.sheet.create({
     data: {
       ...data,
       config: data.config ?? null,

@@ -308,14 +308,17 @@ export async function updateStep(id: number, data: Record<string, unknown>) {
   return prisma.agentStep.update({ where: { id }, data });
 }
 
-export async function upsertRunSheetSnapshot(data: {
-  runId: number;
-  sheetId: number;
-  uploadedData: string | null;
-  config: string | null;
-  kind: RunSheetSnapshotKind;
-}) {
-  return upsertRunSheetSnapshotUsing(prisma, data);
+export async function upsertRunSheetSnapshot(
+  data: {
+    runId: number;
+    sheetId: number;
+    uploadedData: string | null;
+    config: string | null;
+    kind: RunSheetSnapshotKind;
+  },
+  db: Prisma.TransactionClient = prisma,
+) {
+  return upsertRunSheetSnapshotUsing(db, data);
 }
 
 type RunSnapshotDatabase = Pick<

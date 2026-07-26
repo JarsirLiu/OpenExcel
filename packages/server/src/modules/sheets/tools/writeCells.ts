@@ -1,28 +1,20 @@
-import { excelToolSpecs, runToolContextSchema } from "@openexcel/agent";
 import {
+  type ExcelToolInput,
   type SheetChangeCell,
   type SheetMutation,
   sheetChangePatchOutputSchema,
   storageIndex,
 } from "@openexcel/core";
+import { runToolContextSchema } from "../../../shared/tools/context.js";
+import { sheetMutationOutputSchema } from "../../../shared/tools/outputSchemas.js";
+import { defineServerTool } from "../../../shared/tools/serverTool.js";
 import { executeSheetCommandInTransaction } from "../application/executeSheetCommand.js";
 import { buildSheetChangePreview } from "../domain/sheetPreview.js";
 import { runSheetMutation } from "./runSheetMutation.js";
 import { createSheetToolMutationId } from "./sheetToolCommand.js";
 import { toSheetToolPatchResult } from "./sheetToolResult.js";
 
-type CellWriteValue = string | number | boolean;
-type WriteOperation =
-  | { type: "cell"; row: number; col: number; value: CellWriteValue; formula?: string }
-  | {
-      type: "range";
-      startRow: number;
-      startCol: number;
-      endRow: number;
-      endCol: number;
-      value: CellWriteValue;
-      formula?: string;
-    };
+type WriteOperation = ExcelToolInput<"writeCells">["operations"][number];
 
 function expandOperations(operations: WriteOperation[]): SheetChangeCell[] {
   const cells: SheetChangeCell[] = [];
@@ -49,13 +41,10 @@ function affectedRange(cells: SheetChangeCell) {
   };
 }
 
-export const writeCells = {
-  ...excelToolSpecs.writeCells,
+export const writeCells = defineServerTool("writeCells", {
   contextSchema: runToolContextSchema,
-  execute: async (
-    input: { sheetId: number; operations: WriteOperation[] },
-    options: { context: { runId: number; workspaceId: number }; toolCallId?: string },
-  ) => {
+  outputSchema: sheetMutationOutputSchema,
+  execute: async (input, options) => {
     const { sheetId, operations } = input;
     return runSheetMutation(options.context, sheetId, async (sheet, tx) => {
       const cells = expandOperations(operations);
@@ -96,4 +85,4 @@ export const writeCells = {
       return output;
     });
   },
-};
+});

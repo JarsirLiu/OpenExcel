@@ -1,1 +1,1 @@
-export { chartTools } from "./manifest.js";
+export { chartToolManifest } from "./manifest.js";

@@ -1,1 +1,1 @@
-export { workbookTools } from "./manifest.js";
+export { workbookToolManifest } from "./manifest.js";

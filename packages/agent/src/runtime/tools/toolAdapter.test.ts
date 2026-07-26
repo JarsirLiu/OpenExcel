@@ -26,15 +26,13 @@ describe("createAgentToolSet", () => {
     );
 
     expect(output).toEqual({ ok: true });
-    expect(execute).toHaveBeenCalledWith(
-      "readSheetData",
-      { sheetId: 7 },
-      {
-        toolCallId: "call-1",
-        abortSignal: undefined,
-        context: { tenant: "opaque" },
-      },
-    );
+    expect(execute).toHaveBeenCalledWith({
+      toolName: "readSheetData",
+      input: { sheetId: 7 },
+      toolCallId: "call-1",
+      abortSignal: undefined,
+      context: { tenant: "opaque" },
+    });
     expect(onToolStart).toHaveBeenCalledWith({
       toolName: "readSheetData",
       toolCallId: "call-1",
@@ -70,9 +68,11 @@ describe("createAgentToolSet", () => {
     );
 
     expect(execute).toHaveBeenCalledWith(
-      "readSheetData",
-      { sheetId: "7" },
-      expect.objectContaining({ toolCallId: "call-2" }),
+      expect.objectContaining({
+        toolName: "readSheetData",
+        input: { sheetId: "7" },
+        toolCallId: "call-2",
+      }),
     );
   });
 

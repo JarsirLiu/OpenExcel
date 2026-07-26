@@ -1,6 +1,5 @@
 import { buildSystemPrompt } from "../../prompt/systemPrompt.js";
 import { buildWorkspaceContext } from "../../session/context.js";
-import { buildExcelToolCatalog } from "../../tools/catalog.js";
 import type { AgentRunnerInput, AgentRunResult } from "../contracts.js";
 import { runAgentLoop } from "./agentLoop.js";
 
@@ -11,7 +10,7 @@ export class AgentRunner {
     const { transcript, workspace, ...loopInput } = this.input;
     const systemPrompt = buildSystemPrompt(
       buildWorkspaceContext(workspace),
-      buildExcelToolCatalog(),
+      this.input.toolCatalog,
     );
 
     return runAgentLoop({

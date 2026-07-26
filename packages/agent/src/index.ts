@@ -17,9 +17,9 @@ export type {
   AgentRunResult,
   AgentTimeoutConfiguration,
   AgentToolDefinition,
-  AgentToolExecutionOptions,
   AgentTranscriptMessage,
   PersistenceBarrier,
+  ToolExecutionRequest,
   ToolExecutor,
 } from "./runtime/contracts.js";
 export { formatAIError } from "./runtime/errors/formatAIError.js";
@@ -100,16 +100,3 @@ export {
   historyFromRuns,
   removeEmptyAssistantMessages,
 } from "./session/transcript.js";
-export {
-  buildExcelToolCatalog,
-  buildExcelToolContext,
-  buildExcelToolDefinitions,
-  buildRunToolContext,
-  buildWorkspaceToolContext,
-  type ExcelToolName,
-  excelToolSpecs,
-  type RunToolContext,
-  runToolContextSchema,
-  type WorkspaceToolContext,
-  workspaceToolContextSchema,
-} from "./tools/index.js";

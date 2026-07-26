@@ -1,19 +1,14 @@
-import { excelToolSpecs, workspaceToolContextSchema } from "@openexcel/agent";
-import {
-  findSheetCells as findCells,
-  parseSheetToolRange,
-  type SheetCellQuery,
-} from "@openexcel/core";
+import { findSheetCells as findCells, parseSheetToolRange } from "@openexcel/core";
+import { workspaceToolContextSchema } from "../../../shared/tools/context.js";
+import { sheetCellMatchesOutputSchema } from "../../../shared/tools/outputSchemas.js";
+import { defineServerTool } from "../../../shared/tools/serverTool.js";
 import { sheetRecordToSnapshot } from "../../../shared/utils/sheetSnapshot.js";
 import { findSheetForWorkspace } from "../infrastructure/sheetRepository.js";
 
-export const findSheetCells = {
-  ...excelToolSpecs.findSheetCells,
+export const findSheetCells = defineServerTool("findSheetCells", {
   contextSchema: workspaceToolContextSchema,
-  execute: async (
-    { sheetId, range, query }: { sheetId: number; range?: string; query: SheetCellQuery },
-    { context }: { context: { workspaceId: number } },
-  ) => {
+  outputSchema: sheetCellMatchesOutputSchema,
+  execute: async ({ sheetId, range, query }, { context }) => {
     const sheet = await findSheetForWorkspace(sheetId, context.workspaceId);
     if (!sheet) throw new Error(`Sheet ${sheetId} 不存在`);
 
@@ -25,4 +20,4 @@ export const findSheetCells = {
       }),
     };
   },
-};
+});
