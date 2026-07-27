@@ -27,6 +27,25 @@ describe("ConversationStore", () => {
     expect(store.messages.at(-1)?.parts?.[0]).toMatchObject({ text: "答" });
   });
 
+  it("projects compaction lifecycle events without adding a transcript message", () => {
+    const store = new ConversationStore();
+    const event = (type: "context.compaction.started" | "context.compaction.completed") => ({
+      eventId: `event-${type}`,
+      sequence: type.endsWith("started") ? 1 : 2,
+      type,
+      occurredAt: "2026-07-26T00:00:00.000Z",
+      payload: {},
+    });
+
+    store.applyEvent(event("context.compaction.started"));
+    expect(store.compactionStatus).toBe("running");
+    expect(store.messages).toEqual([]);
+
+    store.applyEvent(event("context.compaction.completed"));
+    expect(store.compactionStatus).toBe("completed");
+    expect(store.messages).toEqual([]);
+  });
+
   it("keeps equal sequences from different runs independent", () => {
     const store = new ConversationStore();
 

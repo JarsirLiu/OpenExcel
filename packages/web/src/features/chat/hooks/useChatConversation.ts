@@ -51,12 +51,20 @@ export function useChatConversation({
   const store = storeRef.current;
   const liveSessionIdRef = useRef<number | null>(null);
   const [messages, setMessages] = useState(store.messages);
+  const [compactionStatus, setCompactionStatus] = useState(store.compactionStatus);
   const [historicalRefreshIds] = useState<Set<string>>(() => new Set());
   const hasPrimedWorkbookMutationHistoryRef = useRef(false);
   const pendingWorkspaceRefreshRef = useRef(false);
   const wasStreamingRef = useRef(false);
 
-  useEffect(() => store.subscribe(() => setMessages(store.messages)), [store]);
+  useEffect(
+    () =>
+      store.subscribe(() => {
+        setMessages(store.messages);
+        setCompactionStatus(store.compactionStatus);
+      }),
+    [store],
+  );
 
   const {
     canUndo,
@@ -152,6 +160,7 @@ export function useChatConversation({
 
   return {
     messages,
+    compactionStatus,
     historicalToolCallIds,
     error: run.error,
     canUndo,

@@ -373,7 +373,10 @@ type AgentEvent =
   | { type: "tool.finished"; payload: ToolEventPayload }
   | { type: "step.finished"; payload: StepPayload }
   | { type: "message.delta"; payload: MessageDeltaPayload }
-  | { type: "reasoning.delta"; payload: ReasoningDeltaPayload };
+  | { type: "reasoning.delta"; payload: ReasoningDeltaPayload }
+  | { type: "context.compaction.started"; payload: {} }
+  | { type: "context.compaction.completed"; payload: CompactionCompletedPayload }
+  | { type: "context.compaction.failed"; payload: CompactionFailedPayload }
 
 type MessageDeltaPayload = {
   turnId: string;
@@ -384,6 +387,15 @@ type MessageDeltaPayload = {
 };
 
 type ReasoningDeltaPayload = MessageDeltaPayload;
+
+type CompactionCompletedPayload = {
+  checkpointVersion: number;
+  coveredTranscriptCursor: number;
+};
+
+type CompactionFailedPayload = {
+  stage: "boundary" | "summary" | "checkpoint" | "context_budget" | "unknown";
+};
 
 type ToolEventPayload = {
   turnId: string;
@@ -455,12 +467,19 @@ type PersistedAgentEvent = {
    - `tokenObservation`: 当前 step provider usage 或估算观测
    - `estimatedContextTokens`: 以本步实际 request messages、instructions 和 activeTools 计算的估算值
 
+6. **上下文压缩生命周期事件**：压缩开始、checkpoint 保存并完成上下文重建、或压缩失败时依次产生对应事件。
+   这些事件只携带状态和 checkpoint 游标，不携带摘要正文，也不进入 canonical transcript；前端只将它们投影为
+   独立的“正在压缩/已压缩”状态，模型继续使用 agent 内部重建后的上下文。
+   - `context.compaction.started`: 摘要模型调用开始前发出
+   - `context.compaction.completed`: checkpoint 保存且下一步上下文转换成功后发出
+   - `context.compaction.failed`: 压缩失败时发出，`stage` 用于诊断失败阶段
+
 模型上下文的生命周期由 AI SDK 的 step 回调提供：`onStepStart` 的 `messages`、`instructions`
 和 `activeTools` 是本次实际生效的 step context；`onStepFinish` 的 `request.messages` 是本次
 provider 请求的准确输入消息。Agent 不从 `step.content` 和 `step.toolResults` 手工拼接下一次
 请求上下文，避免工具结果重复计算或改变 assistant/tool 消息结构。
 
-6. **运行终态不属于 Agent 内部执行事件**：Agent 通过 `completion.status` 返回
+7. **运行终态不属于 Agent 内部执行事件**：Agent 通过 `completion.status` 返回
    `completed`、`failed` 或 `cancelled`；server finalizer 再按统一持久化顺序创建唯一的
    `run.completed`、`run.failed` 或 `run.cancelled` durable protocol event。`run.failed`
    必须保留 `failurePhase` 和可选的 `failureStepIndex`，用于区分模型继续生成失败与

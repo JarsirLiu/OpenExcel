@@ -32,6 +32,7 @@ export function ChatPanel({
 
   const {
     messages,
+    compactionStatus,
     error,
     canUndo,
     isStreaming,
@@ -96,6 +97,7 @@ export function ChatPanel({
     <div className={styles.container}>
       <MessageList
         messages={messages}
+        compactionStatus={compactionStatus}
         isStreaming={isStreaming}
         onRegenerate={onRegenerate}
         onUndo={sessionId != null && canUndo ? handleUndo : undefined}

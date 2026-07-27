@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
+import type { ContextCompactionStatus as CompactionStatus } from "../conversation/contextCompactionStatus";
+import { ContextCompactionStatus } from "./ContextCompactionStatus";
 import { MessageItem } from "./MessageItem";
 import styles from "./MessageList.module.css";
 import { MessageRenderBoundary } from "./MessageRenderBoundary";
@@ -6,6 +8,7 @@ import { MessageRenderBoundary } from "./MessageRenderBoundary";
 export function MessageList({
   messages,
   isStreaming,
+  compactionStatus,
   onRegenerate,
   onUndo,
   isUndoing,
@@ -17,6 +20,7 @@ export function MessageList({
 }: {
   messages: any[];
   isStreaming: boolean;
+  compactionStatus: CompactionStatus;
   onRegenerate?: () => void;
   onUndo?: () => void;
   isUndoing?: boolean;
@@ -140,6 +144,7 @@ export function MessageList({
           />
         </MessageRenderBoundary>
       ))}
+      <ContextCompactionStatus status={compactionStatus} />
       <div ref={messagesEndRef} />
 
       {isStreaming &&

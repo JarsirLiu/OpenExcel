@@ -5,6 +5,8 @@ type ChatMessage = {
   [key: string]: unknown;
 };
 
+import type { ContextCompactionStatus } from "./contextCompactionStatus";
+
 type ChatEvent = import("../transport/chatEventStream").ChatEvent;
 
 /**
@@ -19,6 +21,7 @@ export class ConversationStore {
   #listeners = new Set<() => void>();
   #seenEventIds = new Set<string>();
   #seenEventSequences = new Map<string, Set<number>>();
+  #compactionStatus: ContextCompactionStatus = "idle";
 
   constructor(initialMessages: readonly ChatMessage[] = []) {
     this.#messages = [...initialMessages];
@@ -26,6 +29,10 @@ export class ConversationStore {
 
   get messages() {
     return this.#messages;
+  }
+
+  get compactionStatus() {
+    return this.#compactionStatus;
   }
 
   subscribe(listener: () => void) {
@@ -37,6 +44,7 @@ export class ConversationStore {
 
   replaceHistory(messages: readonly ChatMessage[]) {
     this.#messages = [...messages];
+    this.#compactionStatus = "idle";
     this.#seenEventIds.clear();
     this.#seenEventSequences.clear();
     this.#publish();
@@ -49,6 +57,7 @@ export class ConversationStore {
 
   appendOptimisticUserMessage(message: ChatMessage) {
     this.#messages = [...this.#messages, message];
+    this.#compactionStatus = "idle";
     this.#publish();
   }
 
@@ -62,6 +71,7 @@ export class ConversationStore {
     this.#seenEventSequences.set(runKey, sequences);
 
     if (event.type === "run.started") {
+      this.#compactionStatus = "idle";
       const payload = asRecord(event.payload);
       const userMessage = payload?.userMessage;
       if (
@@ -71,6 +81,24 @@ export class ConversationStore {
         this.#messages = [...this.#messages, userMessage];
         this.#publish();
       }
+      return;
+    }
+
+    if (event.type === "context.compaction.started") {
+      this.#compactionStatus = "running";
+      this.#publish();
+      return;
+    }
+
+    if (event.type === "context.compaction.completed") {
+      this.#compactionStatus = "completed";
+      this.#publish();
+      return;
+    }
+
+    if (event.type === "context.compaction.failed") {
+      this.#compactionStatus = "failed";
+      this.#publish();
       return;
     }
 
@@ -89,7 +117,10 @@ export class ConversationStore {
       event.type === "run.cancelled" ||
       event.type === "run.failed"
     ) {
-      this.#closePendingTools(event.type);
+      const compactionFailed = this.#compactionStatus === "running";
+      if (compactionFailed) this.#compactionStatus = "failed";
+      const toolsClosed = this.#closePendingTools(event.type);
+      if (compactionFailed && !toolsClosed) this.#publish();
     }
   }
 
@@ -169,7 +200,7 @@ export class ConversationStore {
     this.#publish();
   }
 
-  #closePendingTools(type: ChatEvent["type"]) {
+  #closePendingTools(type: ChatEvent["type"]): boolean {
     const errorText = type === "run.cancelled" ? "工具执行已中断" : "运行已终止，工具结果未完成";
     let changed = false;
     this.#messages = this.#messages.map((message) => {
@@ -186,6 +217,7 @@ export class ConversationStore {
       return messageChanged ? { ...message, parts } : message;
     });
     if (changed) this.#publish();
+    return changed;
   }
 
   removeAfterUserMessage(messageId: string) {

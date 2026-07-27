@@ -16,7 +16,8 @@ import {
 } from "../../session/contextWindow.js";
 import { ModelStepContext } from "../../session/modelStepContext.js";
 import { TokenUsageTracker } from "../../session/tokenBudget.js";
-import { appendResponseMessages, removeEmptyAssistantMessages } from "../../session/transcript.js";
+import { appendResponseMessages } from "../../session/transcript.js";
+import { ContextCompactionError } from "../context/compaction/types.js";
 import { ContextCompactionCoordinator } from "../context/contextCompactionCoordinator.js";
 import type { ContextTranscriptEntry } from "../context/transcript.js";
 import type {
@@ -121,6 +122,20 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
       signal: agentAbortController.signal,
       convertToModelMessages: convertMessages,
       resetTokenBaseline: () => tokenUsageTracker.resetAfterCompaction(),
+      onCompactionStarted: async () => {
+        await emitEvent("context.compaction.started", {});
+      },
+      onCompactionCompleted: async (checkpoint) => {
+        await emitEvent("context.compaction.completed", {
+          checkpointVersion: checkpoint.version,
+          coveredTranscriptCursor: checkpoint.coveredTranscriptCursor,
+        });
+      },
+      onCompactionFailed: async (error) => {
+        await emitEvent("context.compaction.failed", {
+          stage: error instanceof ContextCompactionError ? error.stage : "unknown",
+        });
+      },
     });
     const initialContext = await compactionCoordinator.initialize();
     activeSystemPrompt = initialContext.system;

@@ -32,9 +32,11 @@ export interface ContextCompactionCoordinatorOptions {
   convertToModelMessages: (
     messages: readonly AgentTranscriptMessage[],
   ) => Promise<readonly unknown[]>;
-  onCompacted?: (
+  onCompactionStarted?: () => void | Promise<void>;
+  onCompactionCompleted?: (
     checkpoint: import("./compaction/types.js").ContextCheckpoint,
   ) => void | Promise<void>;
+  onCompactionFailed?: (error: unknown) => void | Promise<void>;
   resetTokenBaseline: () => void;
 }
 
@@ -141,32 +143,41 @@ export class ContextCompactionCoordinator {
       : estimatedContextTokens;
     if (!force && !shouldCompact(predictedInputTokens, plan)) return undefined;
 
-    const result = await this.engine.compact({
-      contextKey: this.options.contextKey,
-      transcript: this.allEntries,
-      contextWindowTokens: this.options.contextWindowTokens,
-      modelContext: { systemPrompt: this.options.baseSystemPrompt, toolDefinitions: actualTools },
-      predictedInputTokens,
-      externalContextRevision: this.options.externalContextRevision,
-      sourceRunId: this.options.sourceRunId,
-      signal: this.options.signal,
-    });
-    this.checkpoint = result.checkpoint;
-    const assembled = this.assemble(
-      result.checkpoint.summary,
-      result.recentMessages as AgentTranscriptMessage[],
-      actualTools,
-    );
-    this.lastStep = undefined;
-    this.options.resetTokenBaseline();
-    await this.options.onCompacted?.(result.checkpoint);
-    return {
-      system: assembled.system,
-      messages: await this.options.convertToModelMessages(
+    await this.options.onCompactionStarted?.();
+    let completed = false;
+    try {
+      const result = await this.engine.compact({
+        contextKey: this.options.contextKey,
+        transcript: this.allEntries,
+        contextWindowTokens: this.options.contextWindowTokens,
+        modelContext: { systemPrompt: this.options.baseSystemPrompt, toolDefinitions: actualTools },
+        predictedInputTokens,
+        externalContextRevision: this.options.externalContextRevision,
+        sourceRunId: this.options.sourceRunId,
+        signal: this.options.signal,
+      });
+      this.checkpoint = result.checkpoint;
+      const assembled = this.assemble(
+        result.checkpoint.summary,
+        result.recentMessages as AgentTranscriptMessage[],
+        actualTools,
+      );
+      const messages = await this.options.convertToModelMessages(
         assembled.messages as AgentTranscriptMessage[],
-      ),
-      activeTools,
-    };
+      );
+      this.lastStep = undefined;
+      this.options.resetTokenBaseline();
+      await this.options.onCompactionCompleted?.(result.checkpoint);
+      completed = true;
+      return {
+        system: assembled.system,
+        messages,
+        activeTools,
+      };
+    } catch (error) {
+      if (!completed) await this.options.onCompactionFailed?.(error);
+      throw error;
+    }
   }
 
   private assemble(

@@ -37,6 +37,7 @@ describe("runAgentLoop compaction lifecycle", () => {
     mocks.generateText.mockResolvedValue({ output: summary, usage: { inputTokens: 12 } });
 
     let checkpoint: any;
+    const publishedTypes: string[] = [];
     const checkpointStore = {
       load: vi.fn(async () => checkpoint ?? null),
       save: vi.fn(async ({ checkpoint: next, expectedVersion }: any) => {
@@ -126,6 +127,7 @@ describe("runAgentLoop compaction lifecycle", () => {
       compactionCheckpointStore: checkpointStore,
       contextWindowTokens: 10_000,
       outputReserveTokens: 100,
+      eventSink: { publish: vi.fn((event) => publishedTypes.push(event.type)) },
     } as any);
 
     await Promise.race([
@@ -142,6 +144,9 @@ describe("runAgentLoop compaction lifecycle", () => {
     ]);
 
     expect(completion.status).toBe("completed");
+    expect(publishedTypes).toEqual(
+      expect.arrayContaining(["context.compaction.started", "context.compaction.completed"]),
+    );
     expect(preparedContext.messages[0]).toMatchObject({ role: "user" });
     expect(preparedContext.messages[0].parts[0].text).toContain("<context-summary>");
     expect(checkpoint).toMatchObject({
