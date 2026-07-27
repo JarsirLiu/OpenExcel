@@ -6,7 +6,7 @@
   "type": "module",
   "description": "OpenExcel - JSON driven multi-sheet Excel workbench",
   "scripts": {
-    "dev": "concurrently --raw \"pnpm --filter @openexcel/server dev\" \"pnpm --filter @openexcel/web dev\"",
+    "dev": "pnpm db:migrate && concurrently --raw --kill-others-on-fail \"pnpm --filter @openexcel/server dev\" \"wait-on http://127.0.0.1:4000/api/health && pnpm --filter @openexcel/web dev\"",
     "build": "pnpm --filter @openexcel/web build",
     "preview": "pnpm --filter @openexcel/web preview",
     "test": "pnpm --recursive --filter @openexcel/agent --filter @openexcel/core --filter @openexcel/server --filter @openexcel/web test",
@@ -33,6 +33,7 @@
     "@commitlint/config-conventional": "^21.2.0",
     "concurrently": "^10.0.3",
     "husky": "^9.1.7",
-    "lint-staged": "^17.0.8"
+    "lint-staged": "^17.0.8",
+    "wait-on": "^8.0.1"
   }
 }

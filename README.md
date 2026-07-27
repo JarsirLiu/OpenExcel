@@ -55,6 +55,12 @@ DATABASE_URL=postgresql://user:password@db-host:5432/openexcel
 pnpm install
 ```
 
+首次安装或更新 Prisma schema 后，准备 Prisma Client 和数据库：
+
+```bash
+pnpm db:prepare
+```
+
 启动 Web 和 Server：
 
 ```bash
@@ -67,7 +73,7 @@ pnpm dev
 - API：`http://localhost:4000`
 - 健康检查：`http://localhost:4000/api/health`
 
-Vite 会把 `/api` 请求代理到 `http://127.0.0.1:4000`。开发模式启动前会自动生成 Prisma Client 并执行数据库迁移。
+Vite 会把 `/api` 请求代理到 `http://127.0.0.1:4000`。`pnpm dev` 会先执行数据库迁移，然后启动 Web 和 Server；不会重复生成 Prisma Client。首次安装或 schema 变更后，先执行 `pnpm db:prepare` 生成客户端并完成迁移。
 
 ## 常用命令
 
@@ -78,6 +84,7 @@ pnpm test           # 全部测试
 pnpm test:server    # Server 测试
 pnpm test:web       # Web 测试
 pnpm db:prepare     # 生成 Prisma Client 并执行数据库迁移
+pnpm db:generate    # 只生成 Prisma Client
 pnpm db:migrate     # 执行数据库迁移
 ```
 
