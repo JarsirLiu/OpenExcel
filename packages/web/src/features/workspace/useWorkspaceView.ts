@@ -200,7 +200,13 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
 
   useEffect(() => {
     void ensureSheetLoaded(currentSheetIndex);
-  }, [currentSheetIndex, currentWorkbook?.id, ensureSheetLoaded]);
+  }, [
+    currentSheetIndex,
+    currentWorkbook?.id,
+    currentWorkbook?.sheets[currentSheetIndex]?.id,
+    currentWorkbook?.sheets[currentSheetIndex]?.loaded,
+    ensureSheetLoaded,
+  ]);
 
   const refreshCurrentWorkbook = useCallback(async () => {
     if (!currentWorkbook || workspaceId == null) return;

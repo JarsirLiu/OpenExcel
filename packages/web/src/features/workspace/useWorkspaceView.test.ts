@@ -1,9 +1,10 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { WorkbookMeta } from "@/api/workbooks";
+import type { SheetSchema, WorkbookFull, WorkbookMeta } from "@/api/workbooks";
 
 const mocks = vi.hoisted(() => ({
   fetchWorkbooks: vi.fn(),
+  fetchSheet: vi.fn(),
   importWorkbooks: vi.fn(),
   toast: vi.fn(),
   setWorkbooks: vi.fn(),
@@ -13,14 +14,17 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/api/workbooks", () => ({
   fetchWorkbooks: mocks.fetchWorkbooks,
+  fetchSheet: mocks.fetchSheet,
   importWorkbooks: mocks.importWorkbooks,
 }));
+
+let currentWorkbook: WorkbookFull | null = null;
 
 vi.mock("@/features/workspace/useWorkbookCatalog", () => ({
   useWorkbookCatalog: () => ({
     workbooks: [],
     workbookIdx: 0,
-    currentWorkbook: null,
+    currentWorkbook,
     workbookRevision: 0,
     loading: false,
     setWorkbooks: mocks.setWorkbooks,
@@ -51,12 +55,49 @@ function deferred<T>() {
 
 describe("useWorkspaceView", () => {
   beforeEach(() => {
+    currentWorkbook = null;
     mocks.fetchWorkbooks.mockReset();
+    mocks.fetchSheet.mockReset();
     mocks.importWorkbooks.mockReset();
     mocks.toast.mockReset();
     mocks.setWorkbooks.mockReset();
     mocks.replaceCurrentWorkbook.mockReset();
     mocks.setWorkbookIdx.mockReset();
+  });
+
+  it("loads the new active sheet when its index stays the same", async () => {
+    const initialSheet: SheetSchema = {
+      id: 1,
+      sheetNo: 0,
+      name: "First",
+      order: 0,
+      columns: [],
+      merges: [],
+      uploadedData: [],
+      config: null,
+      revision: 1,
+      loaded: true,
+    };
+    const replacementSheet: SheetSchema = {
+      ...initialSheet,
+      id: 2,
+      name: "Replacement",
+      loaded: false,
+    };
+    currentWorkbook = {
+      id: 1,
+      publicId: "workbook-1",
+      name: "Workbook 1",
+      sheets: [initialSheet],
+      charts: [],
+    };
+    mocks.fetchSheet.mockResolvedValue({ ...replacementSheet, loaded: true });
+
+    const { rerender } = renderHook(() => useWorkspaceView(1));
+    currentWorkbook = { ...currentWorkbook, sheets: [replacementSheet] };
+    rerender();
+
+    await waitFor(() => expect(mocks.fetchSheet).toHaveBeenCalledWith(1, 2, expect.anything()));
   });
 
   it("reports a persisted import when the final catalog request is superseded", async () => {

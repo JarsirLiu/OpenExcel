@@ -1,11 +1,11 @@
-import { chartDependencySheetIds } from "@openexcel/core";
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useMemo } from "react";
 import type { WorkbookFull } from "@/api/workbooks";
 import type { SheetGridLayout } from "../layout/fortuneSheetLayout";
 import { normalizeSheetId } from "../sheetIdentity";
 import styles from "./ChartOverlay.module.css";
 import { ChartRendererBoundary } from "./ChartRendererBoundary";
 import { chartsForSheet } from "./chartBinding";
+import { useChartDependencies } from "./useChartDependencies";
 import { chartRectWithMinimumSize, useChartOverlayInteraction } from "./useChartOverlayInteraction";
 import { useChartViewport } from "./useChartViewport";
 
@@ -42,38 +42,12 @@ export function ChartOverlay({
     [activeSheetId, workbook.charts],
   );
   const scroll = useChartViewport({ containerRef, layerRef, sheetId: activeSheetId });
-  const [dependencyError, setDependencyError] = useState<string | null>(null);
-  const requestedDependencyIdsRef = useRef(new Set<number>());
-  const dependencySheetIds = useMemo(() => {
-    const ids = charts.flatMap((chart) => chartDependencySheetIds(chart));
-    return [...new Set(ids)].map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0);
-  }, [charts]);
-  const missingDependencyIds = useMemo(
-    () =>
-      dependencySheetIds.filter((id) => {
-        const sheet = workbook.sheets.find((item) => item.id === id);
-        return sheet?.loaded === false;
-      }),
-    [dependencySheetIds, workbook.sheets],
-  );
-
-  useEffect(() => {
-    if (!sheetLoaded || missingDependencyIds.length === 0) return;
-    const pendingIds = missingDependencyIds.filter(
-      (id) => !requestedDependencyIdsRef.current.has(id),
-    );
-    if (pendingIds.length === 0) return;
-    for (const id of pendingIds) requestedDependencyIdsRef.current.add(id);
-    setDependencyError(null);
-    void (async () => {
-      try {
-        for (const id of pendingIds) await onSheetLoad(id);
-      } catch (error) {
-        for (const id of pendingIds) requestedDependencyIdsRef.current.delete(id);
-        setDependencyError(error instanceof Error ? error.message : "加载图表数据失败");
-      }
-    })();
-  }, [missingDependencyIds, onSheetLoad, sheetLoaded]);
+  const { dependencyError, missingDependencyIds, retryDependencies } = useChartDependencies({
+    charts,
+    sheets: workbook.sheets,
+    enabled: sheetLoaded,
+    onSheetLoad,
+  });
   const {
     beginInteraction,
     displayCharts,
@@ -121,7 +95,21 @@ export function ChartOverlay({
           >
             {missingDependencyIds.length > 0 || dependencyError ? (
               <div className={styles.loading} role="status">
-                {dependencyError ?? "正在加载图表数据..."}
+                {dependencyError ? (
+                  <>
+                    <span>{dependencyError}</span>
+                    <button
+                      type="button"
+                      className={styles.retry}
+                      onPointerDown={(event) => event.stopPropagation()}
+                      onClick={retryDependencies}
+                    >
+                      重试
+                    </button>
+                  </>
+                ) : (
+                  "正在加载图表数据..."
+                )}
               </div>
             ) : (
               <Suspense fallback={<div className={styles.loading}>正在加载图表...</div>}>

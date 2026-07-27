@@ -1,5 +1,5 @@
 import type { ChartSpec } from "@openexcel/core";
-import { Component, type ErrorInfo, lazy, type ReactNode, useMemo, useState } from "react";
+import { Component, type ErrorInfo, lazy, type ReactNode, useState } from "react";
 import type { SheetSchema } from "@/api/workbooks";
 import styles from "./ChartOverlay.module.css";
 
@@ -51,13 +51,19 @@ function loadChartRenderer() {
   return import("./ChartRenderer").then(({ ChartRenderer }) => ({ default: ChartRenderer }));
 }
 
+const InitialChartRenderer = lazy(loadChartRenderer);
+
 export function ChartRendererBoundary({ chart, sheets }: RendererProps) {
   const [attempt, setAttempt] = useState(0);
-  const LazyChartRenderer = useMemo(() => lazy(loadChartRenderer), [attempt]);
+  const [ChartRenderer, setChartRenderer] = useState(() => InitialChartRenderer);
+  const retry = () => {
+    setChartRenderer(() => lazy(loadChartRenderer));
+    setAttempt((value) => value + 1);
+  };
 
   return (
-    <ChartRendererErrorBoundary key={attempt} onRetry={() => setAttempt((value) => value + 1)}>
-      <LazyChartRenderer chart={chart} sheets={sheets} />
+    <ChartRendererErrorBoundary key={attempt} onRetry={retry}>
+      <ChartRenderer chart={chart} sheets={sheets} />
     </ChartRendererErrorBoundary>
   );
 }
