@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mockGenerateText = vi.fn();
 const mockResolveModelForPurpose = vi.fn();
 const mockFindSession = vi.fn();
+const mockFindFirstSessionRunInputText = vi.fn();
 const mockUpdateSession = vi.fn();
 const mockUpdateSessionNameIfUnchanged = vi.fn();
 const mockLoadModelConfig = vi.fn();
@@ -21,6 +22,10 @@ vi.mock("../infrastructure/sessionRepository.js", () => ({
   updateSessionNameIfUnchanged: mockUpdateSessionNameIfUnchanged,
 }));
 
+vi.mock("../runs/repository.js", () => ({
+  findFirstSessionRunInputText: mockFindFirstSessionRunInputText,
+}));
+
 vi.mock("../../../config.js", () => ({
   loadModelConfig: mockLoadModelConfig,
 }));
@@ -31,6 +36,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockResolveModelForPurpose.mockReturnValue("title-model");
   mockUpdateSessionNameIfUnchanged.mockResolvedValue(true);
+  mockFindFirstSessionRunInputText.mockResolvedValue("分析这些数据");
   mockLoadModelConfig.mockReturnValue({
     baseUrl: "http://test.local",
     apiKey: "test-key",
@@ -94,9 +100,10 @@ describe("generateSessionTitleForSession", () => {
     mockFindSession.mockResolvedValue({
       id: 1,
       name: "新对话",
+      titleStatus: "pending",
     });
 
-    const title = await generateSessionTitleForSession(1, 1, "分析这些数据");
+    const title = await generateSessionTitleForSession(1, 1);
 
     expect(mockResolveModelForPurpose).toHaveBeenCalledWith(
       {
@@ -106,6 +113,7 @@ describe("generateSessionTitleForSession", () => {
       },
       "title",
     );
+    expect(mockFindFirstSessionRunInputText).toHaveBeenCalledWith(1, 1);
     expect(mockUpdateSessionNameIfUnchanged).toHaveBeenCalledWith(1, 1, ["新对话"], "数据分析");
     expect(title).toBe("数据分析");
   });
@@ -114,12 +122,39 @@ describe("generateSessionTitleForSession", () => {
     mockFindSession.mockResolvedValue({
       id: 1,
       name: "已有标题",
+      titleStatus: "generated",
     });
 
-    const title = await generateSessionTitleForSession(1, 1, "分析这些数据");
+    const title = await generateSessionTitleForSession(1, 1);
 
     expect(title).toBe("已有标题");
     expect(mockGenerateText).not.toHaveBeenCalled();
     expect(mockUpdateSession).not.toHaveBeenCalled();
+  });
+
+  it("does not replace a manual title", async () => {
+    mockFindSession.mockResolvedValue({
+      id: 1,
+      name: "我的会话",
+      titleStatus: "manual",
+    });
+
+    const title = await generateSessionTitleForSession(1, 1);
+
+    expect(title).toBe("我的会话");
+    expect(mockFindFirstSessionRunInputText).not.toHaveBeenCalled();
+    expect(mockGenerateText).not.toHaveBeenCalled();
+  });
+
+  it("uses the first persisted run input", async () => {
+    mockGenerateText.mockResolvedValue({ text: "数据分析" });
+    mockFindSession.mockResolvedValue({ id: 1, name: "新对话", titleStatus: "pending" });
+    mockFindFirstSessionRunInputText.mockResolvedValue("首条持久化消息");
+
+    await generateSessionTitleForSession(1, 1);
+
+    expect(mockGenerateText).toHaveBeenCalledWith(
+      expect.objectContaining({ prompt: expect.stringContaining("首条持久化消息") }),
+    );
   });
 });

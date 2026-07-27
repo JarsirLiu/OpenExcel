@@ -26,6 +26,7 @@ type Props = {
   handleSelectSession: (id: number) => void;
   handleDeleteSession: (id: number) => Promise<void>;
   handleUndoComplete: () => Promise<void>;
+  handleUserTurnAccepted: (sessionId: number) => void;
   isCreatingSession: boolean;
   sessionError?: Error;
   onAttachExcel: (files: File[]) => Promise<void> | void;
@@ -53,6 +54,7 @@ export function SessionShell({
   handleSelectSession,
   handleDeleteSession,
   handleUndoComplete,
+  handleUserTurnAccepted,
   isCreatingSession,
   sessionError,
   onAttachExcel,
@@ -96,6 +98,7 @@ export function SessionShell({
         onWorkspaceRefresh,
         onSheetChanged,
         onUndoComplete: handleUndoComplete,
+        onUserTurnAccepted: handleUserTurnAccepted,
         onNavigateSheet,
         createSession,
         activateSession,

@@ -15,6 +15,7 @@ type SessionInfra = {
   onWorkspaceRefresh?: () => Promise<void> | void;
   onSheetChanged?: SheetChangedHandler;
   onUndoComplete?: () => Promise<void> | void;
+  onUserTurnAccepted: (sessionId: number) => void;
   onNavigateSheet?: (sheetId: number) => void;
   createSession: () => Promise<Session>;
   activateSession: (sessionId: number) => void;

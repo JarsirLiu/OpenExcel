@@ -33,6 +33,7 @@ export function useChatRun({
   store,
   onCreateSession,
   onSessionActivated,
+  onUserTurnAccepted,
   onInvalidateUndo,
 }: {
   sessionId: number | null;
@@ -40,6 +41,7 @@ export function useChatRun({
   store: ConversationStore;
   onCreateSession?: () => Promise<{ id: number }>;
   onSessionActivated?: (sessionId: number) => Promise<void> | void;
+  onUserTurnAccepted?: (sessionId: number) => void;
   onInvalidateUndo?: () => void;
 }) {
   const [isStreaming, setIsStreaming] = useState(false);
@@ -137,6 +139,9 @@ export function useChatRun({
               continue;
             }
             store.applyEvent(event);
+            if (event.type === "run.started") {
+              onUserTurnAccepted?.(responseSessionId);
+            }
             if (
               event.type === "run.completed" ||
               event.type === "run.cancelled" ||
@@ -183,6 +188,7 @@ export function useChatRun({
       onCreateSession,
       onInvalidateUndo,
       onSessionActivated,
+      onUserTurnAccepted,
       requestRunCancellation,
       store,
       workspaceId,

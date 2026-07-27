@@ -55,6 +55,33 @@ describe("useSessionWorkspace", () => {
     expect(result.current.sessions.map((session) => session.id)).toEqual([5]);
   });
 
+  it("generates a title after a user turn is accepted without changing the selected session", async () => {
+    const selected = {
+      id: 5,
+      publicId: "session-5",
+      sheetId: null,
+      name: "新对话",
+      createdAt: "2026-07-14T00:00:00.000Z",
+    };
+    const { result } = renderHook(() =>
+      useSessionWorkspace(1, undefined, { sessions: [selected] }),
+    );
+    mocks.generateSessionTitle.mockResolvedValue({ title: "数据分析" });
+
+    await waitFor(() => expect(result.current.sessions[0]?.id).toBe(selected.id));
+    act(() => {
+      result.current.activateSession(selected.id);
+      result.current.handleUserTurnAccepted(selected.id);
+      result.current.handleUserTurnAccepted(selected.id);
+    });
+    expect(mocks.generateSessionTitle).toHaveBeenCalledWith(1, selected.id);
+    expect(mocks.generateSessionTitle).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(result.current.sessions[0]?.name).toBe("数据分析"));
+
+    expect(result.current.currentSessionId).toBe(selected.id);
+    expect(result.current.sessions[0]?.name).toBe("数据分析");
+  });
+
   it("creates and activates a formal session when starting a new chat", async () => {
     const session = {
       id: 7,

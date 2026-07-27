@@ -51,12 +51,9 @@ export async function renameSession(
 export async function generateSessionTitle(
   workspaceId: number,
   sessionId: number,
-  firstUserText: string,
 ): Promise<{ title: string }> {
   const res = await apiFetch(`/workspaces/${workspaceId}/sessions/${sessionId}/title`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ firstUserText }),
   });
   if (!res.ok) throw new Error(await readErrorMessage(res, "生成标题失败"));
   return res.json();

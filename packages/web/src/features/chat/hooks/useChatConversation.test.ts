@@ -275,6 +275,11 @@ describe("useChatConversation", () => {
     ];
 
     globalThis.fetch = async (input) => {
+      if (String(input).endsWith("/title")) {
+        return new Response(JSON.stringify({ title: "身份确认" }), {
+          headers: { "content-type": "application/json" },
+        });
+      }
       if (String(input).includes("/context-usage")) {
         return new Response(
           JSON.stringify({
@@ -300,6 +305,7 @@ describe("useChatConversation", () => {
     try {
       const onCreateSession = vi.fn().mockResolvedValue({ id: 19 });
       const onSessionActivated = vi.fn();
+      const onUserTurnAccepted = vi.fn();
       const hook = renderHook(
         ({ sessionId }: { sessionId: number | null }) =>
           useChatConversation({
@@ -307,6 +313,7 @@ describe("useChatConversation", () => {
             workspaceId: 1,
             onCreateSession,
             onSessionActivated,
+            onUserTurnAccepted,
           }),
         { initialProps: { sessionId: null as number | null } },
       );
@@ -333,9 +340,63 @@ describe("useChatConversation", () => {
       ]);
       expect(onCreateSession).toHaveBeenCalledOnce();
       expect(onSessionActivated).toHaveBeenCalledWith(19);
+      await waitFor(() => expect(onUserTurnAccepted).toHaveBeenCalledWith(19));
     } finally {
       globalThis.fetch = originalFetch;
       randomUUID.mockRestore();
+    }
+  });
+
+  it("does not notify the session layer before run.started", async () => {
+    const originalFetch = globalThis.fetch;
+    const onUserTurnAccepted = vi.fn();
+    const event = {
+      eventId: "event-completed",
+      sequence: 1,
+      type: "run.completed",
+      occurredAt: "2026-07-26T00:00:00.002Z",
+      payload: {},
+    };
+
+    globalThis.fetch = vi.fn(async (input) => {
+      const url = String(input);
+      if (url.includes("/messages?")) {
+        return new Response(JSON.stringify({ messages: [], total: 0 }), {
+          headers: { "content-type": "application/json" },
+        });
+      }
+      if (url.endsWith("/context-usage")) {
+        return new Response(
+          JSON.stringify({
+            contextWindowTokens: 180_000,
+            usedTokens: 0,
+            estimatedContextTokens: null,
+            percentage: 0,
+            source: "none",
+            runId: null,
+            updatedAt: null,
+          }),
+          { headers: { "content-type": "application/json" } },
+        );
+      }
+      return new Response(`${JSON.stringify(event)}\n`, {
+        headers: { "content-type": "application/x-ndjson", "X-OpenExcel-Run-Id": "7" },
+      });
+    });
+
+    try {
+      const hook = renderHook(() =>
+        useChatConversation({ sessionId: 19, workspaceId: 1, onUserTurnAccepted }),
+      );
+
+      act(() => {
+        hook.result.current.sendMessage("不应触发标题", []);
+      });
+      await waitFor(() => expect(hook.result.current.isStreaming).toBe(false));
+
+      expect(onUserTurnAccepted).not.toHaveBeenCalled();
+    } finally {
+      globalThis.fetch = originalFetch;
     }
   });
 

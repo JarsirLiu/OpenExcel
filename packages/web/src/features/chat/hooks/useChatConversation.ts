@@ -33,6 +33,7 @@ export function useChatConversation({
   workspaceId,
   onCreateSession,
   onSessionActivated,
+  onUserTurnAccepted,
   initialCanUndo,
   onWorkspaceRefresh,
   onSheetChanged,
@@ -42,6 +43,7 @@ export function useChatConversation({
   workspaceId: number;
   onCreateSession?: () => Promise<{ id: number }>;
   onSessionActivated?: (sessionId: number) => Promise<void> | void;
+  onUserTurnAccepted?: (sessionId: number) => void;
   initialCanUndo?: boolean;
   onWorkspaceRefresh?: () => Promise<void> | void;
   onSheetChanged?: SheetChangedHandler;
@@ -99,6 +101,7 @@ export function useChatConversation({
     store,
     onCreateSession,
     onSessionActivated: handleSessionActivated,
+    onUserTurnAccepted,
     onInvalidateUndo: invalidateUndo,
   });
 

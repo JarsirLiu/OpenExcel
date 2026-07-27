@@ -87,6 +87,19 @@ export async function findRunForSession(workspaceId: number, sessionId: number, 
   });
 }
 
+export async function findFirstSessionRunInputText(workspaceId: number, sessionId: number) {
+  const run = await prisma.agentRun.findFirst({
+    where: {
+      sessionId,
+      session: { workspaceId },
+      inputText: { not: null },
+    },
+    orderBy: [{ startedAt: "asc" }, { id: "asc" }],
+    select: { inputText: true },
+  });
+  return run?.inputText?.trim() || null;
+}
+
 export async function waitForRunSettlement(
   workspaceId: number,
   sessionId: number,

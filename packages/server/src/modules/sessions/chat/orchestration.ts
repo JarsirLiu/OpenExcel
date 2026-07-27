@@ -21,7 +21,6 @@ import {
 } from "../../../shared/tools/registry.js";
 import { type ChatTurnRequest, toCanonicalUserMessage } from "../application/chatTurn.js";
 import { extractMessageText } from "../application/messageText.js";
-import { scheduleSessionTitleGeneration } from "../application/title.js";
 import { withSessionLock } from "../infrastructure/sessionLock.js";
 import * as repo from "../infrastructure/sessionRepository.js";
 import {
@@ -257,7 +256,6 @@ export async function streamChat(workspaceId: number, sessionId: number, turn: C
         });
       })
       .finally(() => {
-        scheduleSessionTitleGeneration(workspaceId, sessionId, inputText);
         runCancellation.close();
       });
 
@@ -275,7 +273,6 @@ export async function streamChat(workspaceId: number, sessionId: number, turn: C
       errorMessage: formatAIError(error),
       leaseLost,
     });
-    scheduleSessionTitleGeneration(workspaceId, sessionId, inputText);
     throw error;
   }
 }

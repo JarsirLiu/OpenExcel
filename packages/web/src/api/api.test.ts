@@ -225,17 +225,15 @@ describe("undoLatestRun", () => {
 });
 
 describe("generateSessionTitle", () => {
-  it("posts first user text to title endpoint", async () => {
+  it("posts to the title endpoint without duplicating chat input", async () => {
     mockFetch.mockResolvedValue(
       new Response(JSON.stringify({ title: "数据分析" }), { status: 200 }),
     );
 
-    const result = await generateSessionTitle(9, 3, "分析这些数据");
+    const result = await generateSessionTitle(9, 3);
     expect(result).toEqual({ title: "数据分析" });
     expect(mockFetch).toHaveBeenCalledWith("/api/workspaces/9/sessions/3/title", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ firstUserText: "分析这些数据" }),
     });
   });
 });

@@ -225,37 +225,25 @@ export async function sessionRoutes(app: FastifyInstance) {
     },
   );
 
-  app.post<{
-    Params: { workspacePublicId: string; sessionPublicId: string };
-    Body: { firstUserText: string };
-  }>("/api/workspaces/:workspacePublicId/sessions/:sessionPublicId/title", async (req, reply) => {
-    const ids = await resolveSessionIdForRequest(
-      req,
-      req.params.workspacePublicId,
-      req.params.sessionPublicId,
-      reply,
-    );
-    if (ids == null) return;
-    const sessionId = ids.sessionId;
-    const firstUserText =
-      typeof req.body?.firstUserText === "string" ? req.body.firstUserText.trim() : "";
-
-    if (!firstUserText) {
-      return reply.status(400).send({ error: "标题生成需要用户消息" });
-    }
-
-    const session = await application.getSession(ids.workspaceId, sessionId);
-    if (!session) {
-      return reply.status(404).send({ error: "会话不存在" });
-    }
-
-    const title = await application.generateSessionTitleForSession(
-      ids.workspaceId,
-      sessionId,
-      firstUserText,
-    );
-    return { title };
-  });
+  app.post<{ Params: { workspacePublicId: string; sessionPublicId: string } }>(
+    "/api/workspaces/:workspacePublicId/sessions/:sessionPublicId/title",
+    async (req, reply) => {
+      const ids = await resolveSessionIdForRequest(
+        req,
+        req.params.workspacePublicId,
+        req.params.sessionPublicId,
+        reply,
+      );
+      if (ids == null) return;
+      const session = await application.getSession(ids.workspaceId, ids.sessionId);
+      if (!session) return reply.status(404).send({ error: "会话不存在" });
+      const title = await application.generateSessionTitleForSession(
+        ids.workspaceId,
+        ids.sessionId,
+      );
+      return { title };
+    },
+  );
 
   app.post<{
     Params: { workspacePublicId: string; sessionPublicId: string };

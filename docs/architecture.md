@@ -784,13 +784,14 @@ shaping remain specified in [AI Spreadsheet Tools](ai-spreadsheet-tools.md).
 
 ### 7.3 Title flow
 
-1. The session service observes that the first transcript has been persisted.
-2. The server schedules title generation independently of the chat response.
-3. Server generates a title and persists it only while the session still has its initial title.
-4. Web refreshes session metadata or updates its session cache.
+1. After the server has persisted a run, the chat stream emits `run.started`.
+2. Web forwards the generic `user turn accepted` event to the session workspace layer.
+3. The session workspace asynchronously calls the separate title endpoint and updates its local session cache.
+4. The title service reads the first persisted `AgentRun.inputText`, generates a title or fallback, and writes it only while the session still has the initial name.
+5. A manual rename is protected by both the service recheck and the conditional database update.
 
 Title generation must never block chat completion.
-The title endpoint remains available for explicit retry or manual client actions, but the initial chat flow does not depend on a mounted chat component to request a title.
+The title request is intentionally lightweight and browser-owned; a browser closing immediately after `run.started` may leave the title pending. If durable retry becomes necessary, the title request can later move behind a server worker without changing the Session API.
 
 ### 7.4 Undo flow
 

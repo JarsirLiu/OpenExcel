@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { createSession as createSessionRequest, type Session } from "@/api/sessions";
+import {
+  createSession as createSessionRequest,
+  generateSessionTitle,
+  type Session,
+} from "@/api/sessions";
 import { useSessionsList } from "./useSessionsList";
 
 export function useSessionWorkspace(
@@ -21,6 +25,7 @@ export function useSessionWorkspace(
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [sessionError, setSessionError] = useState<Error | undefined>();
   const initialSeededRef = useRef(false);
+  const titleRequestedSessionIdsRef = useRef<Set<number>>(new Set());
   // Seed initial sessions from route loader
   useEffect(() => {
     if (!initial || initialSeededRef.current) return;
@@ -36,6 +41,7 @@ export function useSessionWorkspace(
       // Workspace unmounted — no-op, sessions will reset on next mount
     } else if (prevWorkspaceIdRef.current != null && prevWorkspaceIdRef.current !== workspaceId) {
       setSessionError(undefined);
+      titleRequestedSessionIdsRef.current.clear();
       refreshSessions({ resetCurrent: true });
     }
     prevWorkspaceIdRef.current = workspaceId;
@@ -93,6 +99,28 @@ export function useSessionWorkspace(
     await onUndoComplete?.();
   }, [onUndoComplete, refreshSessions]);
 
+  const handleUserTurnAccepted = useCallback(
+    (sessionId: number) => {
+      if (workspaceId == null || titleRequestedSessionIdsRef.current.has(sessionId)) return;
+      titleRequestedSessionIdsRef.current.add(sessionId);
+      void generateSessionTitle(workspaceId, sessionId)
+        .then(({ title }) => {
+          setSessions((current) =>
+            current.map((session) =>
+              session.id === sessionId
+                ? { ...session, name: title, titleStatus: "generated" as const }
+                : session,
+            ),
+          );
+        })
+        .catch((error) => {
+          titleRequestedSessionIdsRef.current.delete(sessionId);
+          console.error("[session] Failed to generate session title:", error);
+        });
+    },
+    [setSessions, workspaceId],
+  );
+
   return {
     sessions,
     currentSessionId,
@@ -105,6 +133,7 @@ export function useSessionWorkspace(
     handleSelectSession,
     handleDeleteSession,
     handleUndoComplete,
+    handleUserTurnAccepted,
     isCreatingSession,
     sessionError,
   };
