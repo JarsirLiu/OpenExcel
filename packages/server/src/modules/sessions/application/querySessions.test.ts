@@ -33,8 +33,8 @@ describe("getMessages", () => {
       runId: 12,
       checkpointSequence: 8,
       transcript: [
-        { role: "user", parts: [{ type: "text", text: "读取数据" }] },
-        { role: "assistant", parts: [{ type: "text", text: "部分结果" }] },
+        { cursor: 0, message: { role: "user", parts: [{ type: "text", text: "读取数据" }] } },
+        { cursor: 1, message: { role: "assistant", parts: [{ type: "text", text: "部分结果" }] } },
       ],
       reasoning: "先读取数据",
       toolState: [],
@@ -54,7 +54,9 @@ describe("getMessages", () => {
     mocks.findLatestSessionCheckpoint.mockResolvedValue({
       runId: 13,
       checkpointSequence: 2,
-      transcript: [{ role: "assistant", parts: [{ type: "text", text: "已恢复" }] }],
+      transcript: [
+        { cursor: 0, message: { role: "assistant", parts: [{ type: "text", text: "已恢复" }] } },
+      ],
       reasoning: "",
       toolState: [],
     });

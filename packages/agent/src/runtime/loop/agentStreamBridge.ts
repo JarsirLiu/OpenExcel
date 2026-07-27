@@ -28,6 +28,7 @@ export interface AgentStreamBridge {
   onFinish(event: unknown): Promise<void>;
   onAbort(event: unknown): Promise<void>;
   onError(event: unknown): Promise<void>;
+  resetForRetry(): void;
   getState(): AgentStreamBridgeState;
 }
 
@@ -112,6 +113,14 @@ export function createAgentStreamBridge(options: AgentStreamBridgeOptions): Agen
       state.loopError = error;
       state.failurePhase = "model";
       await options.onError?.(error);
+    },
+
+    resetForRetry() {
+      state.aborted = false;
+      state.loopError = undefined;
+      state.failurePhase = undefined;
+      streamedText = "";
+      streamedReasoning = "";
     },
 
     getState() {

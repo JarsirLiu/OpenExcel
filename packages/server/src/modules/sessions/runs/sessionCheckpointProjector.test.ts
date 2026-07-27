@@ -28,7 +28,9 @@ describe("projectRunCheckpointForRun", () => {
     mocks.findLatestSessionCheckpoint.mockResolvedValue({
       runId: 2,
       checkpointSequence: 8,
-      transcript: [{ role: "user", parts: [{ type: "text", text: "之前" }] }],
+      transcript: [
+        { cursor: 0, message: { role: "user", parts: [{ type: "text", text: "之前" }] } },
+      ],
       reasoning: "",
       toolState: [],
     });
@@ -73,15 +75,21 @@ describe("projectRunCheckpointForRun", () => {
       reasoning: "先分析",
       toolState: [],
       transcript: [
-        { role: "user", parts: [{ type: "text", text: "之前" }] },
-        { id: "user-4", role: "user", parts: [{ type: "text", text: "当前" }] },
+        { cursor: 0, message: { role: "user", parts: [{ type: "text", text: "之前" }] } },
         {
-          id: "assistant-4",
-          role: "assistant",
-          parts: [
-            { id: "reasoning-4", type: "reasoning", text: "先分析" },
-            { id: "text-4", type: "text", text: "结果" },
-          ],
+          cursor: 1,
+          message: { id: "user-4", role: "user", parts: [{ type: "text", text: "当前" }] },
+        },
+        {
+          cursor: 2,
+          message: {
+            id: "assistant-4",
+            role: "assistant",
+            parts: [
+              { id: "reasoning-4", type: "reasoning", text: "先分析" },
+              { id: "text-4", type: "text", text: "结果" },
+            ],
+          },
         },
       ],
     });

@@ -4,19 +4,40 @@
 context checkpoint。它只影响模型请求看到的 model context，不改变 canonical
 transcript、AgentEvent、工具账本、外部业务状态或前端历史消息。
 
-当前状态：设计完成，运行时尚未启用自动压缩。实现必须以本文档和
-[Agent 可复用包设计](agent-core-package.md)为准，不得恢复旧的按消息数量压缩占位实现。
+当前状态：自动 `compaction` 已接入 `agentLoop` 的模型步骤生命周期；`sliding-window` 仍是显式策略
+的设计预留，当前不会在压缩失败时自动切换。当前实现包括：
+
+- `runtime/context/transcript.ts`：跨运行单调 transcript cursor；
+- `runtime/context/compaction/budgetPlanner.ts`：普通请求预算、摘要请求预算和触发阈值；
+- `runtime/context/compaction/safeBoundary.ts`：按完整 user-led turn 选择 recent tail，禁止拆开工具链；
+- `runtime/context/compaction/summaryBatchPlanner.ts`：按完整 turn 拆分摘要输入；
+- `runtime/context/compaction/summary.ts`：严格结构化摘要 schema 和 token 上限校验；
+- `runtime/context/compaction/modelSummary.ts`：复用当前 chat model 的结构化摘要适配器；
+- `runtime/context/compaction/engine.ts`：增量摘要、context 重建、checkpoint CAS 和 external revision 失效；
+- `runtime/context/modelContextAssembler.ts`：把摘要组装成仅供模型使用的特殊 user context message，不伪装成
+  canonical transcript 消息，也不提升为 system prompt。
+- `runtime/context/contextCompactionCoordinator.ts`：协调步骤完成、预算判断、压缩后上下文重建和 token baseline 重置；
+- server `checkpointRepository.ts`：为 session/run 提供 checkpoint 读取和版本 CAS 保存。
+
+`runAgentLoop` 在 `prepareStep` 前根据上一阶段 provider usage 和当前实际 messages、instructions、
+activeTools 预测下一次输入；达到阈值后由 coordinator 生成摘要、CAS 保存 checkpoint 并重建下一步
+model context。provider context overflow 走独立的有限 compact-and-retry 路径。实现必须以本文档为准，
+不得恢复旧的按消息数量压缩占位实现。
 
 ## 1. 目标
 
 Agent 支持两种上下文策略：
 
-- `compaction`：默认策略。接近上下文上限时，使用当前对话模型生成结构化摘要，并保留
+- `compaction`：当前启用的策略。接近上下文上限时，使用当前对话模型生成结构化摘要，并保留
   最近安全消息；
-- `sliding-window`：应急策略。只保留预算内的最近完整消息窗口，不调用摘要模型。
+- `sliding-window`：设计预留。尚未接入运行时，不能作为压缩失败后的隐式兜底。
 
 两种策略共享 token 观测、增量估算、工具结果预算和消息结构校验。它们不改变外部消息
 协议，也不删除服务端完整历史。
+
+压缩模块只接收通用消息、实际生效的 `systemPrompt/toolDefinitions`、摘要模型端口和
+checkpoint store；它不依赖 Excel、HTTP、Prisma 或 React。工具定义必须来自当前模型步骤，
+不能在压缩模块中重新读取一份静态工具目录。
 
 必须满足：
 
@@ -36,7 +57,6 @@ type ContextPolicy = {
   triggerRatio: number;
   safetyMarginTokens: number;
   outputReserveTokens: number;
-  compactionReserveTokens: number;
   summaryMaxTokens: number;
   keepRecentTokens: number;
   maxRecentTurns?: number;
@@ -52,7 +72,6 @@ type ContextPolicy = {
   triggerRatio: 0.85,
   safetyMarginTokens: 1024,
   outputReserveTokens: 16_000,
-  compactionReserveTokens: 4096,
   summaryMaxTokens: 2048,
   keepRecentTokens: 20_000,
   maxCompactionRetries: 1,
@@ -70,17 +89,16 @@ regularInputBudget = contextWindowTokens
                     - safetyMarginTokens
 ```
 
-自动压缩阈值必须同时满足普通请求阈值和压缩请求预留：
+摘要请求的可用输入预算为：
 
 ```text
-compactBefore = min(
-  regularInputBudget * triggerRatio,
-  contextWindowTokens - compactionReserveTokens - safetyMarginTokens
-)
+summaryInputBudget = contextWindowTokens
+                    - summaryMaxTokens
+                    - safetyMarginTokens
 ```
 
-`compactionReserveTokens` 必须覆盖压缩 prompt、previous summary、待总结历史和摘要输出的
-预留空间。它不是普通模型的 `outputReserveTokens`，两者不能重复计算或互相替代。
+摘要批处理器会对每个批次重新计算 `previousSummary + 当前 batch`，保证单次摘要请求不超过
+`summaryInputBudget`。普通模型的自动压缩阈值由 `regularInputBudget * triggerRatio` 决定。
 
 ## 3. 三类数据
 
@@ -96,6 +114,15 @@ compactBefore = min(
 checkpoint 只表示“摘要覆盖到哪个 transcript 游标”，不是另一份 transcript。最近保留消息
 通过游标从 canonical transcript 重新构造，避免 checkpoint 同时保存一份容易过期的消息副本。
 
+canonical projector 为每条消息分配跨运行递增的游标：
+
+```ts
+type ContextTranscriptEntry = {
+  cursor: number;
+  message: unknown;
+};
+```
+
 建议结构：
 
 ```ts
@@ -104,7 +131,7 @@ type ContextCheckpoint = {
   checkpointId: string;
   contextKey: string;
   version: number;
-  coveredEventSequence: number;
+  coveredTranscriptCursor: number;
   summaryVersion: number;
   summary: ContextSummary;
   sourceTranscriptHash: string;
@@ -124,7 +151,7 @@ revision，其他项目可以绑定文档版本、代码仓库状态或自己的
 
 ```text
 system prompt
-+ context checkpoint summary（如果存在）
++ 特殊 user context message：context checkpoint summary（如果存在）
 + checkpoint 之后的最近安全消息
 + 当前模型步骤需要的工具定义和工具结果
 ```
@@ -257,7 +284,7 @@ assistant text or next tool-call
 6. 将被移除的历史与 `previousSummary` 交给当前 chat model 生成结构化摘要。
 7. 校验摘要 schema、摘要 token 数量和覆盖游标。
 8. 使用 checkpoint store 以乐观版本写入新的 context checkpoint。
-9. checkpoint 写入成功后，发布 `compaction.completed`，重建下一次 model context。
+9. checkpoint 写入成功后，重建下一次 model context，并重置旧 token baseline。
 
 压缩摘要不是一次普通对话消息。摘要生成失败、checkpoint 保存失败或压缩后仍然超限时，
 都必须终止当前运行并返回真实失败阶段。
@@ -283,11 +310,15 @@ type ContextSummary = {
 模型必须输出可校验的结构化结果。摘要生成器负责解析、校验和限制每个字段的长度；不合格
 结果视为压缩失败，不使用模型原始文本兜底。
 
+摘要生成直接复用当前运行已经解析出的 chat model，不新增 `summaryModel` 配置。摘要请求
+不携带 Excel tools，使用独立 system prompt、`Output.object` 结构化输出和当前运行的
+AbortSignal。摘要 usage 单独上报，不覆盖普通模型的 token baseline。
+
 再次压缩时：
 
 - 旧摘要作为 `previousSummary` 独立输入；
-- 新增历史只覆盖旧 checkpoint 之后的 transcript；
-- 新 checkpoint 的 `coveredEventSequence` 必须单调递增；
+- 摘要源只取 `cursor > checkpoint.coveredTranscriptCursor` 的新增 transcript；
+- 新 checkpoint 的 `coveredTranscriptCursor` 必须单调递增；
 - 不把旧摘要当普通 transcript 再次截断。
 
 ## 7. Context overflow 恢复
@@ -333,16 +364,13 @@ interface ContextCheckpointStore {
     current?: ContextCheckpoint;
   }>;
 
-  invalidate(input: {
-    contextKey: string;
-    reason: string;
-    externalContextRevision?: string;
-  }): Promise<void>;
 }
 ```
 
 `save` 返回 `accepted: false` 时，运行必须重新加载最新 checkpoint 和 transcript 后再决定
-是否继续，不能覆盖其他 run 已提交的摘要。checkpoint 失效原因至少包括：
+是否继续，不能覆盖其他 run 已提交的摘要。external context revision 变化时不执行独立删除，
+而是丢弃旧 summary，并以当前 checkpoint version 作为一次 CAS 保存的新版本基线。checkpoint
+失效原因至少包括：
 
 - external context revision 变化；
 - undo、导入或批量外部修改；
@@ -423,14 +451,17 @@ OpenExcel 适配层负责：
 
 实施顺序：
 
-1. 删除旧的按消息数量压缩实现，收紧 `CompactionOptions`；
+1. 删除旧的按消息数量压缩实现，使用 `ContextCompactionPolicy`；
 2. 定义标准 `ModelStepFinished.usage` 和可注入 `TokenEstimator`；
 3. 实现纯 token budget、真实 usage 基线和增量预测；
 4. 实现 safe boundary、sliding-window 和 oversized-turn 处理；
-5. 实现 `CompactionEngine`、结构化 summary 和 overflow 一次恢复；
-6. 实现 CAS checkpoint store 和 external revision 失效；
-7. 接入模型步骤边界、persistence barrier 和 AgentEvent；
-8. 默认启用 `compaction`，保留 `sliding-window` 作为应急配置；
+5. ~~实现 `CompactionEngine`、结构化 summary 和 overflow 一次恢复~~：已完成 engine、summary
+   校验、CAS checkpoint、external revision 失效和有限 overflow recovery；
+6. ~~实现 CAS checkpoint store 和 external revision 失效~~：已完成 runtime store port 与 server
+   Prisma adapter；
+7. ~~接入模型步骤边界、persistence barrier 和 AgentEvent~~：已由 coordinator 接入 loop，
+   server 继续以既有 durable event barrier 作为持久化边界；
+8. 默认启用 `compaction`；`sliding-window` 仍是显式策略预留，不作为压缩失败后的隐式兜底；
 9. 将内核 API 从 OpenExcel 专用字段中抽离，按 [Agent 可复用包设计](agent-core-package.md)整理公开入口。
 
 验收必须覆盖：

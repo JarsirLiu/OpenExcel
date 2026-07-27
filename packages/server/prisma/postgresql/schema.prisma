@@ -221,6 +221,8 @@ model AgentRunCheckpoint {
   transcript        String
   reasoning         String
   toolState         String
+  contextCheckpoint String?
+  contextVersion    Int?
   updatedAt         DateTime @updatedAt
   run               AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
 

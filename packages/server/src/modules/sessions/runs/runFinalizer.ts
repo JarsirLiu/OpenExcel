@@ -1,9 +1,9 @@
 import type { AgentEventSink, AgentRunCompletion, AgentTranscriptMessage } from "@openexcel/agent";
 import { formatAIError } from "@openexcel/agent";
 import { findAgentEventsByRun, persistRunLifecycleEvent } from "./agentEventRepository.js";
-import { persistRunCheckpoint } from "./checkpointRepository.js";
+import { findRunCheckpoint, persistRunCheckpoint } from "./checkpointRepository.js";
 import * as runRepo from "./repository.js";
-import { projectRunCheckpoint, projectRunTranscript } from "./runCheckpointProjector.js";
+import { projectRunCheckpoint, projectRunTranscriptEntries } from "./runCheckpointProjector.js";
 import type { AcquiredRunLease } from "./runLease.js";
 import { completeRunAndUpdateUndoCheckpoint } from "./undoCheckpoint.js";
 
@@ -103,11 +103,17 @@ export function createRunFinalizer(options: {
       }
 
       if (projectionEvents.length > 0) {
-        const transcript = projectRunTranscript(
+        const transcript = projectRunTranscriptEntries(
           projectionEvents,
-          (options.lease.transcript ?? []) as AgentTranscriptMessage[],
+          options.lease
+            .transcript as import("@openexcel/agent").ContextTranscriptEntry<AgentTranscriptMessage>[],
         );
-        const checkpoint = projectRunCheckpoint(projectionEvents, transcript);
+        const projectedCheckpoint = projectRunCheckpoint(projectionEvents, transcript);
+        const currentCheckpoint = await findRunCheckpoint(options.lease.run.id);
+        const checkpoint =
+          currentCheckpoint?.contextCheckpoint || !options.lease.contextCheckpoint
+            ? projectedCheckpoint
+            : { ...projectedCheckpoint, contextCheckpoint: options.lease.contextCheckpoint };
         await persistRunCheckpoint({ runId: options.lease.run.id, ...checkpoint });
       }
     } catch (error) {

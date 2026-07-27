@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   findAgentEventsByRun: vi.fn(),
   persistRunLifecycleEvent: vi.fn(),
   persistRunCheckpoint: vi.fn(),
+  findRunCheckpoint: vi.fn(),
 }));
 
 vi.mock("../infrastructure/sessionLock.js", () => ({
@@ -24,6 +25,7 @@ vi.mock("./agentEventRepository.js", () => ({
 }));
 vi.mock("./checkpointRepository.js", () => ({
   persistRunCheckpoint: mocks.persistRunCheckpoint,
+  findRunCheckpoint: mocks.findRunCheckpoint,
 }));
 
 import { createRunFinalizer } from "./runFinalizer.js";
@@ -33,6 +35,7 @@ function createLease(release = vi.fn()) {
     run: { id: 9 },
     ownerId: "owner-1",
     sessionVersion: 3,
+    transcript: [],
     release,
   } as any;
 }
@@ -46,6 +49,7 @@ describe("createRunFinalizer", () => {
     mocks.findAgentEventsByRun.mockResolvedValue([]);
     mocks.persistRunLifecycleEvent.mockResolvedValue(undefined);
     mocks.persistRunCheckpoint.mockResolvedValue(true);
+    mocks.findRunCheckpoint.mockResolvedValue(null);
   });
 
   it("persists the canonical transcript before the terminal run state", async () => {
@@ -192,12 +196,15 @@ describe("createRunFinalizer", () => {
       expect.objectContaining({
         transcript: [
           {
-            id: "assistant-1",
-            role: "assistant",
-            parts: [
-              { id: "reasoning-1", type: "reasoning", text: "先分析" },
-              { id: "text-1", type: "text", text: "结果" },
-            ],
+            cursor: 0,
+            message: {
+              id: "assistant-1",
+              role: "assistant",
+              parts: [
+                { id: "reasoning-1", type: "reasoning", text: "先分析" },
+                { id: "text-1", type: "text", text: "结果" },
+              ],
+            },
           },
         ],
       }),

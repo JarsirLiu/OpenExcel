@@ -1,3 +1,4 @@
+import type { ContextCheckpoint, ContextCheckpointStore } from "@openexcel/agent";
 import { prisma } from "../../../infra/database/db.js";
 
 export interface RunCheckpoint {
@@ -6,6 +7,7 @@ export interface RunCheckpoint {
   transcript: unknown[];
   reasoning: string;
   toolState: unknown[];
+  contextCheckpoint?: ContextCheckpoint;
 }
 
 function encode(value: unknown) {
@@ -21,6 +23,16 @@ function decodeArray(value: string): unknown[] {
   }
 }
 
+function decodeContextCheckpoint(value: string | null): ContextCheckpoint | undefined {
+  if (!value) return undefined;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return parsed && typeof parsed === "object" ? (parsed as ContextCheckpoint) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function findRunCheckpoint(runId: number) {
   const checkpoint = await prisma.agentRunCheckpoint.findUnique({ where: { runId } });
   if (!checkpoint) return null;
@@ -30,6 +42,9 @@ export async function findRunCheckpoint(runId: number) {
     transcript: decodeArray(checkpoint.transcript),
     reasoning: checkpoint.reasoning,
     toolState: decodeArray(checkpoint.toolState),
+    ...(decodeContextCheckpoint(checkpoint.contextCheckpoint)
+      ? { contextCheckpoint: decodeContextCheckpoint(checkpoint.contextCheckpoint) }
+      : {}),
   } satisfies RunCheckpoint;
 }
 
@@ -52,6 +67,9 @@ export async function findLatestSessionCheckpoint(workspaceId: number, sessionId
     transcript: decodeArray(checkpoint.transcript),
     reasoning: checkpoint.reasoning,
     toolState: decodeArray(checkpoint.toolState),
+    ...(decodeContextCheckpoint(checkpoint.contextCheckpoint)
+      ? { contextCheckpoint: decodeContextCheckpoint(checkpoint.contextCheckpoint) }
+      : {}),
   } satisfies RunCheckpoint;
 }
 
@@ -103,6 +121,12 @@ async function writeCheckpoint(checkpoint: RunCheckpoint) {
           transcript: encode(checkpoint.transcript),
           reasoning: checkpoint.reasoning,
           toolState: encode(checkpoint.toolState),
+          ...(checkpoint.contextCheckpoint
+            ? {
+                contextCheckpoint: encode(checkpoint.contextCheckpoint),
+                contextVersion: checkpoint.contextCheckpoint.version,
+              }
+            : {}),
         },
       });
       return true;
@@ -115,6 +139,12 @@ async function writeCheckpoint(checkpoint: RunCheckpoint) {
         transcript: encode(checkpoint.transcript),
         reasoning: checkpoint.reasoning,
         toolState: encode(checkpoint.toolState),
+        ...(checkpoint.contextCheckpoint
+          ? {
+              contextCheckpoint: encode(checkpoint.contextCheckpoint),
+              contextVersion: checkpoint.contextCheckpoint.version,
+            }
+          : {}),
       },
     });
     if (result.count !== 1) return false;
@@ -131,12 +161,76 @@ async function updateCheckpoint(checkpoint: RunCheckpoint) {
         transcript: encode(checkpoint.transcript),
         reasoning: checkpoint.reasoning,
         toolState: encode(checkpoint.toolState),
+        ...(checkpoint.contextCheckpoint
+          ? {
+              contextCheckpoint: encode(checkpoint.contextCheckpoint),
+              contextVersion: checkpoint.contextCheckpoint.version,
+            }
+          : {}),
       },
     });
     if (result.count !== 1) return false;
 
     return true;
   });
+}
+
+export function createRunContextCheckpointStore(
+  runId: number,
+  contextKey: string,
+  workspaceId: number,
+  sessionId: number,
+): ContextCheckpointStore {
+  return {
+    async load(key) {
+      if (key !== contextKey) throw new Error("Context checkpoint key mismatch");
+      return (
+        (await findRunCheckpoint(runId))?.contextCheckpoint ??
+        (await findLatestSessionCheckpoint(workspaceId, sessionId))?.contextCheckpoint ??
+        null
+      );
+    },
+    async save({ checkpoint, expectedVersion }) {
+      const currentRun = await findRunCheckpoint(runId);
+      const current =
+        currentRun?.contextCheckpoint ??
+        (await findLatestSessionCheckpoint(workspaceId, sessionId))?.contextCheckpoint;
+      const currentVersion = current?.version ?? null;
+      if (currentVersion !== expectedVersion) {
+        return { accepted: false, current };
+      }
+
+      if (!currentRun) {
+        await prisma.agentRunCheckpoint.create({
+          data: {
+            runId,
+            checkpointSequence: -1,
+            transcript: encode([]),
+            reasoning: "",
+            toolState: encode([]),
+            contextCheckpoint: encode(checkpoint),
+            contextVersion: checkpoint.version,
+          },
+        });
+      } else {
+        const result = await prisma.agentRunCheckpoint.updateMany({
+          where: {
+            runId,
+            contextVersion: currentRun.contextCheckpoint?.version ?? null,
+          },
+          data: {
+            contextCheckpoint: encode(checkpoint),
+            contextVersion: checkpoint.version,
+          },
+        });
+        if (result.count !== 1) {
+          return { accepted: false, current: (await findRunCheckpoint(runId))?.contextCheckpoint };
+        }
+      }
+
+      return { accepted: true };
+    },
+  };
 }
 
 function isUniqueConstraintError(error: unknown): error is { code: "P2002" } {

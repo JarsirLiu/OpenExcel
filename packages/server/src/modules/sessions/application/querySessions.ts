@@ -33,8 +33,9 @@ export async function getMessages(
   }
 
   const checkpoint = await findLatestSessionCheckpoint(workspaceId, sessionId);
-  const transcript = checkpoint?.transcript as any[] | undefined;
-  if (!transcript) return { messages: [], total: 0 };
+  const entries = checkpoint?.transcript as Array<{ message: unknown }> | undefined;
+  if (!entries) return { messages: [], total: 0 };
+  const transcript = entries.map((entry) => entry.message);
   const t = transcript.length;
   const start = Math.max(0, t - offset - limit);
   const end = t - offset;

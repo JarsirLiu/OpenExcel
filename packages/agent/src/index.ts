@@ -7,6 +7,59 @@ export {
   resolveModelForPurpose,
 } from "./model.js";
 export { buildSystemPrompt, DEFAULT_PROMPT } from "./prompt/systemPrompt.js";
+export {
+  type ContextBudgetPlan,
+  createContextBudgetPlan,
+  shouldCompact,
+} from "./runtime/context/compaction/budgetPlanner.js";
+export {
+  ContextCompactionEngine,
+  type ContextCompactionRequest,
+  type ContextCompactionResult,
+} from "./runtime/context/compaction/engine.js";
+export {
+  CONTEXT_SUMMARY_SYSTEM_PROMPT,
+  type ContextSummaryGeneratorOptions,
+  createContextSummaryGenerator,
+} from "./runtime/context/compaction/modelSummary.js";
+export {
+  type SafeContextSelection,
+  type SafeContextSelectionOptions,
+  selectSafeContextTail,
+} from "./runtime/context/compaction/safeBoundary.js";
+export { validateContextSummary } from "./runtime/context/compaction/summary.js";
+export {
+  planSummaryBatches,
+  type SummaryBatch,
+} from "./runtime/context/compaction/summaryBatchPlanner.js";
+export type {
+  ContextCheckpoint,
+  ContextCheckpointStore,
+  ContextCompactionEngineOptions,
+  ContextCompactionFailureStage,
+  ContextCompactionMode,
+  ContextCompactionPolicy,
+  ContextSummary,
+  ContextSummaryDecision,
+  ContextSummaryGenerator,
+  ContextSummaryReference,
+} from "./runtime/context/compaction/types.js";
+export {
+  ContextCompactionError,
+  DEFAULT_CONTEXT_COMPACTION_POLICY,
+} from "./runtime/context/compaction/types.js";
+export {
+  type AssembledModelContext,
+  assembleModelContext,
+  type ModelContextAssemblerInput,
+} from "./runtime/context/modelContextAssembler.js";
+export {
+  appendTranscriptEntry,
+  type ContextTranscriptEntry,
+  messagesFromTranscript,
+  type TranscriptCursor,
+  validateTranscriptEntries,
+} from "./runtime/context/transcript.js";
 export type {
   AgentEvent,
   AgentEventSink,
@@ -23,6 +76,7 @@ export type {
   ToolExecutor,
 } from "./runtime/contracts.js";
 export { formatAIError } from "./runtime/errors/formatAIError.js";
+export { isContextOverflowError } from "./runtime/errors/isContextOverflowError.js";
 export { AgentPersistenceError } from "./runtime/events/types.js";
 export {
   AgentRunner,

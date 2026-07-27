@@ -8,6 +8,7 @@ function createOpenAICompatibleProvider(config: RuntimeModelReference) {
     baseURL: config.baseUrl ?? "https://api.openai.com/v1",
     apiKey: config.apiKey ?? "",
     includeUsage: true,
+    supportsStructuredOutputs: true,
   });
 }
 

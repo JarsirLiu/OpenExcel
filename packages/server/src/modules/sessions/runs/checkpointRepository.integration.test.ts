@@ -32,6 +32,8 @@ describe("checkpointRepository (SQLite)", () => {
         "transcript" TEXT NOT NULL,
         "reasoning" TEXT NOT NULL,
         "toolState" TEXT NOT NULL,
+        "contextCheckpoint" TEXT,
+        "contextVersion" INTEGER,
         "updatedAt" DATETIME NOT NULL,
         FOREIGN KEY ("runId") REFERENCES "AgentRun" ("id") ON DELETE CASCADE
       );

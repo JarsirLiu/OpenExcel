@@ -1,4 +1,9 @@
 import { randomUUID } from "node:crypto";
+import type {
+  AgentTranscriptMessage,
+  ContextCheckpoint,
+  ContextTranscriptEntry,
+} from "@openexcel/agent";
 import { prisma } from "../../../infra/database/db.js";
 import type { Prisma } from "../../../infra/database/prismaTypes.js";
 import { SessionBusyError } from "../domain/sessionErrors.js";
@@ -13,13 +18,24 @@ type LeaseSession = {
   version: number;
 };
 
-function parseTranscript(value: string | null): unknown[] {
+function parseTranscript(value: string | null): ContextTranscriptEntry<AgentTranscriptMessage>[] {
   if (!value) return [];
   try {
     const parsed: unknown = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed as ContextTranscriptEntry<AgentTranscriptMessage>[];
   } catch {
     return [];
+  }
+}
+
+function parseContextCheckpoint(value: string | null): ContextCheckpoint | undefined {
+  if (!value) return undefined;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return parsed && typeof parsed === "object" ? (parsed as ContextCheckpoint) : undefined;
+  } catch {
+    return undefined;
   }
 }
 
@@ -34,7 +50,8 @@ export interface AcquiredRunLease {
   run: Awaited<ReturnType<typeof createLeasedRun>>;
   ownerId: string;
   sessionVersion: number;
-  transcript: unknown[];
+  transcript: ContextTranscriptEntry<AgentTranscriptMessage>[];
+  contextCheckpoint?: ContextCheckpoint;
   heartbeat(): Promise<boolean>;
   startHeartbeat(onLost: () => void): void;
   release(): Promise<void>;
@@ -78,7 +95,9 @@ export async function acquireRunLease(data: {
   inputText: string;
   model?: string;
   requestPayloadHash?: string;
-  appendUserTurn(transcript: unknown[]): unknown[];
+  appendUserTurn(
+    transcript: ContextTranscriptEntry<AgentTranscriptMessage>[],
+  ): ContextTranscriptEntry<AgentTranscriptMessage>[];
   now?: Date;
   leaseDurationMs?: number;
 }): Promise<AcquiredRunLease> {
@@ -140,10 +159,13 @@ export async function acquireRunLease(data: {
         checkpoint: { isNot: null },
       },
       orderBy: [{ startedAt: "desc" }, { id: "desc" }],
-      select: { checkpoint: { select: { transcript: true } } },
+      select: { checkpoint: { select: { transcript: true, contextCheckpoint: true } } },
     });
     const canonicalTranscript = parseTranscript(previousRun?.checkpoint?.transcript ?? null);
     const transcript = data.appendUserTurn(canonicalTranscript);
+    const contextCheckpoint = parseContextCheckpoint(
+      previousRun?.checkpoint?.contextCheckpoint ?? null,
+    );
 
     const run = await createLeasedRun(tx, {
       sessionId: data.sessionId,
@@ -157,7 +179,7 @@ export async function acquireRunLease(data: {
       requestPayloadHash: data.requestPayloadHash,
     });
 
-    return { run, transcript, sessionVersion: nextVersion };
+    return { run, transcript, contextCheckpoint, sessionVersion: nextVersion };
   });
 
   let heartbeatTimer: ReturnType<typeof setInterval> | undefined;
@@ -199,6 +221,7 @@ export async function acquireRunLease(data: {
     ownerId,
     sessionVersion: acquired.sessionVersion,
     transcript: acquired.transcript,
+    ...(acquired.contextCheckpoint ? { contextCheckpoint: acquired.contextCheckpoint } : {}),
     heartbeat,
     startHeartbeat(onLost: () => void) {
       heartbeatTimer ??= setInterval(() => {

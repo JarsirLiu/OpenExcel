@@ -71,7 +71,7 @@ export function appendResponseMessages(
       }
       if (parts.length > 0) {
         generated.push({
-          id: messageId(transcript, assistantIndex++),
+          id: typeof message.id === "string" ? message.id : messageId(transcript, assistantIndex++),
           role: "assistant",
           parts,
         });

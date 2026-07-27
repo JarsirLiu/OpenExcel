@@ -1,4 +1,4 @@
-import type { AgentEvent, AgentTranscriptMessage } from "@openexcel/agent";
+import type { AgentEvent, AgentTranscriptMessage, ContextTranscriptEntry } from "@openexcel/agent";
 
 type EventPayload = Record<string, unknown>;
 
@@ -257,9 +257,38 @@ export function projectRunTranscript(
     : (fallbackTranscript ?? base);
 }
 
+/** Projects durable events onto the session transcript while preserving stable cursors. */
+export function projectRunTranscriptEntries(
+  events: readonly AgentEvent[],
+  baseTranscript: readonly ContextTranscriptEntry<AgentTranscriptMessage>[],
+  fallbackTranscript?: readonly ContextTranscriptEntry<AgentTranscriptMessage>[],
+  terminalStatus?: TerminalRunStatus,
+): ContextTranscriptEntry<AgentTranscriptMessage>[] {
+  const baseMessages = baseTranscript.map((entry) => entry.message);
+  const fallbackMessages = fallbackTranscript?.map((entry) => entry.message);
+  const projected = projectRunTranscript(events, baseMessages, fallbackMessages, terminalStatus);
+  const existingById = new Map(
+    baseTranscript.flatMap((entry) => {
+      const id = typeof entry.message.id === "string" ? entry.message.id : undefined;
+      return id ? [[id, entry] as const] : [];
+    }),
+  );
+  let nextCursor = baseTranscript.at(-1)?.cursor ?? -1;
+  return projected.map((message, index) => {
+    const id = typeof message.id === "string" ? message.id : undefined;
+    const indexed = baseTranscript[index];
+    const existing =
+      (id ? existingById.get(id) : undefined) ??
+      (indexed?.message.role === message.role ? indexed : undefined);
+    if (existing) return { cursor: existing.cursor, message };
+    nextCursor += 1;
+    return { cursor: nextCursor, message };
+  });
+}
+
 export function projectRunCheckpoint(
   events: readonly AgentEvent[],
-  transcript: AgentTranscriptMessage[],
+  transcript: unknown[],
   base?: Pick<
     import("./checkpointRepository.js").RunCheckpoint,
     "checkpointSequence" | "reasoning" | "toolState"

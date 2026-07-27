@@ -52,7 +52,9 @@ describe("acquireRunLease", () => {
     mocks.agentRunCreate.mockResolvedValue({ id: 42, status: "running" });
     mocks.agentRunFindFirst.mockResolvedValue({
       checkpoint: {
-        transcript: JSON.stringify([{ role: "user", parts: [{ type: "text", text: "old" }] }]),
+        transcript: JSON.stringify([
+          { cursor: 0, message: { role: "user", parts: [{ type: "text", text: "old" }] } },
+        ]),
       },
     });
   });
@@ -72,7 +74,10 @@ describe("acquireRunLease", () => {
       requestId: "req-1",
       inputText: "new",
       now,
-      appendUserTurn: (messages) => [...messages, { role: "user", text: "new" }],
+      appendUserTurn: (messages) => [
+        ...messages,
+        { cursor: 1, message: { role: "user", text: "new" } },
+      ],
     });
 
     expect(lease.sessionVersion).toBe(4);

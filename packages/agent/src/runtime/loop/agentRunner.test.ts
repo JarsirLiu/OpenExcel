@@ -15,7 +15,12 @@ describe("AgentRunner", () => {
     const result = { completion: Promise.resolve({}) };
     mocks.runAgentLoop.mockResolvedValue(result);
 
-    const transcript = [{ id: "message-1", role: "user", parts: [{ type: "text", text: "你好" }] }];
+    const transcript = [
+      {
+        cursor: 0,
+        message: { id: "message-1", role: "user", parts: [{ type: "text", text: "你好" }] },
+      },
+    ];
     const tools = {};
     const runner = createAgentRunner({
       modelConfig: { modelName: "test-model" } as never,

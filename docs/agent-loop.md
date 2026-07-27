@@ -184,6 +184,7 @@ packages/agent/src/
 │  ├─ tools/               # 通用 tool contract -> AI SDK ToolSet
 │  ├─ events/              # provider-neutral AgentEvent 和序列
 │  ├─ stream/              # Agent 输出的 provider-specific 辅助转换
+│  ├─ context/compaction/  # 压缩预算、安全边界、摘要校验和 checkpoint engine
 │  ├─ contracts.ts         # Agent 输入、端口和运行结果协议
 │  └─ model/               # provider/model resolver
 ├─ prompt/
@@ -201,9 +202,11 @@ packages/agent/src/
 - `agentRunner.ts` 负责读取输入、调用 context/prompt builder、创建 loop、汇总运行终态；
   不直接调用 Prisma、HTTP 或具体 workbook 工具。
 - `agentLoop.ts` 负责调用 Vercel AI SDK、执行多步模型/工具循环、应用停止条件和
- 运行时预算；通过 `ModelStepContext` 读取每个 SDK step 的实际 messages、instructions
-  和 activeTools，通过 `TokenUsageTracker` 记录 provider usage 和下一步预测；不负责
-  server 持久化和 HTTP response。
+运行时预算；通过 `ModelStepContext` 读取每个 SDK step 的实际 messages、instructions
+ 和 activeTools，通过 `TokenUsageTracker` 记录 provider usage 和下一步预测；由
+ `ContextCompactionCoordinator` 在步骤边界接入自动压缩；不负责 server 持久化和 HTTP response。
+- `runtime/context/compaction/` 只负责通用上下文压缩领域逻辑：预算规划、安全消息边界、
+ 结构化摘要校验和 checkpoint CAS；摘要模型、实际 step context 和持久化实现均通过窄接口注入。
 - `contracts.ts` 只定义 `ToolExecutor`、`AgentEventSink`、持久化确认、取消和恢复输入；
   不依赖 AI SDK 的 server 类型。
 - `toolAdapter.ts` 是唯一允许把 OpenExcel tool contract 转换成 AI SDK `ToolSet` 的位置。
@@ -1140,8 +1143,9 @@ AgentEvent 持久化、显式 cancel 和草稿流生命周期隔离已落地。�
 stale-run worker 仍只负责租约回收。Sheet、Workbook 和 Chart 的有副作用工具继续由各自
 application/service 负责短事务，Agent 只通过通用执行端口调用它们。
 
-上下文压缩当前仍未启用；运行时使用现有窗口预算裁剪。自动压缩必须先实现独立的 session context checkpoint、
-当前 chat model 复用、workspace revision 失效和 compaction failure phase，不能重新启用旧的按消息数量占位实现。
+上下文压缩已启用；运行时以完整 canonical transcript 为事实源，通过 session context checkpoint 保存摘要覆盖
+游标，使用当前 chat model 生成结构化摘要，并在模型步骤边界重建下一步上下文。provider overflow 仅允许受限
+的 compact-and-retry，不能重新启用旧的按消息数量占位实现。
 
 进程异常退出后的恢复入口已经由 server application recovery service 提供：它会先诊断 active run、未完成工具、失败工具、
 缺少终态 transcript 或 session version 冲突；只有所有工具完成且终态 assistant 文本已持久化时才允许自动完成 run。

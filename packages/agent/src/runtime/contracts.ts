@@ -3,6 +3,11 @@ import type { ModelConfig } from "../model.js";
 import type { WorkspaceWorkbookSummary } from "../session/context.js";
 import type { ModelStepBudgetEvent } from "../session/tokenBudget.js";
 import type {
+  ContextCheckpointStore,
+  ContextCompactionPolicy,
+} from "./context/compaction/types.js";
+import type { ContextTranscriptEntry } from "./context/transcript.js";
+import type {
   AgentEvent,
   AgentEventSink,
   AgentEventType,
@@ -61,16 +66,10 @@ export interface AgentRunResult {
   completion: Promise<AgentRunCompletion>;
 }
 
-export interface CompactionOptions {
-  enabled?: boolean;
-  minTurnsToCompact?: number;
-  maxTurnsAfterCompact?: number;
-}
-
 export interface AgentRunnerInput {
   turnId?: string;
   modelConfig: ModelConfig;
-  transcript: AgentTranscriptMessage[];
+  transcript: ContextTranscriptEntry<AgentTranscriptMessage>[];
   workspace: WorkspaceWorkbookSummary[];
   toolCatalog: string;
   tools: readonly AgentToolDefinition[];
@@ -83,7 +82,10 @@ export interface AgentRunnerInput {
   outputReserveTokens?: number;
   maxConversationTurns?: number;
   maxUserInputTokens?: number;
-  compaction?: CompactionOptions;
+  compaction?: ContextCompactionPolicy;
+  compactionCheckpointStore?: ContextCheckpointStore;
+  compactionContextKey?: string;
+  externalContextRevision?: string;
   prepareStep?: (...args: any[]) => unknown;
   onModelStepFinished?: (event: ModelStepBudgetEvent) => void | Promise<void>;
   onFinish?: (...args: any[]) => void | Promise<void>;

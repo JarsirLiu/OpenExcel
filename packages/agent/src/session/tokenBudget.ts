@@ -49,6 +49,7 @@ export interface TokenBudgetSnapshot {
 export interface ModelStepBudgetEvent extends ModelStepFinished {
   observation: TokenObservation;
   estimatedContextTokens: number;
+  responseMessages?: readonly unknown[];
 }
 
 function asNonNegativeInteger(value: unknown): number | undefined {

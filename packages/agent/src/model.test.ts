@@ -29,6 +29,7 @@ describe("agent model factory", () => {
       baseURL: "http://test.local",
       apiKey: "test-key",
       includeUsage: true,
+      supportsStructuredOutputs: true,
     });
     expect(mockChat).toHaveBeenCalledWith("test-model");
     expect(model).toBe("chat-model");

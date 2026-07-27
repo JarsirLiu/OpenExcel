@@ -17,35 +17,37 @@ import {
 import { ModelStepContext } from "../../session/modelStepContext.js";
 import { TokenUsageTracker } from "../../session/tokenBudget.js";
 import { appendResponseMessages, removeEmptyAssistantMessages } from "../../session/transcript.js";
+import { ContextCompactionCoordinator } from "../context/contextCompactionCoordinator.js";
+import type { ContextTranscriptEntry } from "../context/transcript.js";
 import type {
   AgentRunCompletion,
   AgentRunnerInput,
   AgentRunResult,
   AgentTranscriptMessage,
 } from "../contracts.js";
+import { isContextOverflowError } from "../errors/isContextOverflowError.js";
 import { AgentPersistenceError, createOrderedAgentEventEmitter } from "../events/events.js";
 import { convertChatReferenceDataPart } from "../stream/referencePart.js";
 import { createAgentStreamBridge } from "./agentStreamBridge.js";
 import { createModelStepObserver } from "./modelStepObserver.js";
 
 export interface AgentLoopInput extends Omit<AgentRunnerInput, "workspace" | "transcript"> {
-  transcript: AgentTranscriptMessage[];
+  transcript: ContextTranscriptEntry<AgentTranscriptMessage>[];
   systemPrompt: string;
 }
 
 export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResult> {
-  const normalizedMessages = removeEmptyAssistantMessages(input.transcript);
+  const normalizedEntries = input.transcript.filter(
+    (entry) =>
+      !(
+        entry.message.role === "assistant" &&
+        Array.isArray(entry.message.parts) &&
+        entry.message.parts.length === 0
+      ),
+  );
+  const normalizedMessages = normalizedEntries.map((entry) => entry.message);
 
   const messagesForContext = normalizedMessages;
-  // TODO: compaction still lacks token thresholds, tool-result capping, checkpoint persistence,
-  // and resume protection; keep it disabled until the full strategy is implemented.
-  if (input.compaction?.enabled === true) {
-    throw new Error(
-      "Compaction is not fully implemented: token-threshold trigger, tool-result capping, " +
-        "checkpoint persistence, and resumption guard are missing. " +
-        "Use context window truncation instead.",
-    );
-  }
 
   const contextWindow = trimMessagesToContextWindow(messagesForContext, {
     contextWindowTokens: input.contextWindowTokens,
@@ -85,6 +87,45 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
     onError: input.onError,
   });
   const tools = streamBridge.tools;
+  const convertMessages = async (messages: readonly AgentTranscriptMessage[]) => {
+    const validated = await validateUIMessages({
+      messages: messages as any,
+      tools: tools as any,
+    });
+    return convertToModelMessages(validated as any, {
+      convertDataPart: convertChatReferenceDataPart,
+    });
+  };
+  let activeSystemPrompt = input.systemPrompt;
+  let modelMessages: unknown[] = [...(await convertMessages(contextWindow.messages))];
+  const model = resolveModelForPurpose(input.modelConfig, "chat");
+  const tokenUsageTracker = new TokenUsageTracker();
+  let compactionCoordinator: ContextCompactionCoordinator | undefined;
+  let lastActiveTools: readonly string[] | undefined;
+  if (input.compaction) {
+    if (!input.compactionCheckpointStore || !input.compactionContextKey) {
+      throw new Error("Context compaction requires a checkpoint store and context key");
+    }
+    compactionCoordinator = new ContextCompactionCoordinator({
+      contextKey: input.compactionContextKey,
+      transcript: normalizedEntries,
+      initialMessages: contextWindow.messages,
+      baseSystemPrompt: input.systemPrompt,
+      model,
+      tools: input.tools,
+      checkpointStore: input.compactionCheckpointStore,
+      contextWindowTokens: input.contextWindowTokens ?? 180_000,
+      policy: input.compaction,
+      externalContextRevision: input.externalContextRevision,
+      sourceRunId: input.turnId,
+      signal: agentAbortController.signal,
+      convertToModelMessages: convertMessages,
+      resetTokenBaseline: () => tokenUsageTracker.resetAfterCompaction(),
+    });
+    const initialContext = await compactionCoordinator.initialize();
+    activeSystemPrompt = initialContext.system;
+    modelMessages = [...initialContext.messages];
+  }
   const validatedMessages = await validateUIMessages({
     messages: contextWindow.messages as any,
     tools: tools as any,
@@ -93,16 +134,20 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
     messages: normalizedMessages as any,
     tools: tools as any,
   });
-  const modelMessages = await convertToModelMessages(validatedMessages as any, {
-    convertDataPart: convertChatReferenceDataPart,
-  });
-  const tokenUsageTracker = new TokenUsageTracker();
-  const modelStepContext = new ModelStepContext(modelMessages, input.systemPrompt, input.tools);
+  if (!compactionCoordinator) {
+    modelMessages = await convertToModelMessages(validatedMessages as any, {
+      convertDataPart: convertChatReferenceDataPart,
+    });
+  }
+  const modelStepContext = new ModelStepContext(modelMessages, activeSystemPrompt, input.tools);
   const modelStepObserver = createModelStepObserver({
     emitter: createEventEmitter,
     tokenUsageTracker,
     modelStepContext,
-    onModelStepFinished: input.onModelStepFinished,
+    onModelStepFinished: async (event) => {
+      compactionCoordinator?.recordStepFinished(event);
+      await input.onModelStepFinished?.(event);
+    },
   });
   await emitEvent("run.started", {
     droppedMessages: contextWindow.droppedMessages,
@@ -121,30 +166,65 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
     resolveCompletion(value);
   };
 
-  const result = streamText({
-    model: resolveModelForPurpose(input.modelConfig, "chat"),
-    system: input.systemPrompt,
-    messages: modelMessages,
-    tools: tools as ToolSet,
-    prepareStep: input.prepareStep as any,
-    stopWhen: isLoopFinished(),
-    maxOutputTokens: input.outputReserveTokens ?? DEFAULT_OUTPUT_RESERVE_TOKENS,
-    maxRetries: input.maxRetries ?? 2,
-    timeout: timeout as any,
-    abortSignal: agentAbortController.signal,
-    include: {
-      requestMessages: true,
-    },
-    onStepFinish: modelStepObserver.onStepFinish,
-    onStepStart: async (step: unknown) => {
-      await modelStepObserver.onStepStart(step);
-      stepIndex = modelStepObserver.getStepIndex();
-    },
-    onChunk: async ({ chunk }: { chunk: unknown }) => streamBridge.onChunk(chunk),
-    onFinish: streamBridge.onFinish,
-    onAbort: streamBridge.onAbort,
-    onError: streamBridge.onError,
-  });
+  const prepareStep = async (step: unknown) => {
+    const original = (await input.prepareStep?.(step as any)) as
+      | Record<string, unknown>
+      | undefined;
+    const value = step as Record<string, unknown>;
+    lastActiveTools = Array.isArray(original?.activeTools)
+      ? original.activeTools.map(String)
+      : Array.isArray(value.activeTools)
+        ? value.activeTools.map(String)
+        : undefined;
+    if (!compactionCoordinator) return original;
+    const compacted = await compactionCoordinator.prepare({
+      messages: value.messages,
+      instructions: value.instructions ?? activeSystemPrompt,
+      activeTools: lastActiveTools,
+    });
+    if (!compacted) return original;
+    activeSystemPrompt = compacted.system;
+    modelMessages = [...compacted.messages];
+    return { ...original, ...compacted };
+  };
+
+  let pendingOverflowError: unknown;
+  let compactionRetries = 0;
+  const createModelResult = () =>
+    streamText({
+      model,
+      system: activeSystemPrompt,
+      messages: modelMessages as any,
+      tools: tools as ToolSet,
+      prepareStep: prepareStep as any,
+      stopWhen: isLoopFinished(),
+      maxOutputTokens: input.outputReserveTokens ?? DEFAULT_OUTPUT_RESERVE_TOKENS,
+      maxRetries: input.maxRetries ?? 2,
+      timeout: timeout as any,
+      abortSignal: agentAbortController.signal,
+      include: {
+        requestMessages: true,
+      },
+      onStepFinish: modelStepObserver.onStepFinish,
+      onStepStart: async (step: unknown) => {
+        await modelStepObserver.onStepStart(step);
+        stepIndex = modelStepObserver.getStepIndex();
+      },
+      onChunk: async ({ chunk }: { chunk: unknown }) => streamBridge.onChunk(chunk),
+      onFinish: streamBridge.onFinish,
+      onAbort: streamBridge.onAbort,
+      onError: async (event: unknown) => {
+        const error =
+          event && typeof event === "object" ? (event as Record<string, unknown>).error : event;
+        if (compactionCoordinator && isContextOverflowError(error)) {
+          pendingOverflowError = error;
+          return;
+        }
+        await streamBridge.onError(event);
+      },
+    });
+
+  let result: any = createModelResult();
 
   // Completion drives the durable event stream and waits for all tool steps.
   const baseMessages = persistenceMessages as unknown as AgentTranscriptMessage[];
@@ -152,11 +232,43 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
     try {
       // Wait for the full loop, including all tool executions.
       // The AI SDK text promise resolves after all steps finish.
-      const [text, responseMessages] = await Promise.all([
-        result.text,
-        (result as { responseMessages?: PromiseLike<unknown> }).responseMessages ??
-          Promise.resolve(undefined),
-      ]);
+      let text: string;
+      let responseMessages: unknown;
+      for (;;) {
+        try {
+          [text, responseMessages] = await Promise.all([
+            result.text,
+            (result as { responseMessages?: PromiseLike<unknown> }).responseMessages ??
+              Promise.resolve(undefined),
+          ]);
+          break;
+        } catch (error) {
+          const overflowError = pendingOverflowError ?? error;
+          if (
+            !compactionCoordinator ||
+            !isContextOverflowError(overflowError) ||
+            compactionRetries >= (input.compaction?.maxCompactionRetries ?? 0)
+          ) {
+            throw error;
+          }
+
+          const compacted = await compactionCoordinator.prepare(
+            {
+              messages: modelMessages,
+              instructions: activeSystemPrompt,
+              activeTools: lastActiveTools,
+            },
+            true,
+          );
+          if (!compacted) throw error;
+          compactionRetries += 1;
+          pendingOverflowError = undefined;
+          activeSystemPrompt = compacted.system;
+          modelMessages = [...compacted.messages];
+          streamBridge.resetForRetry();
+          result = createModelResult();
+        }
+      }
       const streamState = streamBridge.getState();
       const isAborted = streamState.aborted || agentAbortController.signal.aborted;
       const messages = appendResponseMessages(baseMessages, responseMessages);

@@ -4,6 +4,13 @@ const mocks = vi.hoisted(() => ({
   convertToModelMessages: vi.fn(async (messages: unknown) => messages),
   isLoopFinished: vi.fn(() => "loop-finished"),
   streamText: vi.fn(),
+  generateText: vi.fn(
+    async (): Promise<{ output: unknown; usage: { inputTokens: number } }> => ({
+      output: undefined,
+      usage: { inputTokens: 10 },
+    }),
+  ),
+  Output: { object: vi.fn((value: unknown) => value) },
   tool: vi.fn((definition: unknown) => definition),
   validateUIMessages: vi.fn(async ({ messages }: { messages: unknown }) => messages),
 }));
@@ -68,7 +75,9 @@ describe("runAgentLoop", () => {
 
     const result = await runAgentLoop({
       modelConfig: { baseUrl: "http://model", apiKey: "test-key", modelName: "test-model" },
-      transcript: [{ role: "user", parts: [{ type: "text", text: "继续" }] }],
+      transcript: [
+        { cursor: 0, message: { role: "user", parts: [{ type: "text", text: "继续" }] } },
+      ],
       systemPrompt: "你是表格助手",
       workspace: [],
       tools: [],
@@ -118,7 +127,9 @@ describe("runAgentLoop", () => {
     const onModelStepFinished = vi.fn();
     const result = await runAgentLoop({
       modelConfig: { baseUrl: "http://model", apiKey: "test-key", modelName: "test-model" },
-      transcript: [{ role: "user", parts: [{ type: "text", text: "继续" }] }],
+      transcript: [
+        { cursor: 0, message: { role: "user", parts: [{ type: "text", text: "继续" }] } },
+      ],
       systemPrompt: "你是表格助手",
       workspace: [],
       tools: [],
@@ -213,7 +224,9 @@ describe("runAgentLoop", () => {
     const persisted: Array<{ type: string; payload: any }> = [];
     const result = await runAgentLoop({
       modelConfig: { baseUrl: "http://model", apiKey: "test-key", modelName: "test-model" },
-      transcript: [{ role: "user", parts: [{ type: "text", text: "读取" }] }],
+      transcript: [
+        { cursor: 0, message: { role: "user", parts: [{ type: "text", text: "读取" }] } },
+      ],
       systemPrompt: "system",
       workspace: [],
       tools: [
@@ -243,7 +256,9 @@ describe("runAgentLoop", () => {
     const execute = vi.fn();
     const input = {
       modelConfig: { baseUrl: "http://model", apiKey: "test-key", modelName: "test-model" },
-      transcript: [{ role: "user", parts: [{ type: "text", text: "读取数据" }] }],
+      transcript: [
+        { cursor: 0, message: { role: "user", parts: [{ type: "text", text: "读取数据" }] } },
+      ],
       systemPrompt: "你是表格助手",
       workspace: [],
       tools: [],
@@ -298,7 +313,9 @@ describe("runAgentLoop", () => {
     const execute = vi.fn().mockResolvedValue({ cells: [[1]] });
     const input = {
       modelConfig: { baseUrl: "http://model", apiKey: "test-key", modelName: "test-model" },
-      transcript: [{ role: "user", parts: [{ type: "text", text: "读取数据" }] }],
+      transcript: [
+        { cursor: 0, message: { role: "user", parts: [{ type: "text", text: "读取数据" }] } },
+      ],
       systemPrompt: "你是表格助手",
       workspace: [],
       tools: [
@@ -369,7 +386,9 @@ describe("runAgentLoop", () => {
 
     const result = await runAgentLoop({
       modelConfig: { baseUrl: "http://model", apiKey: "test-key", modelName: "test-model" },
-      transcript: [{ role: "user", parts: [{ type: "text", text: "读取数据" }] }],
+      transcript: [
+        { cursor: 0, message: { role: "user", parts: [{ type: "text", text: "读取数据" }] } },
+      ],
       systemPrompt: "你是表格助手",
       workspace: [],
       tools: [
@@ -418,7 +437,9 @@ describe("runAgentLoop", () => {
     const published: Array<{ type: string; payload: any }> = [];
     const result = await runAgentLoop({
       modelConfig: { baseUrl: "http://model", apiKey: "test-key", modelName: "test-model" },
-      transcript: [{ role: "user", parts: [{ type: "text", text: "继续" }] }],
+      transcript: [
+        { cursor: 0, message: { role: "user", parts: [{ type: "text", text: "继续" }] } },
+      ],
       systemPrompt: "你是表格助手",
       workspace: [],
       tools: [],
@@ -453,7 +474,9 @@ describe("runAgentLoop", () => {
     const execute = vi.fn().mockResolvedValue({ cells: [[1]] });
     const input = {
       modelConfig: { baseUrl: "http://model", apiKey: "test-key", modelName: "test-model" },
-      transcript: [{ role: "user", parts: [{ type: "text", text: "读取数据" }] }],
+      transcript: [
+        { cursor: 0, message: { role: "user", parts: [{ type: "text", text: "读取数据" }] } },
+      ],
       systemPrompt: "你是表格助手",
       workspace: [],
       tools: [{ name: "readSheetData", description: "读取", inputSchema: {} }],
@@ -493,7 +516,9 @@ describe("runAgentLoop", () => {
     const onError = vi.fn();
     const result = await runAgentLoop({
       modelConfig: { baseUrl: "http://model", apiKey: "test-key", modelName: "test-model" },
-      transcript: [{ role: "user", parts: [{ type: "text", text: "继续" }] }],
+      transcript: [
+        { cursor: 0, message: { role: "user", parts: [{ type: "text", text: "继续" }] } },
+      ],
       systemPrompt: "你是表格助手",
       workspace: [],
       tools: [],

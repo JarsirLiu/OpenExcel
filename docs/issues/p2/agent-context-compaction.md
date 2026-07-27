@@ -1,15 +1,15 @@
 # P2：Agent 上下文压缩与窗口策略
 
 - **优先级**：P2
-- **状态**：设计完成，尚未实现
+- **状态**：核心 compaction 已实现；sliding-window 尚未接入
 - **范围**：Agent model context、token 预算、自动压缩、窗口滑动、checkpoint 和恢复
 - **设计文档**：[Agent 上下文策略：自动压缩与窗口滑动](../../context-compaction.md)
 - **包设计**：[Agent 可复用包设计](../../agent-core-package.md)
 
 ## 背景
 
-当前 Agent 只有基于 token 预算的窗口裁剪，自动压缩能力尚未接入。旧的按消息数量压缩
-实现不是可用功能，不应作为兼容路径保留。
+Agent 已接入基于当前 chat model 的结构化摘要和 context checkpoint。旧的按消息数量压缩
+实现不是可用功能，不应作为兼容路径保留；sliding-window 仍未启用。
 
 ## 目标
 

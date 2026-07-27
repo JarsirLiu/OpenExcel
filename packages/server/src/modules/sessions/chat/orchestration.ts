@@ -1,6 +1,8 @@
 import {
   AgentPersistenceError,
+  appendTranscriptEntry,
   createAgentRunner,
+  DEFAULT_CONTEXT_COMPACTION_POLICY,
   formatAIError,
   type ToolExecutionRequest,
   type ToolExecutor,
@@ -17,11 +19,7 @@ import {
   type ServerToolRegistry,
   type ToolContextMap,
 } from "../../../shared/tools/registry.js";
-import {
-  appendChatTurn,
-  type ChatTurnRequest,
-  toCanonicalUserMessage,
-} from "../application/chatTurn.js";
+import { type ChatTurnRequest, toCanonicalUserMessage } from "../application/chatTurn.js";
 import { extractMessageText } from "../application/messageText.js";
 import { scheduleSessionTitleGeneration } from "../application/title.js";
 import { withSessionLock } from "../infrastructure/sessionLock.js";
@@ -31,6 +29,7 @@ import {
   createIdempotentToolExecutor,
 } from "../runs/agentPersistence.js";
 import { registerRunCancellation } from "../runs/cancellation.js";
+import { createRunContextCheckpointStore } from "../runs/checkpointRepository.js";
 import { createRunFinalizer } from "../runs/runFinalizer.js";
 import { type AcquiredRunLease, acquireRunLease } from "../runs/runLease.js";
 import { clearSessionUndoCheckpoint } from "../runs/undoCheckpoint.js";
@@ -60,7 +59,7 @@ export async function acquireChatRunLease(
       inputText,
       model: modelName,
       appendUserTurn: (canonicalTranscript) =>
-        appendChatTurn(canonicalTranscript as Array<Record<string, unknown>>, turn),
+        appendTranscriptEntry(canonicalTranscript, toCanonicalUserMessage(turn)),
     }),
   );
 }
@@ -161,7 +160,7 @@ export async function streamChat(workspaceId: number, sessionId: number, turn: C
     inputText,
     config.modelName,
   );
-  const transcript = lease.transcript as Array<Record<string, unknown>>;
+  const transcript = lease.transcript;
   const eventStream = createAgentEventStream();
   const finalizer = createRunFinalizer({
     workspaceId,
@@ -199,7 +198,10 @@ export async function streamChat(workspaceId: number, sessionId: number, turn: C
     );
 
     const workspace = await loadWorkspaceChatContext(workspaceId);
-    const resolvedMessages = resolveChatMessageReferences(transcript, workspace.workbooks);
+    const resolvedMessages = transcript.map((entry) => ({
+      ...entry,
+      message: resolveChatMessageReferences([entry.message], workspace.workbooks)[0],
+    }));
 
     const result = await createAgentRunner({
       modelConfig: config,
@@ -209,6 +211,17 @@ export async function streamChat(workspaceId: number, sessionId: number, turn: C
       maxRetries: config.maxRetries,
       contextWindowTokens: config.contextWindowTokens,
       outputReserveTokens: config.outputReserveTokens,
+      compaction: {
+        ...DEFAULT_CONTEXT_COMPACTION_POLICY,
+        outputReserveTokens: config.outputReserveTokens,
+      },
+      compactionContextKey: `session:${sessionId}`,
+      compactionCheckpointStore: createRunContextCheckpointStore(
+        lease.run.id,
+        `session:${sessionId}`,
+        workspaceId,
+        sessionId,
+      ),
       maxConversationTurns: config.maxConversationTurns,
       maxUserInputTokens: config.maxUserInputTokens,
       timeout: {

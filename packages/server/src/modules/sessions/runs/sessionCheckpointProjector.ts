@@ -7,7 +7,7 @@ import {
   persistRunCheckpoint,
   type RunCheckpoint,
 } from "./checkpointRepository.js";
-import { projectRunCheckpoint, projectRunTranscript } from "./runCheckpointProjector.js";
+import { projectRunCheckpoint, projectRunTranscriptEntries } from "./runCheckpointProjector.js";
 
 /**
  * Closes the durable projection gap before a session history read.
@@ -36,8 +36,8 @@ export async function projectRunCheckpointForRun(
   const events = persistedEvents;
   const baseTranscript = (currentRunCheckpoint?.transcript ??
     baseCheckpoint?.transcript ??
-    []) as AgentTranscriptMessage[];
-  const transcript = projectRunTranscript(events, baseTranscript);
+    []) as import("@openexcel/agent").ContextTranscriptEntry<AgentTranscriptMessage>[];
+  const transcript = projectRunTranscriptEntries(events, baseTranscript);
   const checkpoint = projectRunCheckpoint(events, transcript, currentRunCheckpoint ?? undefined);
 
   await persistRunCheckpoint({ runId: run.id, ...checkpoint });
