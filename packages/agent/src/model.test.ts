@@ -45,31 +45,6 @@ describe("model resolver", () => {
     expect(mockChat).toHaveBeenCalledWith("test-model");
     expect(model).toBe("chat-model");
   });
-
-  it("resolves compaction model when configured", () => {
-    const model = resolveModelForPurpose(
-      {
-        baseUrl: "http://test.local",
-        apiKey: "test-key",
-        modelName: "test-model",
-        compactionModelName: "compact-model",
-      },
-      "compaction",
-    );
-
-    expect(mockChat).toHaveBeenCalledWith("compact-model");
-    expect(model).toBe("chat-model");
-  });
-
-  it("falls back to chat model when compaction model not configured", () => {
-    const model = resolveModelForPurpose(
-      { baseUrl: "http://test.local", apiKey: "test-key", modelName: "test-model" },
-      "compaction",
-    );
-
-    expect(mockChat).toHaveBeenCalledWith("test-model");
-    expect(model).toBe("chat-model");
-  });
 });
 
 describe("mock model", () => {

@@ -64,15 +64,6 @@ export {
   wrapToolExecutorWithResultBudget,
 } from "./runtime/tools/toolResultBudget.js";
 export {
-  COMPACTION_CHECKPOINT_MARKER,
-  type CompactionConfig,
-  type CompactionResult,
-  type Compactor,
-  compactMessagesIfNeeded,
-  createCompactor,
-  ModelCompactor,
-} from "./session/compaction.js";
-export {
   buildWorkspaceContext,
   type WorkspaceSheetSummary,
   type WorkspaceWorkbookSummary,
@@ -85,6 +76,19 @@ export {
   estimateTokens,
   trimMessagesToContextWindow,
 } from "./session/contextWindow.js";
+export {
+  defaultTokenEstimator,
+  type ModelStepBudgetEvent,
+  type ModelStepFinished,
+  type ModelStepUsage,
+  normalizeModelStepUsage,
+  type TokenBudgetSnapshot,
+  type TokenContextSnapshot,
+  type TokenEstimator,
+  type TokenObservation,
+  type TokenObservationSource,
+  TokenUsageTracker,
+} from "./session/tokenBudget.js";
 export {
   appendResponseMessages,
   historyFromRuns,

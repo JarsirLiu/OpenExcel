@@ -1,4 +1,4 @@
-export type ModelPurpose = "chat" | "compaction" | "summarization" | "title";
+export type ModelPurpose = "chat" | "title";
 
 export interface RuntimeModelReference {
   modelName: string;
@@ -15,6 +15,5 @@ export interface ModelConfig {
   baseUrl: string;
   apiKey: string;
   modelName: string;
-  compactionModelName?: string;
   titleModelName?: string;
 }

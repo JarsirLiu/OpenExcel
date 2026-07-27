@@ -85,8 +85,158 @@ describe("runAgentLoop", () => {
         maxRetries: 4,
         timeout: { totalMs: 15_000, chunkMs: 5_000 },
         abortSignal: expect.any(AbortSignal),
+        include: { requestMessages: true },
       }),
     );
+  });
+
+  it("reports provider input usage at the model step boundary", async () => {
+    let resolveDone!: () => void;
+    const done = new Promise<void>((resolve) => {
+      resolveDone = resolve;
+    });
+    mocks.streamText.mockImplementation((options: any) => ({
+      stream: new ReadableStream({
+        start(controller) {
+          void (async () => {
+            await options.onStepStart({ stepNumber: 0 });
+            await options.onStepFinish({
+              stepNumber: 0,
+              finishReason: "stop",
+              usage: { inputTokens: 42, outputTokens: 5 },
+              content: [],
+            });
+            resolveDone();
+            controller.close();
+          })();
+        },
+      }),
+      text: done.then(() => "完成"),
+      responseMessages: done.then(() => []),
+    }));
+
+    const onModelStepFinished = vi.fn();
+    const result = await runAgentLoop({
+      modelConfig: { baseUrl: "http://model", apiKey: "test-key", modelName: "test-model" },
+      transcript: [{ role: "user", parts: [{ type: "text", text: "继续" }] }],
+      systemPrompt: "你是表格助手",
+      workspace: [],
+      tools: [],
+      toolExecutor: { execute: vi.fn() },
+      onModelStepFinished,
+    } as any);
+
+    await result.completion;
+
+    expect(onModelStepFinished).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stepIndex: 0,
+        usage: expect.objectContaining({
+          inputTokens: 42,
+          outputTokens: 5,
+          source: "provider",
+        }),
+        observation: { inputTokens: 42, source: "provider", measuredAtStep: 0 },
+      }),
+    );
+  });
+
+  it("uses SDK request messages once and applies per-step active tools", async () => {
+    let resolveDone!: () => void;
+    const done = new Promise<void>((resolve) => {
+      resolveDone = resolve;
+    });
+    const requestMessages = [{ role: "user", content: [{ type: "text", text: "读取" }] }];
+    const nextStepMessages = [
+      ...requestMessages,
+      {
+        role: "assistant",
+        content: [
+          { type: "tool-call", toolName: "readSheetData", toolCallId: "call-1", input: {} },
+        ],
+      },
+      {
+        role: "tool",
+        content: [
+          { type: "tool-result", toolName: "readSheetData", toolCallId: "call-1", output: "x" },
+        ],
+      },
+    ];
+    mocks.streamText.mockImplementation((options: any) => ({
+      stream: new ReadableStream({
+        start(controller) {
+          void (async () => {
+            await options.onStepStart({
+              stepNumber: 0,
+              messages: requestMessages,
+              instructions: "system",
+              activeTools: ["readSheetData", "writeSheetData"],
+            });
+            await options.onStepFinish({
+              stepNumber: 0,
+              finishReason: "tool-calls",
+              usage: { inputTokens: 100 },
+              content: [
+                { type: "tool-call", toolName: "readSheetData", toolCallId: "call-1" },
+                {
+                  type: "tool-result",
+                  toolName: "readSheetData",
+                  toolCallId: "call-1",
+                  output: "x",
+                },
+              ],
+              toolResults: [{ output: "x" }],
+              request: { messages: requestMessages },
+            });
+            await options.onStepStart({
+              stepNumber: 1,
+              messages: nextStepMessages,
+              instructions: "system",
+              activeTools: ["readSheetData"],
+            });
+            await options.onStepFinish({
+              stepNumber: 1,
+              finishReason: "stop",
+              usage: { inputTokens: 140 },
+              content: [],
+              request: { messages: nextStepMessages },
+            });
+            resolveDone();
+            controller.close();
+          })();
+        },
+      }),
+      text: done.then(() => "完成"),
+      responseMessages: done.then(() => []),
+    }));
+
+    const persisted: Array<{ type: string; payload: any }> = [];
+    const result = await runAgentLoop({
+      modelConfig: { baseUrl: "http://model", apiKey: "test-key", modelName: "test-model" },
+      transcript: [{ role: "user", parts: [{ type: "text", text: "读取" }] }],
+      systemPrompt: "system",
+      workspace: [],
+      tools: [
+        { name: "readSheetData", description: "读取", inputSchema: {} },
+        { name: "writeSheetData", description: "写入", inputSchema: {} },
+      ],
+      toolExecutor: { execute: vi.fn() },
+      persistenceBarrier: { persist: vi.fn((event) => persisted.push(event)) },
+    } as any);
+
+    await result.completion;
+
+    const started = persisted.filter((event) => event.type === "step.started");
+    const finished = persisted.filter((event) => event.type === "step.finished");
+    expect(started).toHaveLength(2);
+    expect(finished).toHaveLength(2);
+    expect(started[1]?.payload.estimatedContextTokens).toBeGreaterThan(
+      started[0]?.payload.estimatedContextTokens,
+    );
+    expect(finished[0]?.payload.estimatedContextTokens).toBeLessThan(
+      started[1]?.payload.estimatedContextTokens,
+    );
+    expect(started[1]?.payload.tokenObservation).toMatchObject({ source: "mixed" });
   });
 
   it("stops before model execution when the persistence barrier rejects", async () => {

@@ -1,6 +1,7 @@
 import type { z } from "zod";
 import type { ModelConfig } from "../model.js";
 import type { WorkspaceWorkbookSummary } from "../session/context.js";
+import type { ModelStepBudgetEvent } from "../session/tokenBudget.js";
 import type {
   AgentEvent,
   AgentEventSink,
@@ -84,7 +85,7 @@ export interface AgentRunnerInput {
   maxUserInputTokens?: number;
   compaction?: CompactionOptions;
   prepareStep?: (...args: any[]) => unknown;
-  onStepFinish?: (...args: any[]) => void | Promise<void>;
+  onModelStepFinished?: (event: ModelStepBudgetEvent) => void | Promise<void>;
   onFinish?: (...args: any[]) => void | Promise<void>;
   onAbort?: (...args: any[]) => void | Promise<void>;
   onError?: (...args: any[]) => void | Promise<void>;

@@ -3,9 +3,14 @@
 本文档是 OpenExcel Agent 系统的职责边界、消息协议和改造基线。它覆盖
 `packages/web`、`packages/server`、`packages/agent` 之间的协作方式。
 
-本文档是所有 Agent 相关重构的唯一详细依据。`docs/architecture.md` 只
-定义稳定的包边界、依赖方向和顶层数据流；如果 Agent 的上下文、工具循环、
-事件、重试、恢复、幂等、持久化或迁移策略发生变化，应先修改本文档，再在
+本文档是 OpenExcel 集成层所有 Agent 相关重构的详细依据。上下文压缩的
+预算、usage 观测、checkpoint 和可复用包契约见
+[上下文策略](context-compaction.md)和[Agent 可复用包设计](agent-core-package.md)。
+`docs/architecture.md` 只
+定义稳定的包边界、依赖方向和顶层数据流；如果 OpenExcel 集成层的工具循环、
+事件、重试、恢复、幂等、持久化或迁移策略发生变化，应先修改本文档；如果
+上下文预算、usage、压缩或 checkpoint 的通用 contract 发生变化，应先修改
+[上下文策略](context-compaction.md)和[Agent 可复用包设计](agent-core-package.md)，再在
 总架构文档中仅同步必要的边界变化。
 
 本文档中的“当前基线”描述已经存在的能力；“目标协议”和“迁移阶段”描述
@@ -186,6 +191,8 @@ packages/agent/src/
 ├─ session/
 │  ├─ context.ts            # workspace model-facing context
 │  ├─ contextWindow.ts      # token 预算和上下文裁剪
+│  ├─ modelStepContext.ts    # 每个 AI SDK step 的实际 messages/system/tools
+│  ├─ tokenBudget.ts         # provider usage、增量估算和预算观测
 │  └─ transcript.ts         # canonical transcript -> model messages
 ```
 
@@ -194,7 +201,9 @@ packages/agent/src/
 - `agentRunner.ts` 负责读取输入、调用 context/prompt builder、创建 loop、汇总运行终态；
   不直接调用 Prisma、HTTP 或具体 workbook 工具。
 - `agentLoop.ts` 负责调用 Vercel AI SDK、执行多步模型/工具循环、应用停止条件和
-  运行时预算；不负责 server 持久化和 HTTP response。
+ 运行时预算；通过 `ModelStepContext` 读取每个 SDK step 的实际 messages、instructions
+  和 activeTools，通过 `TokenUsageTracker` 记录 provider usage 和下一步预测；不负责
+  server 持久化和 HTTP response。
 - `contracts.ts` 只定义 `ToolExecutor`、`AgentEventSink`、持久化确认、取消和恢复输入；
   不依赖 AI SDK 的 server 类型。
 - `toolAdapter.ts` 是唯一允许把 OpenExcel tool contract 转换成 AI SDK `ToolSet` 的位置。
@@ -428,8 +437,10 @@ type PersistedAgentEvent = {
    - 工具业务失败会作为模型可消费的结构化 tool result 返回，模型可以继续下一步或解释失败；
      取消和事件/运行持久化失败仍然立即终止 Agent run。
 
-4. **step.started**: 模型步骤开始前触发，只携带步骤序号，不携带 provider request、workspace 数据或完整消息
+4. **step.started**: 模型步骤开始前触发，只携带步骤序号和 token 预算观测，不携带 provider request、workspace 数据或完整消息
    - `stepNumber`: 当前模型步骤序号
+   - `tokenObservation`: 当前实际 step context 的 provider/estimate/mixed 输入 token 观测
+   - `estimatedContextTokens`: 当前实际 step context 的结构化估算值
 
 5. **step.finished**: 模型步骤完成时触发，用于持久化AgentStep
    - server持久化适配器从此事件提取`stepType`、`status`、`content`、`toolName`、`input`、`output`等字段
@@ -438,6 +449,13 @@ type PersistedAgentEvent = {
    - `text?`: 模型生成的文本内容
    - `toolCalls?`: 工具调用列表
    - `toolResults?`: 工具结果列表
+   - `tokenObservation`: 当前 step provider usage 或估算观测
+   - `estimatedContextTokens`: 以本步实际 request messages、instructions 和 activeTools 计算的估算值
+
+模型上下文的生命周期由 AI SDK 的 step 回调提供：`onStepStart` 的 `messages`、`instructions`
+和 `activeTools` 是本次实际生效的 step context；`onStepFinish` 的 `request.messages` 是本次
+provider 请求的准确输入消息。Agent 不从 `step.content` 和 `step.toolResults` 手工拼接下一次
+请求上下文，避免工具结果重复计算或改变 assistant/tool 消息结构。
 
 6. **运行终态不属于 Agent 内部执行事件**：Agent 通过 `completion.status` 返回
    `completed`、`failed` 或 `cancelled`；server finalizer 再按统一持久化顺序创建唯一的

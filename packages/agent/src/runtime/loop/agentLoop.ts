@@ -14,6 +14,12 @@ import {
   DEFAULT_OUTPUT_RESERVE_TOKENS,
   trimMessagesToContextWindow,
 } from "../../session/contextWindow.js";
+import { ModelStepContext } from "../../session/modelStepContext.js";
+import {
+  type ModelStepBudgetEvent,
+  normalizeModelStepUsage,
+  TokenUsageTracker,
+} from "../../session/tokenBudget.js";
 import { appendResponseMessages, removeEmptyAssistantMessages } from "../../session/transcript.js";
 import type {
   AgentRunCompletion,
@@ -138,6 +144,11 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
     messages: normalizedMessages as any,
     tools: tools as any,
   });
+  const modelMessages = await convertToModelMessages(validatedMessages as any, {
+    convertDataPart: convertChatReferenceDataPart,
+  });
+  const tokenUsageTracker = new TokenUsageTracker();
+  const modelStepContext = new ModelStepContext(modelMessages, input.systemPrompt, input.tools);
   await emitEvent("run.started", {
     droppedMessages: contextWindow.droppedMessages,
     droppedTurns: contextWindow.droppedTurns,
@@ -164,9 +175,7 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
   const result = streamText({
     model: resolveModelForPurpose(input.modelConfig, "chat"),
     system: input.systemPrompt,
-    messages: await convertToModelMessages(validatedMessages as any, {
-      convertDataPart: convertChatReferenceDataPart,
-    }),
+    messages: modelMessages,
     tools: tools as ToolSet,
     prepareStep: input.prepareStep as any,
     stopWhen: isLoopFinished(),
@@ -174,14 +183,47 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
     maxRetries: input.maxRetries ?? 2,
     timeout: timeout as any,
     abortSignal: agentAbortController.signal,
+    include: {
+      requestMessages: true,
+    },
     onStepFinish: async (step: any) => {
-      await emitEvent("step.finished", normalizeStepPayload(step));
-      await input.onStepFinish?.(step);
+      const stepNumber = typeof step?.stepNumber === "number" ? step.stepNumber : stepIndex;
+      const usage = normalizeModelStepUsage(step?.usage);
+      const budget = tokenUsageTracker.recordStepFinished(
+        {
+          stepIndex: stepNumber,
+          usage,
+          finishReason: String(step?.finishReason ?? "stop"),
+        },
+        modelStepContext.finishStep({ messages: step?.request?.messages }),
+      );
+      const stepBudget: ModelStepBudgetEvent = {
+        stepIndex: stepNumber,
+        usage,
+        finishReason: String(step?.finishReason ?? "stop"),
+        observation: budget.observation,
+        estimatedContextTokens: budget.estimatedContextTokens,
+      };
+      await emitEvent("step.finished", {
+        ...normalizeStepPayload(step),
+        tokenObservation: stepBudget.observation,
+        estimatedContextTokens: stepBudget.estimatedContextTokens,
+      });
+      await input.onModelStepFinished?.(stepBudget);
     },
     onStepStart: async (step: any) => {
       stepIndex = typeof step?.stepNumber === "number" ? step.stepNumber : stepIndex + 1;
+      const prediction = tokenUsageTracker.predict(
+        modelStepContext.startStep({
+          messages: step?.messages,
+          instructions: step?.instructions,
+          activeTools: Array.isArray(step?.activeTools) ? step.activeTools : undefined,
+        }),
+      );
       await emitEvent("step.started", {
         stepNumber: stepIndex,
+        tokenObservation: prediction.observation,
+        estimatedContextTokens: prediction.estimatedContextTokens,
       });
     },
     onChunk: async ({ chunk }: { chunk: any }) => {
