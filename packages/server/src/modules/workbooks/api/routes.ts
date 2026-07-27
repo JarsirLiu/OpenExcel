@@ -110,6 +110,22 @@ export async function workbookRoutes(
     },
   );
 
+  app.get<{ Params: { workspacePublicId: string; workbookPublicId: string } }>(
+    "/api/workspaces/:workspacePublicId/workbooks/:workbookPublicId/structure",
+    async (req, reply) => {
+      const ids = await resolveWorkbookIdForRequest(
+        req,
+        req.params.workspacePublicId,
+        req.params.workbookPublicId,
+        reply,
+      );
+      if (ids == null) return;
+      const structure = await application.getWorkbookStructure(ids.workbookId, ids.workspaceId);
+      if (!structure) return reply.status(404).send({ error: "Not found" });
+      return structure;
+    },
+  );
+
   app.patch<{
     Params: { workspacePublicId: string; workbookPublicId: string };
     Body: { name: string };

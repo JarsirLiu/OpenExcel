@@ -13,6 +13,7 @@ export {
 export {
   getReferenceCandidates,
   getWorkbook,
+  getWorkbookStructure,
   getWorkbooks,
   renameWorkbook,
 } from "./queryWorkbooks.js";

@@ -214,6 +214,10 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
           loading={loading}
           currentSheetIndex={workbook.currentSheetIndex}
           setCurrentSheetIndex={workbook.setCurrentSheetIndex}
+          sheetLoading={workbook.sheetLoading}
+          sheetLoadError={workbook.sheetLoadError}
+          onRetrySheetLoad={workbook.retryCurrentSheet}
+          onSheetLoad={workbook.loadSheetById}
           handleSwitchWorkbook={workbook.handleSwitchWorkbook}
           handleNewWorkbookFileChange={handleWorkbookImport}
           handleWorkbookDelete={workbook.handleWorkbookDelete}

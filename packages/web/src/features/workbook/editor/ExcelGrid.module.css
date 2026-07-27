@@ -51,6 +51,37 @@
   position: relative;
 }
 
+.sheetLoadingOverlay {
+  position: absolute;
+  z-index: 40;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: rgb(255 255 255 / 78%);
+  color: var(--text-secondary);
+  font-size: 13px;
+  pointer-events: auto;
+}
+
+.sheetLoadingOverlay p {
+  max-width: min(420px, calc(100% - 32px));
+  margin: 0;
+  text-align: center;
+}
+
+.sheetLoadingOverlay button {
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
 .chartLayer {
   position: absolute;
   z-index: 12;

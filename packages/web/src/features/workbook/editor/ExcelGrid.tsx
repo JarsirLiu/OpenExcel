@@ -62,6 +62,10 @@ interface Props {
   workbookRevision: number;
   currentSheetIndex: number;
   onSheetIndexChange?: (sheetIndex: number) => void;
+  sheetLoading: boolean;
+  sheetLoadError: string | null;
+  onRetrySheetLoad: () => void;
+  onSheetLoad: (sheetId: number) => Promise<void>;
   onWorkbookDelete?: (workbookId: number) => void;
   onWorkbookStructureChanged?: (update: WorkbookStructureUpdate) => void;
   onWorkbookRefresh?: () => Promise<void> | void;
@@ -76,6 +80,10 @@ export function ExcelGrid({
   workbookRevision,
   currentSheetIndex,
   onSheetIndexChange,
+  sheetLoading,
+  sheetLoadError,
+  onRetrySheetLoad,
+  onSheetLoad,
   onWorkbookDelete,
   onWorkbookStructureChanged,
   onWorkbookRefresh,
@@ -85,6 +93,10 @@ export function ExcelGrid({
 }: Props) {
   const gridRootRef = useRef<HTMLDivElement>(null);
   const chartLayerRef = useRef<HTMLDivElement>(null);
+  const activeSheet = workbook
+    ? workbook.sheets[normalizeSheetIndex(currentSheetIndex, workbook.sheets.length)]
+    : undefined;
+  const sheetLoaded = activeSheet?.loaded !== false && !sheetLoading && sheetLoadError === null;
   const {
     saveStatus,
     workbookRef,
@@ -108,6 +120,7 @@ export function ExcelGrid({
     onWorkbookRefresh,
     onWorkbookMutation,
     onSheetRevisionChanged,
+    sheetLoaded,
   });
   useFortuneSheetFilterMenu(gridRootRef, workbook !== null);
   useFortuneSheetTooltip(gridRootRef, workbook !== null);
@@ -207,7 +220,19 @@ export function ExcelGrid({
               layout={currentSheetLayout}
               onWorkbookRefresh={onWorkbookRefresh}
               onWorkbookMutation={onWorkbookMutation}
+              sheetLoaded={sheetLoaded}
+              onSheetLoad={onSheetLoad}
             />
+          </div>
+        ) : null}
+        {!sheetLoaded ? (
+          <div className={styles.sheetLoadingOverlay} role="status">
+            <p>{sheetLoadError ?? "正在加载工作表..."}</p>
+            {sheetLoadError ? (
+              <button type="button" onClick={onRetrySheetLoad}>
+                重试
+              </button>
+            ) : null}
           </div>
         ) : null}
       </div>

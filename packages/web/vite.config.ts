@@ -23,6 +23,16 @@ export default defineConfig({
   build: {
     modulePreload: false,
     chunkSizeWarningLimit: 2500,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("node_modules/@fortune-sheet/")) return "fortune-sheet";
+          if (id.includes("node_modules/@tiptap/") || id.includes("node_modules/prosemirror-")) {
+            return "tiptap";
+          }
+        },
+      },
+    },
   },
   server: {
     host: "127.0.0.1",

@@ -1,15 +1,17 @@
 import type { LoaderFunctionArgs } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { fetchWorkbook, fetchSessions, fetchWorkbooks, fetchWorkspaces } = vi.hoisted(() => ({
-  fetchWorkbook: vi.fn(),
-  fetchSessions: vi.fn(),
-  fetchWorkbooks: vi.fn(),
-  fetchWorkspaces: vi.fn(),
-}));
+const { fetchWorkbookStructure, fetchSessions, fetchWorkbooks, fetchWorkspaces } = vi.hoisted(
+  () => ({
+    fetchWorkbookStructure: vi.fn(),
+    fetchSessions: vi.fn(),
+    fetchWorkbooks: vi.fn(),
+    fetchWorkspaces: vi.fn(),
+  }),
+);
 
 vi.mock("@/api/sessions", () => ({ fetchSessions }));
-vi.mock("@/api/workbooks", () => ({ fetchWorkbook, fetchWorkbooks }));
+vi.mock("@/api/workbooks", () => ({ fetchWorkbookStructure, fetchWorkbooks }));
 vi.mock("@/api/workspaces", () => ({ fetchWorkspaces }));
 
 import { workspaceLoader } from "./workspaceLoader";
@@ -21,13 +23,13 @@ function loaderArgs(params: LoaderFunctionArgs["params"]): LoaderFunctionArgs {
 describe("workspaceLoader", () => {
   beforeEach(() => {
     fetchSessions.mockReset();
-    fetchWorkbook.mockReset();
+    fetchWorkbookStructure.mockReset();
     fetchWorkbooks.mockReset();
     fetchWorkspaces.mockReset();
     fetchWorkspaces.mockResolvedValue([{ id: 11, publicId: "ws_test", name: "Test", order: 0 }]);
     fetchWorkbooks.mockResolvedValue([]);
     fetchSessions.mockResolvedValue([]);
-    fetchWorkbook.mockResolvedValue(null);
+    fetchWorkbookStructure.mockResolvedValue(null);
   });
 
   it("loads the requested workspace data without bootstrapping", async () => {

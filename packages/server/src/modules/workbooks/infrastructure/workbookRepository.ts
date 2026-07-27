@@ -37,6 +37,36 @@ export async function findWorkbookWithSheets(
   return workbook;
 }
 
+export async function findWorkbookStructure(id: number, workspaceId: number) {
+  return prisma.workbook.findFirst({
+    where: { id, workspaceId },
+    select: {
+      id: true,
+      publicId: true,
+      name: true,
+      sheets: {
+        orderBy: { order: "asc" },
+        select: {
+          id: true,
+          sheetNo: true,
+          name: true,
+          order: true,
+          revision: true,
+        },
+      },
+      charts: {
+        orderBy: [{ order: "asc" }, { id: "asc" }],
+        select: {
+          publicId: true,
+          workbookId: true,
+          sheetId: true,
+          spec: true,
+        },
+      },
+    },
+  });
+}
+
 export async function findWorkbook(id: number, workspaceId: number) {
   return prisma.workbook.findFirst({ where: { id, workspaceId } });
 }

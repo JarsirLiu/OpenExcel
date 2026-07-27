@@ -2,12 +2,12 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { WorkbookFull, WorkbookMeta } from "@/api/workbooks";
 
-const { fetchWorkbook, fetchWorkbooks } = vi.hoisted(() => ({
-  fetchWorkbook: vi.fn(),
+const { fetchWorkbookForEditor, fetchWorkbooks } = vi.hoisted(() => ({
+  fetchWorkbookForEditor: vi.fn(),
   fetchWorkbooks: vi.fn(),
 }));
 
-vi.mock("@/api/workbooks", () => ({ fetchWorkbook, fetchWorkbooks }));
+vi.mock("@/api/workbooks", () => ({ fetchWorkbookForEditor, fetchWorkbooks }));
 
 import { useWorkbookCatalog } from "./useWorkbookCatalog";
 
@@ -35,7 +35,7 @@ function deferred<T>() {
 describe("useWorkbookCatalog", () => {
   beforeEach(() => {
     sessionStorage.clear();
-    fetchWorkbook.mockReset();
+    fetchWorkbookForEditor.mockReset();
     fetchWorkbooks.mockReset();
   });
 
@@ -61,7 +61,7 @@ describe("useWorkbookCatalog", () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.currentWorkbook?.id).toBe(10);
     expect(fetchWorkbooks).not.toHaveBeenCalled();
-    expect(fetchWorkbook).not.toHaveBeenCalled();
+    expect(fetchWorkbookForEditor).not.toHaveBeenCalled();
   });
 
   it("discards a late catalog response from the previous workspace", async () => {
@@ -70,7 +70,7 @@ describe("useWorkbookCatalog", () => {
     fetchWorkbooks.mockImplementation((workspaceId: number) =>
       workspaceId === 1 ? firstCatalog.promise : secondCatalog.promise,
     );
-    fetchWorkbook.mockImplementation((workspaceId: number, workbookId: number) =>
+    fetchWorkbookForEditor.mockImplementation((workspaceId: number, workbookId: number) =>
       Promise.resolve(workbookFull(workspaceId * 10 + workbookId)),
     );
 

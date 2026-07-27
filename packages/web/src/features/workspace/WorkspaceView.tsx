@@ -22,6 +22,10 @@ type Props = {
   loading: boolean;
   currentSheetIndex: number;
   setCurrentSheetIndex: (index: number) => void;
+  sheetLoading: boolean;
+  sheetLoadError: string | null;
+  onRetrySheetLoad: () => void;
+  onSheetLoad: (sheetId: number) => Promise<void>;
   handleSwitchWorkbook: (index: number) => void;
   handleNewWorkbookFileChange: (files: File[]) => Promise<boolean>;
   handleWorkbookDelete: (workbookId: number) => void;
@@ -43,6 +47,10 @@ export function WorkspaceView({
   loading,
   currentSheetIndex,
   setCurrentSheetIndex,
+  sheetLoading,
+  sheetLoadError,
+  onRetrySheetLoad,
+  onSheetLoad,
   handleSwitchWorkbook,
   handleNewWorkbookFileChange,
   handleWorkbookDelete,
@@ -91,6 +99,10 @@ export function WorkspaceView({
           workbookRevision={workbookRevision}
           currentSheetIndex={currentSheetIndex}
           onSheetIndexChange={setCurrentSheetIndex}
+          sheetLoading={sheetLoading}
+          sheetLoadError={sheetLoadError}
+          onRetrySheetLoad={onRetrySheetLoad}
+          onSheetLoad={onSheetLoad}
           onWorkbookDelete={handleWorkbookDelete}
           onWorkbookStructureChanged={handleWorkbookStructureChanged}
           onWorkbookRefresh={handleWorkbookRefresh}

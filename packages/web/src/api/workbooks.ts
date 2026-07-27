@@ -51,6 +51,23 @@ export interface SheetSchema {
   uploadedData: any[] | null;
   config: any | null;
   revision: number;
+  loaded?: boolean;
+}
+
+export interface SheetStructure {
+  id: number;
+  sheetNo: number;
+  name: string;
+  order: number;
+  revision: number;
+}
+
+export interface WorkbookStructure {
+  id: number;
+  publicId: string;
+  name: string;
+  sheets: SheetStructure[];
+  charts: ChartSpec[];
 }
 
 export interface WorkbookFull {
@@ -108,6 +125,73 @@ export async function fetchWorkbook(
   });
   if (!res.ok) throw new Error("加载工作簿详情失败");
   return res.json();
+}
+
+export async function fetchWorkbookStructure(
+  workspaceId: number,
+  id: number,
+  options?: { signal?: AbortSignal },
+): Promise<WorkbookStructure> {
+  const res = await apiFetch(`/workspaces/${workspaceId}/workbooks/${id}/structure`, {
+    signal: options?.signal,
+  });
+  if (!res.ok) throw new Error("加载工作簿结构失败");
+  return res.json();
+}
+
+export async function fetchSheet(
+  workspaceId: number,
+  sheetId: number,
+  options?: { signal?: AbortSignal },
+): Promise<SheetSchema> {
+  const res = await apiFetch(`/workspaces/${workspaceId}/sheets/${sheetId}`, {
+    signal: options?.signal,
+  });
+  if (!res.ok) throw new Error("加载工作表失败");
+  const sheet = (await res.json()) as SheetSchema;
+  return { ...sheet, loaded: true };
+}
+
+export function workbookFromStructure(
+  structure: WorkbookStructure,
+  loadedSheets: readonly SheetSchema[] = [],
+): WorkbookFull {
+  const loadedById = new Map(loadedSheets.map((sheet) => [sheet.id, sheet]));
+  return {
+    id: structure.id,
+    publicId: structure.publicId,
+    name: structure.name,
+    charts: structure.charts,
+    sheets: structure.sheets.map((sheet) => {
+      const loaded = loadedById.get(sheet.id);
+      return (
+        loaded ?? {
+          ...sheet,
+          columns: [],
+          merges: [],
+          uploadedData: null,
+          config: null,
+          loaded: false,
+        }
+      );
+    }),
+  };
+}
+
+export async function fetchWorkbookForEditor(
+  workspaceId: number,
+  id: number,
+  options?: { signal?: AbortSignal; sheetIds?: readonly number[] },
+): Promise<WorkbookFull> {
+  const structure = await fetchWorkbookStructure(workspaceId, id, options);
+  const sheetIds = options?.sheetIds ?? (structure.sheets[0] ? [structure.sheets[0].id] : []);
+  const sheets = await Promise.all(
+    sheetIds
+      .map((sheetId) => (structure.sheets.some((sheet) => sheet.id === sheetId) ? sheetId : null))
+      .filter((sheetId): sheetId is number => sheetId !== null)
+      .map((sheetId) => fetchSheet(workspaceId, sheetId, options)),
+  );
+  return workbookFromStructure(structure, sheets);
 }
 
 export async function importWorkbooks(

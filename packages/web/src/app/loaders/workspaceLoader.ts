@@ -1,6 +1,6 @@
 import type { LoaderFunctionArgs } from "react-router-dom";
 import { fetchSessions } from "@/api/sessions";
-import { fetchWorkbook, fetchWorkbooks } from "@/api/workbooks";
+import { fetchWorkbookStructure, fetchWorkbooks, workbookFromStructure } from "@/api/workbooks";
 import { fetchWorkspaces } from "@/api/workspaces";
 
 export async function workspaceLoader({ params }: LoaderFunctionArgs) {
@@ -18,7 +18,10 @@ export async function workspaceLoader({ params }: LoaderFunctionArgs) {
     fetchWorkbooks(workspace.id),
     fetchSessions(workspace.id),
   ]);
-  const currentWorkbook = workbooks[0] ? await fetchWorkbook(workspace.id, workbooks[0].id) : null;
+  const currentStructure = workbooks[0]
+    ? await fetchWorkbookStructure(workspace.id, workbooks[0].id)
+    : null;
+  const currentWorkbook = currentStructure ? workbookFromStructure(currentStructure) : null;
 
   return { workspaces, workspace, workbooks, sessions, currentWorkbook };
 }

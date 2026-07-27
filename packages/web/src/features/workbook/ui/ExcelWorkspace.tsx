@@ -10,6 +10,10 @@ interface Props {
   workbookRevision: number;
   currentSheetIndex: number;
   onSheetIndexChange: (sheetIndex: number) => void;
+  sheetLoading: boolean;
+  sheetLoadError: string | null;
+  onRetrySheetLoad: () => void;
+  onSheetLoad: (sheetId: number) => Promise<void>;
   onWorkbookDelete?: (workbookId: number) => void;
   onWorkbookStructureChanged?: (update: WorkbookStructureUpdate) => void;
   onWorkbookRefresh?: () => Promise<void>;
@@ -24,6 +28,10 @@ export function ExcelWorkspace({
   workbookRevision,
   currentSheetIndex,
   onSheetIndexChange,
+  sheetLoading,
+  sheetLoadError,
+  onRetrySheetLoad,
+  onSheetLoad,
   onWorkbookDelete,
   onWorkbookStructureChanged,
   onWorkbookRefresh,
@@ -40,6 +48,10 @@ export function ExcelWorkspace({
           workbookRevision={workbookRevision}
           currentSheetIndex={currentSheetIndex}
           onSheetIndexChange={onSheetIndexChange}
+          sheetLoading={sheetLoading}
+          sheetLoadError={sheetLoadError}
+          onRetrySheetLoad={onRetrySheetLoad}
+          onSheetLoad={onSheetLoad}
           onWorkbookDelete={onWorkbookDelete}
           onWorkbookStructureChanged={onWorkbookStructureChanged}
           onWorkbookRefresh={onWorkbookRefresh}

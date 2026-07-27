@@ -32,6 +32,18 @@ export async function getWorkbook(id: number, workspaceId: number) {
   };
 }
 
+export async function getWorkbookStructure(id: number, workspaceId: number) {
+  const wb = await repo.findWorkbookStructure(id, workspaceId);
+  if (!wb) return null;
+  return {
+    id: wb.id,
+    publicId: wb.publicId,
+    name: wb.name,
+    sheets: wb.sheets,
+    charts: wb.charts.map(deserializeChartSpec),
+  };
+}
+
 export async function renameWorkbook(id: number, name: string, workspaceId: number) {
   const wb = await repo.updateWorkbookName(id, name, workspaceId);
   if (!wb) return null;

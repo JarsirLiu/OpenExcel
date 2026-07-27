@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  fetchWorkbook,
+  fetchWorkbookForEditor,
   fetchWorkbooks,
   type WorkbookFull,
   type WorkbookMeta,
@@ -113,7 +113,7 @@ export function useWorkbookCatalog(workspaceId: number | null, initial?: Workboo
     const generation = invalidateRequests();
     const controller = new AbortController();
     setLoading(true);
-    fetchWorkbook(workspaceId, wb.id, { signal: controller.signal })
+    fetchWorkbookForEditor(workspaceId, wb.id, { signal: controller.signal })
       .then((full) => {
         if (generation !== requestGenerationRef.current || controller.signal.aborted) return;
         setCurrentWorkbook(full);

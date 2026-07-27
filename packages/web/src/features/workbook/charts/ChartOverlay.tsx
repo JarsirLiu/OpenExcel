@@ -1,9 +1,10 @@
-import { useMemo } from "react";
+import { chartDependencySheetIds } from "@openexcel/core";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import type { WorkbookFull } from "@/api/workbooks";
 import type { SheetGridLayout } from "../layout/fortuneSheetLayout";
 import { normalizeSheetId } from "../sheetIdentity";
 import styles from "./ChartOverlay.module.css";
-import { ChartRenderer } from "./ChartRenderer";
+import { ChartRendererBoundary } from "./ChartRendererBoundary";
 import { chartsForSheet } from "./chartBinding";
 import { chartRectWithMinimumSize, useChartOverlayInteraction } from "./useChartOverlayInteraction";
 import { useChartViewport } from "./useChartViewport";
@@ -17,6 +18,8 @@ type Props = {
   layout: SheetGridLayout;
   onWorkbookRefresh?: () => Promise<void> | void;
   onWorkbookMutation?: () => Promise<void> | void;
+  sheetLoaded: boolean;
+  onSheetLoad: (sheetId: number) => Promise<void>;
 };
 
 const HANDLE_DIRECTIONS = ["nw", "n", "ne", "e", "se", "s", "sw", "w"] as const;
@@ -30,6 +33,8 @@ export function ChartOverlay({
   layout,
   onWorkbookRefresh,
   onWorkbookMutation,
+  sheetLoaded,
+  onSheetLoad,
 }: Props) {
   const activeSheetId = normalizeSheetId(sheetId);
   const charts = useMemo(
@@ -37,6 +42,38 @@ export function ChartOverlay({
     [activeSheetId, workbook.charts],
   );
   const scroll = useChartViewport({ containerRef, layerRef, sheetId: activeSheetId });
+  const [dependencyError, setDependencyError] = useState<string | null>(null);
+  const requestedDependencyIdsRef = useRef(new Set<number>());
+  const dependencySheetIds = useMemo(() => {
+    const ids = charts.flatMap((chart) => chartDependencySheetIds(chart));
+    return [...new Set(ids)].map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0);
+  }, [charts]);
+  const missingDependencyIds = useMemo(
+    () =>
+      dependencySheetIds.filter((id) => {
+        const sheet = workbook.sheets.find((item) => item.id === id);
+        return sheet?.loaded === false;
+      }),
+    [dependencySheetIds, workbook.sheets],
+  );
+
+  useEffect(() => {
+    if (!sheetLoaded || missingDependencyIds.length === 0) return;
+    const pendingIds = missingDependencyIds.filter(
+      (id) => !requestedDependencyIdsRef.current.has(id),
+    );
+    if (pendingIds.length === 0) return;
+    for (const id of pendingIds) requestedDependencyIdsRef.current.add(id);
+    setDependencyError(null);
+    void (async () => {
+      try {
+        for (const id of pendingIds) await onSheetLoad(id);
+      } catch (error) {
+        for (const id of pendingIds) requestedDependencyIdsRef.current.delete(id);
+        setDependencyError(error instanceof Error ? error.message : "加载图表数据失败");
+      }
+    })();
+  }, [missingDependencyIds, onSheetLoad, sheetLoaded]);
   const {
     beginInteraction,
     displayCharts,
@@ -82,7 +119,15 @@ export function ChartOverlay({
               setSelectedId(chart.id);
             }}
           >
-            <ChartRenderer chart={chart} sheets={workbook.sheets} />
+            {missingDependencyIds.length > 0 || dependencyError ? (
+              <div className={styles.loading} role="status">
+                {dependencyError ?? "正在加载图表数据..."}
+              </div>
+            ) : (
+              <Suspense fallback={<div className={styles.loading}>正在加载图表...</div>}>
+                <ChartRendererBoundary chart={chart} sheets={workbook.sheets} />
+              </Suspense>
+            )}
             {selected ? (
               <>
                 <button

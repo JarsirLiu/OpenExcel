@@ -5,6 +5,14 @@
   "packageManager": "pnpm@10.20.0",
   "type": "module",
   "description": "OpenExcel - JSON driven multi-sheet Excel workbench",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "esbuild",
+      "prisma"
+    ]
+  },
   "scripts": {
     "dev": "pnpm db:migrate && concurrently --raw --kill-others-on-fail \"pnpm --filter @openexcel/server dev\" \"wait-on http://127.0.0.1:4000/api/health && pnpm --filter @openexcel/web dev\"",
     "build": "pnpm --filter @openexcel/web build",

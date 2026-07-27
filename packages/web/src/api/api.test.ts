@@ -6,8 +6,11 @@ import {
   deleteSheet,
   downloadTemplateUrl,
   executeSheetCommand,
+  fetchSheet,
   fetchWorkbook,
+  fetchWorkbookForEditor,
   fetchWorkbookReferenceCandidates,
+  fetchWorkbookStructure,
   fetchWorkbooks,
 } from "./workbooks";
 import { bootstrapWorkspace } from "./workspaces";
@@ -95,6 +98,76 @@ describe("fetchWorkbook", () => {
     const result = await fetchWorkbook(9, 1);
     expect(result).toEqual(data);
     expect(mockFetch).toHaveBeenCalledWith("/api/workspaces/9/workbooks/1", {});
+  });
+});
+
+describe("fetchWorkbookStructure", () => {
+  it("loads structure without using the full workbook endpoint", async () => {
+    const data = {
+      id: 1,
+      publicId: "wb_1",
+      name: "WB1",
+      sheets: [{ id: 11, sheetNo: 1, name: "Sheet1", order: 0, revision: 2 }],
+      charts: [],
+    };
+    mockFetch.mockResolvedValue(new Response(JSON.stringify(data), { status: 200 }));
+
+    await expect(fetchWorkbookStructure(9, 1)).resolves.toEqual(data);
+    expect(mockFetch).toHaveBeenCalledWith("/api/workspaces/9/workbooks/1/structure", {});
+  });
+});
+
+describe("fetchSheet", () => {
+  it("marks the response as loaded", async () => {
+    const data = {
+      id: 11,
+      sheetNo: 1,
+      name: "Sheet1",
+      order: 0,
+      columns: [],
+      merges: [],
+      uploadedData: [],
+      config: null,
+      revision: 2,
+    };
+    mockFetch.mockResolvedValue(new Response(JSON.stringify(data), { status: 200 }));
+
+    await expect(fetchSheet(9, 11)).resolves.toMatchObject({ ...data, loaded: true });
+  });
+});
+
+describe("fetchWorkbookForEditor", () => {
+  it("combines structure with only the requested Sheet data", async () => {
+    const structure = {
+      id: 1,
+      publicId: "wb_1",
+      name: "WB1",
+      sheets: [
+        { id: 11, sheetNo: 1, name: "Sheet1", order: 0, revision: 2 },
+        { id: 12, sheetNo: 2, name: "Sheet2", order: 1, revision: 3 },
+      ],
+      charts: [],
+    };
+    const sheet = {
+      id: 12,
+      sheetNo: 2,
+      name: "Sheet2",
+      order: 1,
+      columns: [],
+      merges: [],
+      uploadedData: [{ r: 0, c: 0, v: { v: "loaded" } }],
+      config: null,
+      revision: 3,
+    };
+    mockFetch
+      .mockResolvedValueOnce(new Response(JSON.stringify(structure), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(sheet), { status: 200 }));
+
+    const result = await fetchWorkbookForEditor(9, 1, { sheetIds: [12] });
+
+    expect(result.sheets[0]?.loaded).toBe(false);
+    expect(result.sheets[0]?.uploadedData).toBeNull();
+    expect(result.sheets[1]).toMatchObject({ loaded: true, uploadedData: sheet.uploadedData });
   });
 });
 

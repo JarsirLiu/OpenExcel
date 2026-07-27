@@ -30,6 +30,7 @@ type UseExcelGridWorkspaceProps = {
   onWorkbookRefresh?: () => Promise<void> | void;
   onWorkbookMutation?: () => Promise<void> | void;
   onSheetRevisionChanged?: (sheetId: number, revision: number) => void;
+  sheetLoaded: boolean;
 };
 
 function createMutationId(): string {
@@ -49,6 +50,7 @@ export function useExcelGridWorkspace({
   onWorkbookRefresh,
   onWorkbookMutation,
   onSheetRevisionChanged,
+  sheetLoaded,
 }: UseExcelGridWorkspaceProps) {
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const saveStatusResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -163,6 +165,7 @@ export function useExcelGridWorkspace({
 
   const scheduleSave = useCallback(
     (celldata: any[], config: any) => {
+      if (!sheetLoaded) return;
       if (!workbook?.sheets[activeSheetIndex]) return;
       const sheet = workbook.sheets[activeSheetIndex];
       if (!Array.isArray(celldata)) return;
@@ -175,12 +178,12 @@ export function useExcelGridWorkspace({
         syncSheetToServer(sheet.id, celldata, config, baseRevision, mutationId),
       );
     },
-    [activeSheetIndex, getSnapshot, syncSheetToServer, workbook],
+    [activeSheetIndex, getSnapshot, sheetLoaded, syncSheetToServer, workbook],
   );
 
   const handleChange = useCallback(
     (data: any[]) => {
-      if (!workbook || !Array.isArray(data)) return;
+      if (!sheetLoaded || !workbook || !Array.isArray(data)) return;
 
       setLayoutState((current) => {
         const bySheetId =
@@ -205,7 +208,7 @@ export function useExcelGridWorkspace({
       const config = extractSheetConfig(fortuneSheet);
       scheduleSave(celldata, config);
     },
-    [activeSheetIndex, initialLayouts, layoutSessionKey, scheduleSave, workbook],
+    [activeSheetIndex, initialLayouts, layoutSessionKey, scheduleSave, sheetLoaded, workbook],
   );
 
   const handleActivateSheet = useCallback(

@@ -763,6 +763,13 @@ save system beside full snapshots.
 5. The web app navigates to the protected workbench route.
 6. The route loader reads `GET /api/workspaces`, then loads workbook metadata and conversation-session metadata for the selected workspace.
 
+Workbook opening uses a lightweight structure query first. `GET /api/workspaces/:workspaceId/workbooks/:id/structure`
+returns workbook metadata, Sheet identities/order/revisions, and chart definitions without cell data. The web
+editor then reads `GET /api/workspaces/:workspaceId/sheets/:sheetId` for the active Sheet and caches each Sheet
+after first access. Unloaded Sheets remain tab-visible placeholders and are not editable until their content is
+available. Chart rendering loads the ECharts renderer only when the active Sheet has charts, then loads any
+referenced Sheets through the same Sheet cache.
+
 `AuthSession` is the login identity. `Session` is the persisted conversation resource under a workspace. Login and workspace bootstrap must never create a conversation session.
 
 `GET /api/workspaces` is a read-only query. Initialization is never hidden inside a list request.
@@ -828,6 +835,7 @@ The bootstrap command is authenticated and idempotent. The workspace list endpoi
 
 - `GET /api/workspaces/:workspaceId/workbooks`
 - `GET /api/workspaces/:workspaceId/workbooks/:id`
+- `GET /api/workspaces/:workspaceId/workbooks/:id/structure`
 - `POST /api/workspaces/:workspaceId/workbooks`
 - `POST /api/workspaces/:workspaceId/workbooks/import`
 
