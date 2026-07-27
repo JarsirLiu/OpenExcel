@@ -115,7 +115,6 @@ describe("runAgentLoop compaction lifecycle", () => {
       tools: [],
       toolExecutor: { execute: vi.fn() },
       compaction: {
-        mode: "compaction",
         triggerRatio: 0.5,
         safetyMarginTokens: 0,
         outputReserveTokens: 100,

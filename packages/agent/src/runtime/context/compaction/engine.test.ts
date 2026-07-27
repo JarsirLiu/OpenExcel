@@ -47,7 +47,6 @@ function engine(
     now: () => new Date("2026-01-01T00:00:00.000Z"),
     sourceTranscriptHash: (entries) => `hash:${entries.length}`,
     policy: {
-      mode: "compaction",
       triggerRatio: 0.8,
       safetyMarginTokens: 10,
       outputReserveTokens: 100,

@@ -59,12 +59,6 @@ export class ContextCompactionEngine {
   }
 
   async compact(input: ContextCompactionRequest): Promise<ContextCompactionResult> {
-    if (this.policy.mode !== "compaction") {
-      throw new ContextCompactionError(
-        "ContextCompactionEngine requires the compaction policy mode",
-        "context_budget",
-      );
-    }
     validateTranscriptEntries(input.transcript);
 
     const current = await this.options.checkpointStore.load(input.contextKey);
@@ -222,7 +216,7 @@ function validatePolicy(policy: ContextCompactionPolicy): void {
     throw new RangeError("triggerRatio must be greater than 0 and at most 1");
   }
   for (const [name, value] of Object.entries(policy)) {
-    if (name === "mode" || name === "triggerRatio" || value === undefined) continue;
+    if (name === "triggerRatio" || value === undefined) continue;
     if (!Number.isInteger(value) || value < 0) {
       throw new RangeError(`${name} must be a non-negative integer`);
     }

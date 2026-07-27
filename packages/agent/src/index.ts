@@ -37,7 +37,6 @@ export type {
   ContextCheckpointStore,
   ContextCompactionEngineOptions,
   ContextCompactionFailureStage,
-  ContextCompactionMode,
   ContextCompactionPolicy,
   ContextSummary,
   ContextSummaryDecision,

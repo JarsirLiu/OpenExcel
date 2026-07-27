@@ -1,10 +1,7 @@
 import type { TokenEstimator } from "../../../session/tokenBudget.js";
 import type { ContextTranscriptEntry, TranscriptCursor } from "../transcript.js";
 
-export type ContextCompactionMode = "compaction" | "sliding-window";
-
 export interface ContextCompactionPolicy {
-  mode: ContextCompactionMode;
   triggerRatio: number;
   safetyMarginTokens: number;
   outputReserveTokens: number;
@@ -15,11 +12,10 @@ export interface ContextCompactionPolicy {
 }
 
 export const DEFAULT_CONTEXT_COMPACTION_POLICY: ContextCompactionPolicy = {
-  mode: "compaction",
   triggerRatio: 0.85,
   safetyMarginTokens: 1_024,
   outputReserveTokens: 16_000,
-  summaryMaxTokens: 2_048,
+  summaryMaxTokens: 8_192,
   keepRecentTokens: 20_000,
   maxCompactionRetries: 1,
 };

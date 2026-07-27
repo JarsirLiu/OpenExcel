@@ -51,7 +51,6 @@ describe.skipIf(!runRealModelAcceptance)("real model context compaction acceptan
         },
       },
       compaction: {
-        mode: "compaction",
         triggerRatio: 0.25,
         safetyMarginTokens: 256,
         outputReserveTokens: 2_000,

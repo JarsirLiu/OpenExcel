@@ -4,14 +4,12 @@
 `packages/web`、`packages/server`、`packages/agent` 之间的协作方式。
 
 本文档是 OpenExcel 集成层所有 Agent 相关重构的详细依据。上下文压缩的
-预算、usage 观测、checkpoint 和可复用包契约见
-[上下文策略](context-compaction.md)和[Agent 可复用包设计](agent-core-package.md)。
+预算、usage 观测和 checkpoint 规则见[上下文策略](context-compaction.md)。
 `docs/architecture.md` 只
 定义稳定的包边界、依赖方向和顶层数据流；如果 OpenExcel 集成层的工具循环、
 事件、重试、恢复、幂等、持久化或迁移策略发生变化，应先修改本文档；如果
-上下文预算、usage、压缩或 checkpoint 的通用 contract 发生变化，应先修改
-[上下文策略](context-compaction.md)和[Agent 可复用包设计](agent-core-package.md)，再在
-总架构文档中仅同步必要的边界变化。
+上下文预算、usage、压缩或 checkpoint 的 contract 发生变化，应先修改
+[上下文策略](context-compaction.md)，再在总架构文档中仅同步必要的边界变化。
 
 本文档中的“当前基线”描述已经存在的能力；“目标协议”和“迁移阶段”描述
 尚未完全落地的目标。实现时必须明确标记代码对应的是哪一层，不能把规划
@@ -291,8 +289,8 @@ Browser
    - 只用于服务端后续的模型准备和事件生成。
 
 3. **Model context**
-   - 在 resolved transcript 的基础上加入 system prompt，并按 [上下文策略文档](context-compaction.md)
-     执行自动压缩或窗口滑动。
+   - 在 resolved transcript 的基础上加入 system prompt，并按[上下文策略文档](context-compaction.md)
+     执行自动压缩。
    - 只作为本次模型请求的输入。
    - 裁剪不得反向修改 canonical transcript。
 
@@ -305,8 +303,8 @@ Browser
 
 上下文策略必须保持消息结构合法：assistant 的 tool-call 与对应的 tool result 不能被拆开，
 不能只保留工具结果，也不能把策略结果写回 `AgentRunCheckpoint.transcript`。无法在预算内保留
-完整的一轮时，自动压缩模式应生成独立 context checkpoint；窗口滑动模式应删除该轮的旧上下文。
-不能随机删除二维表格中的值或静默拼接半条消息。两种模式的详细预算、切换和恢复规则见
+完整的一轮时，自动压缩应生成独立 context checkpoint。不能随机删除二维表格中的值或静默拼接
+半条消息。详细预算和恢复规则见
 `docs/context-compaction.md`。
 
 ## 4. HTTP 请求和流协议
@@ -1022,7 +1020,7 @@ repositories -> Prisma only
 - `AgentRunner` facade、运行生命周期和运行结果。
 - `agentLoop` 对 Vercel AI SDK `streamText`/`ToolLoopAgent` 的内部适配。
 - model-facing message 转换与 system prompt 组装。
-- 上下文策略、窗口预算和工具结果预算；自动压缩与窗口滑动的具体设计见
+- 上下文策略、窗口预算和工具结果预算；自动压缩的具体设计见
   `docs/context-compaction.md`。
 - 工具循环、停止条件、模型错误格式化和运行时事件。
 - 面向服务端的 `ToolExecutor`、事件 sink、取消端口和恢复边界。
