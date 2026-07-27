@@ -46,6 +46,39 @@ describe("ConversationStore", () => {
     expect(store.messages).toEqual([]);
   });
 
+  it("projects the latest step context usage without adding a message", () => {
+    const store = new ConversationStore();
+    store.setContextUsage({
+      contextWindowTokens: 1_000_000,
+      usedTokens: 100_000,
+      estimatedContextTokens: 100_100,
+      percentage: 10,
+      source: "none",
+      runId: null,
+      updatedAt: null,
+    });
+
+    store.applyEvent({
+      runId: 7,
+      eventId: "event-step-start",
+      sequence: 1,
+      type: "step.started",
+      occurredAt: "2026-07-27T00:00:01.000Z",
+      payload: {
+        tokenObservation: { inputTokens: 159900, source: "mixed" },
+        estimatedContextTokens: 160100,
+      },
+    });
+
+    expect(store.contextUsage).toMatchObject({
+      usedTokens: 159900,
+      estimatedContextTokens: 160100,
+      source: "mixed",
+      runId: 7,
+    });
+    expect(store.messages).toEqual([]);
+  });
+
   it("keeps equal sequences from different runs independent", () => {
     const store = new ConversationStore();
 
@@ -241,13 +274,28 @@ describe("useChatConversation", () => {
       },
     ];
 
-    globalThis.fetch = async () =>
-      new Response(chunks.map((chunk) => `${JSON.stringify(chunk)}\n`).join(""), {
+    globalThis.fetch = async (input) => {
+      if (String(input).includes("/context-usage")) {
+        return new Response(
+          JSON.stringify({
+            contextWindowTokens: 180_000,
+            usedTokens: 0,
+            estimatedContextTokens: null,
+            percentage: 0,
+            source: "none",
+            runId: null,
+            updatedAt: null,
+          }),
+          { headers: { "content-type": "application/json" } },
+        );
+      }
+      return new Response(chunks.map((chunk) => `${JSON.stringify(chunk)}\n`).join(""), {
         headers: {
           "content-type": "application/x-ndjson",
           "X-OpenExcel-Run-Id": "7",
         },
       });
+    };
 
     try {
       const onCreateSession = vi.fn().mockResolvedValue({ id: 19 });
@@ -310,6 +358,20 @@ describe("useChatConversation", () => {
         return new Response(JSON.stringify({ messages: [], total: 0 }), {
           headers: { "content-type": "application/json" },
         });
+      }
+      if (url.endsWith("/context-usage")) {
+        return new Response(
+          JSON.stringify({
+            contextWindowTokens: 180_000,
+            usedTokens: 0,
+            estimatedContextTokens: null,
+            percentage: 0,
+            source: "none",
+            runId: null,
+            updatedAt: null,
+          }),
+          { headers: { "content-type": "application/json" } },
+        );
       }
       if (url.endsWith("/runs/7/cancel")) {
         return new Response(
@@ -380,6 +442,20 @@ describe("useChatConversation", () => {
         return new Response(JSON.stringify({ messages: [], total: 0 }), {
           headers: { "content-type": "application/json" },
         });
+      }
+      if (String(input).endsWith("/context-usage")) {
+        return new Response(
+          JSON.stringify({
+            contextWindowTokens: 180_000,
+            usedTokens: 0,
+            estimatedContextTokens: null,
+            percentage: 0,
+            source: "none",
+            runId: null,
+            updatedAt: null,
+          }),
+          { headers: { "content-type": "application/json" } },
+        );
       }
       return new Response(
         `${[

@@ -83,6 +83,7 @@ export function DemoChatSidebar({
             onAttachExcel={() => undefined}
             referenceCacheRevision={0}
             workspaceId={scenario.workspace.id}
+            contextUsage={null}
           />
         </div>
       </div>

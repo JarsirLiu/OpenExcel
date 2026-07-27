@@ -98,10 +98,34 @@ function estimateContext(context: TokenContextSnapshot, estimator: TokenEstimato
     estimator.estimate({
       messages: context.messages,
       systemPrompt: context.systemPrompt,
-      toolDefinitions: context.toolDefinitions,
+      toolDefinitions: toEstimableToolDefinitions(context.toolDefinitions),
       pendingToolResults: context.pendingToolResults,
     }),
   );
+}
+
+function toEstimableToolDefinitions(value: unknown): unknown {
+  if (!Array.isArray(value)) return value;
+
+  return value.map((tool) => {
+    if (!isRecord(tool) || !isRecord(tool.inputSchema)) return tool;
+    const schema = tool.inputSchema as SchemaWithJsonSchema;
+    if (typeof schema.toJSONSchema !== "function") return tool;
+
+    try {
+      return { ...tool, inputSchema: schema.toJSONSchema() };
+    } catch {
+      return { ...tool, inputSchema: { type: "object" } };
+    }
+  });
+}
+
+type SchemaWithJsonSchema = {
+  toJSONSchema?: () => unknown;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
 type ConfirmedBaseline = {

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 import { normalizeModelStepUsage, type TokenEstimator, TokenUsageTracker } from "./tokenBudget.js";
 
 const estimator: TokenEstimator = {
@@ -140,5 +141,39 @@ describe("TokenUsageTracker", () => {
 
     expect(result.observation).toMatchObject({ inputTokens: 120, source: "provider" });
     expect(tracker.predict(context("ab")).observation.inputTokens).toBe(121);
+  });
+
+  it("estimates tool schemas from their model-facing JSON shape", () => {
+    const estimatedValues: unknown[] = [];
+    const tracker = new TokenUsageTracker({
+      estimate(value) {
+        estimatedValues.push(value);
+        return 1;
+      },
+    });
+
+    tracker.predict({
+      messages: [],
+      systemPrompt: "system",
+      toolDefinitions: [
+        {
+          name: "readSheetData",
+          description: "读取表格",
+          inputSchema: z.object({ sheetId: z.number() }),
+        },
+      ],
+    });
+
+    expect(estimatedValues[0]).toMatchObject({
+      toolDefinitions: [
+        {
+          inputSchema: {
+            type: "object",
+            properties: { sheetId: { type: "number" } },
+          },
+        },
+      ],
+    });
+    expect(JSON.stringify(estimatedValues[0])).not.toContain('"_zod"');
   });
 });

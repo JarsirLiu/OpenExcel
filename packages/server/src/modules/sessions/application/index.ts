@@ -7,6 +7,8 @@ export {
   chatTurnRequestSchema,
   parseChatTurnRequest,
 } from "./chatTurn.js";
+export type { ContextUsageSnapshot, ContextUsageSource } from "./contextUsage.js";
+export { getContextUsage } from "./contextUsage.js";
 export { createSession } from "./createSession.js";
 export {
   deleteSession,

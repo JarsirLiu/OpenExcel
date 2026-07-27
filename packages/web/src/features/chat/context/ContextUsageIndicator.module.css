@@ -1,0 +1,93 @@
+.wrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.button:hover,
+.button:focus-visible {
+  background: var(--bg-muted);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.ring {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: conic-gradient(var(--color-accent) var(--usage-percent), var(--border-default) 0);
+  position: relative;
+}
+
+.ring::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: var(--bg-surface);
+}
+
+.percent {
+  position: relative;
+  z-index: 1;
+  font-size: 7px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.tooltip {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  width: max-content;
+  max-width: 250px;
+  padding: 9px 11px;
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  background: var(--bg-surface);
+  box-shadow: var(--shadow);
+  color: var(--text-primary);
+  font-size: 12px;
+  line-height: 1.45;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(3px);
+  transition:
+    opacity 0.12s ease,
+    transform 0.12s ease;
+  z-index: 5;
+}
+
+.wrapper:hover .tooltip,
+.button:focus-visible + .tooltip {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.tooltipValue {
+  margin-top: 2px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tooltipMeta {
+  margin-top: 3px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  white-space: nowrap;
+}

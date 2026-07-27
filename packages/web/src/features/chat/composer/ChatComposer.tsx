@@ -9,6 +9,8 @@ import {
   useState,
 } from "react";
 import { t } from "@/lib/i18n";
+import { ContextUsageIndicator } from "../context/ContextUsageIndicator";
+import type { ContextUsageSnapshot } from "../context/contextUsage";
 import styles from "./ChatComposer.module.css";
 import type { ChatReferenceTarget } from "./chatReferences";
 import { useChatComposer } from "./useChatComposer";
@@ -24,6 +26,7 @@ type ChatComposerProps = {
   onAttachExcel: (files: File[]) => Promise<void> | void;
   referenceCacheRevision: number;
   workspaceId: number;
+  contextUsage: ContextUsageSnapshot | null;
 };
 
 const SendIcon = () => (
@@ -66,7 +69,7 @@ const AttachIcon = () => (
 const PLACEHOLDERS = ["使用 @ 来引用表格", "让 AI 来帮你修改表格"];
 
 export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(function ChatComposer(
-  { isStreaming, onSend, onStop, onAttachExcel, referenceCacheRevision, workspaceId },
+  { isStreaming, onSend, onStop, onAttachExcel, referenceCacheRevision, workspaceId, contextUsage },
   ref,
 ) {
   const { editor, editorText, handleSend, setText } = useChatComposer({
@@ -142,6 +145,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
             <AttachIcon />
           </button>
           <div className={styles.spacer} />
+          <ContextUsageIndicator usage={contextUsage} />
           <button
             type="button"
             onClick={() => (isStreaming ? onStop() : handleSend())}

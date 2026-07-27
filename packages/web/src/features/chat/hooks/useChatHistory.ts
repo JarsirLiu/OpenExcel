@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { fetchMessages as fetchChatMessages } from "@/api/chat";
+import { fetchMessages as fetchChatMessages, fetchContextUsage } from "@/api/chat";
 import type { ConversationStore } from "../conversation/conversationStore";
 import { collectWorkbookMutationToolCallIds } from "./useSheetPatchSync";
 
@@ -53,13 +53,33 @@ export function useChatHistory({
     loadedOffsetRef.current = 0;
 
     if (switchedSession && !isCreatedLiveSession) {
+      store.clearContextUsage();
       store.replaceHistory([]);
       historicalToolCallIds.clear();
       setCanUndo(false);
     }
 
     const load = async () => {
-      if (sessionId == null || isCreatedLiveSession) {
+      if (sessionId == null) {
+        if (mountedRef.current && generation === generationRef.current) {
+          setInitialLoaded(true);
+        }
+        return;
+      }
+
+      if (isCreatedLiveSession) {
+        try {
+          const contextUsage = await fetchContextUsage(workspaceId, sessionId, {
+            signal: controller.signal,
+          });
+          if (mountedRef.current && generation === generationRef.current) {
+            store.setContextUsage(contextUsage);
+          }
+        } catch (loadError) {
+          if (!controller.signal.aborted) {
+            console.error("[chat] Failed to load context usage:", loadError);
+          }
+        }
         if (isCreatedLiveSession) {
           skipSessionIdRef.current = null;
           loadedOffsetRef.current = store.messages.length;
@@ -71,9 +91,10 @@ export function useChatHistory({
       }
 
       try {
-        const { messages, total } = await fetchChatMessages(workspaceId, sessionId, PAGE_SIZE, 0, {
-          signal: controller.signal,
-        });
+        const [{ messages, total }, contextUsage] = await Promise.all([
+          fetchChatMessages(workspaceId, sessionId, PAGE_SIZE, 0, { signal: controller.signal }),
+          fetchContextUsage(workspaceId, sessionId, { signal: controller.signal }),
+        ]);
         if (!mountedRef.current || generation !== generationRef.current) return;
         for (const toolCallId of collectWorkbookMutationToolCallIds(messages, new Set())) {
           historicalToolCallIds.add(toolCallId);
@@ -87,6 +108,7 @@ export function useChatHistory({
           (message: any) => typeof message?.id === "string" && !historyIds.has(message.id),
         );
         store.replaceHistory([...messages, ...localProjection]);
+        store.setContextUsage(contextUsage);
         loadedOffsetRef.current = messages.length;
         setHasOlder(messages.length < total);
         setInitialLoaded(true);

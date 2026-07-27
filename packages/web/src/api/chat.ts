@@ -1,9 +1,22 @@
+import type { ContextUsageSnapshot } from "@/features/chat/context/contextUsage";
 import { apiFetch, readErrorMessage } from "./http";
 
 export type ChatMessagesPage = {
   messages: any[];
   total: number;
 };
+
+export async function fetchContextUsage(
+  workspaceId: number,
+  sessionId: number,
+  options?: { signal?: AbortSignal },
+): Promise<ContextUsageSnapshot> {
+  const res = await apiFetch(`/workspaces/${workspaceId}/sessions/${sessionId}/context-usage`, {
+    signal: options?.signal,
+  });
+  if (!res.ok) throw new Error("加载上下文用量失败");
+  return res.json();
+}
 
 export async function fetchMessages(
   workspaceId: number,

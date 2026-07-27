@@ -5,6 +5,11 @@ type ChatMessage = {
   [key: string]: unknown;
 };
 
+import {
+  type ContextUsageSnapshot,
+  contextUsageFromEvent,
+  isNewerContextUsage,
+} from "../context/contextUsage";
 import type { ContextCompactionStatus } from "./contextCompactionStatus";
 
 type ChatEvent = import("../transport/chatEventStream").ChatEvent;
@@ -22,6 +27,7 @@ export class ConversationStore {
   #seenEventIds = new Set<string>();
   #seenEventSequences = new Map<string, Set<number>>();
   #compactionStatus: ContextCompactionStatus = "idle";
+  #contextUsage: ContextUsageSnapshot | null = null;
 
   constructor(initialMessages: readonly ChatMessage[] = []) {
     this.#messages = [...initialMessages];
@@ -33,6 +39,15 @@ export class ConversationStore {
 
   get compactionStatus() {
     return this.#compactionStatus;
+  }
+
+  get contextUsage() {
+    return this.#contextUsage;
+  }
+
+  clearContextUsage() {
+    this.#contextUsage = null;
+    this.#publish();
   }
 
   subscribe(listener: () => void) {
@@ -47,6 +62,12 @@ export class ConversationStore {
     this.#compactionStatus = "idle";
     this.#seenEventIds.clear();
     this.#seenEventSequences.clear();
+    this.#publish();
+  }
+
+  setContextUsage(snapshot: ContextUsageSnapshot) {
+    if (!isNewerContextUsage(snapshot, this.#contextUsage)) return;
+    this.#contextUsage = snapshot;
     this.#publish();
   }
 
@@ -79,6 +100,20 @@ export class ConversationStore {
         !this.#messages.some((message) => message.id === userMessage.id)
       ) {
         this.#messages = [...this.#messages, userMessage];
+        this.#publish();
+      }
+      return;
+    }
+
+    if (event.type === "step.started" || event.type === "step.finished") {
+      const snapshot = contextUsageFromEvent(
+        event.payload,
+        event.occurredAt,
+        this.#contextUsage,
+        event.runId,
+      );
+      if (snapshot && isNewerContextUsage(snapshot, this.#contextUsage)) {
+        this.#contextUsage = snapshot;
         this.#publish();
       }
       return;

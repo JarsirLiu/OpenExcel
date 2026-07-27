@@ -33,6 +33,7 @@ export function ChatPanel({
   const {
     messages,
     compactionStatus,
+    contextUsage,
     error,
     canUndo,
     isStreaming,
@@ -142,6 +143,7 @@ export function ChatPanel({
         onAttachExcel={onAttachExcel}
         referenceCacheRevision={referenceCacheRevision}
         workspaceId={workspaceId}
+        contextUsage={contextUsage}
       />
     </div>
   );
