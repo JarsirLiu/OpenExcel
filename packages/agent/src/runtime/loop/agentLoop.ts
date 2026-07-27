@@ -15,11 +15,7 @@ import {
   trimMessagesToContextWindow,
 } from "../../session/contextWindow.js";
 import { ModelStepContext } from "../../session/modelStepContext.js";
-import {
-  type ModelStepBudgetEvent,
-  normalizeModelStepUsage,
-  TokenUsageTracker,
-} from "../../session/tokenBudget.js";
+import { TokenUsageTracker } from "../../session/tokenBudget.js";
 import { appendResponseMessages, removeEmptyAssistantMessages } from "../../session/transcript.js";
 import type {
   AgentRunCompletion,
@@ -29,43 +25,12 @@ import type {
 } from "../contracts.js";
 import { AgentPersistenceError, createOrderedAgentEventEmitter } from "../events/events.js";
 import { convertChatReferenceDataPart } from "../stream/referencePart.js";
-import { createAgentToolSet } from "../tools/toolAdapter.js";
+import { createAgentStreamBridge } from "./agentStreamBridge.js";
+import { createModelStepObserver } from "./modelStepObserver.js";
 
 export interface AgentLoopInput extends Omit<AgentRunnerInput, "workspace" | "transcript"> {
   transcript: AgentTranscriptMessage[];
   systemPrompt: string;
-}
-
-function normalizeStepPayload(step: Record<string, unknown>) {
-  const toolCalls = Array.isArray(step.toolCalls)
-    ? step.toolCalls
-        .map((call) => {
-          if (!call || typeof call !== "object") return null;
-          const value = call as Record<string, unknown>;
-          return {
-            toolName: String(value.toolName ?? "unknown"),
-            toolCallId: String(value.toolCallId ?? "unknown"),
-          };
-        })
-        .filter((call): call is { toolName: string; toolCallId: string } => call !== null)
-    : [];
-  const toolResults = Array.isArray(step.toolResults)
-    ? step.toolResults.map((result) => ({
-        isError:
-          Boolean(result && typeof result === "object" && "error" in result) ||
-          Boolean(
-            result && typeof result === "object" && (result as Record<string, unknown>).isError,
-          ),
-      }))
-    : [];
-
-  return {
-    stepType: toolCalls.length > 0 ? "tool-call" : toolResults.length > 0 ? "tool-result" : "text",
-    finishReason: String(step.finishReason ?? "stop"),
-    ...(typeof step.text === "string" ? { text: step.text } : {}),
-    ...(toolCalls.length > 0 ? { toolCalls } : {}),
-    ...(toolResults.length > 0 ? { toolResults } : {}),
-  };
 }
 
 export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResult> {
@@ -107,35 +72,19 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
   });
   const emitEvent = (type: Parameters<typeof createEventEmitter.emit>[0], payload: unknown) =>
     createEventEmitter.emit(type, payload);
-  // A model run is one assistant turn in the UI. Individual model steps may
-  // contribute text, reasoning, and tool parts, but they must not become
-  // separate assistant message entities.
-  const assistantMessageId = `${input.turnId ?? "run"}-assistant`;
-  const startedToolCallIds = new Set<string>();
-  const emitToolStarted = async (event: {
-    toolName: string;
-    toolCallId: string;
-    input?: unknown;
-  }) => {
-    if (startedToolCallIds.has(event.toolCallId)) return;
-    startedToolCallIds.add(event.toolCallId);
-    await createEventEmitter.emit("tool.started", {
-      ...event,
-      turnId: input.turnId,
-      stepIndex,
-      messageId: assistantMessageId,
-    });
-  };
-  const tools = createAgentToolSet(input.tools, input.toolExecutor, input.executionContext, {
-    onToolFinish: async (event) => {
-      await createEventEmitter.emit("tool.finished", {
-        ...event,
-        turnId: input.turnId,
-        stepIndex,
-        messageId: assistantMessageId,
-      });
-    },
+  let stepIndex = 0;
+  const streamBridge = createAgentStreamBridge({
+    turnId: input.turnId,
+    tools: input.tools,
+    toolExecutor: input.toolExecutor,
+    executionContext: input.executionContext,
+    emitter: createEventEmitter,
+    getStepIndex: () => stepIndex,
+    onFinish: input.onFinish,
+    onAbort: input.onAbort,
+    onError: input.onError,
   });
+  const tools = streamBridge.tools;
   const validatedMessages = await validateUIMessages({
     messages: contextWindow.messages as any,
     tools: tools as any,
@@ -149,6 +98,12 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
   });
   const tokenUsageTracker = new TokenUsageTracker();
   const modelStepContext = new ModelStepContext(modelMessages, input.systemPrompt, input.tools);
+  const modelStepObserver = createModelStepObserver({
+    emitter: createEventEmitter,
+    tokenUsageTracker,
+    modelStepContext,
+    onModelStepFinished: input.onModelStepFinished,
+  });
   await emitEvent("run.started", {
     droppedMessages: contextWindow.droppedMessages,
     droppedTurns: contextWindow.droppedTurns,
@@ -160,12 +115,6 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
     resolveCompletion = resolve;
   });
   let terminal = false;
-  let loopError: unknown;
-  let streamedText = "";
-  let streamedReasoning = "";
-  let stepIndex = 0;
-  let aborted = false;
-  let failurePhase: "model" | "persistence" | undefined;
   const finish = (value: AgentRunCompletion) => {
     if (terminal) return;
     terminal = true;
@@ -186,85 +135,15 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
     include: {
       requestMessages: true,
     },
-    onStepFinish: async (step: any) => {
-      const stepNumber = typeof step?.stepNumber === "number" ? step.stepNumber : stepIndex;
-      const usage = normalizeModelStepUsage(step?.usage);
-      const budget = tokenUsageTracker.recordStepFinished(
-        {
-          stepIndex: stepNumber,
-          usage,
-          finishReason: String(step?.finishReason ?? "stop"),
-        },
-        modelStepContext.finishStep({ messages: step?.request?.messages }),
-      );
-      const stepBudget: ModelStepBudgetEvent = {
-        stepIndex: stepNumber,
-        usage,
-        finishReason: String(step?.finishReason ?? "stop"),
-        observation: budget.observation,
-        estimatedContextTokens: budget.estimatedContextTokens,
-      };
-      await emitEvent("step.finished", {
-        ...normalizeStepPayload(step),
-        tokenObservation: stepBudget.observation,
-        estimatedContextTokens: stepBudget.estimatedContextTokens,
-      });
-      await input.onModelStepFinished?.(stepBudget);
+    onStepFinish: modelStepObserver.onStepFinish,
+    onStepStart: async (step: unknown) => {
+      await modelStepObserver.onStepStart(step);
+      stepIndex = modelStepObserver.getStepIndex();
     },
-    onStepStart: async (step: any) => {
-      stepIndex = typeof step?.stepNumber === "number" ? step.stepNumber : stepIndex + 1;
-      const prediction = tokenUsageTracker.predict(
-        modelStepContext.startStep({
-          messages: step?.messages,
-          instructions: step?.instructions,
-          activeTools: Array.isArray(step?.activeTools) ? step.activeTools : undefined,
-        }),
-      );
-      await emitEvent("step.started", {
-        stepNumber: stepIndex,
-        tokenObservation: prediction.observation,
-        estimatedContextTokens: prediction.estimatedContextTokens,
-      });
-    },
-    onChunk: async ({ chunk }: { chunk: any }) => {
-      if (chunk.type === "tool-input-start") {
-        await emitToolStarted({ toolName: chunk.toolName, toolCallId: chunk.id });
-      } else if (chunk.type === "text-delta") {
-        streamedText += chunk.text;
-        await emitEvent("message.delta", {
-          turnId: input.turnId ?? "unknown",
-          stepIndex,
-          messageId: assistantMessageId,
-          partId: `${input.turnId ?? "run"}-text-${stepIndex}`,
-          delta: chunk.text,
-          text: streamedText,
-        });
-      } else if (chunk.type === "reasoning-delta") {
-        const delta = chunk.text;
-        streamedReasoning += delta;
-        await emitEvent("reasoning.delta", {
-          turnId: input.turnId ?? "unknown",
-          stepIndex,
-          messageId: assistantMessageId,
-          partId: `${input.turnId ?? "run"}-reasoning-${stepIndex}`,
-          delta,
-          text: streamedReasoning,
-        });
-      }
-    },
-    onFinish: async ({ text }: any) => {
-      // Model text generation can finish before tool execution drains.
-      await input.onFinish?.({ text });
-    },
-    onAbort: async (event: any) => {
-      aborted = true;
-      await input.onAbort?.(event);
-    },
-    onError: async ({ error }: { error: unknown }) => {
-      loopError = error;
-      failurePhase = "model";
-      await input.onError?.(error);
-    },
+    onChunk: async ({ chunk }: { chunk: unknown }) => streamBridge.onChunk(chunk),
+    onFinish: streamBridge.onFinish,
+    onAbort: streamBridge.onAbort,
+    onError: streamBridge.onError,
   });
 
   // Completion drives the durable event stream and waits for all tool steps.
@@ -278,7 +157,8 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
         (result as { responseMessages?: PromiseLike<unknown> }).responseMessages ??
           Promise.resolve(undefined),
       ]);
-      const isAborted = aborted || agentAbortController.signal.aborted;
+      const streamState = streamBridge.getState();
+      const isAborted = streamState.aborted || agentAbortController.signal.aborted;
       const messages = appendResponseMessages(baseMessages, responseMessages);
       const finalMessages: AgentTranscriptMessage[] =
         messages.length === persistenceMessages.length &&
@@ -292,16 +172,17 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
       await createEventEmitter.flushAndClose();
 
       finish({
-        status: loopError ? "failed" : isAborted ? "cancelled" : "completed",
-        text: loopError ? undefined : text,
-        error: loopError,
+        status: streamState.loopError ? "failed" : isAborted ? "cancelled" : "completed",
+        text: streamState.loopError ? undefined : text,
+        error: streamState.loopError,
         messages: finalMessages,
         isAborted,
-        failurePhase: loopError ? failurePhase : undefined,
-        failureStepIndex: loopError ? stepIndex : undefined,
+        failurePhase: streamState.loopError ? streamState.failurePhase : undefined,
+        failureStepIndex: streamState.loopError ? stepIndex : undefined,
       });
     } catch (error) {
-      const isAborted = aborted || agentAbortController.signal.aborted;
+      const streamState = streamBridge.getState();
+      const isAborted = streamState.aborted || agentAbortController.signal.aborted;
       let flushError: unknown;
       try {
         // Abort can reject the SDK promises before queued delta events finish
@@ -331,11 +212,11 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
             ? undefined
             : flushError instanceof AgentPersistenceError || error instanceof AgentPersistenceError
               ? "persistence"
-              : (failurePhase ?? "model"),
+              : (streamState.failurePhase ?? "model"),
         failureStepIndex:
           isAborted && flushError == null
             ? undefined
-            : failurePhase === "model"
+            : streamState.failurePhase === "model"
               ? stepIndex
               : undefined,
       });
