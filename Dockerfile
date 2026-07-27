@@ -28,6 +28,7 @@ COPY packages/web/tsconfig.json ./packages/web/
 COPY packages/web/vite.config.ts ./packages/web/
 COPY templates ./templates
 
+RUN pnpm typecheck
 RUN pnpm --filter @openexcel/web build
 
 FROM node:22-alpine

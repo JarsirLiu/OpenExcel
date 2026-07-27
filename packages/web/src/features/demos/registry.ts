@@ -4,7 +4,9 @@ type DemoLoader = () => Promise<DemoDefinition>;
 
 const demoLoaders: Record<string, DemoLoader> = {
   "bank-transaction-audit": () =>
-    import("./examples/bank-transaction-audit").then(({ bankTransactionAuditDemo }) => bankTransactionAuditDemo),
+    import("./examples/bank-transaction-audit").then(
+      ({ bankTransactionAuditDemo }) => bankTransactionAuditDemo,
+    ),
   "campus-recruitment-analysis": () =>
     import("./examples/campus-recruitment-analysis").then(
       ({ campusRecruitmentAnalysisDemo }) => campusRecruitmentAnalysisDemo,
@@ -14,7 +16,9 @@ const demoLoaders: Record<string, DemoLoader> = {
       ({ departmentBudgetMonitoringDemo }) => departmentBudgetMonitoringDemo,
     ),
   "exam-score-analysis": () =>
-    import("./examples/exam-score-analysis").then(({ examScoreAnalysisDemo }) => examScoreAnalysisDemo),
+    import("./examples/exam-score-analysis").then(
+      ({ examScoreAnalysisDemo }) => examScoreAnalysisDemo,
+    ),
   "financial-health-analysis": () =>
     import("./examples/financial-health-analysis").then(
       ({ financialHealthAnalysisDemo }) => financialHealthAnalysisDemo,
@@ -32,7 +36,9 @@ const demoLoaders: Record<string, DemoLoader> = {
       ({ logisticsOperationsAnalysisDemo }) => logisticsOperationsAnalysisDemo,
     ),
   "marketing-roi-analysis": () =>
-    import("./examples/marketing-roi-analysis").then(({ marketingRoiAnalysisDemo }) => marketingRoiAnalysisDemo),
+    import("./examples/marketing-roi-analysis").then(
+      ({ marketingRoiAnalysisDemo }) => marketingRoiAnalysisDemo,
+    ),
   "order-fulfillment-analysis": () =>
     import("./examples/order-fulfillment-analysis").then(
       ({ orderFulfillmentAnalysisDemo }) => orderFulfillmentAnalysisDemo,

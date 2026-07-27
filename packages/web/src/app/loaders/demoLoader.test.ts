@@ -11,8 +11,8 @@ describe("demoLoader", () => {
   });
 
   it("returns a 404 response for an unknown demo", async () => {
-    await expect(
-      demoLoader({ params: { demoId: "unknown-demo" } }),
-    ).rejects.toMatchObject({ status: 404 });
+    await expect(demoLoader({ params: { demoId: "unknown-demo" } })).rejects.toMatchObject({
+      status: 404,
+    });
   });
 });

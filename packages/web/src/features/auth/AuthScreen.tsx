@@ -159,7 +159,12 @@ export function AuthScreen({
 
                 {error && <div className={styles.error}>{error}</div>}
 
-                <Button variant="primary" type="submit" disabled={submitting} className={styles.submit}>
+                <Button
+                  variant="primary"
+                  type="submit"
+                  disabled={submitting}
+                  className={styles.submit}
+                >
                   {submitting
                     ? t("processing", "处理中…")
                     : mode === "login"
@@ -170,7 +175,9 @@ export function AuthScreen({
 
               <div className={styles.formFooter}>
                 <p className={styles.switch}>
-                  {mode === "login" ? t("no_account", "还没有账号？") : t("has_account", "已有账号？")}
+                  {mode === "login"
+                    ? t("no_account", "还没有账号？")
+                    : t("has_account", "已有账号？")}
                   <button type="button" className={styles.switchLink} onClick={onSwitchMode}>
                     {mode === "login" ? t("sign_up", "注册") : t("sign_in", "登录")}
                   </button>

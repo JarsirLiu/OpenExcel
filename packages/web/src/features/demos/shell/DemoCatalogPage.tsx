@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { routePaths } from "@/app/routePaths";
-import { demoCatalog } from "../catalog";
 import { ProgressiveImage } from "@/shared/ui";
+import { demoCatalog } from "../catalog";
 import styles from "./DemoCatalogPage.module.css";
 
 export function DemoCatalogPage() {

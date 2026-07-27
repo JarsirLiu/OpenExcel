@@ -107,10 +107,9 @@ export function createModelStepObserver(options: ModelStepObserverOptions): Mode
         finishReason: String(value.finishReason ?? "stop"),
         observation: budget.observation,
         estimatedContextTokens: budget.estimatedContextTokens,
-        responseMessages:
-          asRecord(value.response).messages instanceof Array
-            ? (asRecord(value.response).messages as readonly unknown[])
-            : undefined,
+        responseMessages: Array.isArray(asRecord(value.response).messages)
+          ? (asRecord(value.response).messages as readonly unknown[])
+          : undefined,
       };
       await options.emitter.emit("step.finished", {
         ...normalizeStepPayload(step),
