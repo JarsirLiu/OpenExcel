@@ -11,6 +11,7 @@ import styles from "./ExcelGrid.module.css";
 import { useFortuneSheetFilterMenu } from "./fortuneSheetFilterMenu";
 import { useFortuneSheetTooltip } from "./fortuneSheetTooltip";
 import { useExcelGridWorkspace } from "./useExcelGridWorkspace";
+import { useFortuneSheetActiveSheet } from "./useFortuneSheetActiveSheet";
 import { useFortuneSheetWheel } from "./useFortuneSheetWheel";
 
 const TOOLBAR_ITEMS = [
@@ -111,6 +112,13 @@ export function ExcelGrid({
   useFortuneSheetFilterMenu(gridRootRef, workbook !== null);
   useFortuneSheetTooltip(gridRootRef, workbook !== null);
   useFortuneSheetWheel(gridRootRef, workbook !== null);
+  useFortuneSheetActiveSheet({
+    containerRef: gridRootRef,
+    workbookRef,
+    workbook,
+    currentSheetIndex,
+    onSheetIndexChange,
+  });
   const isDemoFocusActive = useDemoGridFocus({
     workbookRef,
     focus: demoGridFocus,

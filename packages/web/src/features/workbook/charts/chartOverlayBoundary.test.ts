@@ -14,16 +14,29 @@ const gridSource = readFileSync(
   resolve(process.cwd(), "src/features/workbook/editor/ExcelGrid.tsx"),
   "utf8",
 );
+const activationSource = readFileSync(
+  resolve(process.cwd(), "src/features/workbook/editor/useExcelGridWorkspace.ts"),
+  "utf8",
+);
+const activeSheetSource = readFileSync(
+  resolve(process.cwd(), "src/features/workbook/editor/useFortuneSheetActiveSheet.ts"),
+  "utf8",
+);
 
 describe("ChartOverlay integration boundary", () => {
   it("keeps chart interaction outside FortuneSheet's private overlay node", () => {
+    const activeSheetLayerKey =
+      "key={" + "`" + "$" + "{workbook.id}:$" + "{currentSheet.id}" + "`" + "}";
+
     expect(overlaySource).not.toContain("createPortal");
     expect(overlaySource).not.toContain("fortune-sheet-overlay");
     expect(overlaySource).not.toContain("fortune-sheet-container");
     expect(viewportSource).toContain("fortune-sheet-container");
-    expect(gridSource).toContain("key={`${workbook.id}:${currentSheet.id}`}");
+    expect(gridSource).toContain(activeSheetLayerKey);
     expect(gridSource).toContain("data-sheet-id={currentSheet.id}");
     expect(gridSource).toContain("className={styles.chartLayer}");
     expect(gridSource).toContain("layerRef={chartLayerRef}");
+    expect(activationSource).toContain("findSheetIndexById(workbook.sheets, sheetId)");
+    expect(activeSheetSource).toContain("luckysheet-sheets-item-active");
   });
 });

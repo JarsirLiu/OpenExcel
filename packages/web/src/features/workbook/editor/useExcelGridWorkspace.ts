@@ -14,6 +14,7 @@ import type { WorkbookStructureUpdate } from "@/features/sync/types";
 import { normalizeSheetIndex } from "@/features/workspace/sheetIndex";
 import { confirm, toast } from "@/shared/lib";
 import { adaptFortuneSheetLayout, type SheetGridLayout } from "../layout/fortuneSheetLayout";
+import { findSheetIndexById } from "../sheetIdentity";
 import { toFortuneSheetData } from "./fortuneSheet";
 import { useSheetActivation } from "./SheetActivationContext";
 import { useWorkbookEditorSession } from "./useWorkbookEditorSession";
@@ -208,9 +209,9 @@ export function useExcelGridWorkspace({
   );
 
   const handleActivateSheet = useCallback(
-    (sheetId: string) => {
+    (sheetId: string | number) => {
       if (!workbook) return;
-      const nextIndex = workbook.sheets.findIndex((sheet) => String(sheet.id) === sheetId);
+      const nextIndex = findSheetIndexById(workbook.sheets, sheetId);
       if (nextIndex >= 0) {
         onSheetIndexChange?.(nextIndex);
       }
