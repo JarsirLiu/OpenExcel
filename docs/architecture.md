@@ -61,6 +61,12 @@ alignment, wrapping, borders, colors, scalar values, and formula semantics; the 
 consumes the same helpers in reverse. No adapter may define a second mapping for `ht`, `vt`, `tb`,
 `ct`, or formula prefixes.
 
+Date cells follow the same canonical model across import, persistence, AI mutation, and export:
+the snapshot keeps the Excel serial in `v` together with `ct.t = "d"` and `ct.fa`, while Core
+converts explicit timezone-free AI date values at the mutation boundary. `readSheetData` exposes a
+sparse `dateValues` projection for model comprehension; it is derived from the snapshot and is never
+a second source of truth or an export input.
+
 Workbook view metadata follows the same boundary. Excel `autoFilter` ranges are converted at the
 shared import boundary into the zero-based `filter_select` range used by FortuneSheet; ExcelJS
 export converts that range back to an Excel A1 range. The browser does not participate in parsing.

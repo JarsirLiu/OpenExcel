@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { sheetRecordToSnapshot, snapshotMergesJson } from "./sheetSnapshot.js";
+import {
+  serializeSheetSnapshot,
+  sheetRecordToSnapshot,
+  snapshotMergesJson,
+} from "./sheetSnapshot.js";
 
 describe("sheetRecordToSnapshot", () => {
   it("materializes legacy merges into the canonical cell snapshot", () => {
@@ -51,5 +55,20 @@ describe("sheetRecordToSnapshot", () => {
     });
 
     expect(snapshot.celldata).toEqual([{ r: 0, c: 0, v: { v: "A", m: "A", fc: "#000000" } }]);
+  });
+
+  it("persists date serials and date semantics in the canonical snapshot", () => {
+    const snapshot = sheetRecordToSnapshot({
+      uploadedData: JSON.stringify([
+        { r: 0, c: 0, v: { v: 44805, m: "2022/9/1", ct: { t: "d", fa: "m/d/yy" } } },
+      ]),
+      config: null,
+      merges: "[]",
+    });
+
+    const persisted = serializeSheetSnapshot(snapshot);
+    expect(JSON.parse(persisted.uploadedData)).toEqual([
+      { r: 0, c: 0, v: { v: 44805, m: "2022/9/1", ct: { t: "d", fa: "m/d/yy" }, fc: "#000000" } },
+    ]);
   });
 });

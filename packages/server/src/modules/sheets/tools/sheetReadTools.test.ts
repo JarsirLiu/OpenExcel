@@ -95,6 +95,26 @@ describe("sheet read tools", () => {
     expect(result.continuation).toBeNull();
   });
 
+  it("returns date values separately from Excel serials", async () => {
+    mockFindFirst.mockResolvedValue({
+      id: 1,
+      name: "Sheet1",
+      sheetNo: 1,
+      workbookId: 3,
+      uploadedData: JSON.stringify([
+        { r: 0, c: 0, v: { v: 44805, m: "2022/9/1", ct: { t: "d", fa: "m/d/yy" } } },
+        { r: 0, c: 1, v: { v: 10, m: "10", ct: { t: "n" } } },
+      ]),
+      config: null,
+      workbook: { workspaceId: 1, id: 3, name: "Workbook" },
+    });
+
+    const result = await readSheetData.execute({ sheetId: 1 }, context());
+
+    expect(result.values).toEqual([[44805, 10]]);
+    expect(result.dateValues).toEqual({ A1: "2022-09-01" });
+  });
+
   it("uses the same workspace boundary for data and format queries", async () => {
     mockFindFirst.mockResolvedValue({
       id: 1,

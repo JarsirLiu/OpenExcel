@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { normalizeFortuneCellValue } from "./fortuneCellValue.js";
+import {
+  dateTextToExcelSerial,
+  excelSerialToDateText,
+  fortuneDateCellValue,
+  normalizeFortuneCellValue,
+} from "./fortuneCellValue.js";
 
 describe("normalizeFortuneCellValue", () => {
   it("projects Excel General numeric values to FortuneSheet numeric cells", () => {
@@ -44,5 +49,36 @@ describe("normalizeFortuneCellValue", () => {
 
     expect(value).toMatchObject({ v: "legacy", m: "legacy" });
     expect(value.ct).toBeUndefined();
+  });
+});
+
+describe("Excel date values", () => {
+  it("round-trips modern date serials without timezone conversion", () => {
+    expect(excelSerialToDateText(44805)).toBe("2022-09-01");
+    expect(dateTextToExcelSerial("2022-09-01")).toBe(44805);
+    expect(excelSerialToDateText(44805.520833333336)).toBe("2022-09-01 12:30:00");
+    expect(dateTextToExcelSerial("2022-09-01 12:30:00")).toBeCloseTo(44805.5208333333);
+  });
+
+  it("preserves the Excel 1900 leap-year compatibility value", () => {
+    expect(dateTextToExcelSerial("1900-02-29")).toBe(60);
+    expect(excelSerialToDateText(60)).toBe("1900-02-29");
+    expect(dateTextToExcelSerial("1900-01-01")).toBe(1);
+    expect(excelSerialToDateText(1)).toBe("1900-01-01");
+  });
+
+  it("rejects invalid or timezone-bearing model date strings", () => {
+    expect(() => dateTextToExcelSerial("2022-02-30")).toThrow("日期值无效");
+    expect(() => dateTextToExcelSerial("2022-09-01T00:00:00Z")).toThrow("日期必须使用");
+  });
+
+  it("keeps an existing date format when constructing a date cell", () => {
+    expect(
+      fortuneDateCellValue("2022-09-01", {
+        v: 44805,
+        m: "2022/9/1",
+        ct: { t: "d", fa: "m/d/yy" },
+      }),
+    ).toMatchObject({ v: 44805, ct: { t: "d", fa: "m/d/yy" } });
   });
 });

@@ -1,6 +1,6 @@
 import { sheetChangeDeltaToZeroBased } from "../chat/sheetCoordinates.js";
 import type { FortuneCell } from "../excel/celldataUtils.js";
-import { normalizeFortuneFormula } from "../excel/fortuneCellValue.js";
+import { fortuneDateCellValue, normalizeFortuneFormula } from "../excel/fortuneCellValue.js";
 import type { SheetMutation } from "./sheetMutation.js";
 import { cloneSheetSnapshot, type SheetSnapshot } from "./sheetSnapshot.js";
 
@@ -32,12 +32,20 @@ function applyWrite(
   row: number,
   col: number,
   value: string | number | boolean,
+  valueType?: "date",
   formula?: string,
 ): void {
   const key = cellKey(row, col);
   const current = cells.get(key) ?? ({ r: row, c: col, v: {} } as FortuneCell);
   const nextValue: Record<string, unknown> = { ...current.v };
   const normalizedFormula = normalizeFortuneFormula(formula);
+  if (valueType === "date") {
+    if (typeof value !== "string" || normalizedFormula) {
+      throw new Error("日期写入必须使用字符串值且不能同时写公式");
+    }
+    cells.set(key, { ...current, v: fortuneDateCellValue(value, current.v) });
+    return;
+  }
   if (!normalizedFormula && value === "") {
     const next = removeContent(current);
     if (next) cells.set(key, next);
@@ -163,7 +171,7 @@ export function applySheetMutation(
 
   if (internal.type === "write") {
     for (const cell of internal.cells)
-      applyWrite(cells, cell.row, cell.col, cell.value, cell.formula);
+      applyWrite(cells, cell.row, cell.col, cell.value, cell.valueType, cell.formula);
     for (const range of internal.merges ?? []) {
       applyMerge(cells, range);
       addMergeConfig(config, range);

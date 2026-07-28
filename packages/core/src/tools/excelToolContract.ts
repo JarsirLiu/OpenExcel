@@ -3,6 +3,7 @@ import { chartSpecSchema } from "../chart/chartModel.js";
 import { sheetChangePatchOutputSchema } from "../chat/sheetChange.js";
 
 const writeCellValueSchema = z.union([z.string(), z.number(), z.boolean()]);
+const writeCellValueTypeSchema = z.literal("date");
 const writeFormulaSchema = z
   .string()
   .trim()
@@ -34,7 +35,7 @@ const sheetCellStyleSchema = z
 const sheetCellQuerySchema = z
   .object({
     value: z.union([z.string(), z.number(), z.boolean(), z.null()]).optional(),
-    valueType: z.enum(["empty", "string", "number", "boolean", "formula"]).optional(),
+    valueType: z.enum(["empty", "string", "number", "boolean", "date", "formula"]).optional(),
     formula: z
       .union([
         z.literal("exists"),
@@ -224,6 +225,7 @@ const sheetReadOutputSchema = z.object({
   sheet: sheetSummaryOutputSchema,
   range: z.string().min(1),
   values: z.array(z.array(z.union([z.string(), z.number(), z.boolean(), z.null()]))),
+  dateValues: z.record(z.string(), z.string()).optional(),
   formulaPatterns: z.array(
     z.object({
       ranges: z.array(z.string().min(1)),
@@ -417,7 +419,7 @@ export const excelToolSpecs = {
   },
   readSheetData: {
     description:
-      "读取指定 Sheet 的矩形数据。返回 range 对应的二维 values、压缩后的公式模式、非统一公式和合并区域；null 是真实空单元格，数字 0 保持为 0，不推断表头，不返回样式或 Excel 对象。未传 range 时读取已使用区域；超过单次网格预算时返回 continuation，下一次原样传回 continuation 读取下一页。",
+      "读取指定 Sheet 的矩形数据。返回 range 对应的二维 values、稀疏的 dateValues、压缩后的公式模式、非统一公式和合并区域；日期在 values 中保留 Excel 序列号，模型使用 dateValues 中的无时区字符串理解日期。null 是真实空单元格，数字 0 保持为 0，不推断表头，不返回样式或 Excel 对象。未传 range 时读取已使用区域；超过单次网格预算时返回 continuation，下一次原样传回 continuation 读取下一页。",
     inputSchema: z.object({
       sheetId: z.coerce.number().int().positive().describe("Sheet ID"),
       range: sheetDataRangeSchema.optional().describe("A1 范围，例如 A1:D20；默认已使用区域"),
@@ -451,7 +453,7 @@ export const excelToolSpecs = {
   },
   writeCells: {
     description:
-      "批量写入单元格内容。使用 operations 数组，支持 cell 离散写入和 range 连续区域填充同一个值或公式。value 可以是字符串、数字或布尔值；写公式时传入 formula，并且只有已知结果时才提供 value 作为缓存显示值。行号和列号都从 1 开始；该工具不修改样式、筛选、图表或其他 Excel 对象，也不负责通用公式重算；清空内容请使用 clearCells。",
+      "批量写入单元格内容。使用 operations 数组，支持 cell 离散写入和 range 连续区域填充同一个值或公式。value 可以是字符串、数字或布尔值；修改真正的 Excel 日期时，必须传 valueType:'date' 和无时区的 YYYY-MM-DD 或 YYYY-MM-DD HH:mm:ss 字符串，不能自行计算 Excel 序列号。写公式时传入 formula，并且只有已知结果时才提供 value 作为缓存显示值。行号和列号都从 1 开始；该工具不修改样式、筛选、图表或其他 Excel 对象，也不负责通用公式重算；清空内容请使用 clearCells。",
     needsRunContext: true,
     outputSchema: sheetMutationOutputSchema,
     inputSchema: z.object({
@@ -465,10 +467,17 @@ export const excelToolSpecs = {
                 row: z.coerce.number().positive().describe("行号，从 1 开始"),
                 col: z.coerce.number().positive().describe("列号，从 1 开始"),
                 value: writeCellValueSchema.describe("写入的值"),
+                valueType: writeCellValueTypeSchema.optional().describe("日期写入时传 date"),
                 formula: writeFormulaSchema.optional(),
               })
               .refine((value) => value.formula != null || value.value != null, {
                 message: "Cell write requires a value or formula",
+              })
+              .refine((value) => value.valueType !== "date" || typeof value.value === "string", {
+                message: "日期值必须是字符串",
+              })
+              .refine((value) => value.valueType !== "date" || value.formula == null, {
+                message: "日期写入不能同时写公式",
               }),
             z
               .object({
@@ -478,6 +487,7 @@ export const excelToolSpecs = {
                 endRow: z.coerce.number().positive().describe("结束行号，从 1 开始"),
                 endCol: z.coerce.number().positive().describe("结束列号，从 1 开始"),
                 value: writeCellValueSchema.describe("写入的值"),
+                valueType: writeCellValueTypeSchema.optional().describe("日期写入时传 date"),
                 formula: writeFormulaSchema.optional(),
               })
               .refine((value) => value.endRow >= value.startRow && value.endCol >= value.startCol, {
@@ -485,6 +495,12 @@ export const excelToolSpecs = {
               })
               .refine((value) => value.formula != null || value.value != null, {
                 message: "Range write requires a value or formula",
+              })
+              .refine((value) => value.valueType !== "date" || typeof value.value === "string", {
+                message: "日期值必须是字符串",
+              })
+              .refine((value) => value.valueType !== "date" || value.formula == null, {
+                message: "日期写入不能同时写公式",
               }),
           ]),
         )

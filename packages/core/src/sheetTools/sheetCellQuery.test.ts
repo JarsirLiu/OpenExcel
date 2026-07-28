@@ -27,6 +27,18 @@ describe("findSheetCells", () => {
     expect(matches).toEqual([{ range: "B1:B2", count: 2, reason: "formula=specified" }]);
   });
 
+  it("locates date cells by semantic type", () => {
+    const matches = findSheetCells(
+      [
+        { r: 0, c: 0, v: { v: 44805, m: "2022/9/1", ct: { t: "d", fa: "m/d/yy" } } },
+        { r: 1, c: 0, v: { v: 100, m: "100", ct: { t: "n" } } },
+      ],
+      { valueType: "date" },
+    );
+
+    expect(matches).toEqual([{ range: "A1", count: 1, reason: "type=date" }]);
+  });
+
   it("applies the requested range to value, formula, style, and type queries", () => {
     const celldata = [
       { r: 0, c: 0, v: { v: "目标", m: "目标", bg: "#92D050", f: "=A1" } },

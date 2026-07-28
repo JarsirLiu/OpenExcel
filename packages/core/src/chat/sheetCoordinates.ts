@@ -57,6 +57,7 @@ export type ZeroBasedSheetChangeCell = {
   row: StorageIndex;
   col: StorageIndex;
   value: string | number | boolean;
+  valueType?: "date";
   formula?: string;
 };
 
@@ -145,6 +146,7 @@ export function sheetChangeCellToZeroBased(cell: SheetChangeCell): ZeroBasedShee
     row: toolIndexToStorage(toolIndex(cell.row)),
     col: toolIndexToStorage(toolIndex(cell.col)),
     value: cell.value,
+    valueType: cell.valueType,
     formula: cell.formula,
   };
 }
@@ -205,6 +207,7 @@ export function zeroBasedSheetChangeCellToSheetChangeCell(
     row: storageIndexToTool(cell.row),
     col: storageIndexToTool(cell.col),
     value: cell.value,
+    valueType: cell.valueType,
     formula: cell.formula,
   };
 }

@@ -1,5 +1,5 @@
 import type { FortuneCell } from "../excel/celldataUtils.js";
-import { fortuneCellValueToScalar } from "../excel/fortuneCellValue.js";
+import { fortuneCellValueToScalar, isFortuneDateCell } from "../excel/fortuneCellValue.js";
 import { formulaToR1C1 } from "../formula/formulaR1C1.js";
 import { type SheetDataValue, type SheetToolRange, sheetUsedRange } from "./sheetDataProjection.js";
 
@@ -7,7 +7,7 @@ const DEFAULT_MAX_QUERY_CELLS = 100_000;
 
 export type SheetCellQuery = {
   value?: SheetDataValue;
-  valueType?: "empty" | "string" | "number" | "boolean" | "formula";
+  valueType?: "empty" | "string" | "number" | "boolean" | "date" | "formula";
   formula?: "exists" | { exact: string } | { r1c1: string };
   style?: {
     fill?: string;
@@ -53,7 +53,13 @@ function matchesValue(cell: FortuneCell | undefined, query: SheetCellQuery): boo
   const value = cell ? cellValue(cell) : null;
   if (query.value !== undefined && value !== query.value) return false;
   if (query.valueType) {
-    const type = isFormula(cell) ? "formula" : isEmptyValue(cell, value) ? "empty" : typeof value;
+    const type = isFormula(cell)
+      ? "formula"
+      : isEmptyValue(cell, value)
+        ? "empty"
+        : cell && isFortuneDateCell(cell.v)
+          ? "date"
+          : typeof value;
     if (type !== query.valueType) return false;
   }
   if (query.formula) {

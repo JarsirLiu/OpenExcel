@@ -1,10 +1,15 @@
 import { fortuneMergesToToolRanges } from "../chat/sheetGeometry.js";
 import type { FortuneCell } from "../excel/celldataUtils.js";
-import { type FortuneCellScalar, fortuneCellValueToScalar } from "../excel/fortuneCellValue.js";
+import {
+  type FortuneCellScalar,
+  fortuneCellValueToScalar,
+  fortuneDateText,
+} from "../excel/fortuneCellValue.js";
 import { formulaToR1C1 } from "../formula/formulaR1C1.js";
 import { planSheetReadPage, type SheetReadContinuation } from "./sheetReadPager.js";
 
 export type SheetDataValue = Exclude<FortuneCellScalar, Date>;
+export type SheetDateValues = Record<string, string>;
 
 export type SheetToolRange = {
   startRow: number;
@@ -35,6 +40,7 @@ export type SheetMerge = {
 export type SheetDataProjection = {
   range: string;
   values: SheetDataValue[][];
+  dateValues?: SheetDateValues;
   formulaPatterns: FormulaPattern[];
   formulaExceptions: FormulaException[];
   merges: SheetMerge[];
@@ -252,10 +258,25 @@ export function projectSheetData(
       ),
     ),
   );
+  const dateValues: SheetDateValues = {};
+  for (const cell of celldata) {
+    const row = cell.r + 1;
+    const col = cell.c + 1;
+    if (
+      row < limited.startRow ||
+      row > limited.endRow ||
+      col < limited.startCol ||
+      col > limited.endCol
+    )
+      continue;
+    const dateText = fortuneDateText(cell.v);
+    if (dateText) dateValues[toA1(row, col)] = dateText;
+  }
   const formula = buildFormulaMetadata(celldata, limited);
   return {
     range: rangeToA1(limited),
     values,
+    ...(Object.keys(dateValues).length > 0 ? { dateValues } : {}),
     ...formula,
     merges: buildMerges(celldata, limited, cellMap),
     continuation: page.continuation,

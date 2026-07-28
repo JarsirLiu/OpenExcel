@@ -1,13 +1,28 @@
 import { z } from "zod";
 
 const sheetChangeValueSchema = z.union([z.string(), z.number(), z.boolean()]);
+const sheetChangeValueTypeSchema = z.literal("date");
 
-export const sheetChangeCellSchema = z.object({
-  row: z.number().int().positive(),
-  col: z.number().int().positive(),
-  value: sheetChangeValueSchema,
-  formula: z.string().trim().min(1).optional(),
-});
+export const sheetChangeCellSchema = z
+  .object({
+    row: z.number().int().positive(),
+    col: z.number().int().positive(),
+    value: sheetChangeValueSchema,
+    valueType: sheetChangeValueTypeSchema.optional(),
+    formula: z.string().trim().min(1).optional(),
+  })
+  .superRefine((cell, ctx) => {
+    if (cell.valueType === "date" && typeof cell.value !== "string") {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["value"], message: "日期值必须是字符串" });
+    }
+    if (cell.valueType === "date" && cell.formula != null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["formula"],
+        message: "日期写入不能同时写公式",
+      });
+    }
+  });
 
 export const sheetChangeClearCellSchema = z.object({
   row: z.number().int().positive(),

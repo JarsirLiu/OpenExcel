@@ -22,6 +22,32 @@ describe("projectSheetData", () => {
     expect(result.continuation).toBeNull();
   });
 
+  it("returns sparse timezone-free date values while keeping serials in values", () => {
+    const result = projectSheetData([
+      { r: 0, c: 0, v: { v: 44805, m: "2022/9/1", ct: { t: "d", fa: "m/d/yy" } } },
+      { r: 0, c: 1, v: { v: 100, m: "100", ct: { t: "n" } } },
+      { r: 1, c: 0, v: { v: 44805.5, m: "2022/9/1 12:00", ct: { t: "d" } } },
+    ]);
+
+    expect(result.values).toEqual([
+      [44805, 100],
+      [44805.5, null],
+    ]);
+    expect(result.dateValues).toEqual({ A1: "2022-09-01", A2: "2022-09-01 12:00:00" });
+  });
+
+  it("only reports dates inside the paged range", () => {
+    const result = projectSheetData(
+      [
+        { r: 0, c: 0, v: { v: 44805, m: "2022/9/1", ct: { t: "d" } } },
+        { r: 1, c: 0, v: { v: 44806, m: "2022/9/2", ct: { t: "d" } } },
+      ],
+      { requestedRange: parseSheetToolRange("A2:A2") },
+    );
+
+    expect(result.dateValues).toEqual({ A2: "2022-09-02" });
+  });
+
   it("compresses repeated relative formulas into one pattern", () => {
     const result = projectSheetData([
       { r: 0, c: 0, v: { v: 1, m: "1" } },

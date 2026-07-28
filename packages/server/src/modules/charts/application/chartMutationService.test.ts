@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   getChartRecord: vi.fn(),
   getChartRecordInTransaction: vi.fn(),
   buildChartSpec: vi.fn(),
+  normalizeChartSpecForWorkspace: vi.fn(),
   createChartInTransaction: vi.fn(),
   deleteChartInTransaction: vi.fn(),
   updateChartInTransaction: vi.fn(),
@@ -20,6 +21,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("./chartService.js", () => ({
   buildChartSpec: mocks.buildChartSpec,
+  normalizeChartSpecForWorkspace: mocks.normalizeChartSpecForWorkspace,
   buildUpdatedChartSpec: mocks.buildUpdatedChartSpec,
   getChartRecord: mocks.getChartRecord,
   getChartRecordInTransaction: mocks.getChartRecordInTransaction,
@@ -102,6 +104,7 @@ describe("chartMutationService", () => {
     mocks.getChartRecord.mockResolvedValue({ spec: previous, order: 4 });
     mocks.getChartRecordInTransaction.mockResolvedValue({ spec: previous, order: 4 });
     mocks.buildChartSpec.mockReturnValue(previous);
+    mocks.normalizeChartSpecForWorkspace.mockImplementation(async (_workspaceId, spec) => spec);
     mocks.createChartInTransaction.mockResolvedValue({ id: 1 });
     mocks.updateChartInTransaction.mockResolvedValue({ id: 1 });
     mocks.deleteChartInTransaction.mockResolvedValue({ id: 1 });

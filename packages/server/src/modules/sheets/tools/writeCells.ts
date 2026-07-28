@@ -31,6 +31,7 @@ function expandOperations(
         row: operation.row,
         col: operation.col,
         value: operation.value,
+        valueType: operation.valueType,
       };
       if (operation.formula !== undefined) cell.formula = operation.formula;
       cells.push(cell);
@@ -48,7 +49,12 @@ function expandOperations(
             ? abortSignal.reason
             : new Error("工具执行已中断");
         }
-        const cell: SheetChangeCell = { row, col, value: operation.value };
+        const cell: SheetChangeCell = {
+          row,
+          col,
+          value: operation.value,
+          valueType: operation.valueType,
+        };
         if (operation.formula !== undefined) cell.formula = operation.formula;
         cells.push(cell);
       }

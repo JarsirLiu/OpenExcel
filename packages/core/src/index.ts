@@ -118,8 +118,14 @@ export type {
   FortuneCellScalar,
 } from "./excel/fortuneCellValue.js";
 export {
+  dateTextToExcelSerial,
   displayValueOfFortuneScalar,
+  excelSerialToDateText,
   fortuneCellValueToScalar,
+  fortuneDateCellValue,
+  fortuneDateText,
+  isDateLikeNumberFormat,
+  isFortuneDateCell,
   normalizeFortuneCellValue,
   normalizeFortuneFormula,
 } from "./excel/fortuneCellValue.js";
@@ -193,6 +199,7 @@ export type {
   SheetDataProjection,
   SheetDataProjectionOptions,
   SheetDataValue,
+  SheetDateValues,
   SheetMerge,
   SheetToolRange,
 } from "./sheetTools/sheetDataProjection.js";

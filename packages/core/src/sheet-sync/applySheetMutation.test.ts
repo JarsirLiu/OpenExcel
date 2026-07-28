@@ -29,6 +29,41 @@ describe("applySheetMutation", () => {
     expect(result.snapshot.celldata).toEqual([{ r: 0, c: 0, v: { bg: "#fff" } }]);
   });
 
+  it("stores date writes as Excel serials with explicit date semantics", () => {
+    const result = applySheetMutation(
+      {
+        celldata: [{ r: 0, c: 0, v: { v: 44805, m: "2022/9/1", ct: { t: "d", fa: "m/d/yy" } } }],
+        config: null,
+      },
+      {
+        type: "write",
+        cells: [{ row: 1, col: 1, value: "2023-01-15", valueType: "date" }],
+      },
+    );
+
+    expect(result.snapshot.celldata[0]?.v).toMatchObject({
+      v: 44941,
+      m: "2023-01-15",
+      ct: { t: "d", fa: "m/d/yy" },
+    });
+  });
+
+  it("uses a stable date format for new date cells", () => {
+    const result = applySheetMutation(
+      { celldata: [], config: null },
+      {
+        type: "write",
+        cells: [{ row: 1, col: 1, value: "2022-09-01 12:30:00", valueType: "date" }],
+      },
+    );
+
+    expect(result.snapshot.celldata[0]?.v).toMatchObject({
+      v: 44805.520833333336,
+      m: "2022-09-01 12:30:00",
+      ct: { t: "d", fa: "yyyy/m/d h:mm:ss" },
+    });
+  });
+
   it("applies merge state to both cells and config", () => {
     const mergeSnapshot: SheetSnapshot = {
       celldata: [

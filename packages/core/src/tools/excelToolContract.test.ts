@@ -54,4 +54,25 @@ describe("Excel tool contract", () => {
 
     expect(result.success).toBe(false);
   });
+
+  it("requires explicit date semantics for date writes", () => {
+    const valid = excelToolSpecs.writeCells.inputSchema.safeParse({
+      sheetId: 1,
+      operations: [{ type: "cell", row: 1, col: 1, value: "2022-09-01", valueType: "date" }],
+    });
+    const ordinaryFormula = excelToolSpecs.writeCells.inputSchema.safeParse({
+      sheetId: 1,
+      operations: [{ type: "cell", row: 1, col: 1, value: "2022-09-01", formula: "=1" }],
+    });
+    const invalidDateFormula = excelToolSpecs.writeCells.inputSchema.safeParse({
+      sheetId: 1,
+      operations: [
+        { type: "cell", row: 1, col: 1, value: "2022-09-01", valueType: "date", formula: "=1" },
+      ],
+    });
+
+    expect(valid.success).toBe(true);
+    expect(ordinaryFormula.success).toBe(true);
+    expect(invalidDateFormula.success).toBe(false);
+  });
 });
