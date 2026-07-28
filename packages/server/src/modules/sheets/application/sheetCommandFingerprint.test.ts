@@ -36,4 +36,24 @@ describe("sheetCommandFingerprint", () => {
 
     expect(sheetCommandFingerprint(first)).toBe(sheetCommandFingerprint(retry));
   });
+
+  it("ignores undefined optional fields like JSON.stringify does", () => {
+    const command: SheetCommand = {
+      kind: "mutation",
+      mutationId: "mutation-1",
+      sheetId: 7,
+      baseRevision: 2,
+      mutation: {
+        type: "write",
+        cells: [{ row: 1, col: 1, value: "中文", formula: undefined }],
+      },
+    };
+    const withoutOptionalField = structuredClone(command);
+    if (withoutOptionalField.mutation.type !== "write") {
+      throw new Error("Expected a write mutation");
+    }
+    delete withoutOptionalField.mutation.cells[0].formula;
+
+    expect(sheetCommandFingerprint(command)).toBe(sheetCommandFingerprint(withoutOptionalField));
+  });
 });

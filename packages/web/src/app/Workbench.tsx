@@ -1,8 +1,10 @@
+import type { CSSProperties } from "react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ChatSidebar } from "@/features/chat/ChatSidebar";
 import { useSessionWorkspace } from "@/features/session/useSessionWorkspace";
 import { useSheetActivation } from "@/features/workbook/editor/SheetActivationContext";
+import { useWorkspaceSidebarLayout } from "@/features/workspace/useWorkspaceSidebarLayout";
 import { useWorkspaceState } from "@/features/workspace/useWorkspaceState";
 import { useWorkspaceView } from "@/features/workspace/useWorkspaceView";
 import { WorkspaceSidebar } from "@/features/workspace/WorkspaceSidebar";
@@ -19,7 +21,7 @@ type Props = {
   routeData?: WorkbenchRouteData;
 };
 
-const MIN_SIDEBAR_WIDTH = 300;
+const CHAT_SIDEBAR_MIN_WIDTH = 300;
 
 export function Workbench({ currentUser, onLogout, routeData }: Props) {
   const navigate = useNavigate();
@@ -32,7 +34,7 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
     workbooksMap,
     refreshWorkbooks,
   } = useWorkspaceState(routeData?.workspaces, routeData?.workspace.id);
-  const layoutRef = useRef<HTMLDivElement>(null);
+  const workspaceSidebarLayout = useWorkspaceSidebarLayout();
 
   const routeWorkspaceId = routeData?.workspace.id ?? null;
   const selectedWorkspaceId = routeWorkspaceId ?? activeWorkspaceId;
@@ -173,24 +175,19 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
     [workbook.currentWorkbook, workbook.setCurrentSheetIndex, activateSheetByIndex],
   );
 
-  const applyChatSidebarWidth = useCallback((width: number) => {
-    layoutRef.current?.style.setProperty("--chat-sidebar-width", `${width}px`);
-  }, []);
-  const notifyWorkbookResize = useCallback(() => {
-    window.dispatchEvent(new Event("resize"));
-  }, []);
-  const { handleMouseDown: handleResizeMouseDown } = usePanelResize({
-    initialWidth: MIN_SIDEBAR_WIDTH,
-    minWidth: MIN_SIDEBAR_WIDTH,
+  const chatSidebarLayout = usePanelResize({
+    initialWidth: CHAT_SIDEBAR_MIN_WIDTH,
+    minWidth: CHAT_SIDEBAR_MIN_WIDTH,
     edge: "left",
-    applyWidth: applyChatSidebarWidth,
-    onResizeSettled: notifyWorkbookResize,
   });
 
   const loading = workbook.loading || workspaceLoading;
 
   return (
-    <div ref={layoutRef} className={styles.layout}>
+    <div
+      className={styles.layout}
+      style={{ "--chat-sidebar-width": `${chatSidebarLayout.width}px` } as CSSProperties}
+    >
       <WorkspaceSidebar
         onNavigateHome={() => navigate("/")}
         activeWorkspaceId={selectedWorkspaceId}
@@ -202,6 +199,7 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
         onWorkbookSelect={handleWorkbookSelect}
         onWorkbookDelete={wrappedWorkbookDelete}
         onWorkbookCreate={wrappedWorkbookCreate}
+        layout={workspaceSidebarLayout}
       />
       <div className={styles.main}>
         <WorkspaceView
@@ -227,7 +225,7 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
           onWorkbookMutation={refreshUndoAvailability}
           onSheetRevisionChanged={workbook.handleSheetRevisionChanged}
         />
-        <div className={styles.resizeHandle} onMouseDown={handleResizeMouseDown} />
+        <div className={styles.resizeHandle} onMouseDown={chatSidebarLayout.handleMouseDown} />
       </div>
       <ChatSidebar
         key={selectedWorkspaceId ?? "no-workspace"}
@@ -238,7 +236,7 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
         referenceCacheRevision={workbook.referenceCacheRevision}
         currentUser={currentUser}
         onLogout={onLogout}
-        style={{ width: "var(--chat-sidebar-width)" }}
+        style={{ width: chatSidebarLayout.width }}
         sessionWorkspace={session}
         onNavigateSheet={handleNavigateSheet}
       />

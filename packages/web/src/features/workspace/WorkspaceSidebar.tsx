@@ -1,18 +1,16 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import type { MouseEventHandler } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { WorkbookMeta } from "@/api/workbooks";
 import { downloadWorkbook } from "@/api/workbooks";
 import type { Workspace } from "@/api/workspaces";
 import { createWorkspace, deleteWorkspace, renameWorkspace } from "@/api/workspaces";
 import { t } from "@/lib/i18n";
-import { usePanelResize } from "@/shared/hooks/usePanelResize";
 import { confirm } from "@/shared/lib";
+import {
+  WORKSPACE_SIDEBAR_COLLAPSED_WIDTH,
+  type WorkspaceSidebarLayout,
+} from "./useWorkspaceSidebarLayout";
 import styles from "./WorkspaceSidebar.module.css";
-
-const MIN_WIDTH = 210;
-const DEFAULT_WIDTH = 246;
-const COLLAPSED_WIDTH = 32;
-const SIDEBAR_COLLAPSED_KEY = "openexcel:sidebarCollapsed:v2";
-const SIDEBAR_WIDTH_KEY = "openexcel:sidebarWidth";
 
 type Props = {
   onNavigateHome: () => void;
@@ -27,7 +25,7 @@ type Props = {
   onWorkbookCreate: (workspaceId: number) => Promise<void>;
   homeLabel?: string;
   readOnly?: boolean;
-  storageNamespace?: string;
+  layout: WorkspaceSidebarLayout;
 };
 
 export function WorkspaceSidebar({
@@ -43,58 +41,21 @@ export function WorkspaceSidebar({
   onWorkbookCreate,
   homeLabel = "返回首页",
   readOnly = false,
-  storageNamespace,
+  layout,
 }: Props) {
-  const collapsedStorageKey = storageNamespace
-    ? `${SIDEBAR_COLLAPSED_KEY}:${storageNamespace}`
-    : SIDEBAR_COLLAPSED_KEY;
-  const widthStorageKey = storageNamespace
-    ? `${SIDEBAR_WIDTH_KEY}:${storageNamespace}`
-    : SIDEBAR_WIDTH_KEY;
-  const [collapsed, setCollapsed] = useState(() => {
-    const stored = sessionStorage.getItem(collapsedStorageKey);
-    return stored !== null ? stored === "true" : false;
-  });
-  const [initialSidebarWidth] = useState(() => {
-    const stored = sessionStorage.getItem(widthStorageKey);
-    return stored !== null ? Number(stored) : DEFAULT_WIDTH;
-  });
+  const {
+    collapsed,
+    width: sidebarWidth,
+    isResizing,
+    onToggleCollapsed,
+    onResizeMouseDown,
+  } = layout;
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editValue, setEditValue] = useState("");
   const [expandedWorkspaces, setExpandedWorkspaces] = useState<Set<number>>(
     () => new Set(readOnly && activeWorkspaceId != null ? [activeWorkspaceId] : []),
   );
   const inputRef = useRef<HTMLInputElement>(null);
-  const sidebarRef = useRef<HTMLDivElement>(null);
-  const innerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    sessionStorage.setItem(collapsedStorageKey, String(collapsed));
-  }, [collapsed, collapsedStorageKey]);
-
-  const applySidebarWidth = useCallback((width: number) => {
-    sidebarRef.current?.style.setProperty("width", `${width}px`);
-    innerRef.current?.style.setProperty("width", `${width}px`);
-  }, []);
-  const notifyWorkbookResize = useCallback(() => {
-    window.dispatchEvent(new Event("resize"));
-  }, []);
-  const {
-    width: sidebarWidth,
-    isResizing,
-    handleMouseDown: handleResizeMouseDown,
-  } = usePanelResize({
-    initialWidth: initialSidebarWidth,
-    minWidth: MIN_WIDTH,
-    edge: "right",
-    applyWidth: applySidebarWidth,
-    onResizeSettled: notifyWorkbookResize,
-  });
-
-  useEffect(() => {
-    sessionStorage.setItem(widthStorageKey, String(sidebarWidth));
-  }, [sidebarWidth, widthStorageKey]);
-
   const expandedSet = expandedWorkspaces;
 
   const toggleExpand = useCallback(
@@ -231,10 +192,10 @@ export function WorkspaceSidebar({
     [onWorkbookCreate, readOnly],
   );
 
-  const width = collapsed ? COLLAPSED_WIDTH : sidebarWidth;
+  const width = collapsed ? WORKSPACE_SIDEBAR_COLLAPSED_WIDTH : sidebarWidth;
   const transitionStyle = isResizing ? { transition: "none" as const } : undefined;
   return collapsed ? (
-    <div className={`${styles.sidebar} ${styles.collapsed}`} style={{ width: COLLAPSED_WIDTH }}>
+    <div className={`${styles.sidebar} ${styles.collapsed}`} style={{ width }}>
       <button
         className={styles.collapsedHomeButton}
         onClick={onNavigateHome}
@@ -248,7 +209,7 @@ export function WorkspaceSidebar({
       </button>
       <button
         className={styles.expandBtn}
-        onClick={() => setCollapsed(false)}
+        onClick={onToggleCollapsed}
         aria-label="展开工作区侧边栏"
         title="Expand sidebar"
       >
@@ -264,8 +225,8 @@ export function WorkspaceSidebar({
       </button>
     </div>
   ) : (
-    <div ref={sidebarRef} className={styles.sidebar} style={{ width, ...transitionStyle }}>
-      <div ref={innerRef} className={styles.inner} style={{ width }}>
+    <div className={styles.sidebar} style={{ width, ...transitionStyle }}>
+      <div className={styles.inner}>
         <button
           className={styles.homeButton}
           onClick={onNavigateHome}
@@ -306,7 +267,7 @@ export function WorkspaceSidebar({
           </span>
           <button
             className={styles.toggleBtn}
-            onClick={() => setCollapsed(true)}
+            onClick={onToggleCollapsed}
             aria-label="收起工作区侧边栏"
             title="Collapse sidebar"
           >
@@ -560,7 +521,7 @@ export function WorkspaceSidebar({
           </button>
         )}
       </div>
-      <div className={styles.resizeHandle} onMouseDown={handleResizeMouseDown} />
+      <div className={styles.resizeHandle} onMouseDown={onResizeMouseDown as MouseEventHandler} />
     </div>
   );
 }

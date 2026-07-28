@@ -27,7 +27,13 @@ function expandOperations(
       if (cells.length >= MAX_WRITE_CELLS_PER_CALL) {
         throw new Error("单次 writeCells 最多写入 10000 个单元格");
       }
-      cells.push(operation);
+      const cell: SheetChangeCell = {
+        row: operation.row,
+        col: operation.col,
+        value: operation.value,
+      };
+      if (operation.formula !== undefined) cell.formula = operation.formula;
+      cells.push(cell);
       continue;
     }
     const rangeSize =
@@ -42,7 +48,9 @@ function expandOperations(
             ? abortSignal.reason
             : new Error("工具执行已中断");
         }
-        cells.push({ row, col, value: operation.value, formula: operation.formula });
+        const cell: SheetChangeCell = { row, col, value: operation.value };
+        if (operation.formula !== undefined) cell.formula = operation.formula;
+        cells.push(cell);
       }
     }
   }

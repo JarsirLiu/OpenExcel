@@ -23,6 +23,9 @@ COPY packages/server/src ./packages/server/src
 COPY packages/server/scripts ./packages/server/scripts
 COPY packages/web/src ./packages/web/src
 COPY packages/web/public ./packages/web/public
+COPY packages/core/tsconfig.json ./packages/core/
+COPY packages/agent/tsconfig.json ./packages/agent/
+COPY packages/server/tsconfig.json ./packages/server/
 COPY packages/web/index.html ./packages/web/
 COPY packages/web/tsconfig.json ./packages/web/
 COPY packages/web/vite.config.ts ./packages/web/

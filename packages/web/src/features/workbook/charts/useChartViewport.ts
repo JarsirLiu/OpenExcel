@@ -74,12 +74,10 @@ export function useChartViewport({ containerRef, layerRef, sheetId }: Props): Sc
     const handleScroll = () => notifyLayoutChange();
     horizontal?.addEventListener("scroll", handleScroll);
     vertical?.addEventListener("scroll", handleScroll);
-    window.addEventListener("resize", handleScroll);
 
     return () => {
       horizontal?.removeEventListener("scroll", handleScroll);
       vertical?.removeEventListener("scroll", handleScroll);
-      window.removeEventListener("resize", handleScroll);
     };
   }, [containerRef, notifyLayoutChange]);
 

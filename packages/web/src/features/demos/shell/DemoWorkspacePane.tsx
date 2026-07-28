@@ -3,6 +3,7 @@ import type { WorkbookMeta } from "@/api/workbooks";
 import type { Workspace } from "@/api/workspaces";
 import workbenchStyles from "@/app/Workbench.module.css";
 import { SheetActivationProvider } from "@/features/workbook/editor/SheetActivationContext";
+import { useWorkspaceSidebarLayout } from "@/features/workspace/useWorkspaceSidebarLayout";
 import { WorkspaceSidebar } from "@/features/workspace/WorkspaceSidebar";
 import { WorkspaceView } from "@/features/workspace/WorkspaceView";
 import type { DemoDefinition, DemoReplayFocus, DemoWorkbook } from "../runtime/replayTypes";
@@ -33,6 +34,7 @@ export const DemoWorkspacePane = memo(function DemoWorkspacePane({
   workbookRevision,
   focus,
 }: Props) {
+  const workspaceSidebarLayout = useWorkspaceSidebarLayout(`demo-${scenario.id}`);
   const [currentWorkbookIndex, setCurrentWorkbookIndex] = useState(0);
   const [currentSheetIndex, setCurrentSheetIndex] = useState(0);
   const workbookMetas = useMemo<WorkbookMeta[]>(
@@ -106,7 +108,7 @@ export const DemoWorkspacePane = memo(function DemoWorkspacePane({
         onWorkbookDelete={async () => undefined}
         onWorkbookCreate={async () => undefined}
         readOnly
-        storageNamespace={`demo-${scenario.id}`}
+        layout={workspaceSidebarLayout}
       />
       <div className={workbenchStyles.main}>
         <DemoWorkspaceView

@@ -104,14 +104,7 @@ describe("Workbench", () => {
     ]);
   });
 
-  it("does not dispatch workbook resize while dragging the chat sidebar", () => {
-    const animationFrames: FrameRequestCallback[] = [];
-    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
-      animationFrames.push(callback);
-      return animationFrames.length;
-    });
-    vi.stubGlobal("cancelAnimationFrame", vi.fn());
-    const dispatchEvent = vi.spyOn(window, "dispatchEvent");
+  it("keeps chat width in the parent layout while dragging", () => {
     const { container } = render(
       <Workbench
         currentUser={{ email: "user@example.com", displayName: "User" }}
@@ -126,20 +119,9 @@ describe("Workbench", () => {
       document.dispatchEvent(new MouseEvent("mousemove", { clientX: 440 }));
     });
 
-    expect(dispatchEvent).not.toHaveBeenCalled();
-
     act(() => {
       document.dispatchEvent(new MouseEvent("mouseup"));
     });
-
-    expect(dispatchEvent).not.toHaveBeenCalled();
-    expect(animationFrames).toHaveLength(1);
-
-    act(() => {
-      animationFrames[0](0);
-    });
-
-    const resizeEvents = dispatchEvent.mock.calls.filter(([event]) => event.type === "resize");
-    expect(resizeEvents).toHaveLength(1);
+    expect(container.querySelector("[style*='--chat-sidebar-width']")).not.toBeNull();
   });
 });

@@ -8,23 +8,12 @@ describe("usePanelResize", () => {
     vi.restoreAllMocks();
   });
 
-  it("applies width during drag and settles once after mouseup", () => {
-    const appliedWidths: number[] = [];
-    const onResizeSettled = vi.fn();
-    const animationFrames: FrameRequestCallback[] = [];
-    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
-      animationFrames.push(callback);
-      return animationFrames.length;
-    });
-    vi.stubGlobal("cancelAnimationFrame", vi.fn());
-
+  it("updates width during a drag and clamps to the minimum", () => {
     const { result } = renderHook(() =>
       usePanelResize({
         initialWidth: 320,
         minWidth: 240,
         edge: "left",
-        applyWidth: (width) => appliedWidths.push(width),
-        onResizeSettled,
       }),
     );
 
@@ -36,21 +25,12 @@ describe("usePanelResize", () => {
       document.dispatchEvent(new MouseEvent("mousemove", { clientX: 440 }));
     });
 
-    expect(appliedWidths).toEqual([380]);
-    expect(onResizeSettled).not.toHaveBeenCalled();
+    expect(result.current.width).toBe(380);
 
     act(() => {
       document.dispatchEvent(new MouseEvent("mouseup"));
     });
 
-    expect(onResizeSettled).not.toHaveBeenCalled();
-    expect(animationFrames).toHaveLength(1);
-
-    act(() => {
-      animationFrames[0](0);
-    });
-
     expect(result.current.width).toBe(380);
-    expect(onResizeSettled).toHaveBeenCalledOnce();
   });
 });
