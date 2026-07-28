@@ -44,8 +44,9 @@ const UserMenu = ({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className={styles.hamburger}
+        className={styles.iconButton}
         title={t("account", "账号")}
+        aria-label={t("account", "账号")}
       >
         <svg
           width={16}
@@ -56,9 +57,8 @@ const UserMenu = ({
           strokeWidth="2"
           strokeLinecap="round"
         >
-          <line x1="3" y1="6" x2="21" y2="6" />
-          <line x1="3" y1="12" x2="21" y2="12" />
-          <line x1="3" y1="18" x2="21" y2="18" />
+          <path d="M12 8.25a3.75 3.75 0 1 0 0 7.5 3.75 3.75 0 0 0 0-7.5Z" />
+          <path d="m19.4 15 .05.03a1.8 1.8 0 0 1-1.8 3.12l-.05-.03a1.8 1.8 0 0 0-2.7 1.56V19.75a1.8 1.8 0 0 1-3.6 0v-.07a1.8 1.8 0 0 0-2.7-1.56l-.05.03a1.8 1.8 0 1 1-1.8-3.12l.05-.03a1.8 1.8 0 0 0 0-3.12l-.05-.03a1.8 1.8 0 1 1 1.8-3.12l.05.03a1.8 1.8 0 0 0 2.7-1.56v-.07a1.8 1.8 0 0 1 3.6 0v.07a1.8 1.8 0 0 0 2.7 1.56l.05-.03a1.8 1.8 0 1 1 1.8 3.12l-.05.03a1.8 1.8 0 0 0 0 3.12Z" />
         </svg>
       </button>
 

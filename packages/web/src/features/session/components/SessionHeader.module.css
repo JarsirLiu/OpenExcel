@@ -129,7 +129,7 @@
   position: relative;
 }
 
-.hamburger {
+.iconButton {
   width: 31px;
   height: 31px;
   border: 1px solid #d9d7d1;
@@ -145,7 +145,7 @@
   transition: background 0.15s;
 }
 
-.hamburger:hover {
+.iconButton:hover {
   border-color: #aaa79f;
   background: #fff;
 }

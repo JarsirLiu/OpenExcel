@@ -66,16 +66,6 @@ export function createRunFinalizer(options: {
 
   async function finalize(input: RunFinalizationInput) {
     const outcome = outcomeFromInput(input);
-    console.info(
-      "[session.run]",
-      JSON.stringify({
-        at: new Date().toISOString(),
-        phase: "finalize_started",
-        runId: options.lease.run.id,
-        status: outcome.status,
-        error: outcome.errorMessage,
-      }),
-    );
     let allEvents: Awaited<ReturnType<typeof findAgentEventsByRun>> = [];
     let lifecycleEvent: Awaited<ReturnType<typeof persistRunLifecycleEvent>> | undefined;
     try {
@@ -140,15 +130,6 @@ export function createRunFinalizer(options: {
         await markRecoveryRequired("运行租约已失效，等待恢复器检查");
       } else if (lifecycleEvent) {
         await options.eventSink?.publish(toAgentEvent(lifecycleEvent));
-        console.info(
-          "[session.run]",
-          JSON.stringify({
-            at: new Date().toISOString(),
-            phase: "terminal_published",
-            runId: options.lease.run.id,
-            status: outcome.status,
-          }),
-        );
       }
     } catch (error) {
       console.error(`[session] Failed to finalize run ${options.lease.run.id}:`, error);
