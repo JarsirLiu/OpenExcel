@@ -9,7 +9,19 @@ const mocks = vi.hoisted(() => ({
   toast: vi.fn(),
   setWorkbooks: vi.fn(),
   replaceCurrentWorkbook: vi.fn(),
-  setWorkbookIdx: vi.fn(),
+  updateCurrentWorkbook: vi.fn(),
+  reloadCurrentWorkbook: vi.fn(),
+  loadWorkbook: vi.fn(),
+  loadSheet: vi.fn(),
+  refreshCatalog: vi.fn(),
+  createWorkbookInCatalog: vi.fn(),
+  deleteWorkbookInCatalog: vi.fn(),
+  importWorkbooksInCatalog: vi.fn(),
+  renameWorkbookInCatalog: vi.fn(),
+  requestWorkbookById: vi.fn(),
+  commitWorkbook: vi.fn(),
+  failWorkbookTransition: vi.fn(),
+  clearActiveWorkbook: vi.fn(),
 }));
 
 vi.mock("@/api/workbooks", () => ({
@@ -27,10 +39,56 @@ vi.mock("@/features/workspace/useWorkbookCatalog", () => ({
     currentWorkbook,
     workbookRevision: 0,
     loading: false,
-    setWorkbooks: mocks.setWorkbooks,
     replaceCurrentWorkbook: mocks.replaceCurrentWorkbook,
-    setWorkbookIdx: mocks.setWorkbookIdx,
+    updateCurrentWorkbook: mocks.updateCurrentWorkbook,
+    reloadCurrentWorkbook: mocks.reloadCurrentWorkbook,
+    loadWorkbook: mocks.loadWorkbook,
+    loadSheet: mocks.loadSheet,
+    refreshCatalog: mocks.refreshCatalog,
+    createWorkbookInCatalog: mocks.createWorkbookInCatalog,
+    deleteWorkbookInCatalog: mocks.deleteWorkbookInCatalog,
+    importWorkbooksInCatalog: mocks.importWorkbooksInCatalog,
+    renameWorkbookInCatalog: mocks.renameWorkbookInCatalog,
+    requestWorkbookById: mocks.requestWorkbookById,
+    commitWorkbook: mocks.commitWorkbook,
+    failWorkbookTransition: mocks.failWorkbookTransition,
+    clearActiveWorkbook: mocks.clearActiveWorkbook,
+    activeWorkbookId: 1,
+    transition: null,
+    retryTransition: vi.fn(),
     switchWorkbook: vi.fn(),
+  }),
+}));
+
+vi.mock("./useWorkbookDocument", () => ({
+  useWorkbookDocument: () => ({
+    currentWorkbook,
+    currentWorkbookRef: { current: currentWorkbook },
+    workbookRevision: 0,
+    replaceCurrentWorkbook: mocks.replaceCurrentWorkbook,
+    updateCurrentWorkbook: (updater: (workbook: WorkbookFull) => WorkbookFull) => {
+      if (currentWorkbook) {
+        currentWorkbook = updater(currentWorkbook);
+        mocks.replaceCurrentWorkbook(currentWorkbook);
+      }
+      return currentWorkbook;
+    },
+    updateCharts: vi.fn(),
+    updateSheetRevision: vi.fn(),
+    updateWorkbookMetadata: vi.fn(),
+    loadWorkbook: vi.fn().mockResolvedValue(null),
+    reloadCurrentWorkbook: vi.fn().mockResolvedValue(null),
+    loadSheet: async (sheetId: number) => {
+      const loaded = await mocks.fetchSheet(1, sheetId, { signal: new AbortController().signal });
+      if (currentWorkbook) {
+        currentWorkbook = {
+          ...currentWorkbook,
+          sheets: currentWorkbook.sheets.map((sheet) => (sheet.id === loaded.id ? loaded : sheet)),
+        };
+        mocks.replaceCurrentWorkbook(currentWorkbook);
+      }
+      return currentWorkbook;
+    },
   }),
 }));
 
@@ -62,7 +120,7 @@ describe("useWorkspaceView", () => {
     mocks.toast.mockReset();
     mocks.setWorkbooks.mockReset();
     mocks.replaceCurrentWorkbook.mockReset();
-    mocks.setWorkbookIdx.mockReset();
+    mocks.updateCurrentWorkbook.mockReset();
   });
 
   it("loads the new active sheet when its index stays the same", async () => {

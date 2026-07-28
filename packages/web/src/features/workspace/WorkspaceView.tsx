@@ -1,11 +1,13 @@
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import type { WorkbookFull } from "@/api/workbooks";
 import type { WorkbookStructureUpdate } from "@/features/sync/types";
 import type { ChartMutation } from "@/features/workbook/charts/chartMutation";
 import type { DemoGridFocus } from "@/features/workbook/editor/demoGridFocus";
 import { t } from "@/lib/i18n";
+import { preloadChartRenderer } from "../workbook/charts/ChartRendererBoundary";
 import { ExcelWorkspace } from "../workbook/ui/ExcelWorkspace";
 import { WorkbookHeader } from "../workbook/ui/WorkbookHeader";
+import type { WorkbookTransition } from "./useWorkbookCatalog";
 import styles from "./WorkspaceView.module.css";
 
 type WorkbookMeta = {
@@ -21,6 +23,8 @@ type Props = {
   currentWorkbook: WorkbookFull | null;
   workbookRevision: number;
   loading: boolean;
+  transition: WorkbookTransition | null;
+  onRetryWorkbookTransition: () => void;
   currentSheetIndex: number;
   setCurrentSheetIndex: (index: number) => void;
   sheetLoading: boolean;
@@ -47,6 +51,8 @@ export function WorkspaceView({
   currentWorkbook,
   workbookRevision,
   loading,
+  transition,
+  onRetryWorkbookTransition,
   currentSheetIndex,
   setCurrentSheetIndex,
   sheetLoading,
@@ -67,7 +73,11 @@ export function WorkspaceView({
 }: Props) {
   const newWbInputRef = useRef<HTMLInputElement>(null);
 
-  if (loading) {
+  useEffect(() => {
+    preloadChartRenderer();
+  }, []);
+
+  if (loading && !currentWorkbook) {
     return <div className={styles.loading}>{t("loading", "加载中...")}</div>;
   }
 
@@ -114,6 +124,19 @@ export function WorkspaceView({
           onSheetRevisionChanged={onSheetRevisionChanged}
           demoGridFocus={demoGridFocus}
         />
+        {transition?.status === "loading" && (
+          <div className={styles.transitionOverlay} role="status" aria-live="polite">
+            <span>{t("switchingWorkbook", "正在切换工作簿…")}</span>
+          </div>
+        )}
+        {transition?.status === "failed" && (
+          <div className={styles.transitionError} role="alert">
+            <span>{transition.error ?? t("workbookLoadFailed", "工作簿加载失败")}</span>
+            <button type="button" onClick={onRetryWorkbookTransition}>
+              {t("retry", "重试")}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

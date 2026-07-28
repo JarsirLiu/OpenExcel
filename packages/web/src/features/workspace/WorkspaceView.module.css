@@ -18,8 +18,39 @@
 
 .excelArea {
   flex: 1;
+  position: relative;
   display: flex;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+}
+
+.transitionOverlay,
+.transitionError {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  background: color-mix(in srgb, var(--surface-primary) 58%, transparent);
+  color: var(--text-secondary);
+  font-size: 13px;
+  backdrop-filter: blur(1px);
+}
+
+.transitionError {
+  flex-direction: column;
+  gap: 10px;
+  color: var(--text-primary);
+}
+
+.transitionError button {
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  padding: 5px 12px;
+  background: var(--surface-primary);
+  color: inherit;
+  cursor: pointer;
 }

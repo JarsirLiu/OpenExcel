@@ -2,12 +2,11 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { WorkbookFull, WorkbookMeta } from "@/api/workbooks";
 
-const { fetchWorkbookForEditor, fetchWorkbooks } = vi.hoisted(() => ({
-  fetchWorkbookForEditor: vi.fn(),
+const { fetchWorkbooks } = vi.hoisted(() => ({
   fetchWorkbooks: vi.fn(),
 }));
 
-vi.mock("@/api/workbooks", () => ({ fetchWorkbookForEditor, fetchWorkbooks }));
+vi.mock("@/api/workbooks", () => ({ fetchWorkbooks }));
 
 import { useWorkbookCatalog } from "./useWorkbookCatalog";
 
@@ -35,7 +34,6 @@ function deferred<T>() {
 describe("useWorkbookCatalog", () => {
   beforeEach(() => {
     sessionStorage.clear();
-    fetchWorkbookForEditor.mockReset();
     fetchWorkbooks.mockReset();
   });
 
@@ -59,9 +57,8 @@ describe("useWorkbookCatalog", () => {
     });
 
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.currentWorkbook?.id).toBe(10);
+    expect(result.current.activeWorkbookId).toBe(10);
     expect(fetchWorkbooks).not.toHaveBeenCalled();
-    expect(fetchWorkbookForEditor).not.toHaveBeenCalled();
   });
 
   it("discards a late catalog response from the previous workspace", async () => {
@@ -70,10 +67,6 @@ describe("useWorkbookCatalog", () => {
     fetchWorkbooks.mockImplementation((workspaceId: number) =>
       workspaceId === 1 ? firstCatalog.promise : secondCatalog.promise,
     );
-    fetchWorkbookForEditor.mockImplementation((workspaceId: number, workbookId: number) =>
-      Promise.resolve(workbookFull(workspaceId * 10 + workbookId)),
-    );
-
     const { result, rerender } = renderHook(({ workspaceId }) => useWorkbookCatalog(workspaceId), {
       initialProps: { workspaceId: 1 },
     });
@@ -84,7 +77,7 @@ describe("useWorkbookCatalog", () => {
       secondCatalog.resolve([workbookMeta(21)]);
     });
 
-    await waitFor(() => expect(result.current.currentWorkbook?.id).toBe(41));
+    await waitFor(() => expect(result.current.activeWorkbookId).toBe(21));
     expect(result.current.workbooks.map((workbook) => workbook.id)).toEqual([21]);
   });
 });

@@ -47,8 +47,16 @@ class ChartRendererErrorBoundary extends Component<BoundaryProps, BoundaryState>
   }
 }
 
+const chartRendererModule = import("./ChartRenderer").then(({ ChartRenderer }) => ({
+  default: ChartRenderer,
+}));
+
+export function preloadChartRenderer() {
+  void chartRendererModule;
+}
+
 function loadChartRenderer() {
-  return import("./ChartRenderer").then(({ ChartRenderer }) => ({ default: ChartRenderer }));
+  return chartRendererModule;
 }
 
 const InitialChartRenderer = lazy(loadChartRenderer);

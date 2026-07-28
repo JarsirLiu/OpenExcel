@@ -118,6 +118,8 @@ export const DemoWorkspacePane = memo(function DemoWorkspacePane({
           currentWorkbook={currentWorkbook}
           workbookRevision={workbookRevision}
           loading={false}
+          transition={null}
+          onRetryWorkbookTransition={() => undefined}
           currentSheetIndex={currentSheetIndex}
           setCurrentSheetIndex={setCurrentSheetIndex}
           sheetLoading={false}

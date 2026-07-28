@@ -1,4 +1,5 @@
 import type { ChartSpec, SheetCommand } from "@openexcel/core";
+import { chartDependencySheetIds } from "@openexcel/core";
 import { downloadBlob, XLSX_MIME_TYPE } from "@/shared/lib";
 import { API_BASE, apiFetch, readErrorMessage } from "./http";
 
@@ -181,10 +182,19 @@ export function workbookFromStructure(
 export async function fetchWorkbookForEditor(
   workspaceId: number,
   id: number,
-  options?: { signal?: AbortSignal; sheetIds?: readonly number[] },
+  options?: {
+    signal?: AbortSignal;
+    sheetIds?: readonly number[];
+    loadChartDependencies?: boolean;
+  },
 ): Promise<WorkbookFull> {
   const structure = await fetchWorkbookStructure(workspaceId, id, options);
-  const sheetIds = options?.sheetIds ?? (structure.sheets[0] ? [structure.sheets[0].id] : []);
+  const requestedSheetIds =
+    options?.sheetIds ?? (structure.sheets[0] ? [structure.sheets[0].id] : []);
+  const chartSheetIds = options?.loadChartDependencies
+    ? resolveChartDependencySheetIds(structure.sheets, structure.charts)
+    : [];
+  const sheetIds = [...new Set([...requestedSheetIds, ...chartSheetIds])];
   const sheets = await Promise.all(
     sheetIds
       .map((sheetId) => (structure.sheets.some((sheet) => sheet.id === sheetId) ? sheetId : null))
@@ -192,6 +202,22 @@ export async function fetchWorkbookForEditor(
       .map((sheetId) => fetchSheet(workspaceId, sheetId, options)),
   );
   return workbookFromStructure(structure, sheets);
+}
+
+function resolveChartDependencySheetIds(
+  sheets: readonly { id: number }[],
+  charts: readonly ChartSpec[],
+): number[] {
+  const sheetBySerializedId = new Map(sheets.map((sheet) => [String(sheet.id), sheet.id]));
+  const resolved = new Set<number>();
+  for (const serializedId of charts.flatMap((chart) => chartDependencySheetIds(chart))) {
+    const sheetId = sheetBySerializedId.get(serializedId);
+    if (sheetId == null) {
+      throw new Error(`图表引用了不存在的工作表: ${serializedId}`);
+    }
+    resolved.add(sheetId);
+  }
+  return [...resolved];
 }
 
 export async function importWorkbooks(
@@ -222,10 +248,12 @@ export async function createWorkbook(
     sheetName?: string;
     sourceSheetId?: number;
   },
+  options?: { signal?: AbortSignal },
 ): Promise<WorkbookCreateResult> {
   const res = await apiFetch(`/workspaces/${workspaceId}/workbooks`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    signal: options?.signal,
     body: JSON.stringify({
       name: input?.name,
       sheetName: input?.sheetName,
@@ -296,8 +324,15 @@ export async function createSheet(
   return res.json();
 }
 
-export async function deleteWorkbook(workspaceId: number, id: number): Promise<void> {
-  const res = await apiFetch(`/workspaces/${workspaceId}/workbooks/${id}`, { method: "DELETE" });
+export async function deleteWorkbook(
+  workspaceId: number,
+  id: number,
+  options?: { signal?: AbortSignal },
+): Promise<void> {
+  const res = await apiFetch(`/workspaces/${workspaceId}/workbooks/${id}`, {
+    method: "DELETE",
+    signal: options?.signal,
+  });
   if (!res.ok) throw new Error(await readErrorMessage(res, "删除工作簿失败"));
 }
 
@@ -319,11 +354,13 @@ export async function updateWorkbookName(
   workspaceId: number,
   workbookId: number,
   name: string,
+  options?: { signal?: AbortSignal },
 ): Promise<void> {
   const res = await apiFetch(`/workspaces/${workspaceId}/workbooks/${workbookId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name }),
+    signal: options?.signal,
   });
   if (!res.ok) throw new Error(await readErrorMessage(res, "重命名失败"));
 }

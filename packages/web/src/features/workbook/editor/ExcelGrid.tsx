@@ -13,6 +13,7 @@ import { useFortuneSheetFilterMenu } from "./fortuneSheetFilterMenu";
 import { useFortuneSheetTooltip } from "./fortuneSheetTooltip";
 import { useExcelGridWorkspace } from "./useExcelGridWorkspace";
 import { useFortuneSheetActiveSheet } from "./useFortuneSheetActiveSheet";
+import { useFortuneSheetResize } from "./useFortuneSheetResize";
 import { useFortuneSheetWheel } from "./useFortuneSheetWheel";
 
 const TOOLBAR_ITEMS = [
@@ -100,6 +101,7 @@ export function ExcelGrid({
     ? workbook.sheets[normalizeSheetIndex(currentSheetIndex, workbook.sheets.length)]
     : undefined;
   const sheetLoaded = activeSheet?.loaded !== false && !sheetLoading && sheetLoadError === null;
+  useFortuneSheetResize({ containerRef: gridRootRef, enabled: workbook !== null });
   const {
     saveStatus,
     workbookRef,
