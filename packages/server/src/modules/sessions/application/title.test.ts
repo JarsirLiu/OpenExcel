@@ -56,10 +56,12 @@ describe("generateTitle", () => {
       expect.objectContaining({
         model: "title-model",
         prompt: expect.stringContaining("分析这些数据"),
-        maxOutputTokens: 32,
-        temperature: 0,
+        providerOptions: {
+          openexcel: { reasoningEffort: "none" },
+        },
       }),
     );
+    expect(mockGenerateText.mock.calls[0][0]).not.toHaveProperty("maxOutputTokens");
     expect(title).toBe("数据分析报告生成");
   });
 
