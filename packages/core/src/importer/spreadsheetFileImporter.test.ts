@@ -48,6 +48,40 @@ async function styledXlsxBytes(): Promise<ArrayBuffer> {
   return workbook.xlsx.writeBuffer();
 }
 
+async function datedXlsxBytes(): Promise<ArrayBuffer> {
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet("日期");
+  worksheet.getCell("A1").value = "日期";
+  worksheet.getCell("A2").value = new Date(Date.UTC(2024, 0, 1));
+  worksheet.getCell("A2").numFmt = "yyyy-mm-dd";
+  worksheet.getCell("B1").value = "时间";
+  worksheet.getCell("B2").value = new Date(Date.UTC(2024, 0, 1, 12, 30));
+  worksheet.getCell("B2").numFmt = "yyyy-mm-dd hh:mm";
+  worksheet.getCell("C1").value = "数字";
+  worksheet.getCell("C2").value = 45292;
+  return workbook.xlsx.writeBuffer();
+}
+
+async function formattedXlsxBytes(): Promise<ArrayBuffer> {
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet("格式");
+  worksheet.getCell("A1").value = 1234.5;
+  worksheet.getCell("A1").numFmt = "$#,##0.00";
+  worksheet.getCell("A2").value = 0.125;
+  worksheet.getCell("A2").numFmt = "0.0%";
+  worksheet.getCell("A3").value = 1234567.89;
+  worksheet.getCell("A3").numFmt = "#,##0.00";
+  worksheet.getCell("A4").value = { formula: "1+1", result: 2 };
+  worksheet.getCell("A4").numFmt = "0.00";
+  worksheet.getCell("A5").value = true;
+  worksheet.getCell("A6").value = false;
+  worksheet.getCell("A7").value = { error: "#DIV/0!" };
+  worksheet.getCell("A8").value = {
+    richText: [{ text: "粗体", font: { bold: true } }, { text: "普通" }],
+  };
+  return workbook.xlsx.writeBuffer();
+}
+
 async function configuredXlsxBytes(): Promise<ArrayBuffer> {
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet("配置");
@@ -203,6 +237,44 @@ describe("parseSpreadsheetFile", () => {
     expect(sheet?.config.config).toEqual(
       expect.objectContaining({ columnlen: expect.any(Object), rowlen: expect.any(Object) }),
     );
+  });
+
+  it("formats Excel date serials for display without changing their numeric values", async () => {
+    const result = await parseSpreadsheetFile({
+      fileName: "日期.xlsx",
+      format: "xlsx",
+      bytes: await datedXlsxBytes(),
+    });
+    const cells = new Map(result.sheets[0]?.celldata.map((cell) => [`${cell.r}:${cell.c}`, cell]));
+
+    expect(cells.get("1:0")?.v).toMatchObject({
+      v: 45292,
+      m: "2024-01-01",
+      ct: { fa: "yyyy-mm-dd", t: "n" },
+    });
+    expect(cells.get("1:1")?.v).toMatchObject({
+      v: 45292.52083333333,
+      m: "2024-01-01 12:30",
+    });
+    expect(cells.get("1:2")?.v).toMatchObject({ v: 45292, m: "45292" });
+  });
+
+  it("preserves Excel display formats and scalar types", async () => {
+    const result = await parseSpreadsheetFile({
+      fileName: "格式.xlsx",
+      format: "xlsx",
+      bytes: await formattedXlsxBytes(),
+    });
+    const cells = new Map(result.sheets[0]?.celldata.map((cell) => [cell.r, cell.v]));
+
+    expect(cells.get(0)).toMatchObject({ v: 1234.5, m: "$1,234.50" });
+    expect(cells.get(1)).toMatchObject({ v: 0.125, m: "12.5%" });
+    expect(cells.get(2)).toMatchObject({ v: 1234567.89, m: "1,234,567.89" });
+    expect(cells.get(3)).toMatchObject({ v: 2, m: "2.00", f: "1+1" });
+    expect(cells.get(4)).toMatchObject({ v: true, m: "TRUE", ct: { t: "b" } });
+    expect(cells.get(5)).toMatchObject({ v: false, m: "FALSE", ct: { t: "b" } });
+    expect(cells.get(6)).toMatchObject({ v: "#DIV/0!", m: "#DIV/0!", ct: { t: "e" } });
+    expect(cells.get(7)).toMatchObject({ v: "粗体普通", m: "粗体普通" });
   });
 
   it("imports charts from the XLSX drawing and chart parts", async () => {

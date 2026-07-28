@@ -265,7 +265,18 @@ function toMergeConfig(merges: readonly XLSX.Range[]) {
   return merge;
 }
 
-function normalizeImportedCelldata(input: unknown): FortuneCell[] {
+type XlsxCellMetadata = {
+  type?: string;
+  rawValue?: unknown;
+  displayValue?: string;
+};
+
+type XlsxDisplayValues = ReadonlyMap<string, XlsxCellMetadata>;
+
+function normalizeImportedCelldata(
+  input: unknown,
+  displayValues?: XlsxDisplayValues,
+): FortuneCell[] {
   if (!Array.isArray(input)) return [];
 
   const celldata = input.map((rawCell) => {
@@ -283,6 +294,38 @@ function normalizeImportedCelldata(input: unknown): FortuneCell[] {
     if (value.m == null) value.m = value.v == null ? "" : String(value.v);
     else if (typeof value.m !== "string") value.m = String(value.m);
 
+    const metadata = displayValues?.get(`${Number(cell.r)}:${Number(cell.c)}`);
+
+    if (metadata?.type === "b") {
+      value.v =
+        typeof metadata.rawValue === "boolean"
+          ? metadata.rawValue
+          : metadata.rawValue === 1 || metadata.rawValue === "1";
+      value.ct = {
+        ...(value.ct && typeof value.ct === "object" && !Array.isArray(value.ct) ? value.ct : {}),
+        t: "b",
+      };
+    } else if (metadata?.type === "e") {
+      value.v = metadata.displayValue ?? value.v;
+      value.ct = {
+        ...(value.ct && typeof value.ct === "object" && !Array.isArray(value.ct) ? value.ct : {}),
+        t: "e",
+      };
+    } else if (
+      metadata?.type === "s" &&
+      value.v === "" &&
+      value.ct &&
+      typeof value.ct === "object" &&
+      !Array.isArray(value.ct) &&
+      Array.isArray((value.ct as { s?: unknown }).s)
+    ) {
+      value.v = metadata.rawValue ?? metadata.displayValue ?? "";
+    }
+
+    if (metadata?.displayValue != null) {
+      value.m = metadata.displayValue;
+    }
+
     return {
       r: Number(cell.r),
       c: Number(cell.c),
@@ -293,10 +336,14 @@ function normalizeImportedCelldata(input: unknown): FortuneCell[] {
   return normalizeFortuneCellData(celldata, { inferGeneralNumeric: true });
 }
 
-function normalizeFortuneSheet(sheet: FortuneExcelSheet, index: number): ImportedSheetInput {
+function normalizeFortuneSheet(
+  sheet: FortuneExcelSheet,
+  index: number,
+  displayValues?: XlsxDisplayValues,
+): ImportedSheetInput {
   const name =
     typeof sheet.name === "string" && sheet.name.trim() ? sheet.name : `Sheet${index + 1}`;
-  const celldata = normalizeImportedCelldata(sheet.celldata);
+  const celldata = normalizeImportedCelldata(sheet.celldata, displayValues);
   return {
     key: `sheet-${index}`,
     name,
@@ -306,22 +353,46 @@ function normalizeFortuneSheet(sheet: FortuneExcelSheet, index: number): Importe
   };
 }
 
-function readXlsxAutoFilterSelections(bytes: Uint8Array): (FilterSelection | undefined)[] {
+type XlsxMetadata = {
+  filterSelections: (FilterSelection | undefined)[];
+  displayValues: XlsxDisplayValues[];
+};
+
+function readXlsxMetadata(bytes: Uint8Array): XlsxMetadata {
   try {
     const workbook = XLSX.read(bytes, {
       type: "array",
       cellDates: false,
-      cellFormula: false,
+      cellFormula: true,
+      cellNF: true,
       cellStyles: false,
-      raw: true,
+      raw: false,
     });
-    return workbook.SheetNames.map((name) =>
-      excelAutoFilterRefToFortune(workbook.Sheets[name]?.["!autofilter"]?.ref),
-    );
+    return {
+      filterSelections: workbook.SheetNames.map((name) =>
+        excelAutoFilterRefToFortune(workbook.Sheets[name]?.["!autofilter"]?.ref),
+      ),
+      displayValues: workbook.SheetNames.map((name) => {
+        const displayValues = new Map<string, XlsxCellMetadata>();
+        const worksheet = workbook.Sheets[name];
+        if (!worksheet) return displayValues;
+        for (const [ref, cell] of Object.entries(worksheet)) {
+          if (!ref.startsWith("!") && cell) {
+            const address = XLSX.utils.decode_cell(ref);
+            displayValues.set(`${address.r}:${address.c}`, {
+              type: typeof cell.t === "string" ? cell.t : undefined,
+              rawValue: cell.v,
+              displayValue: cell.w != null ? String(cell.w) : undefined,
+            });
+          }
+        }
+        return displayValues;
+      }),
+    };
   } catch {
     // FortuneExcel remains the source of truth for cells and styles. Metadata
     // recovery is best-effort so an unsupported optional feature never blocks import.
-    return [];
+    return { filterSelections: [], displayValues: [] };
   }
 }
 
@@ -350,13 +421,13 @@ async function parseXlsxWithFortuneExcel(
   if (!Array.isArray(parsedSheets) || parsedSheets.length === 0) {
     throw new Error("工作簿不包含可导入的工作表");
   }
-  const filterSelections = readXlsxAutoFilterSelections(bytes);
+  const metadata = readXlsxMetadata(bytes);
   const charts = await parseXlsxCharts(bytes);
   return {
     name: workbookNameFromFile(input.fileName),
     sheets: parsedSheets.map((sheet, index) => {
-      const normalized = normalizeFortuneSheet(sheet, index);
-      const filterSelect = filterSelections[index];
+      const normalized = normalizeFortuneSheet(sheet, index, metadata.displayValues[index]);
+      const filterSelect = metadata.filterSelections[index];
       if (!filterSelect || normalized.config.filter_select != null) return normalized;
       return {
         ...normalized,
