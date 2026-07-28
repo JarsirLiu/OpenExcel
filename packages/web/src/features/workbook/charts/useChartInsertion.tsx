@@ -1,11 +1,11 @@
 import type { WorkbookInstance } from "@fortune-sheet/react";
 import type { ChartSpec } from "@openexcel/core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createChart } from "@/api/charts";
 import type { WorkbookFull } from "@/api/workbooks";
 import { ChartIcon } from "./ChartIcon";
 import { ChartInsertDialog } from "./ChartInsertDialog";
-import type { ChartMutation } from "./chartMutation";
+import type { ChartMutation, ChartMutationPort } from "./chartMutation";
+import { chartMutationPort } from "./chartMutationPort";
 import { type FortuneSelection, normalizeChartSelection } from "./chartSelection";
 
 type Props = {
@@ -13,8 +13,8 @@ type Props = {
   workbook: WorkbookFull | null;
   workbookRef: React.RefObject<WorkbookInstance | null>;
   currentSheetIndex: number;
-  onChartMutation?: (mutation: ChartMutation) => void;
-  onWorkbookMutation?: () => Promise<void> | void;
+  onChartMutation?: (mutation: ChartMutation) => Promise<void> | void;
+  mutationPort?: ChartMutationPort;
 };
 
 export function useChartInsertion({
@@ -23,7 +23,7 @@ export function useChartInsertion({
   workbookRef,
   currentSheetIndex,
   onChartMutation,
-  onWorkbookMutation,
+  mutationPort = chartMutationPort,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [selection, setSelection] = useState<ReturnType<typeof normalizeChartSelection>>(null);
@@ -65,11 +65,10 @@ export function useChartInsertion({
   const handleCreate = useCallback(
     async (draft: Omit<ChartSpec, "id">) => {
       if (workspaceId == null || !workbook) throw new Error("当前工作簿不可用");
-      const chart = await createChart(workspaceId, workbook.id, draft);
-      onChartMutation?.({ kind: "created", chart });
-      await onWorkbookMutation?.();
+      const chart = await mutationPort.create(workspaceId, workbook.id, draft);
+      await onChartMutation?.({ kind: "created", chart });
     },
-    [onChartMutation, onWorkbookMutation, workbook, workspaceId],
+    [mutationPort, onChartMutation, workbook, workspaceId],
   );
 
   const selectedSheet =

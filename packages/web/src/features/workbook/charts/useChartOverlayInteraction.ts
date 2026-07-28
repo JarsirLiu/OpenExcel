@@ -1,6 +1,5 @@
 import type { ChartAnchor, ChartSpec } from "@openexcel/core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { deleteChart, updateChart } from "@/api/charts";
 import { confirm } from "@/shared/lib";
 import type { SheetGridLayout } from "../layout/fortuneSheetLayout";
 import {
@@ -9,7 +8,8 @@ import {
   chartRectEquals,
   rectToChartAnchor,
 } from "./chartAnchorGeometry";
-import type { ChartMutation } from "./chartMutation";
+import type { ChartMutation, ChartMutationPort } from "./chartMutation";
+import { chartMutationPort } from "./chartMutationPort";
 
 export type ResizeDirection = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
 export type InteractionMode = "move" | { resize: ResizeDirection };
@@ -36,8 +36,8 @@ type Props = {
   charts: readonly ChartSpec[];
   layout: SheetGridLayout;
   workspaceId: number | null;
-  onChartMutation?: (mutation: ChartMutation) => void;
-  onWorkbookMutation?: () => Promise<void> | void;
+  onChartMutation?: (mutation: ChartMutation) => Promise<void> | void;
+  mutationPort?: ChartMutationPort;
 };
 
 const MIN_WIDTH = 240;
@@ -90,7 +90,7 @@ export function useChartOverlayInteraction({
   layout,
   workspaceId,
   onChartMutation,
-  onWorkbookMutation,
+  mutationPort = chartMutationPort,
 }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [interaction, setInteraction] = useState<ChartOverlayInteraction | null>(null);
@@ -177,8 +177,8 @@ export function useChartOverlayInteraction({
         .catch(() => undefined)
         .then(async () => {
           try {
-            const updatedChart = await updateChart(workspaceId, chart.id, { anchor: nextAnchor });
-            onChartMutation?.({ kind: "updated", chart: updatedChart });
+            const updatedChart = await mutationPort.updateAnchor(workspaceId, chart.id, nextAnchor);
+            await onChartMutation?.({ kind: "updated", chart: updatedChart });
             if (anchorSaveVersionRef.current[chart.id] === version) {
               setAnchorOverrides((current) => ({ ...current, [chart.id]: updatedChart.anchor }));
             }
@@ -188,14 +188,6 @@ export function useChartOverlayInteraction({
               setError(cause instanceof Error ? cause.message : "保存图表位置失败");
             }
             return;
-          }
-
-          try {
-            await onWorkbookMutation?.();
-          } catch (cause) {
-            if (anchorSaveVersionRef.current[chart.id] === version) {
-              setError(cause instanceof Error ? cause.message : "刷新图表状态失败");
-            }
           }
         });
       let settled: Promise<void>;
@@ -209,7 +201,7 @@ export function useChartOverlayInteraction({
       anchorSaveChainRef.current[chart.id] = settled;
       await settled;
     },
-    [layout, onChartMutation, onWorkbookMutation, workspaceId],
+    [layout, mutationPort, onChartMutation, workspaceId],
   );
 
   const removeChart = useCallback(
@@ -224,15 +216,14 @@ export function useChartOverlayInteraction({
       if (!confirmed) return;
       setError(null);
       try {
-        await deleteChart(workspaceId, chartId);
+        await mutationPort.remove(workspaceId, chartId);
         setSelectedId(null);
-        onChartMutation?.({ kind: "deleted", chartId });
-        await onWorkbookMutation?.();
+        await onChartMutation?.({ kind: "deleted", chartId });
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "删除图表失败");
       }
     },
-    [onChartMutation, onWorkbookMutation, workspaceId],
+    [mutationPort, onChartMutation, workspaceId],
   );
 
   useEffect(() => {

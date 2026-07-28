@@ -16,8 +16,7 @@ type Props = {
   workbook: WorkbookFull;
   sheetId: string;
   layout: SheetGridLayout;
-  onChartMutation?: (mutation: ChartMutation) => void;
-  onWorkbookMutation?: () => Promise<void> | void;
+  onChartMutation?: (mutation: ChartMutation) => Promise<void> | void;
   sheetLoaded: boolean;
   onSheetLoad: (sheetId: number) => Promise<void>;
 };
@@ -32,7 +31,6 @@ export function ChartOverlay({
   sheetId,
   layout,
   onChartMutation,
-  onWorkbookMutation,
   sheetLoaded,
   onSheetLoad,
 }: Props) {
@@ -56,7 +54,6 @@ export function ChartOverlay({
     layout,
     workspaceId,
     onChartMutation,
-    onWorkbookMutation,
   });
 
   if (charts.length === 0) return null;

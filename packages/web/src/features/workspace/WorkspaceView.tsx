@@ -34,7 +34,7 @@ type Props = {
   handleWorkbookStructureChanged: (update: WorkbookStructureUpdate) => void;
   handleWorkbookRefresh: () => Promise<void>;
   onWorkbookMutation?: () => Promise<void> | void;
-  onChartMutation?: (mutation: ChartMutation) => void;
+  onChartMutation?: (mutation: ChartMutation) => Promise<void> | void;
   onSheetRevisionChanged?: (sheetId: number, revision: number) => void;
   presentationMode?: boolean;
   demoGridFocus?: DemoGridFocus;

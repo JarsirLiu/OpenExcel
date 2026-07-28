@@ -70,7 +70,7 @@ interface Props {
   onWorkbookDelete?: (workbookId: number) => void;
   onWorkbookStructureChanged?: (update: WorkbookStructureUpdate) => void;
   onWorkbookRefresh?: () => Promise<void> | void;
-  onChartMutation?: (mutation: ChartMutation) => void;
+  onChartMutation?: (mutation: ChartMutation) => Promise<void> | void;
   onWorkbookMutation?: () => Promise<void> | void;
   onSheetRevisionChanged?: (sheetId: number, revision: number) => void;
   demoGridFocus?: DemoGridFocus;
@@ -146,7 +146,6 @@ export function ExcelGrid({
     workbookRef,
     currentSheetIndex,
     onChartMutation,
-    onWorkbookMutation,
   });
   const hooks = useMemo(
     () => ({
@@ -221,7 +220,6 @@ export function ExcelGrid({
               sheetId={String(currentSheet.id)}
               layout={currentSheetLayout}
               onChartMutation={onChartMutation}
-              onWorkbookMutation={onWorkbookMutation}
               sheetLoaded={sheetLoaded}
               onSheetLoad={onSheetLoad}
             />

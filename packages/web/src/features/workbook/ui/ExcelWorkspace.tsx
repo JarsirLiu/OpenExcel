@@ -18,7 +18,7 @@ interface Props {
   onWorkbookDelete?: (workbookId: number) => void;
   onWorkbookStructureChanged?: (update: WorkbookStructureUpdate) => void;
   onWorkbookRefresh?: () => Promise<void>;
-  onChartMutation?: (mutation: ChartMutation) => void;
+  onChartMutation?: (mutation: ChartMutation) => Promise<void> | void;
   onWorkbookMutation?: () => Promise<void> | void;
   onSheetRevisionChanged?: (sheetId: number, revision: number) => void;
   demoGridFocus?: DemoGridFocus;

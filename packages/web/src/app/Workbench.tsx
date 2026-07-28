@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ChatSidebar } from "@/features/chat/ChatSidebar";
 import { useSessionWorkspace } from "@/features/session/useSessionWorkspace";
+import type { ChartMutation } from "@/features/workbook/charts/chartMutation";
 import { useSheetActivation } from "@/features/workbook/editor/SheetActivationContext";
 import { useWorkspaceSidebarLayout } from "@/features/workspace/useWorkspaceSidebarLayout";
 import { useWorkspaceState } from "@/features/workspace/useWorkspaceState";
@@ -86,6 +87,14 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
       console.error("[session] Failed to refresh undo availability:", error);
     }
   }, [session]);
+
+  const handleChartMutation = useCallback(
+    async (mutation: ChartMutation) => {
+      workbook.handleChartMutation(mutation);
+      await refreshUndoAvailability();
+    },
+    [refreshUndoAvailability, workbook.handleChartMutation],
+  );
 
   // Wrappers that refresh sidebar workbooksMap after workbook mutations
   const wrappedWorkbookCreate = useCallback(
@@ -222,7 +231,7 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
           handleWorkbookRename={handleWorkbookRename}
           handleWorkbookStructureChanged={workbook.handleWorkbookStructureChanged}
           handleWorkbookRefresh={workbook.handleWorkbookRefresh}
-          onChartMutation={workbook.handleChartMutation}
+          onChartMutation={handleChartMutation}
           onWorkbookMutation={refreshUndoAvailability}
           onSheetRevisionChanged={workbook.handleSheetRevisionChanged}
         />
