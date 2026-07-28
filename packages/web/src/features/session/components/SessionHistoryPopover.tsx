@@ -16,30 +16,54 @@ export function SessionHistoryPopover({
   onDeleteSession,
 }: Props) {
   return (
-    <>
+    <div className={styles.content}>
+      <div className={styles.heading}>
+        <span>{t("conversation_history", "历史对话")}</span>
+      </div>
       {sessions.length === 0 ? (
         <div className={styles.empty}>{t("no_history", "暂无历史记录")}</div>
       ) : (
-        sessions.map((session) => (
-          <div
-            key={session.id}
-            onClick={() => onSelectSession(session.id)}
-            className={`${styles.item} ${session.id === currentSessionId ? styles.itemActive : styles.itemInactive}`}
-          >
-            <span className={styles.itemName}>{session.name}</span>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onDeleteSession(session.id);
-              }}
-              className={styles.deleteBtn}
-              title={t("delete", "删除")}
-            >
-              ✕
-            </button>
-          </div>
-        ))
+        <ul className={styles.list} aria-label={t("conversation_history", "历史对话")}>
+          {sessions.map((session) => {
+            const isActive = session.id === currentSessionId;
+            return (
+              <li key={session.id} className={styles.item}>
+                <button
+                  type="button"
+                  onClick={() => onSelectSession(session.id)}
+                  className={`${styles.itemSelect} ${isActive ? styles.itemActive : ""}`}
+                  aria-current={isActive ? "true" : undefined}
+                >
+                  <span className={styles.itemName}>{session.name}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDeleteSession(session.id)}
+                  className={styles.deleteBtn}
+                  aria-label={`${t("delete", "删除")} ${session.name}`}
+                >
+                  <svg
+                    width="15"
+                    height="15"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M3 6h18" />
+                    <path d="M8 6V4h8v2" />
+                    <path d="m19 6-1 14H6L5 6" />
+                    <path d="M10 11v5M14 11v5" />
+                  </svg>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
       )}
-    </>
+    </div>
   );
 }
