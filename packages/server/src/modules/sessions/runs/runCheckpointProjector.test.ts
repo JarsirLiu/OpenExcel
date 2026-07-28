@@ -140,6 +140,46 @@ describe("projectStreamedAssistantMessages", () => {
     ]);
   });
 
+  it("keeps a model-valid input when closing a legacy pending tool", () => {
+    expect(
+      projectStreamedAssistantMessages([
+        {
+          eventId: "tool-start",
+          sequence: 1,
+          type: "tool.started",
+          occurredAt: "",
+          payload: {
+            turnId: "turn-1",
+            toolCallId: "call-1",
+            toolName: "createChart",
+          },
+        },
+        {
+          eventId: "run-failed",
+          sequence: 2,
+          type: "run.failed",
+          occurredAt: "",
+          payload: {},
+        },
+      ]),
+    ).toEqual([
+      {
+        id: "turn-1-assistant",
+        role: "assistant",
+        parts: [
+          {
+            id: "tool-call-1",
+            type: "tool-createChart",
+            toolCallId: "call-1",
+            state: "output-error",
+            input: {},
+            errorText: "运行已终止，工具结果未完成",
+          },
+        ],
+      },
+    ]);
+  });
+
   it("groups all model steps into one assistant message", () => {
     expect(
       projectStreamedAssistantMessages([

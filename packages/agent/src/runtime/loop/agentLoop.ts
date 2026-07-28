@@ -3,6 +3,7 @@ globalThis.AI_SDK_LOG_WARNINGS = false;
 import {
   convertToModelMessages,
   isLoopFinished,
+  NoOutputGeneratedError,
   streamText,
   type ToolSet,
   validateUIMessages,
@@ -16,7 +17,7 @@ import {
 } from "../../session/contextWindow.js";
 import { ModelStepContext } from "../../session/modelStepContext.js";
 import { TokenUsageTracker } from "../../session/tokenBudget.js";
-import { appendResponseMessages } from "../../session/transcript.js";
+import { appendResponseMessages, normalizeToolErrorInputs } from "../../session/transcript.js";
 import { ContextCompactionError } from "../context/compaction/types.js";
 import { ContextCompactionCoordinator } from "../context/contextCompactionCoordinator.js";
 import type { ContextTranscriptEntry } from "../context/transcript.js";
@@ -32,20 +33,47 @@ import { convertChatReferenceDataPart } from "../stream/referencePart.js";
 import { createAgentStreamBridge } from "./agentStreamBridge.js";
 import { createModelStepObserver } from "./modelStepObserver.js";
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+}
+
+function hasRecoverableModelMessages(value: unknown): boolean {
+  if (!Array.isArray(value)) return false;
+  return value.some((candidate) => {
+    const message = asRecord(candidate);
+    if (message.role === "tool") return true;
+    if (message.role !== "assistant" || !Array.isArray(message.content)) return false;
+    return message.content.some((part) => {
+      const partValue = asRecord(part);
+      return typeof partValue.type === "string" && partValue.type.startsWith("tool-");
+    });
+  });
+}
+
+function responseMessagesOfStep(value: unknown): unknown[] {
+  const response = asRecord(asRecord(value).response);
+  return Array.isArray(response.messages) ? response.messages : [];
+}
+
 export interface AgentLoopInput extends Omit<AgentRunnerInput, "workspace" | "transcript"> {
   transcript: ContextTranscriptEntry<AgentTranscriptMessage>[];
   systemPrompt: string;
 }
 
 export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResult> {
-  const normalizedEntries = input.transcript.filter(
-    (entry) =>
-      !(
-        entry.message.role === "assistant" &&
-        Array.isArray(entry.message.parts) &&
-        entry.message.parts.length === 0
-      ),
-  );
+  const normalizedEntries = input.transcript
+    .map((entry) => ({
+      ...entry,
+      message: normalizeToolErrorInputs([entry.message])[0],
+    }))
+    .filter(
+      (entry) =>
+        !(
+          entry.message.role === "assistant" &&
+          Array.isArray(entry.message.parts) &&
+          entry.message.parts.length === 0
+        ),
+    );
   const normalizedMessages = normalizedEntries.map((entry) => entry.message);
 
   const messagesForContext = normalizedMessages;
@@ -205,8 +233,10 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
 
   let pendingOverflowError: unknown;
   let compactionRetries = 0;
-  const createModelResult = () =>
-    streamText({
+  let capturedResponseMessages: unknown[] = [];
+  const createModelResult = () => {
+    capturedResponseMessages = [];
+    return streamText({
       model,
       system: activeSystemPrompt,
       messages: modelMessages as any,
@@ -220,7 +250,11 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
       include: {
         requestMessages: true,
       },
-      onStepFinish: modelStepObserver.onStepFinish,
+      onStepFinish: async (step: unknown) => {
+        capturedResponseMessages.push(...responseMessagesOfStep(step));
+        await streamBridge.reconcileStep(step);
+        await modelStepObserver.onStepFinish(step);
+      },
       onStepStart: async (step: unknown) => {
         await modelStepObserver.onStepStart(step);
         stepIndex = modelStepObserver.getStepIndex();
@@ -235,9 +269,18 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
           pendingOverflowError = error;
           return;
         }
+        if (NoOutputGeneratedError.isInstance(error)) {
+          await streamBridge.finishPendingTools({
+            kind: "tool_protocol_error",
+            message: "工具调用已返回结果，但模型没有产生最终文本",
+            retryable: true,
+          });
+          return;
+        }
         await streamBridge.onError(event);
       },
     });
+  };
 
   let result: any = createModelResult();
 
@@ -251,11 +294,37 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
       let responseMessages: unknown;
       for (;;) {
         try {
-          [text, responseMessages] = await Promise.all([
+          const [textResult, responseResult] = await Promise.allSettled([
             result.text,
             (result as { responseMessages?: PromiseLike<unknown> }).responseMessages ??
               Promise.resolve(undefined),
           ]);
+          if (
+            responseResult.status === "rejected" &&
+            !NoOutputGeneratedError.isInstance(responseResult.reason)
+          ) {
+            throw responseResult.reason;
+          }
+          responseMessages =
+            responseResult.status === "fulfilled" && Array.isArray(responseResult.value)
+              ? responseResult.value
+              : capturedResponseMessages;
+          if (textResult.status === "rejected") {
+            if (
+              !NoOutputGeneratedError.isInstance(textResult.reason) ||
+              !hasRecoverableModelMessages(responseMessages)
+            ) {
+              throw textResult.reason;
+            }
+            text = "";
+          } else if (
+            responseResult.status === "rejected" &&
+            !hasRecoverableModelMessages(responseMessages)
+          ) {
+            throw responseResult.reason;
+          } else {
+            text = textResult.value;
+          }
           break;
         } catch (error) {
           const overflowError = pendingOverflowError ?? error;

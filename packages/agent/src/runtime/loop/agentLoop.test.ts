@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
     }),
   ),
   Output: { object: vi.fn((value: unknown) => value) },
+  NoOutputGeneratedError: { isInstance: vi.fn(() => false) },
   tool: vi.fn((definition: unknown) => definition),
   validateUIMessages: vi.fn(async ({ messages }: { messages: unknown }) => messages),
 }));
@@ -58,6 +59,7 @@ function createModelStream(options: {
 describe("runAgentLoop", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.NoOutputGeneratedError.isInstance.mockImplementation(() => false);
   });
 
   it("passes retry, timeout, and cancellation policy to the model SDK", async () => {
@@ -532,5 +534,121 @@ describe("runAgentLoop", () => {
       failurePhase: "model",
     });
     expect(onError).toHaveBeenCalledWith(providerError);
+  });
+
+  it("does not fail the run when a tool result exists but the SDK has no final text", async () => {
+    const noOutputError = new Error("No output generated");
+    mocks.NoOutputGeneratedError.isInstance.mockReturnValue(true);
+    let resolveDone!: () => void;
+    const done = new Promise<void>((resolve) => {
+      resolveDone = resolve;
+    });
+    mocks.streamText.mockImplementation((options: any) => {
+      return {
+        stream: new ReadableStream({
+          start(controller) {
+            void (async () => {
+              await options.onStepFinish({
+                stepNumber: 0,
+                toolCalls: [
+                  {
+                    toolCallId: "call-1",
+                    toolName: "readSheetData",
+                    input: { sheetId: 7 },
+                  },
+                ],
+                toolResults: [
+                  {
+                    type: "tool-error",
+                    toolCallId: "call-1",
+                    toolName: "readSheetData",
+                    input: { sheetId: 7 },
+                    error: "参数错误",
+                  },
+                ],
+                response: {
+                  messages: [
+                    {
+                      role: "assistant",
+                      content: [
+                        {
+                          type: "tool-call",
+                          toolCallId: "call-1",
+                          toolName: "readSheetData",
+                          input: { sheetId: 7 },
+                        },
+                      ],
+                    },
+                    {
+                      role: "tool",
+                      content: [
+                        {
+                          type: "tool-error",
+                          toolCallId: "call-1",
+                          toolName: "readSheetData",
+                          error: "参数错误",
+                        },
+                      ],
+                    },
+                  ],
+                },
+              });
+              await options.onError({ error: noOutputError });
+              controller.close();
+              resolveDone();
+            })();
+          },
+        }),
+        text: done.then(() => Promise.reject(noOutputError)),
+        responseMessages: done.then(() => Promise.reject(noOutputError)),
+      };
+    });
+
+    const persisted: Array<{ type: string; payload: Record<string, unknown> }> = [];
+    const result = await runAgentLoop({
+      modelConfig: { baseUrl: "http://model", apiKey: "test-key", modelName: "test-model" },
+      transcript: [
+        { cursor: 0, message: { role: "user", parts: [{ type: "text", text: "继续" }] } },
+      ],
+      systemPrompt: "你是表格助手",
+      workspace: [],
+      tools: [],
+      toolExecutor: { execute: vi.fn() },
+      persistenceBarrier: {
+        persist: vi.fn((event: { type: string; payload: Record<string, unknown> }) => {
+          persisted.push(event);
+        }),
+      },
+    } as any);
+
+    await expect(result.completion).resolves.toMatchObject({
+      status: "completed",
+      text: "",
+      error: undefined,
+      messages: [
+        { role: "user" },
+        {
+          role: "assistant",
+          parts: [
+            {
+              type: "tool-readSheetData",
+              state: "output-error",
+              errorText: "参数错误",
+            },
+          ],
+        },
+      ],
+    });
+    expect(persisted).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: "tool.finished",
+          payload: expect.objectContaining({
+            toolCallId: "call-1",
+            error: expect.objectContaining({ message: "参数错误" }),
+          }),
+        }),
+      ]),
+    );
   });
 });

@@ -436,7 +436,7 @@ type PersistedAgentEvent = {
    - `droppedMessages`: 因token预算裁剪丢弃的消息数
    - `droppedTurns`: 因token预算裁剪丢弃的完整轮次数
 
-2. **tool.started**: AI SDK 产生 `tool-input-start` 时触发，用于在模型仍在生成工具参数时持久化工具调用意图；它不等待工具执行，也不由 `tool.execute` 兜底补发
+2. **tool.started**: Agent 收到 `tool-input-start` 后立即触发，让实时界面尽早显示工具节点；此时 `input` 使用 `{}` 占位，完整参数在后续 `tool.finished` 或 step 对账时写入。原始 `tool-input-delta` 等参数流事件不进入 durable event，避免把每个参数片段持久化
    - `toolName`: 工具名称
    - `toolCallId`: 工具调用唯一ID（用于幂等）
    - `input`: 工具输入参数
@@ -475,7 +475,11 @@ type PersistedAgentEvent = {
 模型上下文的生命周期由 AI SDK 的 step 回调提供：`onStepStart` 的 `messages`、`instructions`
 和 `activeTools` 是本次实际生效的 step context；`onStepFinish` 的 `request.messages` 是本次
 provider 请求的准确输入消息。Agent 不从 `step.content` 和 `step.toolResults` 手工拼接下一次
-请求上下文，避免工具结果重复计算或改变 assistant/tool 消息结构。
+请求上下文；但会在 step 结束时按 `toolCallId` 对账工具调用和工具结果，为未进入
+`tool.execute` 的无效调用生成独立的错误工具事件和模型可消费的 tool result。
+如果 AI SDK 随后因 `NoOutputGeneratedError` 同时拒绝 `text`、`responseMessages` 和
+`steps`，Agent 使用此前 `onStepFinish` 捕获的 step response messages 完成本轮工具结果恢复，
+不把已经产生的工具错误升级为整轮对话失败。
 
 7. **运行终态不属于 Agent 内部执行事件**：Agent 通过 `completion.status` 返回
    `completed`、`failed` 或 `cancelled`；server finalizer 再按统一持久化顺序创建唯一的
@@ -491,9 +495,10 @@ provider 请求的准确输入消息。Agent 不从 `step.content` 和 `step.too
 - 持久化失败时，Agent必须立即停止执行，不允许仅记录日志后继续
 - `sequence`在一个run内单调递增，客户端回放时按sequence去重
 - `tool.finished`事件的output/error字段互斥，不能同时存在
-- 已经发出 `tool.started` 的工具，无论成功、业务失败还是显式取消，都必须发出对应的
-  `tool.finished`；只有尚未开始执行的工具可以没有工具终态事件。终态投影还必须把
-  运行结束时残留的 pending 工具卡片收敛为错误态，不能在历史中继续显示为运行中。
+- 已经发出 `tool.started` 的工具，无论成功、业务失败、协议错误还是显式取消，都必须发出对应的
+  `tool.finished`；AI SDK 标记为无效的 `tool-call` 也必须按调用 ID 转换为带 `error` 的
+  `tool.finished` 和模型可消费的 tool result，不能因为没有进入 `tool.execute` 而留下 pending 工具。
+  运行结束时的 pending 收敛只用于进程崩溃、连接断开或旧 checkpoint 修复，不能作为正常工具错误处理路径。
 - 工具等待超时由 AI SDK 作为工具错误交还模型，属于工具失败而不是对话失败；只有运行取消或事件持久化失败才终止 Agent loop。
 - `step.started`和`step.finished`只保留回放所需的规范化字段，不写入完整 provider request/response
 - 取消事实和取消收敛是两个状态：`run.cancelled` 表示 Agent 已停止；只有 checkpoint、

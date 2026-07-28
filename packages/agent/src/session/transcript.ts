@@ -5,6 +5,37 @@ type RunLike = {
   outputText?: string | null;
 };
 
+/**
+ * Older event projections could close a pending tool without retaining its
+ * streamed input. Keep those transcripts model-valid during recovery.
+ */
+export function normalizeToolErrorInputs<T extends AgentTranscriptMessage>(
+  messages: readonly T[],
+): T[] {
+  return messages.map((message) => {
+    if (message.role !== "assistant" || !Array.isArray(message.parts)) return message;
+
+    let changed = false;
+    const parts = message.parts.map((part) => {
+      if (!part || typeof part !== "object") return part;
+      const value = part as Record<string, unknown>;
+      if (
+        value.state !== "output-error" ||
+        typeof value.type !== "string" ||
+        !value.type.startsWith("tool-") ||
+        Object.hasOwn(value, "input") ||
+        Object.hasOwn(value, "rawInput")
+      ) {
+        return part;
+      }
+      changed = true;
+      return { ...value, input: {} };
+    });
+
+    return changed ? ({ ...message, parts } as T) : message;
+  });
+}
+
 function messageId(transcript: AgentTranscriptMessage[], index: number) {
   const latestUserMessage = [...transcript]
     .reverse()
@@ -12,6 +43,27 @@ function messageId(transcript: AgentTranscriptMessage[], index: number) {
   const turnId =
     typeof latestUserMessage?.id === "string" ? latestUserMessage.id : crypto.randomUUID();
   return `assistant-${turnId}-${index + 1}`;
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+}
+
+function errorTextOf(value: unknown): string {
+  if (value instanceof Error) return value.message;
+  const record = asRecord(value);
+  if (typeof record.message === "string" && record.message.length > 0) return record.message;
+  if (typeof value === "string" && value.length > 0) return value;
+  try {
+    return JSON.stringify(value) || "工具调用失败";
+  } catch {
+    return String(value);
+  }
+}
+
+function isToolErrorOutput(value: unknown): value is { error: unknown } {
+  const record = asRecord(value);
+  return record.isError === true && Object.hasOwn(record, "error");
 }
 
 function toToolPart(part: Record<string, unknown>) {
@@ -27,12 +79,18 @@ function toToolPart(part: Record<string, unknown>) {
   }
 
   if (part.type === "tool-result" || part.type === "tool-error") {
+    const toolError = part.type === "tool-error";
+    const modelError = isToolErrorOutput(part.output);
     return {
       type: `tool-${toolName}`,
       toolCallId,
-      state: part.type === "tool-error" ? "output-error" : "output-available",
-      input: part.input,
-      ...(part.type === "tool-error" ? { errorText: String(part.error) } : { output: part.output }),
+      state: toolError || modelError ? "output-error" : "output-available",
+      input: part.input ?? {},
+      ...(toolError || modelError
+        ? {
+            errorText: errorTextOf(toolError ? part.error : asRecord(part.output).error),
+          }
+        : { output: part.output }),
     };
   }
 
@@ -87,8 +145,18 @@ export function appendResponseMessages(
         if (!toolCallId) continue;
         const existing = toolParts.get(toolCallId);
         if (existing) {
-          existing.state = "output-available";
-          existing.output = part.output;
+          existing.input = part.input ?? existing.input ?? {};
+          if (part.type === "tool-error" || isToolErrorOutput(part.output)) {
+            existing.state = "output-error";
+            existing.errorText = errorTextOf(
+              part.type === "tool-error" ? part.error : asRecord(part.output).error,
+            );
+            delete existing.output;
+          } else {
+            existing.state = "output-available";
+            existing.output = part.output;
+            delete existing.errorText;
+          }
         }
       }
     }

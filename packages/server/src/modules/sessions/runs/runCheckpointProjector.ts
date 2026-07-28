@@ -51,6 +51,9 @@ function closePendingTools(messages: Map<string, ProjectedMessage>, status: Term
         continue;
       }
       part.value.state = "output-error";
+      if (part.value.input === undefined) {
+        part.value.input = {};
+      }
       part.value.errorText = errorText;
     }
   }
