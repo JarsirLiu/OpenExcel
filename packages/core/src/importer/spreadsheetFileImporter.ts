@@ -157,15 +157,72 @@ function normalizeBorderSide(side?: SheetJsBorderSide) {
   return { s: style, c: excelColorToFortune(side.color) };
 }
 
-function toFortuneValue(cell: XLSX.CellObject): FortuneCellValue {
+function isDateLikeNumberFormat(format: unknown): format is string {
+  if (typeof format !== "string" || !format.trim()) return false;
+
+  const withoutLiterals = format
+    .replace(/"(?:[^"]|"")*"/g, "")
+    .replace(/\\./g, "")
+    .replace(/\[[^\]]*\]/g, "");
+  return /[ymdhs]/i.test(withoutLiterals) && !/^general$/i.test(withoutLiterals.trim());
+}
+
+function isDateLikeDisplayValue(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  const normalized = value.trim();
+  return (
+    /^(?:\d{1,4}[/-]\d{1,2}[/-]\d{1,4})(?:[ T]\d{1,2}:\d{2}(?::\d{2})?)?$/.test(normalized) ||
+    /^(?:\d{4}年\d{1,2}月(?:\d{1,2}日)?)$/.test(normalized)
+  );
+}
+
+function fallbackDateFormat(displayValue: string): string {
+  if (/年/.test(displayValue)) return 'yyyy"年"m"月"';
+  if (/[ T]\d{1,2}:\d{2}/.test(displayValue)) return "yyyy/m/d h:mm";
+  return /^\d{4}[/-]/.test(displayValue) ? "yyyy/m/d" : "m/d/yy";
+}
+
+function isShortUsDateFormat(format: unknown): format is string {
+  return typeof format === "string" && format.trim().toLowerCase() === "m/d/yy";
+}
+
+function localizedDateDisplay(serial: number, format: string, fallback: string): string {
+  if (!isShortUsDateFormat(format) || !Number.isFinite(serial)) return fallback;
+
+  const date = new Date(Date.UTC(1899, 11, 30) + Math.floor(serial) * 86_400_000);
+  if (Number.isNaN(date.getTime())) return fallback;
+  return `${date.getUTCFullYear()}/${date.getUTCMonth() + 1}/${date.getUTCDate()}`;
+}
+
+function dateCellFormat(cell: XLSX.CellObject, displayValue: string): string | undefined {
+  if (isDateLikeNumberFormat(cell.z) || isDateLikeDisplayValue(displayValue)) {
+    return isDateLikeNumberFormat(cell.z) ? String(cell.z) : fallbackDateFormat(displayValue);
+  }
+  return undefined;
+}
+
+function toFortuneValue(cell: XLSX.CellObject, inferDateFromDisplay = false): FortuneCellValue {
   const rawValue = cell.v ?? "";
+  const displayValue = cell.w ?? String(rawValue);
   const value: FortuneCellValue = {
     v: rawValue,
-    m: cell.w ?? String(rawValue),
+    m: displayValue,
   };
 
   if (cell.f) value.f = normalizeFortuneFormula(cell.f);
-  if (cell.z) value.ct = { fa: String(cell.z), t: cell.t };
+  const numericRawValue = typeof rawValue === "number" ? rawValue : undefined;
+  const dateFormat =
+    numericRawValue != null &&
+    (isDateLikeNumberFormat(cell.z) ||
+      (inferDateFromDisplay && isDateLikeDisplayValue(displayValue)))
+      ? dateCellFormat(cell, displayValue)
+      : undefined;
+  value.m =
+    dateFormat && numericRawValue != null
+      ? localizedDateDisplay(numericRawValue, dateFormat, displayValue)
+      : displayValue;
+  if (cell.z || dateFormat)
+    value.ct = { fa: dateFormat ?? String(cell.z), t: dateFormat ? "d" : cell.t };
 
   const style = normalizeSheetJsStyle(cell.s);
   if (style?.font) {
@@ -295,6 +352,38 @@ function normalizeImportedCelldata(
     else if (typeof value.m !== "string") value.m = String(value.m);
 
     const metadata = displayValues?.get(`${Number(cell.r)}:${Number(cell.c)}`);
+    const displayValue =
+      typeof metadata?.displayValue === "string"
+        ? metadata.displayValue
+        : typeof value.m === "string"
+          ? value.m
+          : String(value.m ?? "");
+    const numericValue =
+      typeof value.v === "number"
+        ? value.v
+        : typeof metadata?.rawValue === "number"
+          ? metadata.rawValue
+          : undefined;
+    const cellFormat =
+      value.ct && typeof value.ct === "object" && !Array.isArray(value.ct)
+        ? (value.ct as { fa?: unknown }).fa
+        : undefined;
+    const dateFormat =
+      numericValue != null &&
+      (isDateLikeNumberFormat(cellFormat) || isDateLikeDisplayValue(displayValue))
+        ? isDateLikeNumberFormat(cellFormat)
+          ? cellFormat
+          : fallbackDateFormat(displayValue)
+        : undefined;
+
+    if (dateFormat) {
+      if (typeof metadata?.rawValue === "number") value.v = metadata.rawValue;
+      value.ct = {
+        ...(value.ct && typeof value.ct === "object" && !Array.isArray(value.ct) ? value.ct : {}),
+        fa: dateFormat,
+        t: "d",
+      };
+    }
 
     if (metadata?.type === "b") {
       value.v =
@@ -323,7 +412,9 @@ function normalizeImportedCelldata(
     }
 
     if (metadata?.displayValue != null) {
-      value.m = metadata.displayValue;
+      value.m = dateFormat
+        ? localizedDateDisplay(numericValue ?? 0, dateFormat, metadata.displayValue)
+        : metadata.displayValue;
     }
 
     return {
@@ -438,7 +529,12 @@ async function parseXlsxWithFortuneExcel(
   };
 }
 
-function buildSheet(name: string, worksheet: XLSX.WorkSheet, index: number): ImportedSheetInput {
+function buildSheet(
+  name: string,
+  worksheet: XLSX.WorkSheet,
+  index: number,
+  inferDateFromDisplay = false,
+): ImportedSheetInput {
   const range = worksheet["!ref"]
     ? XLSX.utils.decode_range(worksheet["!ref"])
     : { s: { r: 0, c: 0 }, e: { r: 0, c: 0 } };
@@ -453,7 +549,7 @@ function buildSheet(name: string, worksheet: XLSX.WorkSheet, index: number): Imp
       const merge = findMerge(r, c);
       if (!cell && !merge) continue;
 
-      const value = cell ? toFortuneValue(cell) : { v: "", m: "" };
+      const value = cell ? toFortuneValue(cell, inferDateFromDisplay) : { v: "", m: "" };
       if (merge) {
         value.mc =
           merge.range.s.r === r && merge.range.s.c === c
@@ -516,7 +612,7 @@ export async function parseSpreadsheetFile(
   });
 
   const sheets = workbook.SheetNames.map((name, index) =>
-    buildSheet(name, workbook.Sheets[name], index),
+    buildSheet(name, workbook.Sheets[name], index, input.format === "xls"),
   );
   if (sheets.length === 0) throw new Error("工作簿不包含可导入的工作表");
   return {

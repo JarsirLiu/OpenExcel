@@ -59,6 +59,8 @@ async function datedXlsxBytes(): Promise<ArrayBuffer> {
   worksheet.getCell("B2").numFmt = "yyyy-mm-dd hh:mm";
   worksheet.getCell("C1").value = "数字";
   worksheet.getCell("C2").value = 45292;
+  worksheet.getCell("D1").value = new Date(Date.UTC(2022, 8, 1));
+  worksheet.getCell("D1").numFmt = "m/d/yy";
   return workbook.xlsx.writeBuffer();
 }
 
@@ -250,13 +252,19 @@ describe("parseSpreadsheetFile", () => {
     expect(cells.get("1:0")?.v).toMatchObject({
       v: 45292,
       m: "2024-01-01",
-      ct: { fa: "yyyy-mm-dd", t: "n" },
+      ct: { fa: "yyyy-mm-dd", t: "d" },
     });
     expect(cells.get("1:1")?.v).toMatchObject({
       v: 45292.52083333333,
       m: "2024-01-01 12:30",
+      ct: { t: "d" },
     });
     expect(cells.get("1:2")?.v).toMatchObject({ v: 45292, m: "45292" });
+    expect(cells.get("0:3")?.v).toMatchObject({
+      v: 44805,
+      m: "2022/9/1",
+      ct: { fa: "m/d/yy", t: "d" },
+    });
   });
 
   it("preserves Excel display formats and scalar types", async () => {
