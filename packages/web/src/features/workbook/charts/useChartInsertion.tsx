@@ -52,18 +52,11 @@ export function useChartInsertion({
 
   const handleOpen = useCallback(() => {
     const instance = workbookRef.current;
-    const activeSheet = instance?.getSheet();
     const sheet = currentSheetRef.current;
-    const activeSheetId =
-      activeSheet?.id != null
-        ? String(activeSheet.id)
-        : sheet?.id != null
-          ? String(sheet.id)
-          : undefined;
     const activeSelection = instance?.getSelection()?.[0];
 
-    if (activeSheetId && activeSelection) {
-      applySelection(activeSheetId, activeSelection);
+    if (sheet?.id != null && activeSelection) {
+      applySelection(String(sheet.id), activeSelection);
     }
     setOpen(true);
   }, [applySelection, workbookRef]);

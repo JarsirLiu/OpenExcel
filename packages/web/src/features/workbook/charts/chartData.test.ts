@@ -51,4 +51,35 @@ describe("buildChartRenderData", () => {
       series: [{ id: "series-1", name: "销售额", data: [12, 18, 21] }],
     });
   });
+
+  it("updates rendered values without changing chart placement", () => {
+    const originalAnchor = chart.anchor;
+    const nextData = [
+      { r: 0, c: 0, v: { v: "一月" } },
+      { r: 0, c: 1, v: { v: 99 } },
+      { r: 1, c: 0, v: { v: "二月" } },
+      { r: 1, c: 1, v: { v: 108 } },
+      { r: 2, c: 0, v: { v: "三月" } },
+      { r: 2, c: 1, v: { v: 121 } },
+    ];
+
+    expect(
+      buildChartRenderData(chart, [
+        {
+          id: 11,
+          sheetNo: 1,
+          name: "销售",
+          order: 0,
+          columns: [],
+          merges: [],
+          config: null,
+          revision: 1,
+          uploadedData: nextData,
+        },
+      ]),
+    ).toMatchObject({
+      series: [{ data: [99, 108, 121] }],
+    });
+    expect(chart.anchor).toBe(originalAnchor);
+  });
 });

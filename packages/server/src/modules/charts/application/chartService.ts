@@ -7,7 +7,14 @@ import {
 } from "@openexcel/core";
 import type { Prisma } from "../../../infra/database/prismaTypes.js";
 import { generatePublicId } from "../../../shared/utils/publicId.js";
-import { deserializeChartSpec } from "../domain/chart.js";
+import { sheetRecordToSnapshot } from "../../../shared/utils/sheetSnapshot.js";
+import { findSheetForWorkspace } from "../../sheets/infrastructure/sheetRepository.js";
+import {
+  ChartValidationError,
+  deserializeChartSpec,
+  parseChartRelationId,
+} from "../domain/chart.js";
+import { normalizeChartSpecForSheets } from "../domain/chartDataValidation.js";
 import * as repository from "../infrastructure/chartRepository.js";
 
 export type CreateChartInput = Omit<ChartSpec, "id"> & { id?: string };
@@ -18,6 +25,37 @@ export type UpdateChartInput = {
   anchor?: ChartAnchor;
   series?: ChartSeriesSpec[];
 };
+
+export async function normalizeChartSpecForWorkspace(
+  workspaceId: number,
+  spec: ChartSpec,
+  db?: Prisma.TransactionClient,
+): Promise<ChartSpec> {
+  const sheetIds = chartDependencySheetIds(spec).map((sheetId) =>
+    parseChartRelationId(sheetId, "sheetId"),
+  );
+  const sheets = db
+    ? await db.sheet.findMany({
+        where: { id: { in: sheetIds }, workbook: { workspaceId } },
+        select: { id: true, uploadedData: true, config: true, merges: true },
+      })
+    : await Promise.all(sheetIds.map((sheetId) => findSheetForWorkspace(sheetId, workspaceId)));
+
+  const existingSheets = sheets.filter(
+    (sheet): sheet is NonNullable<typeof sheet> => sheet != null,
+  );
+  if (existingSheets.length !== new Set(sheetIds).size) {
+    throw new ChartValidationError("图表引用的 Sheet 不存在或不属于当前工作区");
+  }
+
+  return normalizeChartSpecForSheets(
+    spec,
+    existingSheets.map((sheet) => ({
+      id: String(sheet.id),
+      celldata: sheetRecordToSnapshot(sheet).celldata,
+    })),
+  );
+}
 
 function toSpec(record: Awaited<ReturnType<typeof repository.findChart>>) {
   return record ? deserializeChartSpec(record) : null;

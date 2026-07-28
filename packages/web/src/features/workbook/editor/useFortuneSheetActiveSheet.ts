@@ -1,11 +1,8 @@
-import type { WorkbookInstance } from "@fortune-sheet/react";
 import { useEffect } from "react";
 import type { WorkbookFull } from "@/api/workbooks";
-import { findSheetIndexById } from "../sheetIdentity";
 
 type Props = {
   containerRef: React.RefObject<HTMLDivElement | null>;
-  workbookRef: React.RefObject<WorkbookInstance | null>;
   workbook: WorkbookFull | null;
   currentSheetIndex: number;
   onSheetIndexChange?: (sheetIndex: number) => void;
@@ -13,8 +10,8 @@ type Props = {
 
 function findActiveSheetIndex(
   root: HTMLElement,
-  workbookRef: React.RefObject<WorkbookInstance | null>,
   workbook: WorkbookFull,
+  currentSheetIndex: number,
 ): number {
   const tabRoot = root.querySelector<HTMLElement>("#fortune-sheettab-container");
   const activeTab = tabRoot?.querySelector<HTMLElement>(".luckysheet-sheets-item-active");
@@ -26,13 +23,7 @@ function findActiveSheetIndex(
     if (index >= 0) return index;
   }
 
-  const activeSheet = workbookRef.current?.getSheet();
-  if (activeSheet?.id != null) {
-    const index = findSheetIndexById(workbook.sheets, activeSheet.id);
-    if (index >= 0) return index;
-  }
-
-  if (!tabRoot || !activeTab) return -1;
+  if (!tabRoot || !activeTab) return currentSheetIndex;
 
   const tabs = Array.from(tabRoot.querySelectorAll<HTMLElement>(".luckysheet-sheets-item"));
   return tabs.indexOf(activeTab);
@@ -40,7 +31,6 @@ function findActiveSheetIndex(
 
 export function useFortuneSheetActiveSheet({
   containerRef,
-  workbookRef,
   workbook,
   currentSheetIndex,
   onSheetIndexChange,
@@ -54,7 +44,7 @@ export function useFortuneSheetActiveSheet({
       if (frame !== null) cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
         frame = null;
-        const nextIndex = findActiveSheetIndex(root, workbookRef, workbook);
+        const nextIndex = findActiveSheetIndex(root, workbook, currentSheetIndex);
         if (nextIndex >= 0 && nextIndex !== currentSheetIndex) {
           onSheetIndexChange(nextIndex);
         }
@@ -75,5 +65,5 @@ export function useFortuneSheetActiveSheet({
       observer.disconnect();
       root.removeEventListener("click", syncActiveSheet, true);
     };
-  }, [containerRef, currentSheetIndex, onSheetIndexChange, workbook, workbookRef]);
+  }, [containerRef, currentSheetIndex, onSheetIndexChange, workbook]);
 }

@@ -88,6 +88,7 @@
   overflow: hidden;
   pointer-events: none;
   visibility: hidden;
+  contain: layout paint;
 }
 
 .chartLayer[data-ready="true"] {

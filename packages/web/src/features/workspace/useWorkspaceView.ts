@@ -11,7 +11,7 @@ import {
   updateWorkbookName,
 } from "@/api/workbooks";
 import type { WorkbookStructureUpdate } from "@/features/sync/types";
-import { isWorkbookSnapshotStale } from "@/features/sync/workbookRevision";
+import { mergeWorkbookSnapshot } from "@/features/sync/workbookRevision";
 import { toast } from "@/shared/lib";
 import { patchWorkbookWithDelta } from "../workbook/utils/patchWorkbook";
 import { getSheetIndexAfterDeletion, normalizeSheetIndex } from "./sheetIndex";
@@ -96,11 +96,11 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
   const replaceWorkbookIfFresh = useCallback(
     (nextWorkbook: NonNullable<typeof currentWorkbook>) => {
       const current = currentWorkbookRef.current;
-      if (current && isWorkbookSnapshotStale(current, nextWorkbook)) {
-        const merged = { ...current, charts: nextWorkbook.charts };
+      if (current) {
+        const merged = mergeWorkbookSnapshot(current, nextWorkbook);
         currentWorkbookRef.current = merged;
         replaceCurrentWorkbook(merged);
-        return false;
+        return merged === nextWorkbook;
       }
       currentWorkbookRef.current = nextWorkbook;
       replaceCurrentWorkbook(nextWorkbook);

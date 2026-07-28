@@ -1,11 +1,10 @@
-import { Suspense, useMemo } from "react";
+import { useMemo } from "react";
 import type { WorkbookFull } from "@/api/workbooks";
 import type { SheetGridLayout } from "../layout/fortuneSheetLayout";
 import { normalizeSheetId } from "../sheetIdentity";
+import { ChartDataLayer } from "./ChartDataLayer";
 import styles from "./ChartOverlay.module.css";
-import { ChartRendererBoundary } from "./ChartRendererBoundary";
 import { chartsForSheet } from "./chartBinding";
-import { useChartDependencies } from "./useChartDependencies";
 import { chartRectWithMinimumSize, useChartOverlayInteraction } from "./useChartOverlayInteraction";
 import { useChartViewport } from "./useChartViewport";
 
@@ -41,13 +40,7 @@ export function ChartOverlay({
     () => chartsForSheet(workbook.charts, activeSheetId),
     [activeSheetId, workbook.charts],
   );
-  const scroll = useChartViewport({ containerRef, layerRef, sheetId: activeSheetId });
-  const { dependencyError, missingDependencyIds, retryDependencies } = useChartDependencies({
-    charts,
-    sheets: workbook.sheets,
-    enabled: sheetLoaded,
-    onSheetLoad,
-  });
+  const viewport = useChartViewport({ containerRef, layerRef, sheetId: activeSheetId });
   const {
     beginInteraction,
     displayCharts,
@@ -73,10 +66,7 @@ export function ChartOverlay({
         const rect = chartRectWithMinimumSize(chart, layout, interaction);
         const selected = selectedId === chart.id;
         const style = {
-          left: layout.rowHeaderWidth * layout.zoomRatio + rect.left - scroll.left,
-          top: layout.columnHeaderHeight * layout.zoomRatio + rect.top - scroll.top,
-          width: rect.width,
-          height: rect.height,
+          ...viewport.rectToViewport(rect),
           zIndex: selected ? 2 : 1,
         };
 
@@ -93,29 +83,12 @@ export function ChartOverlay({
               setSelectedId(chart.id);
             }}
           >
-            {missingDependencyIds.length > 0 || dependencyError ? (
-              <div className={styles.loading} role="status">
-                {dependencyError ? (
-                  <>
-                    <span>{dependencyError}</span>
-                    <button
-                      type="button"
-                      className={styles.retry}
-                      onPointerDown={(event) => event.stopPropagation()}
-                      onClick={retryDependencies}
-                    >
-                      重试
-                    </button>
-                  </>
-                ) : (
-                  "正在加载图表数据..."
-                )}
-              </div>
-            ) : (
-              <Suspense fallback={<div className={styles.loading}>正在加载图表...</div>}>
-                <ChartRendererBoundary chart={chart} sheets={workbook.sheets} />
-              </Suspense>
-            )}
+            <ChartDataLayer
+              chart={chart}
+              workbook={workbook}
+              sheetLoaded={sheetLoaded}
+              onSheetLoad={onSheetLoad}
+            />
             {selected ? (
               <>
                 <button

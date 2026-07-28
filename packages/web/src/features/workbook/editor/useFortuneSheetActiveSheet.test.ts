@@ -1,4 +1,3 @@
-import type { WorkbookInstance } from "@fortune-sheet/react";
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { WorkbookFull } from "@/api/workbooks";
@@ -58,13 +57,11 @@ describe("FortuneSheet active sheet synchronization", () => {
     vi.stubGlobal("cancelAnimationFrame", vi.fn());
 
     const containerRef = { current: root };
-    const workbookRef = { current: null } as React.RefObject<WorkbookInstance | null>;
     const onSheetIndexChange = vi.fn();
     const workbook = createWorkbook();
     const { unmount } = renderHook(() =>
       useFortuneSheetActiveSheet({
         containerRef,
-        workbookRef,
         workbook,
         currentSheetIndex: 0,
         onSheetIndexChange,

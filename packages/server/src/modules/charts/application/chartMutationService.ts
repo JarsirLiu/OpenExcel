@@ -21,6 +21,7 @@ import {
   type CreateChartInput,
   getChartRecord,
   getChartRecordInTransaction,
+  normalizeChartSpecForWorkspace,
   persistChart,
   persistDeletedChart,
   persistUpdatedChart,
@@ -69,12 +70,11 @@ export async function createChartMutation(
   context: ChartRunContext = {},
 ) {
   const spec = buildChartSpec(input);
-  const sheetIds = dependencySheetIds([spec]);
 
   if (context.runId != null) {
     return withUndoTrackedSheetMutationAfterSuccess(
       workspaceId,
-      sheetIds,
+      dependencySheetIds([spec]),
       async (tx: Prisma.TransactionClient) => {
         const receipt = receiptInput(context);
         if (receipt) {
@@ -85,17 +85,19 @@ export async function createChartMutation(
           );
           if (replay !== null) return replay;
         }
+        const normalizedSpec = await normalizeChartSpecForWorkspace(workspaceId, spec, tx);
+        const sheetIds = dependencySheetIds([normalizedSpec]);
         await runRepository.upsertRunChartSnapshotUsing(tx, {
           runId: context.runId as number,
-          chartId: spec.id,
-          workbookId: parseChartRelationId(spec.workbookId, "workbookId"),
-          sheetId: parseChartRelationId(spec.sheetId, "sheetId"),
+          chartId: normalizedSpec.id,
+          workbookId: parseChartRelationId(normalizedSpec.workbookId, "workbookId"),
+          sheetId: parseChartRelationId(normalizedSpec.sheetId, "sheetId"),
           sheetIds,
           order: 0,
           spec: null,
         });
-        const created = await createChartInTransaction(tx, workspaceId, spec);
-        if (!created) throw new Error(`Workbook ${spec.workbookId} 不存在`);
+        const created = await createChartInTransaction(tx, workspaceId, normalizedSpec);
+        if (!created) throw new Error(`Workbook ${normalizedSpec.workbookId} 不存在`);
         if (receipt) {
           await recordChartMutationReceipt(tx, {
             ...receipt,
@@ -113,10 +115,11 @@ export async function createChartMutation(
 
   return withUndoTrackedMutation(
     workspaceId,
-    sheetIds,
+    async () => dependencySheetIds([await normalizeChartSpecForWorkspace(workspaceId, spec)]),
     async () => {
-      const result = await persistChart(workspaceId, spec);
-      if (!result) throw new Error(`Workbook ${spec.workbookId} 不存在`);
+      const normalizedSpec = await normalizeChartSpecForWorkspace(workspaceId, spec);
+      const result = await persistChart(workspaceId, normalizedSpec);
+      if (!result) throw new Error(`Workbook ${normalizedSpec.workbookId} 不存在`);
       return result;
     },
     context.runId,
@@ -155,7 +158,8 @@ export async function updateChartMutation(
         const current = await getChartRecordInTransaction(tx, workspaceId, chartId);
         if (!current) throw new ChartMutationNotFoundError(chartId);
         const updated = buildUpdatedChartSpec(current.spec, patch);
-        const sheetIds = dependencySheetIds([current.spec, updated]);
+        const normalizedUpdated = await normalizeChartSpecForWorkspace(workspaceId, updated, tx);
+        const sheetIds = dependencySheetIds([current.spec, normalizedUpdated]);
         await runRepository.upsertRunChartSnapshotUsing(tx, {
           runId: context.runId as number,
           chartId: current.spec.id,
@@ -165,7 +169,7 @@ export async function updateChartMutation(
           order: current.order,
           spec: JSON.stringify(current.spec),
         });
-        const result = await updateChartInTransaction(tx, workspaceId, chartId, updated);
+        const result = await updateChartInTransaction(tx, workspaceId, chartId, normalizedUpdated);
         if (!result) throw new ChartMutationNotFoundError(chartId);
         if (receipt) {
           await recordChartMutationReceipt(tx, {
@@ -188,7 +192,10 @@ export async function updateChartMutation(
       const current = await getChartRecord(workspaceId, chartId);
       if (!current) throw new ChartMutationNotFoundError(chartId);
       previous = current.spec;
-      next = buildUpdatedChartSpec(current.spec, patch);
+      next = await normalizeChartSpecForWorkspace(
+        workspaceId,
+        buildUpdatedChartSpec(current.spec, patch),
+      );
       previousOrder = current.order;
       return dependencySheetIds([previous, next]);
     },

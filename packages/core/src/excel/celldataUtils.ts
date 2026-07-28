@@ -77,8 +77,17 @@ export function normalizeFortuneCellData(
   celldata: FortuneCell[],
   options: FortuneCellNormalizationOptions = {},
 ): FortuneCell[] {
+  const uniqueCells = new Map<string, FortuneCell>();
+  let deduplicated = false;
+  for (const cell of celldata) {
+    if (!cell || !Number.isInteger(cell.r) || !Number.isInteger(cell.c)) continue;
+    const key = `${cell.r}:${cell.c}`;
+    if (uniqueCells.has(key)) deduplicated = true;
+    uniqueCells.set(key, cell);
+  }
+  const source = deduplicated ? [...uniqueCells.values()] : celldata;
   let changed = false;
-  const normalized = celldata.map((cell) => {
+  const normalized = source.map((cell) => {
     if (
       !cell ||
       typeof cell !== "object" ||
@@ -101,7 +110,7 @@ export function normalizeFortuneCellData(
     return cell;
   });
 
-  return changed ? normalized : celldata;
+  return changed || deduplicated ? normalized : celldata;
 }
 
 export function extractMergesFromCelldata(

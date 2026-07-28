@@ -19,14 +19,12 @@ export function toFortuneSheetData(sheet: {
   let merges: { row: [number, number]; col: [number, number] }[];
 
   if (sheet.uploadedData && isCelldata(sheet.uploadedData)) {
-    celldata = sheet.uploadedData as FortuneCell[];
+    celldata = normalizeFortuneCellData(sheet.uploadedData as FortuneCell[]);
     merges = extractMergesFromCelldata(celldata);
   } else {
     celldata = [];
     merges = [];
   }
-
-  celldata = normalizeFortuneCellData(celldata);
 
   const result: FortuneSheetData = {
     id: String(sheet.id),

@@ -104,15 +104,19 @@ export function resolveChartData(
       })()
     : [];
 
-  const series = chart.series.map((item) => {
-    const valueSheet = sheetById.get(item.valueRef.sheetId);
-    return {
-      id: item.id,
-      name: seriesName(sheetById, item),
-      data: valueSheet ? rangeValues(valueSheet, item.valueRef).map(numericValue) : [],
-      chartType: item.chartType,
-    };
-  });
+  const series = chart.series
+    .map((item) => {
+      const valueSheet = sheetById.get(item.valueRef.sheetId);
+      return {
+        id: item.id,
+        name: seriesName(sheetById, item),
+        data: valueSheet ? rangeValues(valueSheet, item.valueRef).map(numericValue) : [],
+        chartType: item.chartType,
+      };
+    })
+    // Text-only columns are not chart series. Keeping them here creates
+    // misleading legends after a table range includes descriptive columns.
+    .filter((item) => item.data.some((value) => value !== null));
 
   const length = Math.max(categories.length, ...series.map((item) => item.data.length), 0);
   if (length === 0) return null;

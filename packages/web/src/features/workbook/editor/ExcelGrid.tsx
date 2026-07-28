@@ -127,7 +127,6 @@ export function ExcelGrid({
   useFortuneSheetWheel(gridRootRef, workbook !== null);
   useFortuneSheetActiveSheet({
     containerRef: gridRootRef,
-    workbookRef,
     workbook,
     currentSheetIndex,
     onSheetIndexChange,

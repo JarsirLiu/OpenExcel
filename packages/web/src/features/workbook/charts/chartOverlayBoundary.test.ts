@@ -31,12 +31,17 @@ describe("ChartOverlay integration boundary", () => {
     expect(overlaySource).not.toContain("createPortal");
     expect(overlaySource).not.toContain("fortune-sheet-overlay");
     expect(overlaySource).not.toContain("fortune-sheet-container");
+    expect(overlaySource).not.toContain("rowHeaderWidth");
+    expect(overlaySource).not.toContain("columnHeaderHeight");
     expect(viewportSource).toContain("fortune-sheet-container");
+    expect(viewportSource).toContain("fortune-sheet-canvas");
+    expect(viewportSource).toContain("cellOriginLeft");
+    expect(viewportSource).toContain("cellOriginTop");
     expect(gridSource).toContain(activeSheetLayerKey);
     expect(gridSource).toContain("data-sheet-id={currentSheet.id}");
     expect(gridSource).toContain("className={styles.chartLayer}");
     expect(gridSource).toContain("layerRef={chartLayerRef}");
-    expect(activationSource).toContain("findSheetIndexById(workbook.sheets, sheetId)");
+    expect(activationSource).toContain("currentSheetIndex");
     expect(activeSheetSource).toContain("luckysheet-sheets-item-active");
   });
 });

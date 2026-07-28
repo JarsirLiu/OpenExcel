@@ -1,11 +1,13 @@
 import { defineServerTool } from "../../../shared/tools/serverTool.js";
 import { createChartMutation } from "../application/chartMutationService.js";
+import { buildChartSpec } from "../application/chartService.js";
 import { toCreateChartSpec } from "./chartToolInput.js";
 import { toCreateChartToolResult } from "./chartToolResult.js";
 
 export const createChart = defineServerTool("createChart", {
   execute: async (input, { context, db, toolCallId }) => {
-    const result = await createChartMutation(context.workspaceId, toCreateChartSpec(input), {
+    const spec = buildChartSpec(toCreateChartSpec(input));
+    const result = await createChartMutation(context.workspaceId, spec, {
       runId: context.runId,
       db,
       mutationId: `ai:${context.runId}:${toolCallId}`,
