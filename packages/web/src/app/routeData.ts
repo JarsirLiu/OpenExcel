@@ -1,5 +1,5 @@
 import type { Session } from "@/api/sessions";
-import type { WorkbookFull, WorkbookMeta } from "@/api/workbooks";
+import type { WorkbookMeta } from "@/api/workbooks";
 import type { Workspace } from "@/api/workspaces";
 
 export type WorkbenchRouteData = {
@@ -7,5 +7,4 @@ export type WorkbenchRouteData = {
   workspace: Workspace;
   workbooks: WorkbookMeta[];
   sessions: Session[];
-  currentWorkbook: WorkbookFull | null;
 };

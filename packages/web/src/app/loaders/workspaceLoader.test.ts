@@ -1,35 +1,33 @@
 import type { LoaderFunctionArgs } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { fetchWorkbookStructure, fetchSessions, fetchWorkbooks, fetchWorkspaces } = vi.hoisted(
-  () => ({
-    fetchWorkbookStructure: vi.fn(),
-    fetchSessions: vi.fn(),
-    fetchWorkbooks: vi.fn(),
-    fetchWorkspaces: vi.fn(),
-  }),
-);
+const { fetchSessions, fetchWorkbooks, fetchWorkspaces } = vi.hoisted(() => ({
+  fetchSessions: vi.fn(),
+  fetchWorkbooks: vi.fn(),
+  fetchWorkspaces: vi.fn(),
+}));
 
 vi.mock("@/api/sessions", () => ({ fetchSessions }));
-vi.mock("@/api/workbooks", () => ({ fetchWorkbookStructure, fetchWorkbooks }));
+vi.mock("@/api/workbooks", () => ({ fetchWorkbooks }));
 vi.mock("@/api/workspaces", () => ({ fetchWorkspaces }));
 
 import { workspaceLoader } from "./workspaceLoader";
 
 function loaderArgs(params: LoaderFunctionArgs["params"]): LoaderFunctionArgs {
-  return { params } as LoaderFunctionArgs;
+  return {
+    params,
+    request: new Request("http://localhost/workspaces/ws_test"),
+  } as LoaderFunctionArgs;
 }
 
 describe("workspaceLoader", () => {
   beforeEach(() => {
     fetchSessions.mockReset();
-    fetchWorkbookStructure.mockReset();
     fetchWorkbooks.mockReset();
     fetchWorkspaces.mockReset();
     fetchWorkspaces.mockResolvedValue([{ id: 11, publicId: "ws_test", name: "Test", order: 0 }]);
     fetchWorkbooks.mockResolvedValue([]);
     fetchSessions.mockResolvedValue([]);
-    fetchWorkbookStructure.mockResolvedValue(null);
   });
 
   it("loads the requested workspace data without bootstrapping", async () => {
@@ -40,8 +38,17 @@ describe("workspaceLoader", () => {
       workspace: { id: 11, publicId: "ws_test", name: "Test", order: 0 },
       workbooks: [],
       sessions: [],
-      currentWorkbook: null,
     });
-    expect(fetchWorkspaces).toHaveBeenCalledTimes(1);
+    expect(fetchWorkspaces).toHaveBeenCalledWith(
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+    expect(fetchWorkbooks).toHaveBeenCalledWith(
+      11,
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+    expect(fetchSessions).toHaveBeenCalledWith(
+      11,
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
   });
 });

@@ -38,7 +38,7 @@ function saveIdx(workspaceId: number | null, idx: number) {
 export type WorkbookInitial = {
   workspaceId: number;
   workbooks: WorkbookMeta[];
-  currentWorkbook: WorkbookFull | null;
+  currentWorkbook?: WorkbookFull | null;
 };
 
 export type WorkbookTransition = {

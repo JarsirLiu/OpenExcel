@@ -46,7 +46,6 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
         ? {
             workspaceId: routeData.workspace.id,
             workbooks: routeData.workbooks,
-            currentWorkbook: routeData.currentWorkbook,
           }
         : undefined,
       session: routeData?.sessions

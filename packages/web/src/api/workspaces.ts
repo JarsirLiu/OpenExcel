@@ -7,8 +7,8 @@ export interface Workspace {
   order: number;
 }
 
-export async function fetchWorkspaces(): Promise<Workspace[]> {
-  const res = await apiFetch("/workspaces");
+export async function fetchWorkspaces(options?: { signal?: AbortSignal }): Promise<Workspace[]> {
+  const res = await apiFetch("/workspaces", options);
   if (!res.ok) throw new Error("加载工作区失败");
   return res.json();
 }
