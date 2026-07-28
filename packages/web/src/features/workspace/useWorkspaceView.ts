@@ -8,11 +8,7 @@ import { toast } from "@/shared/lib";
 import { patchWorkbookWithDelta } from "../workbook/utils/patchWorkbook";
 import { getSheetIndexAfterDeletion, normalizeSheetIndex } from "./sheetIndex";
 import { useSheetNavigation } from "./useSheetNavigation";
-import {
-  useWorkbookCatalog,
-  type WorkbookEntryMode,
-  type WorkbookInitial,
-} from "./useWorkbookCatalog";
+import { useWorkbookCatalog, type WorkbookInitial } from "./useWorkbookCatalog";
 import { useWorkbookDocument } from "./useWorkbookDocument";
 
 const MAX_IMPORT_WORKBOOKS = 20;
@@ -23,11 +19,7 @@ function loadedSheetIds(workbook: WorkbookFull | null): number[] | undefined {
   return ids.length > 0 ? ids : undefined;
 }
 
-export function useWorkspaceView(
-  workspaceId: number | null,
-  initial?: WorkbookInitial,
-  entryMode: WorkbookEntryMode = "welcome",
-) {
+export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookInitial) {
   const {
     workbooks,
     workbookIdx,
@@ -45,7 +37,7 @@ export function useWorkspaceView(
     deleteWorkbookInCatalog,
     importWorkbooksInCatalog,
     renameWorkbookInCatalog,
-  } = useWorkbookCatalog(workspaceId, initial, entryMode);
+  } = useWorkbookCatalog(workspaceId, initial);
   const {
     currentWorkbook,
     currentWorkbookRef,

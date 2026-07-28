@@ -45,8 +45,6 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
 
   const routeWorkspaceId = routeData?.workspace.id ?? null;
   const selectedWorkspaceId = routeWorkspaceId ?? activeWorkspaceId;
-  const initialLocationKeyRef = useRef(location.key);
-
   const domainInitial = useMemo(
     () => ({
       workbook: routeData?.workbooks
@@ -64,19 +62,7 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
     [routeData],
   );
 
-  const restoreWorkbookOnEntry = useMemo(() => {
-    if (location.key !== initialLocationKeyRef.current) return false;
-    if (typeof performance === "undefined") return false;
-    const navigation = performance.getEntriesByType("navigation")[0] as
-      | PerformanceNavigationTiming
-      | undefined;
-    return navigation?.type === "reload" || navigation?.type === "back_forward";
-  }, [location.key]);
-  const workbook = useWorkspaceView(
-    selectedWorkspaceId,
-    domainInitial.workbook,
-    restoreWorkbookOnEntry ? "restore" : "welcome",
-  );
+  const workbook = useWorkspaceView(selectedWorkspaceId, domainInitial.workbook);
   const session = useSessionWorkspace(
     selectedWorkspaceId,
     workbook.handleWorkspaceRefresh,

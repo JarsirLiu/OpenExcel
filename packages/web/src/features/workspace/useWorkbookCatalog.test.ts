@@ -43,7 +43,7 @@ describe("useWorkbookCatalog", () => {
       workbooks: [workbookMeta(10)],
       currentWorkbook: workbookFull(10),
     };
-    const { result, rerender } = renderHook(({ seed }) => useWorkbookCatalog(1, seed, "restore"), {
+    const { result, rerender } = renderHook(({ seed }) => useWorkbookCatalog(1, seed), {
       initialProps: { seed: initial },
     });
 
@@ -61,6 +61,19 @@ describe("useWorkbookCatalog", () => {
     expect(fetchWorkbooks).not.toHaveBeenCalled();
   });
 
+  it("selects a workbook when entering a workspace with catalog data", async () => {
+    const initial = {
+      workspaceId: 2,
+      workbooks: [workbookMeta(20), workbookMeta(21)],
+    };
+
+    const { result } = renderHook(() => useWorkbookCatalog(2, initial));
+
+    await waitFor(() => expect(result.current.transition?.targetWorkbookId).toBe(20));
+    expect(result.current.activeWorkbookId).toBe(20);
+    expect(result.current.loading).toBe(true);
+  });
+
   it("discards a late catalog response from the previous workspace", async () => {
     const firstCatalog = deferred<WorkbookMeta[]>();
     const secondCatalog = deferred<WorkbookMeta[]>();
@@ -68,7 +81,7 @@ describe("useWorkbookCatalog", () => {
       workspaceId === 1 ? firstCatalog.promise : secondCatalog.promise,
     );
     const { result, rerender } = renderHook(
-      ({ workspaceId }) => useWorkbookCatalog(workspaceId, undefined, "restore"),
+      ({ workspaceId }) => useWorkbookCatalog(workspaceId, undefined),
       {
         initialProps: { workspaceId: 1 },
       },
