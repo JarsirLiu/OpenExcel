@@ -13,6 +13,7 @@ type SessionInfra = {
   onAttachExcel: (files: File[]) => Promise<void> | void;
   referenceCacheRevision: number;
   onWorkspaceRefresh?: () => Promise<void> | void;
+  onChartsRefresh?: () => Promise<void> | void;
   onSheetChanged?: SheetChangedHandler;
   onUndoComplete?: () => Promise<void> | void;
   onUserTurnAccepted: (sessionId: number) => void;

@@ -164,9 +164,11 @@ export function collectWorkbookMutationToolCallIds(
   messages: ReadonlyArray<SheetPatchMessageLike>,
   seenToolCallIds: ReadonlySet<string>,
 ): string[] {
-  return collectWorkbookRefreshToolCallIds(messages, seenToolCallIds, {
+  const workbookToolCallIds = collectWorkbookRefreshToolCallIds(messages, seenToolCallIds, {
     sheetDeltasHandled: false,
   });
+  const seen = new Set([...seenToolCallIds, ...workbookToolCallIds]);
+  return [...workbookToolCallIds, ...collectChartMutationToolCallIds(messages, seen)];
 }
 
 export function collectWorkbookRefreshToolCallIds(
@@ -196,17 +198,24 @@ export function collectWorkbookRefreshToolCallIds(
     seenAfterStructureUpdates.add(update.toolCallId);
   }
 
+  return Array.from(toolCallIds);
+}
+
+export function collectChartMutationToolCallIds(
+  messages: ReadonlyArray<SheetPatchMessageLike>,
+  seenToolCallIds: ReadonlySet<string>,
+): string[] {
+  const toolCallIds: string[] = [];
   for (const message of messages) {
     if (message.role !== "assistant" || !Array.isArray(message.parts)) continue;
     for (const part of message.parts) {
-      if (!isCompletedToolPart(part) || seenAfterStructureUpdates.has(part.toolCallId)) continue;
+      if (!isCompletedToolPart(part) || seenToolCallIds.has(part.toolCallId)) continue;
       if (["createChart", "updateChart", "deleteChart"].includes(getToolName(part))) {
-        toolCallIds.add(part.toolCallId);
+        toolCallIds.push(part.toolCallId);
       }
     }
   }
-
-  return Array.from(toolCallIds);
+  return toolCallIds;
 }
 
 export function useSheetPatchSync(

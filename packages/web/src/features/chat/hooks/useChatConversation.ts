@@ -6,6 +6,7 @@ import { ConversationStore } from "../conversation/conversationStore";
 import { useChatHistory } from "./useChatHistory";
 import { useChatRun } from "./useChatRun";
 import {
+  collectChartMutationToolCallIds,
   collectWorkbookMutationToolCallIds,
   collectWorkbookRefreshToolCallIds,
 } from "./useSheetPatchSync";
@@ -36,6 +37,7 @@ export function useChatConversation({
   onUserTurnAccepted,
   initialCanUndo,
   onWorkspaceRefresh,
+  onChartsRefresh,
   onSheetChanged,
   onStreamingChange,
 }: {
@@ -46,6 +48,7 @@ export function useChatConversation({
   onUserTurnAccepted?: (sessionId: number) => void;
   initialCanUndo?: boolean;
   onWorkspaceRefresh?: () => Promise<void> | void;
+  onChartsRefresh?: () => Promise<void> | void;
   onSheetChanged?: SheetChangedHandler;
   onStreamingChange?: (isStreaming: boolean) => void;
 }) {
@@ -58,6 +61,7 @@ export function useChatConversation({
   const [historicalRefreshIds] = useState<Set<string>>(() => new Set());
   const hasPrimedWorkbookMutationHistoryRef = useRef(false);
   const pendingWorkspaceRefreshRef = useRef(false);
+  const pendingChartsRefreshRef = useRef(false);
   const wasStreamingRef = useRef(false);
 
   useEffect(
@@ -110,11 +114,13 @@ export function useChatConversation({
   }, [onStreamingChange, run.isStreaming]);
 
   useEffect(() => {
-    const toolCallIds = onSheetChanged
+    const workbookToolCallIds = onSheetChanged
       ? collectWorkbookRefreshToolCallIds(messages, historicalRefreshIds, {
           sheetDeltasHandled: true,
         })
       : collectWorkbookMutationToolCallIds(messages, historicalRefreshIds);
+    const chartToolCallIds = collectChartMutationToolCallIds(messages, historicalRefreshIds);
+    const toolCallIds = [...workbookToolCallIds, ...chartToolCallIds];
     if (toolCallIds.length === 0) {
       hasPrimedWorkbookMutationHistoryRef.current = true;
       return;
@@ -126,7 +132,8 @@ export function useChatConversation({
     }
     if (sessionId != null) markCanUndo();
     if (!run.isStreaming && !wasStreamingRef.current) return;
-    pendingWorkspaceRefreshRef.current = true;
+    if (workbookToolCallIds.length > 0) pendingWorkspaceRefreshRef.current = true;
+    if (chartToolCallIds.length > 0) pendingChartsRefreshRef.current = true;
   }, [markCanUndo, messages, onSheetChanged, run.isStreaming, sessionId, historicalRefreshIds]);
 
   const flushPendingWorkspaceRefresh = useCallback(async () => {
@@ -135,6 +142,12 @@ export function useChatConversation({
     await onWorkspaceRefresh?.();
   }, [onWorkspaceRefresh]);
 
+  const flushPendingChartsRefresh = useCallback(async () => {
+    if (!pendingChartsRefreshRef.current) return;
+    pendingChartsRefreshRef.current = false;
+    await onChartsRefresh?.();
+  }, [onChartsRefresh]);
+
   useEffect(() => {
     if (run.isStreaming) {
       wasStreamingRef.current = true;
@@ -142,8 +155,8 @@ export function useChatConversation({
     }
     if (!wasStreamingRef.current) return;
     wasStreamingRef.current = false;
-    void flushPendingWorkspaceRefresh();
-  }, [flushPendingWorkspaceRefresh, run.isStreaming]);
+    void Promise.all([flushPendingWorkspaceRefresh(), flushPendingChartsRefresh()]);
+  }, [flushPendingChartsRefresh, flushPendingWorkspaceRefresh, run.isStreaming]);
 
   const handleUndo = useCallback(async (): Promise<{ undoneUserText: string }> => {
     if (run.isStreaming) throw new Error("对话进行中，无法撤销");

@@ -9,6 +9,7 @@ import {
   chartRectEquals,
   rectToChartAnchor,
 } from "./chartAnchorGeometry";
+import type { ChartMutation } from "./chartMutation";
 
 export type ResizeDirection = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
 export type InteractionMode = "move" | { resize: ResizeDirection };
@@ -35,7 +36,7 @@ type Props = {
   charts: readonly ChartSpec[];
   layout: SheetGridLayout;
   workspaceId: number | null;
-  onWorkbookRefresh?: () => Promise<void> | void;
+  onChartMutation?: (mutation: ChartMutation) => void;
   onWorkbookMutation?: () => Promise<void> | void;
 };
 
@@ -88,7 +89,7 @@ export function useChartOverlayInteraction({
   charts,
   layout,
   workspaceId,
-  onWorkbookRefresh,
+  onChartMutation,
   onWorkbookMutation,
 }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -177,6 +178,7 @@ export function useChartOverlayInteraction({
         .then(async () => {
           try {
             const updatedChart = await updateChart(workspaceId, chart.id, { anchor: nextAnchor });
+            onChartMutation?.({ kind: "updated", chart: updatedChart });
             if (anchorSaveVersionRef.current[chart.id] === version) {
               setAnchorOverrides((current) => ({ ...current, [chart.id]: updatedChart.anchor }));
             }
@@ -207,7 +209,7 @@ export function useChartOverlayInteraction({
       anchorSaveChainRef.current[chart.id] = settled;
       await settled;
     },
-    [layout, onWorkbookMutation, workspaceId],
+    [layout, onChartMutation, onWorkbookMutation, workspaceId],
   );
 
   const removeChart = useCallback(
@@ -224,13 +226,13 @@ export function useChartOverlayInteraction({
       try {
         await deleteChart(workspaceId, chartId);
         setSelectedId(null);
-        await onWorkbookRefresh?.();
+        onChartMutation?.({ kind: "deleted", chartId });
         await onWorkbookMutation?.();
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "删除图表失败");
       }
     },
-    [onWorkbookMutation, onWorkbookRefresh, workspaceId],
+    [onChartMutation, onWorkbookMutation, workspaceId],
   );
 
   useEffect(() => {

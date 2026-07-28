@@ -4,6 +4,7 @@ import "@fortune-sheet/react/dist/index.css";
 import type { WorkbookFull } from "@/api/workbooks";
 import type { WorkbookStructureUpdate } from "@/features/sync/types";
 import { ChartOverlay } from "@/features/workbook/charts/ChartOverlay";
+import type { ChartMutation } from "@/features/workbook/charts/chartMutation";
 import { useChartInsertion } from "@/features/workbook/charts/useChartInsertion";
 import { normalizeSheetIndex } from "@/features/workspace/sheetIndex";
 import { type DemoGridFocus, useDemoGridFocus } from "./demoGridFocus";
@@ -69,6 +70,7 @@ interface Props {
   onWorkbookDelete?: (workbookId: number) => void;
   onWorkbookStructureChanged?: (update: WorkbookStructureUpdate) => void;
   onWorkbookRefresh?: () => Promise<void> | void;
+  onChartMutation?: (mutation: ChartMutation) => void;
   onWorkbookMutation?: () => Promise<void> | void;
   onSheetRevisionChanged?: (sheetId: number, revision: number) => void;
   demoGridFocus?: DemoGridFocus;
@@ -87,6 +89,7 @@ export function ExcelGrid({
   onWorkbookDelete,
   onWorkbookStructureChanged,
   onWorkbookRefresh,
+  onChartMutation,
   onWorkbookMutation,
   onSheetRevisionChanged,
   demoGridFocus,
@@ -142,7 +145,7 @@ export function ExcelGrid({
     workbook,
     workbookRef,
     currentSheetIndex,
-    onWorkbookRefresh,
+    onChartMutation,
     onWorkbookMutation,
   });
   const hooks = useMemo(
@@ -217,7 +220,7 @@ export function ExcelGrid({
               workbook={workbook}
               sheetId={String(currentSheet.id)}
               layout={currentSheetLayout}
-              onWorkbookRefresh={onWorkbookRefresh}
+              onChartMutation={onChartMutation}
               onWorkbookMutation={onWorkbookMutation}
               sheetLoaded={sheetLoaded}
               onSheetLoad={onSheetLoad}

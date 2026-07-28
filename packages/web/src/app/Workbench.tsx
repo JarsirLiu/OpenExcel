@@ -222,6 +222,7 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
           handleWorkbookRename={handleWorkbookRename}
           handleWorkbookStructureChanged={workbook.handleWorkbookStructureChanged}
           handleWorkbookRefresh={workbook.handleWorkbookRefresh}
+          onChartMutation={workbook.handleChartMutation}
           onWorkbookMutation={refreshUndoAvailability}
           onSheetRevisionChanged={workbook.handleSheetRevisionChanged}
         />
@@ -231,6 +232,7 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
         key={selectedWorkspaceId ?? "no-workspace"}
         workspaceId={selectedWorkspaceId}
         onWorkspaceRefresh={workbook.handleWorkspaceRefresh}
+        onChartsRefresh={workbook.handleChartsRefresh}
         onSheetChanged={workbook.handleSheetChanged}
         onAttachExcel={handleAttachExcel}
         referenceCacheRevision={workbook.referenceCacheRevision}

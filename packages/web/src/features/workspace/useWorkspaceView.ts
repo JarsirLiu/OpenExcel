@@ -1,5 +1,6 @@
 import type { SheetChangeDelta, SheetChangeVersion } from "@openexcel/core";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { listCharts } from "@/api/charts";
 import type { WorkbookFull, WorkbookMeta } from "@/api/workbooks";
 import {
   createWorkbook,
@@ -12,6 +13,7 @@ import {
 } from "@/api/workbooks";
 import type { WorkbookStructureUpdate } from "@/features/sync/types";
 import { mergeWorkbookSnapshot } from "@/features/sync/workbookRevision";
+import type { ChartMutation } from "@/features/workbook/charts/chartMutation";
 import { toast } from "@/shared/lib";
 import { patchWorkbookWithDelta } from "../workbook/utils/patchWorkbook";
 import { getSheetIndexAfterDeletion, normalizeSheetIndex } from "./sheetIndex";
@@ -46,6 +48,7 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
     loading,
     setWorkbooks,
     replaceCurrentWorkbook,
+    replaceCurrentWorkbookCharts,
     setWorkbookIdx,
     workbookRevision,
   } = useWorkbookCatalog(workspaceId, initial);
@@ -224,6 +227,48 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
       }
     }
   }, [beginRequest, currentWorkbook, isCurrentRequest, replaceWorkbookIfFresh, workspaceId]);
+
+  const refreshCurrentCharts = useCallback(async () => {
+    const workbook = currentWorkbookRef.current;
+    if (!workbook || workspaceId == null) return;
+    try {
+      const charts = await listCharts(workspaceId, workbook.id);
+      const latest = currentWorkbookRef.current;
+      if (!latest || latest.id !== workbook.id) return;
+      currentWorkbookRef.current = { ...latest, charts };
+      replaceCurrentWorkbookCharts(charts);
+    } catch (error) {
+      console.error("[workbook] Failed to refresh charts:", error);
+    }
+  }, [replaceCurrentWorkbookCharts, workspaceId]);
+
+  const handleChartMutation = useCallback(
+    (mutation: ChartMutation) => {
+      const workbook = currentWorkbookRef.current;
+      if (!workbook) return;
+
+      const charts = [...workbook.charts];
+      if (mutation.kind === "created") {
+        if (charts.some((chart) => chart.id === mutation.chart.id)) return;
+        charts.push(mutation.chart);
+      } else if (mutation.kind === "updated") {
+        const index = charts.findIndex((chart) => chart.id === mutation.chart.id);
+        if (index < 0) return;
+        charts[index] = mutation.chart;
+      } else {
+        const nextCharts = charts.filter((chart) => chart.id !== mutation.chartId);
+        if (nextCharts.length === charts.length) return;
+        currentWorkbookRef.current = { ...workbook, charts: nextCharts };
+        replaceCurrentWorkbookCharts(nextCharts);
+        return;
+      }
+
+      const nextWorkbook = { ...workbook, charts };
+      currentWorkbookRef.current = nextWorkbook;
+      replaceCurrentWorkbookCharts(charts);
+    },
+    [replaceCurrentWorkbookCharts],
+  );
 
   const refreshWorkspace = useCallback(async () => {
     if (workspaceId == null) return;
@@ -610,6 +655,8 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
     handleSheetRevisionChanged,
     handleWorkbookStructureChanged,
     handleWorkbookRefresh: refreshCurrentWorkbook,
+    handleChartsRefresh: refreshCurrentCharts,
+    handleChartMutation,
     handleWorkspaceRefresh: refreshWorkspace,
     handleSwitchWorkbook,
     handleNewWorkbookFileChange,

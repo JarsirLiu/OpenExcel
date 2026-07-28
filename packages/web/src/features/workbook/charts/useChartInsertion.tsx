@@ -5,6 +5,7 @@ import { createChart } from "@/api/charts";
 import type { WorkbookFull } from "@/api/workbooks";
 import { ChartIcon } from "./ChartIcon";
 import { ChartInsertDialog } from "./ChartInsertDialog";
+import type { ChartMutation } from "./chartMutation";
 import { type FortuneSelection, normalizeChartSelection } from "./chartSelection";
 
 type Props = {
@@ -12,7 +13,7 @@ type Props = {
   workbook: WorkbookFull | null;
   workbookRef: React.RefObject<WorkbookInstance | null>;
   currentSheetIndex: number;
-  onWorkbookRefresh?: () => Promise<void> | void;
+  onChartMutation?: (mutation: ChartMutation) => void;
   onWorkbookMutation?: () => Promise<void> | void;
 };
 
@@ -21,7 +22,7 @@ export function useChartInsertion({
   workbook,
   workbookRef,
   currentSheetIndex,
-  onWorkbookRefresh,
+  onChartMutation,
   onWorkbookMutation,
 }: Props) {
   const [open, setOpen] = useState(false);
@@ -64,11 +65,11 @@ export function useChartInsertion({
   const handleCreate = useCallback(
     async (draft: Omit<ChartSpec, "id">) => {
       if (workspaceId == null || !workbook) throw new Error("当前工作簿不可用");
-      await createChart(workspaceId, workbook.id, draft);
-      await onWorkbookRefresh?.();
+      const chart = await createChart(workspaceId, workbook.id, draft);
+      onChartMutation?.({ kind: "created", chart });
       await onWorkbookMutation?.();
     },
-    [onWorkbookMutation, onWorkbookRefresh, workbook, workspaceId],
+    [onChartMutation, onWorkbookMutation, workbook, workspaceId],
   );
 
   const selectedSheet =

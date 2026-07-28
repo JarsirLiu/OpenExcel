@@ -31,6 +31,7 @@ type Props = {
   sessionError?: Error;
   onAttachExcel: (files: File[]) => Promise<void> | void;
   onWorkspaceRefresh?: () => Promise<void> | void;
+  onChartsRefresh?: () => Promise<void> | void;
   onSheetChanged?: (
     sheetId: number,
     delta: SheetChangeDelta | null,
@@ -59,6 +60,7 @@ export function SessionShell({
   sessionError,
   onAttachExcel,
   onWorkspaceRefresh,
+  onChartsRefresh,
   onSheetChanged,
   referenceCacheRevision,
   currentUser,
@@ -96,6 +98,7 @@ export function SessionShell({
         onAttachExcel,
         referenceCacheRevision,
         onWorkspaceRefresh,
+        onChartsRefresh,
         onSheetChanged,
         onUndoComplete: handleUndoComplete,
         onUserTurnAccepted: handleUserTurnAccepted,

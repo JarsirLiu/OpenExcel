@@ -1,5 +1,6 @@
 import type { WorkbookFull } from "@/api/workbooks";
 import type { WorkbookStructureUpdate } from "@/features/sync/types";
+import type { ChartMutation } from "@/features/workbook/charts/chartMutation";
 import type { DemoGridFocus } from "@/features/workbook/editor/demoGridFocus";
 import { ExcelGrid } from "@/features/workbook/editor/ExcelGrid";
 import styles from "./ExcelWorkspace.module.css";
@@ -17,6 +18,7 @@ interface Props {
   onWorkbookDelete?: (workbookId: number) => void;
   onWorkbookStructureChanged?: (update: WorkbookStructureUpdate) => void;
   onWorkbookRefresh?: () => Promise<void>;
+  onChartMutation?: (mutation: ChartMutation) => void;
   onWorkbookMutation?: () => Promise<void> | void;
   onSheetRevisionChanged?: (sheetId: number, revision: number) => void;
   demoGridFocus?: DemoGridFocus;
@@ -35,6 +37,7 @@ export function ExcelWorkspace({
   onWorkbookDelete,
   onWorkbookStructureChanged,
   onWorkbookRefresh,
+  onChartMutation,
   onWorkbookMutation,
   onSheetRevisionChanged,
   demoGridFocus,
@@ -55,6 +58,7 @@ export function ExcelWorkspace({
           onWorkbookDelete={onWorkbookDelete}
           onWorkbookStructureChanged={onWorkbookStructureChanged}
           onWorkbookRefresh={onWorkbookRefresh}
+          onChartMutation={onChartMutation}
           onWorkbookMutation={onWorkbookMutation}
           onSheetRevisionChanged={onSheetRevisionChanged}
           demoGridFocus={demoGridFocus}

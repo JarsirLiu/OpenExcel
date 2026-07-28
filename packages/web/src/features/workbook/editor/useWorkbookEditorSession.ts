@@ -21,7 +21,7 @@ export function useWorkbookEditorSession(
   const sheetData = useMemo(() => {
     if (!workbook) return [];
     return workbook.sheets.map((sheet) => cloneForEditor(toFortuneSheetData(sheet)));
-  }, [workbook, revision]);
+  }, [workbook?.sheets, revision]);
 
   return {
     sheetData,

@@ -136,6 +136,10 @@ export function useWorkbookCatalog(workspaceId: number | null, initial?: Workboo
     setWorkbookRevision((revision) => revision + 1);
   }, []);
 
+  const replaceCurrentWorkbookCharts = useCallback((charts: WorkbookFull["charts"]) => {
+    setCurrentWorkbook((current) => (current ? { ...current, charts } : current));
+  }, []);
+
   useEffect(() => {
     saveIdx(workbookIdx);
   }, [workbookIdx]);
@@ -151,6 +155,7 @@ export function useWorkbookCatalog(workspaceId: number | null, initial?: Workboo
     setWorkbookIdx,
     currentWorkbook,
     replaceCurrentWorkbook,
+    replaceCurrentWorkbookCharts,
     workbookRevision,
     loading,
     switchWorkbook,

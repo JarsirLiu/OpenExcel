@@ -21,6 +21,7 @@ export function ChatPanel({
   const {
     workspaceId,
     onWorkspaceRefresh,
+    onChartsRefresh,
     onSheetChanged,
     onUndoComplete,
     onUserTurnAccepted,
@@ -54,6 +55,7 @@ export function ChatPanel({
     onUserTurnAccepted,
     initialCanUndo,
     onWorkspaceRefresh,
+    onChartsRefresh,
     onSheetChanged,
   });
 

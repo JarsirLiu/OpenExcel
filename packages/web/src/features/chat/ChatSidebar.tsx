@@ -12,6 +12,7 @@ type SessionWorkspaceState = ReturnType<typeof useSessionWorkspace>;
 
 export function ChatSidebar({
   onWorkspaceRefresh,
+  onChartsRefresh,
   onSheetChanged,
   onAttachExcel,
   referenceCacheRevision,
@@ -23,6 +24,7 @@ export function ChatSidebar({
   onNavigateSheet,
 }: {
   onWorkspaceRefresh?: () => Promise<void> | void;
+  onChartsRefresh?: () => Promise<void> | void;
   onSheetChanged?: (
     sheetId: number,
     delta: SheetChangeDelta | null,
@@ -43,6 +45,7 @@ export function ChatSidebar({
         {...sessionWorkspace}
         workspaceId={workspaceId}
         onWorkspaceRefresh={onWorkspaceRefresh}
+        onChartsRefresh={onChartsRefresh}
         onSheetChanged={onSheetChanged}
         referenceCacheRevision={referenceCacheRevision}
         onAttachExcel={onAttachExcel}

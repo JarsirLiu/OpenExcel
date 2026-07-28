@@ -1,6 +1,12 @@
 import type { ChartSpec } from "@openexcel/core";
 import { apiFetch, readErrorMessage } from "./http";
 
+export async function listCharts(workspaceId: number, workbookId: number): Promise<ChartSpec[]> {
+  const res = await apiFetch(`/workspaces/${workspaceId}/workbooks/${workbookId}/charts`);
+  if (!res.ok) throw new Error(await readErrorMessage(res, "加载图表失败"));
+  return res.json();
+}
+
 export async function createChart(
   workspaceId: number,
   workbookId: number,

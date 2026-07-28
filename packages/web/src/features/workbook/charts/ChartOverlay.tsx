@@ -5,6 +5,7 @@ import { normalizeSheetId } from "../sheetIdentity";
 import { ChartDataLayer } from "./ChartDataLayer";
 import styles from "./ChartOverlay.module.css";
 import { chartsForSheet } from "./chartBinding";
+import type { ChartMutation } from "./chartMutation";
 import { chartRectWithMinimumSize, useChartOverlayInteraction } from "./useChartOverlayInteraction";
 import { useChartViewport } from "./useChartViewport";
 
@@ -15,7 +16,7 @@ type Props = {
   workbook: WorkbookFull;
   sheetId: string;
   layout: SheetGridLayout;
-  onWorkbookRefresh?: () => Promise<void> | void;
+  onChartMutation?: (mutation: ChartMutation) => void;
   onWorkbookMutation?: () => Promise<void> | void;
   sheetLoaded: boolean;
   onSheetLoad: (sheetId: number) => Promise<void>;
@@ -30,7 +31,7 @@ export function ChartOverlay({
   workbook,
   sheetId,
   layout,
-  onWorkbookRefresh,
+  onChartMutation,
   onWorkbookMutation,
   sheetLoaded,
   onSheetLoad,
@@ -54,7 +55,7 @@ export function ChartOverlay({
     charts,
     layout,
     workspaceId,
-    onWorkbookRefresh,
+    onChartMutation,
     onWorkbookMutation,
   });
 

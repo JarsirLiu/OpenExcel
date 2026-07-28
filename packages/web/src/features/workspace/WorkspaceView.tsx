@@ -1,6 +1,7 @@
 import { useRef } from "react";
 import type { WorkbookFull } from "@/api/workbooks";
 import type { WorkbookStructureUpdate } from "@/features/sync/types";
+import type { ChartMutation } from "@/features/workbook/charts/chartMutation";
 import type { DemoGridFocus } from "@/features/workbook/editor/demoGridFocus";
 import { t } from "@/lib/i18n";
 import { ExcelWorkspace } from "../workbook/ui/ExcelWorkspace";
@@ -33,6 +34,7 @@ type Props = {
   handleWorkbookStructureChanged: (update: WorkbookStructureUpdate) => void;
   handleWorkbookRefresh: () => Promise<void>;
   onWorkbookMutation?: () => Promise<void> | void;
+  onChartMutation?: (mutation: ChartMutation) => void;
   onSheetRevisionChanged?: (sheetId: number, revision: number) => void;
   presentationMode?: boolean;
   demoGridFocus?: DemoGridFocus;
@@ -58,6 +60,7 @@ export function WorkspaceView({
   handleWorkbookStructureChanged,
   handleWorkbookRefresh,
   onWorkbookMutation,
+  onChartMutation,
   onSheetRevisionChanged,
   presentationMode = false,
   demoGridFocus,
@@ -107,6 +110,7 @@ export function WorkspaceView({
           onWorkbookStructureChanged={handleWorkbookStructureChanged}
           onWorkbookRefresh={handleWorkbookRefresh}
           onWorkbookMutation={onWorkbookMutation}
+          onChartMutation={onChartMutation}
           onSheetRevisionChanged={onSheetRevisionChanged}
           demoGridFocus={demoGridFocus}
         />
