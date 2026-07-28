@@ -353,7 +353,7 @@ The current implementation follows that direction with a cookie-backed email/pas
 - each browser gets an opaque session token stored in an HttpOnly cookie
 - the server resolves it to a current user at request time
 - registration or login only provisions the authentication session
-- an explicit authenticated bootstrap command provisions the user's private workspace
+- an explicit authenticated workspace creation command provisions the user's private workspace
 - workspace, workbook, sheet, and session reads are filtered by the current user
 
 This keeps the SQLite development path usable for multi-user demos without changing the workbook model or exposing internal sheet identifiers as a permission boundary, while leaving room for password reset, logout-all, and future SSO-style auth later.
@@ -483,9 +483,9 @@ Authentication and workspace boundaries have completed the first application-lay
 - `src/modules/auth/domain/*` owns auth contracts and predictable errors.
 - `src/modules/auth/infrastructure/*` owns Prisma persistence, password hashing, and session-cookie primitives.
 - `src/modules/workspaces/api/routes.ts` owns workspace HTTP adapters.
-- `src/modules/workspaces/application/*` owns workspace use cases and bootstrap orchestration.
+- `src/modules/workspaces/application/*` owns workspace resource use cases.
 - `src/modules/workspaces/domain/*` owns workspace errors and contracts.
-- `src/modules/workspaces/infrastructure/*` owns Prisma queries, resource-group transactions, and example provisioning.
+- `src/modules/workspaces/infrastructure/*` owns Prisma queries and resource-group transactions. Empty workspaces are presented by the web entry surface and receive content only through explicit user actions.
 - `src/modules/workbooks/api/*` owns workbook HTTP adapters, including nested sheet-structure endpoints.
 - `src/modules/workbooks/application/*` owns workbook import/export, creation/deletion, and sheet creation/deletion use cases.
 - `src/modules/workbooks/domain/*` owns workbook creation rules and predictable errors.
@@ -754,14 +754,14 @@ The known sync risks and their remediation order are tracked in
 The incremental protocol remains the target architecture: it must not become a second independent
 save system beside full snapshots.
 
-### 7.1.1 Authentication and workspace bootstrap flow
+### 7.1.1 Authentication and workspace entry flow
 
 1. Registration or login validates credentials and atomically creates the user and `AuthSession`.
 2. The server sets the opaque `openexcel_session` cookie and returns the current user.
-3. The web app calls `POST /api/workspaces/bootstrap`.
-4. The bootstrap use case provisions the initial workspace, workbook, and sheets in one idempotent transaction. It does not create a conversation `Session`.
-5. The web app navigates to the protected workbench route.
-6. The route loader reads `GET /api/workspaces`, then loads workbook metadata and conversation-session metadata for the selected workspace.
+3. The web app calls `GET /api/workspaces` and keeps the empty-project state when no workspace exists.
+4. The protected workbench route renders the workspace entry surface without creating application data.
+5. The user-facing creation flows compose resource APIs: new project creates a workspace and then a blank workbook; Excel import creates a workspace and then imports directly into it.
+6. For an existing workspace, the route loader reads `GET /api/workspaces`, then loads workbook metadata and conversation-session metadata for the selected workspace.
 
 Workbook opening uses a lightweight structure query first. `GET /api/workspaces/:workspaceId/workbooks/:id/structure`
 returns workbook metadata, Sheet identities/order/revisions, and chart definitions without cell data. The web
@@ -770,7 +770,7 @@ after first access. Unloaded Sheets remain tab-visible placeholders and are not 
 available. Chart rendering loads the ECharts renderer only when the active Sheet has charts, then loads any
 referenced Sheets through the same Sheet cache.
 
-`AuthSession` is the login identity. `Session` is the persisted conversation resource under a workspace. Login and workspace bootstrap must never create a conversation session.
+`AuthSession` is the login identity. `Session` is the persisted conversation resource under a workspace. Login and workspace entry never creates a conversation session.
 
 `GET /api/workspaces` is a read-only query. Initialization is never hidden inside a list request.
 
@@ -820,16 +820,16 @@ being guessed at runtime.
 
 The API surface should stay explicit.
 
-### 8.0 Authentication and bootstrap APIs
+### 8.0 Authentication and workspace APIs
 
 - `POST /api/auth/register`
 - `POST /api/auth/login`
 - `POST /api/auth/logout`
 - `GET /api/auth/me`
-- `POST /api/workspaces/bootstrap`
 - `GET /api/workspaces`
+- `POST /api/workspaces`
 
-The bootstrap command is authenticated and idempotent. The workspace list endpoint is read-only and must not create application data.
+Workspace creation is authenticated and only creates the workspace resource. Creating a blank workbook and importing an Excel file are separate workbook APIs composed by the web application. The workspace list endpoint is read-only and must not create application data.
 
 ### 8.1 Workbook APIs
 
@@ -881,7 +881,7 @@ Title must remain a separate endpoint.
 - `GET /api/workspaces/:workspaceId/workbooks/reference-candidates`
 
 This endpoint backs `@` mention suggestions in the chat composer.
-It should load on demand instead of being fetched during workbook bootstrap, so ordinary workbook open/delete flows stay fast.
+It should load on demand instead of being fetched during workbook creation, so ordinary workbook open/delete flows stay fast.
 
 ## 9. Server Execution Rules
 

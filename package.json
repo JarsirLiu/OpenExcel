@@ -5,22 +5,15 @@
   "packageManager": "pnpm@10.20.0",
   "type": "module",
   "description": "OpenExcel - JSON driven multi-sheet Excel workbench",
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "@prisma/client",
-      "@prisma/engines",
-      "esbuild",
-      "prisma"
-    ]
-  },
   "scripts": {
-    "dev": "pnpm db:migrate && concurrently --raw --kill-others-on-fail \"pnpm --filter @openexcel/server dev\" \"wait-on http://127.0.0.1:4000/api/health && pnpm --filter @openexcel/web dev\"",
+    "dev": "pnpm db:prepare && concurrently --raw --kill-others-on-fail \"pnpm --filter @openexcel/server dev\" \"wait-on http://127.0.0.1:4000/api/health && pnpm --filter @openexcel/web dev\"",
     "build": "pnpm --filter @openexcel/web build",
     "preview": "pnpm --filter @openexcel/web preview",
     "test": "pnpm --recursive --filter @openexcel/agent --filter @openexcel/core --filter @openexcel/server --filter @openexcel/web test",
     "test:core": "pnpm --filter @openexcel/core test",
     "test:server": "pnpm --filter @openexcel/server test",
     "test:web": "pnpm --filter @openexcel/web test",
+    "db:generate": "pnpm --filter @openexcel/server db:generate",
     "db:migrate": "pnpm --filter @openexcel/server db:migrate",
     "db:prepare": "pnpm --filter @openexcel/server db:prepare",
     "check": "biome check --write . && pnpm typecheck",

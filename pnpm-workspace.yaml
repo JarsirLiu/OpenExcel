@@ -5,3 +5,9 @@ packageExtensions:
     dependencies:
       lodash: ^4.0.0
       react: ^18.3.1
+
+onlyBuiltDependencies:
+  - '@prisma/client'
+  - '@prisma/engines'
+  - esbuild
+  - prisma

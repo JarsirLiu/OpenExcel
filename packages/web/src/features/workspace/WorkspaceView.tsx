@@ -8,6 +8,7 @@ import { preloadChartRenderer } from "../workbook/charts/ChartRendererBoundary";
 import { ExcelWorkspace } from "../workbook/ui/ExcelWorkspace";
 import { WorkbookHeader } from "../workbook/ui/WorkbookHeader";
 import type { WorkbookTransition } from "./useWorkbookCatalog";
+import { WorkspaceEmptyState } from "./WorkspaceEmptyState";
 import styles from "./WorkspaceView.module.css";
 
 type WorkbookMeta = {
@@ -33,6 +34,8 @@ type Props = {
   onSheetLoad: (sheetId: number) => Promise<void>;
   handleSwitchWorkbook: (index: number) => void;
   handleNewWorkbookFileChange: (files: File[]) => Promise<boolean>;
+  onCreateEmptyWorkbook: () => Promise<void>;
+  onImportEmptyWorkbook: (file: File) => Promise<void>;
   handleWorkbookDelete: (workbookId: number) => void;
   handleWorkbookRename: (workbookId: number, newName: string) => Promise<void>;
   handleWorkbookStructureChanged: (update: WorkbookStructureUpdate) => void;
@@ -61,6 +64,8 @@ export function WorkspaceView({
   onSheetLoad,
   handleSwitchWorkbook,
   handleNewWorkbookFileChange,
+  onCreateEmptyWorkbook,
+  onImportEmptyWorkbook,
   handleWorkbookDelete,
   handleWorkbookRename,
   handleWorkbookStructureChanged,
@@ -79,6 +84,18 @@ export function WorkspaceView({
 
   if (loading && !currentWorkbook) {
     return <div className={styles.loading}>{t("loading", "加载中...")}</div>;
+  }
+
+  if (!loading && currentWorkbook == null && transition == null) {
+    return (
+      <div className={styles.container}>
+        <WorkspaceEmptyState
+          hasWorkspace={workspaceId != null}
+          onCreateWorkbook={onCreateEmptyWorkbook}
+          onImportWorkbook={onImportEmptyWorkbook}
+        />
+      </div>
+    );
   }
 
   return (

@@ -11,11 +11,33 @@ function localTimeISO() {
 }
 
 /* ───── 非请求日志 ───── */
-function otherFormat(level: string, msg: string) {
+function otherFormat(level: string, log: Record<string, unknown>) {
+  const error = log.err;
   return JSON.stringify({
     time: localTimeISO(),
     level: level.toLowerCase(),
-    msg,
+    msg: typeof log.msg === "string" ? log.msg : undefined,
+    ...(typeof log.scope === "string" ? { scope: log.scope } : {}),
+    ...(typeof log.operation === "string" ? { operation: log.operation } : {}),
+    ...(typeof log.email === "string" ? { email: log.email } : {}),
+    ...(error && typeof error === "object"
+      ? {
+          error: {
+            name:
+              typeof (error as { type?: unknown }).type === "string"
+                ? (error as { type: string }).type
+                : undefined,
+            message:
+              typeof (error as { message?: unknown }).message === "string"
+                ? (error as { message: string }).message
+                : undefined,
+            code:
+              typeof (error as { code?: unknown }).code === "string"
+                ? (error as { code: string }).code
+                : undefined,
+          },
+        }
+      : {}),
   });
 }
 
@@ -33,7 +55,7 @@ export const pinoStream = new Writable({
         return;
       }
 
-      console.log(otherFormat(level, log.msg));
+      console.log(otherFormat(level, log));
     } catch {
       console.log(chunk.toString().trim());
     }

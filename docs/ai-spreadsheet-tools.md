@@ -262,6 +262,83 @@ C4 = B4 * 10
 - 组合图可以额外传入 `seriesTypes`，每个系列只能是 `bar`、`line` 或 `area`；
 - `updateChart` 使用相同的锚点结构，`listCharts` 返回持久化后的锚点和数据引用；图表变更完成后，Web 通过工作簿刷新契约重新读取 ChartSpec。
 
+### 2.5 大型 Sheet 的认知工具
+
+工作簿和 Sheet 的身份清单由会话上下文默认注入，工具不重复提供工作簿目录工具。工具只负责在模型已经知道 `workbookId` 和 `sheetId` 后，按需建立对目标 Sheet 的认知。
+
+对于上万行数据，模型不应该通过连续调用 `readSheetData` 读取整张表。工具分工应当是：
+
+```text
+inspectSheet       建立 Sheet 结构画像
+findSheetCells     定位值、公式或格式匹配区域
+analyzeSheetRange  在 server 侧统计、聚合和审计
+readSheetData      读取定位后的少量精确区域
+readSheetObjects   读取图表、筛选、表格等对象摘要
+```
+
+#### `inspectSheet`
+
+这是只读的 Sheet 结构画像工具，不返回完整二维数据。输入只需要 `sheetId` 和可选的 `include` 项：
+
+```json
+{
+  "sheetId": 4,
+  "include": ["schema", "samples", "formulas", "formats", "objects"]
+}
+```
+
+返回内容包括：
+
+- used range、行列数和数据区域候选；
+- 表头候选及其置信信息；
+- 文本、数字、日期、公式和混合列的类型摘要；
+- 前几行、后几行和非空样本；
+- 公式数量、公式模式和公式异常数量；
+- 空值、错误值和重复值统计；
+- 主要数字格式、表头格式和格式区域；
+- 合并、筛选、图表、表格和透视表的对象摘要。
+
+它只返回统计、样本和引用，不返回完整单元格矩阵。画像必须带有 `sheetId` 和 `revision`，模型不能把旧 revision 的画像用于写入决策。
+
+#### `analyzeSheetRange`
+
+这是 server 侧分析工具，不把原始大范围数据传给模型。输入包含 `sheetId`、A1 `range`、分析操作、分组列、值列和结果上限。初始操作建议包括：
+
+- `summary`：行数、列数、数值统计、空值率和错误值；
+- `distinct`：去重值及频次；
+- `group`：按列分组聚合；
+- `top` / `bottom`：最大或最小的前 N 项；
+- `formulaAudit`：公式覆盖率、模式和异常；
+- `nulls` / `errors`：空值和错误位置摘要。
+
+分析结果必须返回结果范围、数据 revision、使用的列和是否截断，不返回没有边界的巨大数组。分析工具只读，不负责写入、格式化或生成图表。
+
+#### `findSheetCells` 的分页约束
+
+`findSheetCells` 继续作为定位工具的唯一契约，不另起一套功能重复的 `searchSheet` 工具。它必须支持明确的 `limit` 和结构化 `cursor`，并可选返回有限的上下文范围。默认结果不能因为命中数量过大而无限扩张；模型应当先定位，再调用 `readSheetData` 读取具体区域。
+
+### 2.6 工具能力与数据持久化边界
+
+工具不拥有第二份权威 Sheet 数据。持久化和查询分成两个层次：
+
+```text
+SheetSnapshot                         权威数据源
+  -> SheetReadIndex(sheetId, revision) 可重建的派生读取模型
+  -> inspect/find/analyze/read          模型工具查询
+```
+
+第一阶段保留现有 Sheet 快照作为权威数据，新增按 `sheetId + revision` 标识的派生读取索引。索引可以包含 used range、区域统计、表头候选、公式索引、文本索引、格式指纹、对象索引和按行块统计。写入或结构变更提交新 revision 后，旧索引失效，新索引可以延迟构建。
+
+索引必须满足以下约束：
+
+- 可以从权威快照完全重建；
+- 不参与写入正确性、撤销判断或图表定义持久化；
+- revision 不一致时不能返回给模型；
+- 索引构建失败不能破坏 Sheet 写入；
+- 查询必须有扫描范围、结果上限和取消边界。
+
+如果数据规模继续增长到几十万或百万级单元格，再将单块 JSON 快照演进为按行块或区域块存储。不要直接把每个单元格拆成一条数据库记录；这会放大写入事务、格式维护、合并维护和撤销快照的复杂度。区域块是性能优化，不能成为第二套业务状态。
+
 ## 3. 模块职责
 
 ```text
@@ -272,14 +349,17 @@ packages/core
   sheetDataProjection       值、公式模式、合并区域、分页
   sheetCellQuery             值/公式/直接格式定位
   sheetObjectProjection      图表、筛选、表格、透视表摘要
+  sheetProfileProjection     Sheet 结构、类型、样本和统计摘要
+  sheetRangeAnalysis         有界范围的纯统计和聚合
                          |
                          v
 packages/server
   授权、读取 Sheet、调用 core 投影、执行工具
+  SheetReadIndex 的构建、revision 校验和失效管理
                          |
                          v
 packages/agent
-  Zod 输入契约、工具目录、模型说明
+  Zod 输入契约、工具目录、模型说明和结果预算
 ```
 
 约束：
@@ -294,7 +374,9 @@ packages/agent
 
 ### 默认结果
 
-默认读取只包含：
+工作空间下的工作簿和 Sheet 身份清单由会话上下文默认注入，不属于本专项工具。工具调用只需要引用已经注入的稳定 ID。
+
+默认的精确数据读取只包含：
 
 - Sheet 身份；
 - 请求范围；
@@ -303,6 +385,19 @@ packages/agent
 - 压缩后的公式模式。
 
 单元格查询和图表、筛选、表格、透视表等对象都必须按需读取。
+
+大型 Sheet 的默认认知流程是：
+
+```text
+默认上下文：工作簿和 Sheet ID/name
+  -> inspectSheet：结构画像、样本和对象引用
+  -> findSheetCells：定位值、公式或格式
+  -> analyzeSheetRange：服务端统计、聚合或审计
+  -> readSheetData：读取少量关键范围
+  -> 独立修改工具：执行写入、格式或图表变更
+```
+
+模型不应通过分页读取完整 Sheet 来完成常规理解。只有用户明确要求逐行检查、导出或精确核对时，才允许持续消费 `readSheetData` 的 continuation。
 
 ### 预算规则
 
@@ -329,6 +424,14 @@ packages/agent
 
 “这个 Sheet 有哪些图表和筛选”
   -> readSheetObjects
+
+“理解这个 Sheet 的结构”
+  -> inspectSheet
+
+“统计每个部门的金额并找出异常”
+  -> inspectSheet
+  -> analyzeSheetRange
+  -> readSheetData（只读取异常或需要展示的范围）
 ```
 
 ## 5. 验收标准
@@ -342,3 +445,7 @@ packages/agent
 - 大范围读取不会被通用结果压缩器随机截断；
 - 模型可以仅凭 A1 范围、二维数组、公式模式和合并区域准确定位单元格；
 - 数据、查询和 Excel 对象模块可以独立测试和演进。
+- `inspectSheet` 不返回完整数据矩阵，但能让模型知道目标区域、数据类型、公式、格式和对象摘要。
+- 大范围统计在 server/core 侧完成，模型只接收有界的聚合结果。
+- `SheetReadIndex` 只能由 `SheetSnapshot + revision` 重建，不能成为第二份权威数据。
+- 旧 revision 的画像、索引和分析结果不会被用于新的写入决策。

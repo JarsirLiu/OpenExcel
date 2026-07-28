@@ -13,65 +13,12 @@ import {
   fetchWorkbookStructure,
   fetchWorkbooks,
 } from "./workbooks";
-import { bootstrapWorkspace } from "./workspaces";
 
 const mockFetch = vi.fn();
 globalThis.fetch = mockFetch;
 
 beforeEach(() => {
   mockFetch.mockReset();
-});
-
-describe("bootstrapWorkspace", () => {
-  it("uses the explicit bootstrap endpoint", async () => {
-    const workspace = { id: 1, publicId: "ws_test", name: "Test", order: 0 };
-    mockFetch.mockResolvedValue(new Response(JSON.stringify(workspace), { status: 200 }));
-
-    await expect(bootstrapWorkspace()).resolves.toEqual(workspace);
-    expect(mockFetch).toHaveBeenCalledWith("/api/workspaces/bootstrap", { method: "POST" });
-  });
-
-  it("does not cache a completed bootstrap result", async () => {
-    const firstWorkspace = { id: 1, publicId: "ws_first", name: "First", order: 0 };
-    const secondWorkspace = { id: 2, publicId: "ws_second", name: "Second", order: 0 };
-    mockFetch
-      .mockResolvedValueOnce(new Response(JSON.stringify(firstWorkspace), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify(secondWorkspace), { status: 200 }));
-
-    await expect(bootstrapWorkspace()).resolves.toEqual(firstWorkspace);
-    await expect(bootstrapWorkspace()).resolves.toEqual(secondWorkspace);
-
-    expect(mockFetch).toHaveBeenCalledTimes(2);
-  });
-
-  it("does not share concurrent bootstrap requests", async () => {
-    const firstWorkspace = { id: 1, publicId: "ws_first", name: "First", order: 0 };
-    const secondWorkspace = { id: 2, publicId: "ws_second", name: "Second", order: 0 };
-    let resolveFirst: (response: Response) => void = () => {};
-    let resolveSecond: (response: Response) => void = () => {};
-    mockFetch
-      .mockReturnValueOnce(
-        new Promise<Response>((resolve) => {
-          resolveFirst = resolve;
-        }),
-      )
-      .mockReturnValueOnce(
-        new Promise<Response>((resolve) => {
-          resolveSecond = resolve;
-        }),
-      );
-
-    const firstRequest = bootstrapWorkspace();
-    const secondRequest = bootstrapWorkspace();
-    expect(mockFetch).toHaveBeenCalledTimes(2);
-
-    resolveFirst(new Response(JSON.stringify(firstWorkspace), { status: 200 }));
-    resolveSecond(new Response(JSON.stringify(secondWorkspace), { status: 200 }));
-    await expect(Promise.all([firstRequest, secondRequest])).resolves.toEqual([
-      firstWorkspace,
-      secondWorkspace,
-    ]);
-  });
 });
 
 describe("fetchWorkbooks", () => {

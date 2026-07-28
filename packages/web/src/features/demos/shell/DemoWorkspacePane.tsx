@@ -100,6 +100,7 @@ export const DemoWorkspacePane = memo(function DemoWorkspacePane({
         homeLabel="返回案例库"
         activeWorkspaceId={demoWorkspace.id}
         onWorkspaceSelect={() => undefined}
+        onWorkspaceCreate={async () => demoWorkspace}
         workspaces={[demoWorkspace]}
         onRefresh={() => undefined}
         workbooksMap={new Map([[demoWorkspace.id, workbookMetas]])}
@@ -128,6 +129,8 @@ export const DemoWorkspacePane = memo(function DemoWorkspacePane({
           onSheetLoad={async () => undefined}
           handleSwitchWorkbook={handleWorkbookSwitch}
           handleNewWorkbookFileChange={handleWorkbookImportNoop}
+          onCreateEmptyWorkbook={async () => undefined}
+          onImportEmptyWorkbook={async () => undefined}
           handleWorkbookDelete={handleWorkbookDeleteNoop}
           handleWorkbookRename={handleWorkbookNoop}
           handleWorkbookStructureChanged={handleStructureNoop}

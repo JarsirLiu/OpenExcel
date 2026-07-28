@@ -1,13 +1,6 @@
 import { provisionWorkspaceResources } from "../infrastructure/workspaceProvisioner.js";
-import * as workspaceRepository from "../infrastructure/workspaceRepository.js";
 
 export async function createWorkspace(ownerUserId: number, name?: string) {
-  return provisionWorkspaceResources(ownerUserId, name?.trim() || "新项目");
-}
-
-export async function ensureWorkspaceForUser(ownerUserId: number) {
-  const workspaces = await workspaceRepository.findWorkspaces(ownerUserId);
-  if (workspaces.length > 0) return workspaces[0];
-
-  return createWorkspace(ownerUserId);
+  const workspaceName = name?.trim() || "新项目";
+  return provisionWorkspaceResources(ownerUserId, workspaceName);
 }

@@ -48,10 +48,9 @@ vi.mock("./api/auth.js", () => ({
 }));
 
 vi.mock("./api/workspaces.js", () => ({
-  fetchWorkspaces: vi.fn().mockResolvedValue([]),
-  bootstrapWorkspace: vi
+  fetchWorkspaces: vi
     .fn()
-    .mockResolvedValue({ id: 1, publicId: "ws_test", name: "Test", order: 0 }),
+    .mockResolvedValue([{ id: 1, publicId: "ws_test", name: "Test", order: 0 }]),
 }));
 
 vi.mock("./api/workbooks.js", () => ({

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, Outlet, useLoaderData, useLocation, useNavigate } from "react-router-dom";
 import type { CurrentUser } from "@/api/auth";
-import { bootstrapWorkspace } from "@/api/workspaces";
+import { fetchWorkspaces } from "@/api/workspaces";
 import { getInternalReturnTo, routePaths } from "@/app/routePaths";
 import { AuthScreen } from "@/features/auth/AuthScreen";
 import { useAuthActions } from "@/features/auth/useAuthActions";
@@ -33,8 +33,9 @@ export function AuthPage({
     setStartError(null);
     setStarting(true);
     try {
-      const workspace = await bootstrapWorkspace();
-      navigate(routePaths.workspace(workspace.publicId));
+      const workspaces = await fetchWorkspaces();
+      const workspace = workspaces[0] ?? null;
+      navigate(workspace ? routePaths.workspace(workspace.publicId) : routePaths.workspaceRoot);
     } catch (error) {
       setStartError(error instanceof Error ? error.message : "进入工作区失败，请重试");
       throw error;

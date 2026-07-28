@@ -43,7 +43,7 @@ describe("useWorkbookCatalog", () => {
       workbooks: [workbookMeta(10)],
       currentWorkbook: workbookFull(10),
     };
-    const { result, rerender } = renderHook(({ seed }) => useWorkbookCatalog(1, seed), {
+    const { result, rerender } = renderHook(({ seed }) => useWorkbookCatalog(1, seed, "restore"), {
       initialProps: { seed: initial },
     });
 
@@ -67,9 +67,12 @@ describe("useWorkbookCatalog", () => {
     fetchWorkbooks.mockImplementation((workspaceId: number) =>
       workspaceId === 1 ? firstCatalog.promise : secondCatalog.promise,
     );
-    const { result, rerender } = renderHook(({ workspaceId }) => useWorkbookCatalog(workspaceId), {
-      initialProps: { workspaceId: 1 },
-    });
+    const { result, rerender } = renderHook(
+      ({ workspaceId }) => useWorkbookCatalog(workspaceId, undefined, "restore"),
+      {
+        initialProps: { workspaceId: 1 },
+      },
+    );
 
     rerender({ workspaceId: 2 });
     await act(async () => {

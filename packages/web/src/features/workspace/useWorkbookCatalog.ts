@@ -41,6 +41,8 @@ export type WorkbookInitial = {
   currentWorkbook?: WorkbookFull | null;
 };
 
+export type WorkbookEntryMode = "welcome" | "restore";
+
 export type WorkbookTransition = {
   targetWorkbookId: number;
   status: "loading" | "failed";
@@ -60,7 +62,11 @@ type CatalogImportResult = {
   error: unknown | null;
 };
 
-export function useWorkbookCatalog(workspaceId: number | null, initial?: WorkbookInitial) {
+export function useWorkbookCatalog(
+  workspaceId: number | null,
+  initial: WorkbookInitial | undefined,
+  entryMode: WorkbookEntryMode,
+) {
   const [workbooks, setWorkbooks] = useState<WorkbookMeta[]>(initial?.workbooks ?? []);
   const [activeWorkbookId, setActiveWorkbookId] = useState<number | null>(
     initial?.currentWorkbook?.id ?? null,
@@ -96,15 +102,21 @@ export function useWorkbookCatalog(workspaceId: number | null, initial?: Workboo
       const initialWorkbookIdx = initial.currentWorkbook
         ? safeList.findIndex((workbook) => workbook.id === initial.currentWorkbook?.id)
         : loadStoredIdx(workspaceId);
+      const hasHydratedDocument = initial.currentWorkbook != null;
+      const shouldRestore = entryMode === "restore";
       const idx = Math.min(initialWorkbookIdx >= 0 ? initialWorkbookIdx : 0, safeList.length - 1);
-      const nextId = safeList[idx >= 0 ? idx : 0]?.id ?? null;
+      const nextId = hasHydratedDocument
+        ? (initial.currentWorkbook?.id ?? null)
+        : shouldRestore
+          ? (safeList[idx >= 0 ? idx : 0]?.id ?? null)
+          : null;
       setActiveWorkbookId(nextId);
       if (initial.currentWorkbook == null && nextId != null) {
         setTransition({ targetWorkbookId: nextId, status: "loading" });
       } else {
         setTransition(null);
       }
-      setLoading(safeList.length > 0 && initial.currentWorkbook == null);
+      setLoading(!hasHydratedDocument && shouldRestore && safeList.length > 0);
       return () => controller.abort();
     }
 

@@ -32,6 +32,18 @@ function sendAuthError(reply: FastifyReply, error: unknown) {
   throw error;
 }
 
+function logAuthFailure(
+  req: FastifyRequest,
+  operation: "register" | "login",
+  email: string,
+  error: unknown,
+) {
+  req.log.error(
+    { err: error, scope: "auth", operation, email },
+    "authentication persistence failed",
+  );
+}
+
 function requestMetadata(req: FastifyRequest) {
   return {
     userAgent: typeof req.headers["user-agent"] === "string" ? req.headers["user-agent"] : null,
@@ -72,6 +84,9 @@ export async function authRoutes(app: FastifyInstance) {
       reply.header("Set-Cookie", buildSessionCookie(result.rawToken));
       return reply.status(201).send({ user: result.user });
     } catch (error) {
+      if (!(error instanceof AuthError)) {
+        logAuthFailure(req, "register", parsed.data.email, error);
+      }
       return sendAuthError(reply, error);
     }
   });
@@ -87,6 +102,9 @@ export async function authRoutes(app: FastifyInstance) {
       reply.header("Set-Cookie", buildSessionCookie(result.rawToken));
       return { user: result.user };
     } catch (error) {
+      if (!(error instanceof AuthError)) {
+        logAuthFailure(req, "login", parsed.data.email, error);
+      }
       return sendAuthError(reply, error);
     }
   });

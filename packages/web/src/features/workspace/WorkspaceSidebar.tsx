@@ -3,7 +3,7 @@ import { useCallback, useRef, useState } from "react";
 import type { WorkbookMeta } from "@/api/workbooks";
 import { downloadWorkbook } from "@/api/workbooks";
 import type { Workspace } from "@/api/workspaces";
-import { createWorkspace, deleteWorkspace, renameWorkspace } from "@/api/workspaces";
+import { deleteWorkspace, renameWorkspace } from "@/api/workspaces";
 import { t } from "@/lib/i18n";
 import { confirm } from "@/shared/lib";
 import {
@@ -16,6 +16,7 @@ type Props = {
   onNavigateHome: () => void;
   activeWorkspaceId: number | null;
   onWorkspaceSelect: (workspace: Workspace) => void;
+  onWorkspaceCreate: () => Promise<Workspace>;
   workspaces: Workspace[];
   onRefresh: () => void;
   workbooksMap: Map<number, WorkbookMeta[]>;
@@ -32,6 +33,7 @@ export function WorkspaceSidebar({
   onNavigateHome,
   activeWorkspaceId,
   onWorkspaceSelect,
+  onWorkspaceCreate,
   workspaces,
   onRefresh,
   workbooksMap,
@@ -74,12 +76,12 @@ export function WorkspaceSidebar({
   const handleCreate = useCallback(async () => {
     if (readOnly) return;
     try {
-      const ws = await createWorkspace(t("new_project", "新项目"));
+      const ws = await onWorkspaceCreate();
       onWorkspaceSelect(ws);
     } catch (e) {
       console.error("创建项目失败:", e);
     }
-  }, [onWorkspaceSelect, readOnly]);
+  }, [onWorkspaceCreate, onWorkspaceSelect, readOnly]);
 
   const handleSelect = useCallback(
     (workspace: Workspace) => {

@@ -5,12 +5,18 @@ import { ChatSidebar } from "@/features/chat/ChatSidebar";
 import { useSessionWorkspace } from "@/features/session/useSessionWorkspace";
 import type { ChartMutation } from "@/features/workbook/charts/chartMutation";
 import { useSheetActivation } from "@/features/workbook/editor/SheetActivationContext";
+import {
+  createProject,
+  createProjectFromImport,
+  createProjectWithBlankWorkbook,
+} from "@/features/workspace/projectCreation";
 import { useWorkspaceSidebarLayout } from "@/features/workspace/useWorkspaceSidebarLayout";
 import { useWorkspaceState } from "@/features/workspace/useWorkspaceState";
 import { useWorkspaceView } from "@/features/workspace/useWorkspaceView";
 import { WorkspaceSidebar } from "@/features/workspace/WorkspaceSidebar";
 import { WorkspaceView } from "@/features/workspace/WorkspaceView";
 import { usePanelResize } from "@/shared/hooks/usePanelResize";
+import { toast } from "@/shared/lib";
 import type { WorkbenchRouteData } from "./routeData";
 import styles from "./Workbench.module.css";
 
@@ -39,6 +45,7 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
 
   const routeWorkspaceId = routeData?.workspace.id ?? null;
   const selectedWorkspaceId = routeWorkspaceId ?? activeWorkspaceId;
+  const initialLocationKeyRef = useRef(location.key);
 
   const domainInitial = useMemo(
     () => ({
@@ -57,7 +64,19 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
     [routeData],
   );
 
-  const workbook = useWorkspaceView(selectedWorkspaceId, domainInitial.workbook);
+  const restoreWorkbookOnEntry = useMemo(() => {
+    if (location.key !== initialLocationKeyRef.current) return false;
+    if (typeof performance === "undefined") return false;
+    const navigation = performance.getEntriesByType("navigation")[0] as
+      | PerformanceNavigationTiming
+      | undefined;
+    return navigation?.type === "reload" || navigation?.type === "back_forward";
+  }, [location.key]);
+  const workbook = useWorkspaceView(
+    selectedWorkspaceId,
+    domainInitial.workbook,
+    restoreWorkbookOnEntry ? "restore" : "welcome",
+  );
   const session = useSessionWorkspace(
     selectedWorkspaceId,
     workbook.handleWorkspaceRefresh,
@@ -73,6 +92,15 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
     },
     [location.pathname, navigate],
   );
+
+  const handleWorkspaceCreate = useCallback(async () => {
+    try {
+      return await createProject();
+    } catch (error) {
+      toast({ message: error instanceof Error ? error.message : "创建项目失败", variant: "error" });
+      throw error;
+    }
+  }, []);
 
   const activeWorkbookId = useMemo(
     () => workbook.currentWorkbook?.id ?? workbook.workbooks[workbook.workbookIdx]?.id ?? null,
@@ -131,6 +159,37 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
       await refreshUndoAvailability();
     },
     [handleWorkbookImport, refreshUndoAvailability],
+  );
+
+  const handleCreateEmptyWorkbook = useCallback(async () => {
+    try {
+      if (selectedWorkspaceId != null) {
+        await workbook.handleCreateWorkbook(selectedWorkspaceId);
+        await refreshWorkbooks(workspaces);
+        return;
+      }
+      const workspace = await createProjectWithBlankWorkbook();
+      navigate(`/workspaces/${workspace.publicId}`);
+    } catch (error) {
+      toast({ message: error instanceof Error ? error.message : "创建失败", variant: "error" });
+    }
+  }, [navigate, refreshWorkbooks, selectedWorkspaceId, workbook.handleCreateWorkbook, workspaces]);
+
+  const handleImportEmptyWorkbook = useCallback(
+    async (file: File) => {
+      if (selectedWorkspaceId != null) {
+        await handleWorkbookImport([file]);
+        return;
+      }
+
+      try {
+        const workspace = await createProjectFromImport(file);
+        navigate(`/workspaces/${workspace.publicId}`);
+      } catch (error) {
+        toast({ message: error instanceof Error ? error.message : "导入失败", variant: "error" });
+      }
+    },
+    [handleWorkbookImport, navigate, selectedWorkspaceId],
   );
 
   const handleWorkbookRename = useCallback(
@@ -200,6 +259,7 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
         onNavigateHome={() => navigate("/")}
         activeWorkspaceId={selectedWorkspaceId}
         onWorkspaceSelect={handleWorkspaceSelect}
+        onWorkspaceCreate={handleWorkspaceCreate}
         workspaces={workspaces}
         onRefresh={workspaceRefresh}
         workbooksMap={workbooksMap}
@@ -228,6 +288,8 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
           onSheetLoad={workbook.loadSheetById}
           handleSwitchWorkbook={workbook.handleSwitchWorkbook}
           handleNewWorkbookFileChange={handleWorkbookImport}
+          onCreateEmptyWorkbook={handleCreateEmptyWorkbook}
+          onImportEmptyWorkbook={handleImportEmptyWorkbook}
           handleWorkbookDelete={workbook.handleWorkbookDelete}
           handleWorkbookRename={handleWorkbookRename}
           handleWorkbookStructureChanged={workbook.handleWorkbookStructureChanged}
@@ -238,20 +300,22 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
         />
         <div className={styles.resizeHandle} onMouseDown={chatSidebarLayout.handleMouseDown} />
       </div>
-      <ChatSidebar
-        key={selectedWorkspaceId ?? "no-workspace"}
-        workspaceId={selectedWorkspaceId}
-        onWorkspaceRefresh={workbook.handleWorkspaceRefresh}
-        onChartsRefresh={workbook.handleChartsRefresh}
-        onSheetChanged={workbook.handleSheetChanged}
-        onAttachExcel={handleAttachExcel}
-        referenceCacheRevision={workbook.referenceCacheRevision}
-        currentUser={currentUser}
-        onLogout={onLogout}
-        style={{ width: chatSidebarLayout.width }}
-        sessionWorkspace={session}
-        onNavigateSheet={handleNavigateSheet}
-      />
+      {selectedWorkspaceId != null && (
+        <ChatSidebar
+          key={selectedWorkspaceId ?? "no-workspace"}
+          workspaceId={selectedWorkspaceId}
+          onWorkspaceRefresh={workbook.handleWorkspaceRefresh}
+          onChartsRefresh={workbook.handleChartsRefresh}
+          onSheetChanged={workbook.handleSheetChanged}
+          onAttachExcel={handleAttachExcel}
+          referenceCacheRevision={workbook.referenceCacheRevision}
+          currentUser={currentUser}
+          onLogout={onLogout}
+          style={{ width: chatSidebarLayout.width }}
+          sessionWorkspace={session}
+          onNavigateSheet={handleNavigateSheet}
+        />
+      )}
     </div>
   );
 }

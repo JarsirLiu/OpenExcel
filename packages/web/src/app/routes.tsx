@@ -112,13 +112,25 @@ export const routes: RouteObject[] = [
         loader: protectedLoader,
         children: [
           {
-            id: "workspace-route",
-            path: "workspaces/:workspacePublicId",
-            loader: workspaceLoader,
-            lazy: async () => {
-              const { WorkbenchRoutePage } = await import("@/app/WorkbenchRoutePage");
-              return { Component: WorkbenchRoutePage };
-            },
+            path: "workspaces",
+            children: [
+              {
+                index: true,
+                lazy: async () => {
+                  const { WorkbenchRoutePage } = await import("@/app/WorkbenchRoutePage");
+                  return { Component: WorkbenchRoutePage };
+                },
+              },
+              {
+                id: "workspace-route",
+                path: ":workspacePublicId",
+                loader: workspaceLoader,
+                lazy: async () => {
+                  const { WorkbenchRoutePage } = await import("@/app/WorkbenchRoutePage");
+                  return { Component: WorkbenchRoutePage };
+                },
+              },
+            ],
           },
         ],
       },

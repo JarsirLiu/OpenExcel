@@ -13,16 +13,6 @@ export async function fetchWorkspaces(options?: { signal?: AbortSignal }): Promi
   return res.json();
 }
 
-export async function bootstrapWorkspace(): Promise<Workspace> {
-  return requestBootstrapWorkspace();
-}
-
-async function requestBootstrapWorkspace(): Promise<Workspace> {
-  const res = await apiFetch("/workspaces/bootstrap", { method: "POST" });
-  if (!res.ok) throw new Error("工作区初始化失败，请重试");
-  return res.json();
-}
-
 export async function fetchWorkspace(id: number): Promise<Workspace> {
   const res = await apiFetch(`/workspaces/${id}`);
   if (!res.ok) throw new Error("加载工作区失败");
@@ -36,8 +26,7 @@ export async function createWorkspace(name?: string): Promise<Workspace> {
     body: JSON.stringify({ name }),
   });
   if (!res.ok) throw new Error("创建项目失败");
-  const data = await res.json();
-  return data.workspace ?? data;
+  return res.json();
 }
 
 export async function renameWorkspace(id: number, name: string): Promise<Workspace> {
