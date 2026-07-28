@@ -7,7 +7,7 @@ OpenExcel is a pnpm monorepo. Main packages live under `packages/`:
 - `packages/core` - shared spreadsheet primitives and Excel conversion logic
 - `packages/agent` - model/tooling and chat session utilities
 
-Keep feature code inside the owning package’s `src/` tree. Avoid generated output such as `dist/` or `node_modules/`. For package-boundary changes, update `docs/architecture.md`; for Agent loop, context, tool, retry, event, or recovery changes, update `docs/agent-loop.md`. Read package-specific guides like `packages/server/AGENTS.md` before touching server code.
+Keep feature code inside the owning package’s `src/` tree. Avoid generated output such as `dist/` or `node_modules/`. For package-boundary changes, update `docs/architecture.md`; for Agent loop, context, tool, retry, event, or recovery changes, update `docs/agent-loop.md`. For tool design and implementation workflow, read [docs/architecture/tools/README.md](docs/architecture/tools/README.md) and [docs/architecture/tools/authoring.md](docs/architecture/tools/authoring.md). Read package-specific guides like `packages/server/AGENTS.md` before touching server code.
 
 ## Build, Test, and Development Commands
 - `pnpm dev` - run web and server in parallel

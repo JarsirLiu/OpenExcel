@@ -16,6 +16,11 @@ idempotency rules, or Agent migration checklists here; update
 package boundary, update both documents so this file records only the durable
 boundary and links to the detailed contract.
 
+Tool design and implementation rules are maintained in
+[Tool System Architecture](architecture/tools/README.md). Use that guide when
+adding or changing a tool; this document remains the source of truth for the
+top-level package boundaries.
+
 ## 1. Goals
 
 OpenExcel is a spreadsheet workbench with AI-assisted conversation. The project must support:

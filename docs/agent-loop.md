@@ -436,7 +436,10 @@ type PersistedAgentEvent = {
    - `droppedMessages`: 因token预算裁剪丢弃的消息数
    - `droppedTurns`: 因token预算裁剪丢弃的完整轮次数
 
-2. **tool.started**: Agent 收到 `tool-input-start` 后立即触发，让实时界面尽早显示工具节点；此时 `input` 使用 `{}` 占位，完整参数在后续 `tool.finished` 或 step 对账时写入。原始 `tool-input-delta` 等参数流事件不进入 durable event，避免把每个参数片段持久化
+2. **tool.started**: Agent 第一次观察到工具调用时触发，让实时界面尽早显示工具节点。流式 provider 通常对应
+   `tool-input-start`；只返回完整调用的 provider 对应 `tool-call`。如果调用参数还在流式生成，`input` 可以使用 `{}`
+   占位；完整参数在工具完成或 step 对账时补齐。`tool.started` 表示调用已进入 Agent 生命周期，不表示服务端副作用已经提交。
+   原始 `tool-input-delta` 等参数片段不进入 durable event，避免为每个参数片段持久化事件。
    - `toolName`: 工具名称
    - `toolCallId`: 工具调用唯一ID（用于幂等）
    - `input`: 工具输入参数
@@ -570,25 +573,29 @@ AgentRunner。浏览器不能因为没有收到某个事件就重新执行工具
 
 ## 6. 工具调用边界
 
-工具调用的唯一执行方是服务端。一次有副作用的工具调用必须遵循以下顺序：
+工具调用的唯一执行方是服务端。模型调用流和工具执行生命周期是两个阶段，必须遵循以下顺序：
 
 ```text
-AgentRunner emits tool request
+model emits tool-input-start or complete tool-call
     ↓
-server ToolExecutor validates input, capability, resource scope, and approval
+Agent emits tool.started
     ↓
-server reserves (runId, toolCallId) and persists tool.started
+Agent tool adapter validates the input
     ↓
-server transaction commits workbook change, undo snapshot, tool result, and tool.completed
+server rechecks capability, resource scope, and approval, then claims AgentToolExecution.running
     ↓
-server returns structured ToolExecutionResult
+server transaction commits workbook change, undo snapshot, and tool execution result
     ↓
-AgentRunner continues or stops the loop
+Agent emits tool.finished and receives the structured tool result
     ↓
-server sends already-persisted event to browser
+AgentRunner continues or stops the model loop
+    ↓
     ↓
 browser renders and refreshes affected UI
 ```
+
+`tool.started` 必须发生在可能耗时的工具执行之前。参数校验失败、权限失败和工具执行失败都必须转换为
+`tool.finished` 的错误结果，让模型继续处理；只有取消或事件持久化失败才终止运行。
 
 工具可见性和工具授权必须分开：Agent 只接收可见工具集合，但模型仍可能伪造调用，旧 run
 或重试请求也可能绕过可见性过滤。因此 server 的 ToolExecutor 必须在副作用事务前重新执行
