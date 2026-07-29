@@ -90,6 +90,8 @@ pnpm db:migrate     # 执行数据库迁移
 
 ## Docker 部署
 
+完整的镜像发布和服务器部署流程见 [Docker deployment guide](docs/current/docker-deployment.md)。
+
 复制 `.env.example` 并填写模型配置：
 
 ```bash

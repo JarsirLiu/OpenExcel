@@ -35,6 +35,7 @@
 | Change Sheet writes, revisions, or synchronization | [current/spreadsheet-sync.md](current/spreadsheet-sync.md) |
 | Change an AI tool | [current/tools.md](current/tools.md), [architecture/tools/README.md](architecture/tools/README.md) |
 | Change an API, database model, or resource authorization | [current/api.md](current/api.md), [current/data-model.md](current/data-model.md), and `packages/server/AGENTS.md` |
+| Build or deploy with Docker | [current/docker-deployment.md](current/docker-deployment.md), `Dockerfile`, and `docker-compose.yml` |
 | Change the Web editor, charts, or layout | [current/architecture.md](current/architecture.md), [rules/web-ui.md](rules/web-ui.md), and `packages/web/AGENTS.md` |
 | Change user-visible copy, locale handling, or errors shown in Web | [current/i18n.md](current/i18n.md), [rules/i18n.md](rules/i18n.md), and `packages/web/AGENTS.md` |
 | Change tests | [rules/testing.md](rules/testing.md) |
@@ -57,6 +58,7 @@ runtime.
 - [Repository map](repository-map.md)
 - [Current architecture](current/architecture.md)
 - [Current data model](current/data-model.md)
+- [Docker deployment](current/docker-deployment.md)
 - [Current API](current/api.md)
 - [Current Agent runtime](current/agent-runtime.md)
 - [Current Sheet synchronization](current/spreadsheet-sync.md)
