@@ -12,7 +12,6 @@ OpenExcel/
 |   |-- server/     # Fastify API, Prisma, resource orchestration, and executors
 |   `-- web/        # React/Vite browser application and editor interactions
 |-- docs/           # Current facts, rules, designs, proposals, and history
-|-- templates/      # Application templates
 |-- config/         # Repository-level configuration
 `-- .data/          # Local database and file-storage runtime data
 ```

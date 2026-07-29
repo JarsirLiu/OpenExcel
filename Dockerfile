@@ -28,7 +28,6 @@ COPY packages/server/tsconfig.json ./packages/server/
 COPY packages/web/index.html ./packages/web/
 COPY packages/web/tsconfig.json ./packages/web/
 COPY packages/web/vite.config.ts ./packages/web/
-COPY templates ./templates
 
 RUN pnpm typecheck
 RUN pnpm --filter @openexcel/web build
@@ -55,7 +54,6 @@ COPY --from=build /app/packages/server/src ./packages/server/src
 COPY --from=build /app/packages/core/src ./packages/core/src
 COPY --from=build /app/packages/agent/src ./packages/agent/src
 COPY --from=build /app/packages/web/dist ./packages/web/dist
-COPY --from=build /app/templates ./templates
 
 RUN mkdir -p /app/.data \
   && find /app/packages/server/scripts -type f -name '*.sh' -exec sed -i 's/\r$//' {} + \
