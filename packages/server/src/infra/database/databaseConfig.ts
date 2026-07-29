@@ -1,4 +1,4 @@
-export type DatabaseProvider = "sqlite" | "postgresql" | "mysql";
+export type DatabaseProvider = "sqlite" | "postgresql";
 
 export interface DatabaseConfig {
   provider: DatabaseProvider;
@@ -7,7 +7,7 @@ export interface DatabaseConfig {
 
 function normalizeProvider(value: string | undefined): DatabaseProvider {
   const provider = (value ?? "sqlite").trim().toLowerCase();
-  if (provider === "sqlite" || provider === "postgresql" || provider === "mysql") {
+  if (provider === "sqlite" || provider === "postgresql") {
     return provider;
   }
   throw new Error(`Unsupported database provider: ${value}`);
@@ -32,6 +32,5 @@ export function loadDatabaseConfig(): DatabaseConfig {
 
 export function getDefaultDatabaseUrl(provider: DatabaseProvider): string {
   if (provider === "sqlite") return buildDefaultSqliteUrl();
-  if (provider === "postgresql") return "postgresql://postgres:postgres@localhost:5432/openexcel";
-  return "mysql://root:root@localhost:3306/openexcel";
+  return "postgresql://postgres:postgres@localhost:5432/openexcel";
 }

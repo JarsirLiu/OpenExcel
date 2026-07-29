@@ -189,7 +189,10 @@ export async function streamChat(workspaceId: number, sessionId: number, turn: C
       concreteToolExecutor,
       toolResultBudget,
     );
-    const toolExecutor = createIdempotentToolExecutor(lease.run.id, budgetedToolExecutor);
+    const toolExecutor = createIdempotentToolExecutor(lease.run.id, budgetedToolExecutor, {
+      isTransactionalTool: (toolName) =>
+        serverToolRegistry[toolName as ExcelToolName]?.persistenceMode === "mutation",
+    });
 
     const workspace = await loadWorkspaceChatContext(workspaceId);
     const resolvedMessages = transcript.map((entry) => ({

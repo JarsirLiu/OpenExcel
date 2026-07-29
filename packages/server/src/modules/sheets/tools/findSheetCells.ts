@@ -5,6 +5,7 @@ import { sheetRecordToSnapshot } from "../../../shared/utils/sheetSnapshot.js";
 import { findSheetForWorkspace } from "../infrastructure/sheetRepository.js";
 
 export const findSheetCells = defineServerTool("findSheetCells", {
+  persistenceMode: "read",
   resultBudget: { maxTokens: 4_000, compact: (value) => value },
   execute: async ({ sheetId, range, query, offset = 0, limit = 50 }, { context }) => {
     const sheet = await findSheetForWorkspace(sheetId, context.workspaceId);

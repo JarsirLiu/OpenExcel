@@ -13,6 +13,8 @@ export type ToolResultBudgetContext = {
   maxTokens: number;
 };
 
+export type ServerToolPersistenceMode = "read" | "mutation";
+
 export type ServerToolExecutionOptions<Context> = {
   context: Context;
   db?: Prisma.TransactionClient;
@@ -35,6 +37,7 @@ export type ServerToolDefinition<Name extends ExcelToolName = ExcelToolName> = {
   description: (typeof excelToolSpecs)[Name]["description"];
   inputSchema: (typeof excelToolSpecs)[Name]["inputSchema"];
   contextScope: "run" | "workspace";
+  persistenceMode: ServerToolPersistenceMode;
   contextSchema: z.ZodTypeAny;
   outputSchema: (typeof excelToolSpecs)[Name]["outputSchema"];
   resultBudget: ToolResultPolicy;
@@ -50,6 +53,7 @@ export type ServerToolRuntimeDefinition = {
   description: string;
   inputSchema: z.ZodTypeAny;
   contextScope: "run" | "workspace";
+  persistenceMode: ServerToolPersistenceMode;
   contextSchema: z.ZodTypeAny;
   outputSchema: z.ZodTypeAny;
   resultBudget: ToolResultPolicy;
@@ -57,6 +61,7 @@ export type ServerToolRuntimeDefinition = {
 };
 
 type ServerToolConfig<Name extends ExcelToolName> = {
+  persistenceMode: ServerToolPersistenceMode;
   resultBudget: Omit<ToolResultPolicy, "validate">;
   execute: (
     input: ExcelToolInput<Name>,
@@ -74,6 +79,7 @@ export function defineServerTool<const Name extends ExcelToolName>(
     description: spec.description,
     inputSchema: spec.inputSchema,
     contextScope: spec.needsRunContext ? "run" : "workspace",
+    persistenceMode: config.persistenceMode,
     contextSchema: spec.needsRunContext ? runToolContextSchema : workspaceToolContextSchema,
     outputSchema: spec.outputSchema,
     resultBudget: {

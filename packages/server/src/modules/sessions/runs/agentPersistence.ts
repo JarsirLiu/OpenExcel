@@ -4,12 +4,15 @@ import {
   type PersistenceBarrier,
   type ToolExecutor,
 } from "@openexcel/agent";
+import { withDatabaseWriteLock } from "../../../infra/database/databaseConcurrency.js";
 import { prisma } from "../../../infra/database/db.js";
 import { withWorkspaceUndoLock } from "../infrastructure/workspaceUndoLock.js";
 import { type PersistedAgentStep, persistAgentEvent } from "./agentEventRepository.js";
 import {
   claimToolExecutionUsing,
+  completeToolExecution,
   completeToolExecutionUsing,
+  failToolExecution,
   failToolExecutionUsing,
   ToolExecutionConflictError,
 } from "./toolExecutionRepository.js";
@@ -53,7 +56,11 @@ export function createAgentPersistenceBarrier(runId: number): PersistenceBarrier
   };
 }
 
-export function createIdempotentToolExecutor(runId: number, executor: ToolExecutor): ToolExecutor {
+export function createIdempotentToolExecutor(
+  runId: number,
+  executor: ToolExecutor,
+  options: { isTransactionalTool: (toolName: string) => boolean },
+): ToolExecutor {
   return {
     async execute(request) {
       const workspaceId =
@@ -62,7 +69,42 @@ export function createIdempotentToolExecutor(runId: number, executor: ToolExecut
         typeof (request.context as { workspaceId?: unknown }).workspaceId === "number"
           ? (request.context as { workspaceId: number }).workspaceId
           : undefined;
-      const execute = () =>
+      if (!options.isTransactionalTool(request.toolName)) {
+        const claim = await withDatabaseWriteLock(() =>
+          prisma.$transaction((tx) =>
+            claimToolExecutionUsing(tx, {
+              runId,
+              toolCallId: request.toolCallId,
+              toolName: request.toolName,
+              input: request.input,
+            }),
+          ),
+        );
+        if (claim.kind === "replay") return claim.output;
+
+        let output: unknown;
+        try {
+          output = await executor.execute(request);
+        } catch (error) {
+          try {
+            await withDatabaseWriteLock(() => failToolExecution(runId, request.toolCallId, error));
+          } catch (persistenceError) {
+            throw new AgentPersistenceError(persistenceError);
+          }
+          throw error;
+        }
+
+        try {
+          await withDatabaseWriteLock(() =>
+            completeToolExecution(runId, request.toolCallId, output),
+          );
+        } catch (error) {
+          throw new AgentPersistenceError(error);
+        }
+        return output;
+      }
+
+      const executeMutation = () =>
         prisma.$transaction(async (tx) => {
           let claim: Awaited<ReturnType<typeof claimToolExecutionUsing>>;
           try {
@@ -101,6 +143,7 @@ export function createIdempotentToolExecutor(runId: number, executor: ToolExecut
           }
           return { kind: "completed" as const, output };
         });
+      const execute = () => withDatabaseWriteLock(executeMutation);
       const result =
         workspaceId == null ? await execute() : await withWorkspaceUndoLock(workspaceId, execute);
       if (result.kind === "failed") throw result.error;

@@ -28,6 +28,15 @@ The Server obtains concrete tools from `serverToolRegistry`, validates input and
 execution context, invokes the tool, validates output, and converts it to
 model-safe JSON. The Agent adapter does not own Excel-specific tool logic.
 
+Tool persistence mode is explicit in the server registry. Read tools claim their
+tool-call ledger row in a short transaction, execute without a database
+transaction, and persist completion or failure in a separate short write.
+Mutation tools keep the claim, concrete database mutation, and ledger completion
+in one transaction so a committed mutation always has a completed receipt.
+SQLite write transactions are serialized by a process-local server gate; this
+supports the local single-process deployment model but does not coordinate
+multiple server processes. PostgreSQL is required for multi-instance operation.
+
 Every registered tool declares its own per-call result policy: a maximum
 model-visible size and a tool-owned model projection function. The generic
 Agent budget adapter only invokes that policy and verifies the resulting size;

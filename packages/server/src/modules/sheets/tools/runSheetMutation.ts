@@ -1,4 +1,5 @@
 import { ToolNotFoundError } from "@openexcel/agent";
+import { withDatabaseWriteLock } from "../../../infra/database/databaseConcurrency.js";
 import { prisma } from "../../../infra/database/db.js";
 import type { Prisma } from "../../../infra/database/prismaTypes.js";
 import {
@@ -64,5 +65,7 @@ export async function runSheetMutation<T extends RevisionedResult>(
   };
 
   if (context.db) return execute(context.db);
-  return withWorkspaceUndoLock(context.workspaceId, () => prisma.$transaction(execute));
+  return withWorkspaceUndoLock(context.workspaceId, () =>
+    withDatabaseWriteLock(() => prisma.$transaction(execute)),
+  );
 }

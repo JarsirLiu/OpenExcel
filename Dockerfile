@@ -15,7 +15,6 @@ RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
 COPY packages/server/prisma ./packages/server/prisma
 RUN pnpm --filter @openexcel/server exec prisma generate --schema prisma/schema.prisma
 RUN pnpm --filter @openexcel/server exec prisma generate --schema prisma/postgresql/schema.prisma
-RUN pnpm --filter @openexcel/server exec prisma generate --schema prisma/mysql/schema.prisma
 
 COPY packages/core/src ./packages/core/src
 COPY packages/agent/src ./packages/agent/src

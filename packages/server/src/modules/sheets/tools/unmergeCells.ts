@@ -13,6 +13,7 @@ import { createSheetToolMutationId } from "./sheetToolCommand.js";
 import { toSheetToolPatchResult } from "./sheetToolResult.js";
 
 export const unmergeCells = defineServerTool("unmergeCells", {
+  persistenceMode: "mutation",
   resultBudget: { maxTokens: 4_000, compact: (value) => value },
   execute: async (input, options) => {
     return runSheetMutation(

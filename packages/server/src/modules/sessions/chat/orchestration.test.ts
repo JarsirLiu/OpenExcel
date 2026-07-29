@@ -21,6 +21,7 @@ describe("buildRunToolset", () => {
     });
     const fakeManifest = (Object.keys(excelToolSpecs) as ExcelToolName[]).map((name) =>
       defineServerTool(name, {
+        persistenceMode: name === "createChart" ? "mutation" : "read",
         resultBudget: { maxTokens: 1_000, compact: (value) => value },
         execute: async (input, options) => {
           if (name === "createChart") {
@@ -82,6 +83,7 @@ describe("buildRunToolset", () => {
     const execute = vi.fn();
     const fakeManifest = (Object.keys(excelToolSpecs) as ExcelToolName[]).map((name) =>
       defineServerTool(name, {
+        persistenceMode: "read",
         resultBudget: { maxTokens: 1_000, compact: (value) => value },
         execute: async () => undefined as never,
       }),
@@ -104,6 +106,7 @@ describe("buildRunToolset", () => {
     const execute = vi.fn();
     const fakeManifest = (Object.keys(excelToolSpecs) as ExcelToolName[]).map((name) =>
       defineServerTool(name, {
+        persistenceMode: "read",
         resultBudget: { maxTokens: 1_000, compact: (value) => value },
         execute: async () => {
           execute();

@@ -1,9 +1,0 @@
-ALTER TABLE `Sheet`
-  MODIFY `columns` LONGTEXT NOT NULL,
-  MODIFY `merges` LONGTEXT NOT NULL,
-  MODIFY `uploadedData` LONGTEXT NULL,
-  MODIFY `config` LONGTEXT NULL;
-
-ALTER TABLE `AgentRunSheetSnapshot`
-  MODIFY `uploadedData` LONGTEXT NULL,
-  MODIFY `config` LONGTEXT NULL;

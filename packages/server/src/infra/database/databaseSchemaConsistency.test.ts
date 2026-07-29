@@ -16,12 +16,6 @@ const schemaFiles = [
     outputPath: "../generated/postgresql/client",
     migrationsPath: resolve(serverPackageRoot, "prisma/postgresql/migrations"),
   },
-  {
-    provider: "mysql",
-    schemaPath: resolve(serverPackageRoot, "prisma/mysql/schema.prisma"),
-    outputPath: "../generated/mysql/client",
-    migrationsPath: resolve(serverPackageRoot, "prisma/mysql/migrations"),
-  },
 ] as const;
 
 function readSchema(schemaPath: string): string {

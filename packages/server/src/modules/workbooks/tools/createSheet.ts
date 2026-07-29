@@ -4,6 +4,7 @@ import * as runRepo from "../../sessions/runs/repository.js";
 import { createSheet as createSheetUseCase } from "../application/createSheet.js";
 
 export const createSheet = defineServerTool("createSheet", {
+  persistenceMode: "mutation",
   resultBudget: { maxTokens: 1_000, compact: (value) => value },
   execute: async (input, { context, db }) => {
     const result = await createSheetUseCase(

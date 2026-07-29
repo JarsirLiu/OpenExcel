@@ -40,7 +40,7 @@ DATABASE_PROVIDER=sqlite
 
 SQLite 的数据库文件默认位于项目根目录的 `.data/openexcel.db`。Docker Compose 会将同名数据库保存在 `/app/.data/openexcel.db`，并通过 volume 持久化。
 
-如果切换到 PostgreSQL 或 MySQL，再配置对应的连接串：
+如果切换到 PostgreSQL，再配置对应的连接串：
 
 ```env
 DATABASE_PROVIDER=postgresql

@@ -31,9 +31,8 @@ describe("databaseConfig", () => {
     expect(() => loadDatabaseConfig()).toThrow("Unsupported database provider: oracle");
   });
 
-  it("provides built-in defaults for each provider", () => {
+  it("provides built-in defaults for each supported provider", () => {
     expect(getDefaultDatabaseUrl("sqlite")).toContain("/.data/openexcel.db");
     expect(getDefaultDatabaseUrl("postgresql")).toContain("postgresql://");
-    expect(getDefaultDatabaseUrl("mysql")).toContain("mysql://");
   });
 });

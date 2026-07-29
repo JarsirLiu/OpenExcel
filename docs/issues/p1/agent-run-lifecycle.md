@@ -173,7 +173,7 @@ workbooks/mutations/
 
 ### 4. 多实例协调
 
-`withWorkspaceUndoLock` 当前只能保护同一进程。多实例部署前必须替换为以 `workbookId` 为粒度的数据库协调：PostgreSQL 使用 advisory lock 或行锁，MySQL 使用事务行锁或等价机制。只有在数据库锁无法满足部署要求时才引入 Redis，并且必须具备 TTL、owner token 和续租机制。
+`withWorkspaceUndoLock` only protects one process. Before multi-instance deployment, replace it with database coordination at `workbookId` granularity: PostgreSQL should use an advisory lock or row lock. Introduce Redis only if database locking is insufficient, with a TTL, owner token, and renewal mechanism.
 
 锁只保护同一工作簿的 mutation 和 Undo checkpoint，不锁整个 workspace，也不下沉到 `packages/agent`。
 

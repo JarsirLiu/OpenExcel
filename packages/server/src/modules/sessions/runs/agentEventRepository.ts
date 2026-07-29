@@ -1,4 +1,5 @@
 import type { AgentEvent } from "@openexcel/agent";
+import { withDatabaseWriteLock } from "../../../infra/database/databaseConcurrency.js";
 import { prisma } from "../../../infra/database/db.js";
 
 export class AgentEventConflictError extends Error {
@@ -26,28 +27,30 @@ export async function persistAgentEvent(
   const data = eventPersistenceData(runId, event);
 
   try {
-    return await prisma.$transaction(async (tx) => {
-      const existing = await findExistingEvent(tx, runId, event);
-      if (existing) return existing;
+    return await withDatabaseWriteLock(() =>
+      prisma.$transaction(async (tx) => {
+        const existing = await findExistingEvent(tx, runId, event);
+        if (existing) return existing;
 
-      const persisted = await tx.agentEvent.create({ data });
+        const persisted = await tx.agentEvent.create({ data });
 
-      if (step) {
-        await tx.agentStep.create({
-          data: {
-            runId,
-            ...step,
-          },
+        if (step) {
+          await tx.agentStep.create({
+            data: {
+              runId,
+              ...step,
+            },
+          });
+        }
+
+        await tx.agentRun.updateMany({
+          where: { id: runId, lastEventSequence: { lt: event.sequence } },
+          data: { lastEventSequence: event.sequence },
         });
-      }
 
-      await tx.agentRun.updateMany({
-        where: { id: runId, lastEventSequence: { lt: event.sequence } },
-        data: { lastEventSequence: event.sequence },
-      });
-
-      return persisted;
-    });
+        return persisted;
+      }),
+    );
   } catch (error) {
     if (!isUniqueConstraintError(error)) throw error;
 
@@ -107,29 +110,31 @@ export async function persistRunLifecycleEvent(data: {
   type: Extract<AgentEvent["type"], "run.completed" | "run.cancelled" | "run.failed">;
   payload: unknown;
 }) {
-  return prisma.$transaction(async (tx) => {
-    const latest = await tx.agentEvent.findFirst({
-      where: { runId: data.runId },
-      orderBy: { sequence: "desc" },
-      select: { sequence: true },
-    });
-    const sequence = (latest?.sequence ?? -1) + 1;
-    const event = await tx.agentEvent.create({
-      data: {
-        runId: data.runId,
-        eventId: `agent-event-${crypto.randomUUID()}`,
-        sequence,
-        type: data.type,
-        occurredAt: new Date(),
-        payload: JSON.stringify(data.payload),
-      },
-    });
-    await tx.agentRun.updateMany({
-      where: { id: data.runId, lastEventSequence: { lt: sequence } },
-      data: { lastEventSequence: sequence },
-    });
-    return event;
-  });
+  return withDatabaseWriteLock(() =>
+    prisma.$transaction(async (tx) => {
+      const latest = await tx.agentEvent.findFirst({
+        where: { runId: data.runId },
+        orderBy: { sequence: "desc" },
+        select: { sequence: true },
+      });
+      const sequence = (latest?.sequence ?? -1) + 1;
+      const event = await tx.agentEvent.create({
+        data: {
+          runId: data.runId,
+          eventId: `agent-event-${crypto.randomUUID()}`,
+          sequence,
+          type: data.type,
+          occurredAt: new Date(),
+          payload: JSON.stringify(data.payload),
+        },
+      });
+      await tx.agentRun.updateMany({
+        where: { id: data.runId, lastEventSequence: { lt: sequence } },
+        data: { lastEventSequence: sequence },
+      });
+      return event;
+    }),
+  );
 }
 
 export async function findAgentEventsByRun(runId: number) {

@@ -1,3 +1,4 @@
+import { withDatabaseWriteLock } from "../../../infra/database/databaseConcurrency.js";
 import { prisma } from "../../../infra/database/db.js";
 import type { Prisma } from "../../../infra/database/prismaTypes.js";
 
@@ -79,5 +80,7 @@ export async function commitSheetCommand(input: {
   commandHash: string;
   result: string;
 }): Promise<SheetCommandCommit> {
-  return prisma.$transaction((tx) => commitSheetCommandInTransaction(tx, input));
+  return withDatabaseWriteLock(() =>
+    prisma.$transaction((tx) => commitSheetCommandInTransaction(tx, input)),
+  );
 }

@@ -1,4 +1,5 @@
 import type { ContextCheckpoint, ContextCheckpointStore } from "@openexcel/agent";
+import { withDatabaseWriteLock } from "../../../infra/database/databaseConcurrency.js";
 import { prisma } from "../../../infra/database/db.js";
 
 export interface RunCheckpoint {
@@ -109,14 +110,56 @@ export async function persistRunCheckpoint(checkpoint: RunCheckpoint) {
 }
 
 async function writeCheckpoint(checkpoint: RunCheckpoint) {
-  return prisma.$transaction(async (tx) => {
-    const existing = await tx.agentRunCheckpoint.findUnique({ where: { runId: checkpoint.runId } });
-    if (existing && existing.checkpointSequence > checkpoint.checkpointSequence) return false;
+  return withDatabaseWriteLock(() =>
+    prisma.$transaction(async (tx) => {
+      const existing = await tx.agentRunCheckpoint.findUnique({
+        where: { runId: checkpoint.runId },
+      });
+      if (existing && existing.checkpointSequence > checkpoint.checkpointSequence) return false;
 
-    if (!existing) {
-      await tx.agentRunCheckpoint.create({
-        data: {
+      if (!existing) {
+        await tx.agentRunCheckpoint.create({
+          data: {
+            runId: checkpoint.runId,
+            checkpointSequence: checkpoint.checkpointSequence,
+            transcript: encode(checkpoint.transcript),
+            reasoning: checkpoint.reasoning,
+            toolState: encode(checkpoint.toolState),
+            ...(checkpoint.contextCheckpoint
+              ? {
+                  contextCheckpoint: encode(checkpoint.contextCheckpoint),
+                  contextVersion: checkpoint.contextCheckpoint.version,
+                }
+              : {}),
+          },
+        });
+        return true;
+      }
+
+      if (existing.checkpointSequence === checkpoint.checkpointSequence) {
+        await tx.agentRunCheckpoint.update({
+          where: { runId: checkpoint.runId },
+          data: {
+            transcript: encode(checkpoint.transcript),
+            reasoning: checkpoint.reasoning,
+            toolState: encode(checkpoint.toolState),
+            ...(checkpoint.contextCheckpoint
+              ? {
+                  contextCheckpoint: encode(checkpoint.contextCheckpoint),
+                  contextVersion: checkpoint.contextCheckpoint.version,
+                }
+              : {}),
+          },
+        });
+        return true;
+      }
+
+      const result = await tx.agentRunCheckpoint.updateMany({
+        where: {
           runId: checkpoint.runId,
+          checkpointSequence: { lt: checkpoint.checkpointSequence },
+        },
+        data: {
           checkpointSequence: checkpoint.checkpointSequence,
           transcript: encode(checkpoint.transcript),
           reasoning: checkpoint.reasoning,
@@ -129,13 +172,22 @@ async function writeCheckpoint(checkpoint: RunCheckpoint) {
             : {}),
         },
       });
+      if (result.count !== 1) return false;
       return true;
-    }
+    }),
+  );
+}
 
-    if (existing.checkpointSequence === checkpoint.checkpointSequence) {
-      await tx.agentRunCheckpoint.update({
-        where: { runId: checkpoint.runId },
+async function updateCheckpoint(checkpoint: RunCheckpoint) {
+  return withDatabaseWriteLock(() =>
+    prisma.$transaction(async (tx) => {
+      const result = await tx.agentRunCheckpoint.updateMany({
+        where: {
+          runId: checkpoint.runId,
+          checkpointSequence: { lt: checkpoint.checkpointSequence },
+        },
         data: {
+          checkpointSequence: checkpoint.checkpointSequence,
           transcript: encode(checkpoint.transcript),
           reasoning: checkpoint.reasoning,
           toolState: encode(checkpoint.toolState),
@@ -147,50 +199,11 @@ async function writeCheckpoint(checkpoint: RunCheckpoint) {
             : {}),
         },
       });
+      if (result.count !== 1) return false;
+
       return true;
-    }
-
-    const result = await tx.agentRunCheckpoint.updateMany({
-      where: { runId: checkpoint.runId, checkpointSequence: { lt: checkpoint.checkpointSequence } },
-      data: {
-        checkpointSequence: checkpoint.checkpointSequence,
-        transcript: encode(checkpoint.transcript),
-        reasoning: checkpoint.reasoning,
-        toolState: encode(checkpoint.toolState),
-        ...(checkpoint.contextCheckpoint
-          ? {
-              contextCheckpoint: encode(checkpoint.contextCheckpoint),
-              contextVersion: checkpoint.contextCheckpoint.version,
-            }
-          : {}),
-      },
-    });
-    if (result.count !== 1) return false;
-    return true;
-  });
-}
-
-async function updateCheckpoint(checkpoint: RunCheckpoint) {
-  return prisma.$transaction(async (tx) => {
-    const result = await tx.agentRunCheckpoint.updateMany({
-      where: { runId: checkpoint.runId, checkpointSequence: { lt: checkpoint.checkpointSequence } },
-      data: {
-        checkpointSequence: checkpoint.checkpointSequence,
-        transcript: encode(checkpoint.transcript),
-        reasoning: checkpoint.reasoning,
-        toolState: encode(checkpoint.toolState),
-        ...(checkpoint.contextCheckpoint
-          ? {
-              contextCheckpoint: encode(checkpoint.contextCheckpoint),
-              contextVersion: checkpoint.contextCheckpoint.version,
-            }
-          : {}),
-      },
-    });
-    if (result.count !== 1) return false;
-
-    return true;
-  });
+    }),
+  );
 }
 
 export function createRunContextCheckpointStore(
@@ -219,28 +232,32 @@ export function createRunContextCheckpointStore(
       }
 
       if (!currentRun) {
-        await prisma.agentRunCheckpoint.create({
-          data: {
-            runId,
-            checkpointSequence: -1,
-            transcript: encode([]),
-            reasoning: "",
-            toolState: encode([]),
-            contextCheckpoint: encode(checkpoint),
-            contextVersion: checkpoint.version,
-          },
-        });
+        await withDatabaseWriteLock(() =>
+          prisma.agentRunCheckpoint.create({
+            data: {
+              runId,
+              checkpointSequence: -1,
+              transcript: encode([]),
+              reasoning: "",
+              toolState: encode([]),
+              contextCheckpoint: encode(checkpoint),
+              contextVersion: checkpoint.version,
+            },
+          }),
+        );
       } else {
-        const result = await prisma.agentRunCheckpoint.updateMany({
-          where: {
-            runId,
-            contextVersion: currentRun.contextCheckpoint?.version ?? null,
-          },
-          data: {
-            contextCheckpoint: encode(checkpoint),
-            contextVersion: checkpoint.version,
-          },
-        });
+        const result = await withDatabaseWriteLock(() =>
+          prisma.agentRunCheckpoint.updateMany({
+            where: {
+              runId,
+              contextVersion: currentRun.contextCheckpoint?.version ?? null,
+            },
+            data: {
+              contextCheckpoint: encode(checkpoint),
+              contextVersion: checkpoint.version,
+            },
+          }),
+        );
         if (result.count !== 1) {
           return { accepted: false, current: (await findRunCheckpoint(runId))?.contextCheckpoint };
         }

@@ -37,7 +37,9 @@ authorization boundary.
 
 ## Database and files
 
-- The default local database is selected by `DATABASE_PROVIDER` and `DATABASE_URL`; development defaults to SQLite.
+- The supported database providers are SQLite and PostgreSQL. The default local database is selected by `DATABASE_PROVIDER` and `DATABASE_URL`; development defaults to SQLite.
+- SQLite is intended for local or single-process deployments. The server serializes its application-owned SQLite writes in process and configures WAL, busy timeout, and bounded transaction waits. This is not a cross-process lock.
+- PostgreSQL is the supported multi-user and multi-instance deployment database; its database transactions and run-lease compare-and-set operations provide cross-instance coordination.
 - Prisma schema changes require an explicit migration. Do not use runtime `db push`.
 - `UploadAsset.storageKey` points to local storage or the configured storage adapter.
 - Local default data lives under `.data/`; Docker uses a persistent volume.

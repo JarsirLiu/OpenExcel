@@ -62,6 +62,9 @@ export function createServerToolRegistry<const T extends readonly ServerToolRunt
     ) {
       throw new Error(`Server tool result budget contract mismatch: ${tool.name}`);
     }
+    if (tool.persistenceMode !== "read" && tool.persistenceMode !== "mutation") {
+      throw new Error(`Server tool persistence mode contract mismatch: ${tool.name}`);
+    }
     const expectedContextScope = spec.needsRunContext ? "run" : "workspace";
     const expectedContextSchema = spec.needsRunContext
       ? runToolContextSchema

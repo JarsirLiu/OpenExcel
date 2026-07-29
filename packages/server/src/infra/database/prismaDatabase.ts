@@ -15,7 +15,6 @@ const prismaCliPath = require.resolve("prisma/build/index.js");
 const schemaByProvider: Record<DatabaseProvider, string> = {
   sqlite: resolve(serverPackageRoot, "prisma/schema.prisma"),
   postgresql: resolve(serverPackageRoot, "prisma/postgresql/schema.prisma"),
-  mysql: resolve(serverPackageRoot, "prisma/mysql/schema.prisma"),
 };
 
 function ensureSqliteDatabaseFile(schemaPath: string, databaseUrl: string): void {

@@ -4,6 +4,7 @@ import type {
   ContextCheckpoint,
   ContextTranscriptEntry,
 } from "@openexcel/agent";
+import { withDatabaseWriteLock } from "../../../infra/database/databaseConcurrency.js";
 import { prisma } from "../../../infra/database/db.js";
 import type { Prisma } from "../../../infra/database/prismaTypes.js";
 import { SessionBusyError } from "../domain/sessionErrors.js";
@@ -106,81 +107,83 @@ export async function acquireRunLease(data: {
   const leaseDurationMs = data.leaseDurationMs ?? RUN_LEASE_DURATION_MS;
   const leaseExpiresAt = new Date(now.getTime() + leaseDurationMs);
 
-  const acquired = await prisma.$transaction(async (tx) => {
-    const session = await tx.session.findFirst({
-      where: { id: data.sessionId, workspaceId: data.workspaceId },
-      select: {
-        id: true,
-        leaseOwnerId: true,
-        leaseExpiresAt: true,
-        version: true,
-      },
-    });
-    if (!session) throw new Error("Session not found");
-
-    if (!leaseIsAvailable(session, now)) throw new SessionBusyError();
-
-    if (session.leaseOwnerId && session.leaseExpiresAt && session.leaseExpiresAt <= now) {
-      await tx.agentRun.updateMany({
-        where: {
-          sessionId: data.sessionId,
-          status: "running",
-          ownerId: session.leaseOwnerId,
-        },
-        data: {
-          status: "recovery_required",
-          errorMessage: "运行租约已过期，等待恢复器检查最后持久化边界",
-          endedAt: now,
+  const acquired = await withDatabaseWriteLock(() =>
+    prisma.$transaction(async (tx) => {
+      const session = await tx.session.findFirst({
+        where: { id: data.sessionId, workspaceId: data.workspaceId },
+        select: {
+          id: true,
+          leaseOwnerId: true,
+          leaseExpiresAt: true,
+          version: true,
         },
       });
-    }
+      if (!session) throw new Error("Session not found");
 
-    const nextVersion = session.version + 1;
-    const claimed = await tx.session.updateMany({
-      where: {
-        id: data.sessionId,
-        workspaceId: data.workspaceId,
-        version: session.version,
-        OR: [{ leaseOwnerId: null, leaseExpiresAt: null }, { leaseExpiresAt: { lte: now } }],
-      },
-      data: {
-        leaseOwnerId: ownerId,
-        leaseExpiresAt,
-        leaseHeartbeatAt: now,
-        version: nextVersion,
-      },
-    });
-    if (claimed.count !== 1) throw new SessionBusyError();
+      if (!leaseIsAvailable(session, now)) throw new SessionBusyError();
 
-    const previousRun = await tx.agentRun.findFirst({
-      where: {
+      if (session.leaseOwnerId && session.leaseExpiresAt && session.leaseExpiresAt <= now) {
+        await tx.agentRun.updateMany({
+          where: {
+            sessionId: data.sessionId,
+            status: "running",
+            ownerId: session.leaseOwnerId,
+          },
+          data: {
+            status: "recovery_required",
+            errorMessage: "运行租约已过期，等待恢复器检查最后持久化边界",
+            endedAt: now,
+          },
+        });
+      }
+
+      const nextVersion = session.version + 1;
+      const claimed = await tx.session.updateMany({
+        where: {
+          id: data.sessionId,
+          workspaceId: data.workspaceId,
+          version: session.version,
+          OR: [{ leaseOwnerId: null, leaseExpiresAt: null }, { leaseExpiresAt: { lte: now } }],
+        },
+        data: {
+          leaseOwnerId: ownerId,
+          leaseExpiresAt,
+          leaseHeartbeatAt: now,
+          version: nextVersion,
+        },
+      });
+      if (claimed.count !== 1) throw new SessionBusyError();
+
+      const previousRun = await tx.agentRun.findFirst({
+        where: {
+          sessionId: data.sessionId,
+          status: { not: "reverted" },
+          checkpoint: { isNot: null },
+        },
+        orderBy: [{ startedAt: "desc" }, { id: "desc" }],
+        select: { checkpoint: { select: { transcript: true, contextCheckpoint: true } } },
+      });
+      const canonicalTranscript = parseTranscript(previousRun?.checkpoint?.transcript ?? null);
+      const transcript = data.appendUserTurn(canonicalTranscript);
+      const contextCheckpoint = parseContextCheckpoint(
+        previousRun?.checkpoint?.contextCheckpoint ?? null,
+      );
+
+      const run = await createLeasedRun(tx, {
         sessionId: data.sessionId,
-        status: { not: "reverted" },
-        checkpoint: { isNot: null },
-      },
-      orderBy: [{ startedAt: "desc" }, { id: "desc" }],
-      select: { checkpoint: { select: { transcript: true, contextCheckpoint: true } } },
-    });
-    const canonicalTranscript = parseTranscript(previousRun?.checkpoint?.transcript ?? null);
-    const transcript = data.appendUserTurn(canonicalTranscript);
-    const contextCheckpoint = parseContextCheckpoint(
-      previousRun?.checkpoint?.contextCheckpoint ?? null,
-    );
+        requestId: data.requestId,
+        inputText: data.inputText,
+        model: data.model,
+        ownerId,
+        sessionVersion: nextVersion,
+        leaseExpiresAt,
+        heartbeatAt: now,
+        requestPayloadHash: data.requestPayloadHash,
+      });
 
-    const run = await createLeasedRun(tx, {
-      sessionId: data.sessionId,
-      requestId: data.requestId,
-      inputText: data.inputText,
-      model: data.model,
-      ownerId,
-      sessionVersion: nextVersion,
-      leaseExpiresAt,
-      heartbeatAt: now,
-      requestPayloadHash: data.requestPayloadHash,
-    });
-
-    return { run, transcript, contextCheckpoint, sessionVersion: nextVersion };
-  });
+      return { run, transcript, contextCheckpoint, sessionVersion: nextVersion };
+    }),
+  );
 
   let heartbeatTimer: ReturnType<typeof setInterval> | undefined;
   let released = false;

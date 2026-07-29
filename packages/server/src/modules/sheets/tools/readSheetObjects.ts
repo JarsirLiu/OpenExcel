@@ -6,6 +6,7 @@ import { listChartsPage } from "../../charts/application/chartService.js";
 import { findSheetForWorkspace, findSheetsForWorkbook } from "../infrastructure/sheetRepository.js";
 
 export const readSheetObjects = defineServerTool("readSheetObjects", {
+  persistenceMode: "read",
   resultBudget: { maxTokens: 8_000, compact: (value) => value },
   execute: async ({ sheetId, objectType, offset = 0, limit = 50 }, { context }) => {
     const sheet = await findSheetForWorkspace(sheetId, context.workspaceId);
