@@ -49,6 +49,7 @@ describe("ChartOverlay integration boundary", () => {
     expect(gridSource).toContain("data-sheet-id={currentSheet.id}");
     expect(gridSource).toContain("className={styles.chartLayer}");
     expect(gridSource).toContain("layerRef={chartLayerRef}");
+    expect(gridSource).toContain('data-sheet-wheel-owner="true"');
     expect(activationSource).toContain("currentSheetIndex");
     expect(activeSheetSource).toContain("luckysheet-sheets-item-active");
     expect(rendererSource).toContain("RadarChart");

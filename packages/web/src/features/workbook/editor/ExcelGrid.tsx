@@ -213,6 +213,7 @@ export function ExcelGrid({
             ref={chartLayerRef}
             className={styles.chartLayer}
             data-sheet-id={currentSheet.id}
+            data-sheet-wheel-owner="true"
           >
             <ChartOverlay
               containerRef={gridRootRef}

@@ -1,5 +1,7 @@
+import { renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { calculateFortuneSheetWheel, type FortuneSheetScrollable } from "./fortuneSheetWheel";
+import { useFortuneSheetWheel } from "./useFortuneSheetWheel";
 
 function createScrollable(overrides: Partial<FortuneSheetScrollable> = {}): FortuneSheetScrollable {
   return {
@@ -78,5 +80,69 @@ describe("applyFortuneSheetWheel", () => {
 
     expect(result.scrollLeft).toBe(500);
     expect(result.scrollTop).toBe(1500);
+  });
+});
+
+describe("useFortuneSheetWheel", () => {
+  it("scrolls the Sheet when the pointer is over a chart layer", () => {
+    const root = document.createElement("div");
+    const sheetContainer = document.createElement("div");
+    sheetContainer.className = "fortune-sheet-container";
+    const horizontal = document.createElement("div");
+    horizontal.className = "luckysheet-scrollbar-x";
+    const vertical = document.createElement("div");
+    vertical.className = "luckysheet-scrollbar-y";
+    const chartLayer = document.createElement("div");
+    chartLayer.dataset.sheetWheelOwner = "true";
+    const chartCanvas = document.createElement("canvas");
+
+    Object.defineProperties(horizontal, {
+      clientWidth: { value: 500 },
+      scrollWidth: { value: 1000 },
+    });
+    Object.defineProperties(vertical, {
+      clientHeight: { value: 500 },
+      scrollHeight: { value: 2000 },
+    });
+    sheetContainer.append(horizontal, vertical);
+    chartLayer.append(chartCanvas);
+    root.append(sheetContainer, chartLayer);
+
+    const { unmount } = renderHook(() => useFortuneSheetWheel({ current: root }, true));
+    const event = new WheelEvent("wheel", { deltaY: 120, cancelable: true });
+    chartCanvas.dispatchEvent(event);
+
+    expect(vertical.scrollTop).toBe(120);
+    expect(event.defaultPrevented).toBe(true);
+    unmount();
+  });
+
+  it("does not hijack wheel events outside the Sheet and its floating layers", () => {
+    const root = document.createElement("div");
+    const toolbar = document.createElement("div");
+    const sheetContainer = document.createElement("div");
+    sheetContainer.className = "fortune-sheet-container";
+    const horizontal = document.createElement("div");
+    horizontal.className = "luckysheet-scrollbar-x";
+    const vertical = document.createElement("div");
+    vertical.className = "luckysheet-scrollbar-y";
+    Object.defineProperties(horizontal, {
+      clientWidth: { value: 500 },
+      scrollWidth: { value: 1000 },
+    });
+    Object.defineProperties(vertical, {
+      clientHeight: { value: 500 },
+      scrollHeight: { value: 2000 },
+    });
+    sheetContainer.append(horizontal, vertical);
+    root.append(toolbar, sheetContainer);
+
+    const { unmount } = renderHook(() => useFortuneSheetWheel({ current: root }, true));
+    const event = new WheelEvent("wheel", { deltaY: 120, cancelable: true });
+    toolbar.dispatchEvent(event);
+
+    expect(vertical.scrollTop).toBe(0);
+    expect(event.defaultPrevented).toBe(false);
+    unmount();
   });
 });
