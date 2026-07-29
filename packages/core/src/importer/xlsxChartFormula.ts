@@ -1,6 +1,13 @@
 import type { ChartSpec } from "../chart/chartModel.js";
 import type { ImportedChartSeries, ImportedRangeReference } from "../excel/workbookImport.js";
-import { child, descendant, textContent, XlsxChartImportError, type XmlNode } from "./xlsxXml.js";
+import {
+  child,
+  descendant,
+  textContent,
+  XlsxChartImportError,
+  XlsxChartUnsupportedError,
+  type XmlNode,
+} from "./xlsxXml.js";
 
 function parseColumn(value: string): number {
   let result = 0;
@@ -22,7 +29,7 @@ export function parseReferenceFormula(
     /^(?:'((?:''|[^'])+)'|([^!]+))!\$?([A-Z]+)\$?(\d+)(?::\$?([A-Z]+)\$?(\d+))?$/i,
   );
   if (!match) {
-    throw new XlsxChartImportError(`暂不支持的 XLSX 图表数据引用：${formula}`, { cause: path });
+    throw new XlsxChartUnsupportedError(`暂不支持的 XLSX 图表数据引用：${formula}`);
   }
 
   const sheetName = (match[1] ?? match[2]).replace(/''/g, "'");
@@ -81,13 +88,13 @@ export function parseSeries(
   const categoryNode = child(series, scatter ? "xVal" : "cat");
   const valueNode = child(series, scatter ? "yVal" : "val");
   const valueRef = parseFormulaReference(valueNode, sheetKeyByName, path);
-  if (!valueRef) throw new XlsxChartImportError(`XLSX 图表系列缺少数值引用：${path}`);
+  if (!valueRef) throw new XlsxChartUnsupportedError(`XLSX 图表系列缺少数值引用：${path}`);
   const categoryRef = parseFormulaReference(categoryNode, sheetKeyByName, path);
   if (
     (scatter || chartType === "pie" || chartType === "doughnut" || chartType === "radar") &&
     !categoryRef
   ) {
-    throw new XlsxChartImportError(`XLSX 图表系列缺少分类引用：${path}`);
+    throw new XlsxChartUnsupportedError(`XLSX 图表系列缺少分类引用：${path}`);
   }
 
   return {

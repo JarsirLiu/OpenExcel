@@ -1,4 +1,4 @@
-import { createWorkbook, importWorkbooks } from "@/api/workbooks";
+import { createWorkbook, importWorkbooks, type WorkbookImportResult } from "@/api/workbooks";
 import { createWorkspace, type Workspace } from "@/api/workspaces";
 
 /**
@@ -19,8 +19,11 @@ export async function createProjectWithBlankWorkbook(): Promise<Workspace> {
   return workspace;
 }
 
-export async function createProjectFromImport(file: File): Promise<Workspace> {
+export async function createProjectFromImport(file: File): Promise<{
+  workspace: Workspace;
+  imported: WorkbookImportResult[];
+}> {
   const workspace = await createWorkspace("新项目");
-  await importWorkbooks(workspace.id, file);
-  return workspace;
+  const imported = await importWorkbooks(workspace.id, file);
+  return { workspace, imported };
 }

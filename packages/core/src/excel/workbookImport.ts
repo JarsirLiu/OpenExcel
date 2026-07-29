@@ -2,6 +2,19 @@ import type { ChartSeriesSpec, ChartSpec, RangeReference } from "../chart/chartM
 import type { FortuneCell } from "./celldataUtils.js";
 import type { SheetConfig } from "./sheetConfig.js";
 
+export type ImportedWorkbookWarningFeature =
+  | "charts"
+  | "comments"
+  | "pivotTables"
+  | "externalLinks"
+  | "macros";
+
+export type ImportedWorkbookWarning = {
+  code: "UNSUPPORTED_FEATURE";
+  feature: ImportedWorkbookWarningFeature;
+  count: number;
+};
+
 export type ImportedRangeReference = Omit<RangeReference, "sheetId"> & { sheetKey: string };
 
 export type ImportedChartSeries = Omit<ChartSeriesSpec, "categoryRef" | "valueRef" | "name"> & {
@@ -28,6 +41,7 @@ export interface ImportedWorkbookInput {
   name: string;
   sheets: ImportedSheetInput[];
   charts: ImportedChartInput[];
+  warnings?: ImportedWorkbookWarning[];
 }
 
 export interface ImportedWorkbookBatchInput {

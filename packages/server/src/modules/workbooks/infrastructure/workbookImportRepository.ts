@@ -1,4 +1,4 @@
-import type { ImportedChartInput } from "@openexcel/core";
+import type { ImportedChartInput, ImportedWorkbookWarning } from "@openexcel/core";
 import { prisma } from "../../../infra/database/db.js";
 import { generateWorkbookPublicId } from "../../../shared/utils/publicId.js";
 import type { AssetRecord } from "../../assets/domain/asset.js";
@@ -15,6 +15,7 @@ type ParsedWorkbook = {
     config?: unknown;
   }[];
   charts: readonly ImportedChartInput[];
+  warnings?: readonly ImportedWorkbookWarning[];
 };
 
 export async function createImportedWorkbooks(
@@ -87,6 +88,7 @@ export async function createImportedWorkbooks(
         publicId: wb.publicId,
         name: parsedWorkbook.workbookName,
         sheets: parsedWorkbook.sheetNames.length,
+        ...(parsedWorkbook.warnings?.length ? { warnings: parsedWorkbook.warnings } : {}),
       });
     }
 

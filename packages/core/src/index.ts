@@ -155,6 +155,8 @@ export type {
   ImportedSheetInput,
   ImportedWorkbookBatchInput,
   ImportedWorkbookInput,
+  ImportedWorkbookWarning,
+  ImportedWorkbookWarningFeature,
 } from "./excel/workbookImport.js";
 export { templateToExcel } from "./exporter/templateToExcel.js";
 export type { ExcelSheetInput } from "./exporter/xlsxExportTypes.js";

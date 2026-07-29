@@ -329,6 +329,8 @@ describe("parseSpreadsheetFile", () => {
 
     expect(result.charts).toHaveLength(1);
     expect(result.charts[0]?.type).toBe(type);
+    expect(result.charts[0]?.series[0]).not.toHaveProperty("valueRef.sheetId");
+    expect(result.charts[0]?.series[0]?.valueRef.sheetKey).toBe("sheet-0");
   });
 
   it("enforces chart limits while reading the XLSX package", async () => {
@@ -341,7 +343,7 @@ describe("parseSpreadsheetFile", () => {
     ).rejects.toThrow("图表数量超过安全限制");
   });
 
-  it("rejects chart presentation that is not represented by ChartSpec", async () => {
+  it("skips chart presentation that is not represented by ChartSpec", async () => {
     const zip = await JSZip.loadAsync(await chartXlsxBytes());
     const chartFile = zip.file("xl/charts/chart1.xml");
     if (!chartFile) throw new Error("test chart part is missing");
@@ -351,19 +353,105 @@ describe("parseSpreadsheetFile", () => {
       chartXml.replace("<c:plotArea>", '<c:legend><c:legendPos val="b"/></c:legend><c:plotArea>'),
     );
 
-    await expect(
-      parseSpreadsheetFile({
-        fileName: "带图例.xlsx",
-        format: "xlsx",
-        bytes: await zip.generateAsync({ type: "arraybuffer" }),
-      }),
-    ).rejects.toThrow("尚未建模的展示属性");
+    const result = await parseSpreadsheetFile({
+      fileName: "带图例.xlsx",
+      format: "xlsx",
+      bytes: await zip.generateAsync({ type: "arraybuffer" }),
+    });
+
+    expect(result.sheets).toHaveLength(1);
+    expect(result.charts).toHaveLength(0);
+    expect(result.warnings).toEqual([{ code: "UNSUPPORTED_FEATURE", feature: "charts", count: 1 }]);
+  });
+
+  it("ignores non-visibility data-label extensions written by Excel", async () => {
+    const zip = await JSZip.loadAsync(await chartXlsxBytes());
+    const chartFile = zip.file("xl/charts/chart1.xml");
+    if (!chartFile) throw new Error("test chart part is missing");
+    const chartXml = await chartFile.async("string");
+    zip.file(
+      "xl/charts/chart1.xml",
+      chartXml.replace(
+        "</c:dLbls>",
+        '<c:numFmt formatCode="General" sourceLinked="1"/><c:extLst><c:ext uri="{test}"/></c:extLst></c:dLbls>',
+      ),
+    );
+
+    const result = await parseSpreadsheetFile({
+      fileName: "Excel保存的图表.xlsx",
+      format: "xlsx",
+      bytes: await zip.generateAsync({ type: "arraybuffer" }),
+    });
+
+    expect(result.charts).toHaveLength(1);
+  });
+
+  it("ignores Excel default data-label flags that do not display labels", async () => {
+    const zip = await JSZip.loadAsync(await chartXlsxBytes());
+    const chartFile = zip.file("xl/charts/chart1.xml");
+    if (!chartFile) throw new Error("test chart part is missing");
+    const chartXml = await chartFile.async("string");
+    zip.file(
+      "xl/charts/chart1.xml",
+      chartXml.replace(
+        "<c:lineChart>",
+        '<c:lineChart><c:dLbls><c:showBubbleSize val="1"/><c:showLeaderLines val="1"/></c:dLbls>',
+      ),
+    );
+
+    const result = await parseSpreadsheetFile({
+      fileName: "Excel默认图表标签属性.xlsx",
+      format: "xlsx",
+      bytes: await zip.generateAsync({ type: "arraybuffer" }),
+    });
+
+    expect(result.charts).toHaveLength(1);
+    expect(result.warnings).toBeUndefined();
+  });
+
+  it("reports unsupported optional XLSX parts without blocking sheet import", async () => {
+    const zip = await JSZip.loadAsync(await chartXlsxBytes());
+    zip.file(
+      "xl/comments1.xml",
+      '<comments xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>',
+    );
+
+    const result = await parseSpreadsheetFile({
+      fileName: "带批注.xlsx",
+      format: "xlsx",
+      bytes: await zip.generateAsync({ type: "arraybuffer" }),
+    });
+
+    expect(result.sheets).toHaveLength(1);
+    expect(result.warnings).toEqual([
+      { code: "UNSUPPORTED_FEATURE", feature: "comments", count: 1 },
+    ]);
+  });
+
+  it("skips charts with visible data labels", async () => {
+    const zip = await JSZip.loadAsync(await chartXlsxBytes());
+    const chartFile = zip.file("xl/charts/chart1.xml");
+    if (!chartFile) throw new Error("test chart part is missing");
+    const chartXml = await chartFile.async("string");
+    zip.file(
+      "xl/charts/chart1.xml",
+      chartXml.replace('<c:showVal val="0"/>', '<c:showVal val="1"/>'),
+    );
+
+    const result = await parseSpreadsheetFile({
+      fileName: "带数据标签.xlsx",
+      format: "xlsx",
+      bytes: await zip.generateAsync({ type: "arraybuffer" }),
+    });
+
+    expect(result.sheets).toHaveLength(1);
+    expect(result.charts).toHaveLength(0);
   });
 
   it.each([
     "stacked",
     "percentStacked",
-  ] as const)("rejects %s charts that cannot round-trip through ChartSpec", async (grouping) => {
+  ] as const)("skips %s charts that cannot round-trip through ChartSpec", async (grouping) => {
     const zip = await JSZip.loadAsync(await chartXlsxBytes());
     const chartFile = zip.file("xl/charts/chart1.xml");
     if (!chartFile) throw new Error("test chart part is missing");
@@ -373,16 +461,17 @@ describe("parseSpreadsheetFile", () => {
       chartXml.replace('<c:grouping val="standard"/>', `<c:grouping val="${grouping}"/>`),
     );
 
-    await expect(
-      parseSpreadsheetFile({
-        fileName: "堆叠图.xlsx",
-        format: "xlsx",
-        bytes: await zip.generateAsync({ type: "arraybuffer" }),
-      }),
-    ).rejects.toThrow("图表分组方式");
+    const result = await parseSpreadsheetFile({
+      fileName: "堆叠图.xlsx",
+      format: "xlsx",
+      bytes: await zip.generateAsync({ type: "arraybuffer" }),
+    });
+
+    expect(result.sheets).toHaveLength(1);
+    expect(result.charts).toHaveLength(0);
   });
 
-  it("rejects chart titles linked to cells instead of flattening their formula", async () => {
+  it("skips chart titles linked to cells instead of flattening their formula", async () => {
     const zip = await JSZip.loadAsync(await chartXlsxBytes());
     const chartFile = zip.file("xl/charts/chart1.xml");
     if (!chartFile) throw new Error("test chart part is missing");
@@ -395,13 +484,14 @@ describe("parseSpreadsheetFile", () => {
       ),
     );
 
-    await expect(
-      parseSpreadsheetFile({
-        fileName: "动态标题.xlsx",
-        format: "xlsx",
-        bytes: await zip.generateAsync({ type: "arraybuffer" }),
-      }),
-    ).rejects.toThrow("引用单元格的 XLSX 图表标题");
+    const result = await parseSpreadsheetFile({
+      fileName: "动态标题.xlsx",
+      format: "xlsx",
+      bytes: await zip.generateAsync({ type: "arraybuffer" }),
+    });
+
+    expect(result.sheets).toHaveLength(1);
+    expect(result.charts).toHaveLength(0);
   });
 
   it("supports FortuneExcel's Node runtime when an XLSX contains images", async () => {

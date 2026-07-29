@@ -6,6 +6,7 @@ import {
   importWorkbooks,
   updateWorkbookName,
   type WorkbookFull,
+  type WorkbookImportResult,
   type WorkbookMeta,
 } from "@/api/workbooks";
 import { sortWorkbooks } from "./workbookOrdering";
@@ -53,7 +54,7 @@ type CatalogMutationResult<T> = {
 };
 
 type CatalogImportResult = {
-  results: { id: number; publicId: string; name: string; sheets: number }[];
+  results: WorkbookImportResult[];
   completedFiles: number;
   activeFileName: string;
   workbooks: WorkbookMeta[];

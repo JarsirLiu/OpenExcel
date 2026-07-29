@@ -106,6 +106,14 @@ const importedChartSchema = z
   })
   .strict();
 
+const importedWorkbookWarningSchema = z
+  .object({
+    code: z.literal("UNSUPPORTED_FEATURE"),
+    feature: z.enum(["charts", "comments", "pivotTables", "externalLinks", "macros"]),
+    count: z.number().int().positive().max(200),
+  })
+  .strict();
+
 const mergeCellSchema = z
   .object({
     r: nonNegativeRow,
@@ -208,6 +216,7 @@ export const importedWorkbookSchema = z
     name: z.string().trim().min(1).max(WORKBOOK_IMPORT_PAYLOAD_LIMITS.maxWorkbookNameLength),
     sheets: z.array(importedSheetSchema).min(1),
     charts: z.array(importedChartSchema).max(WORKBOOK_IMPORT_PAYLOAD_LIMITS.maxChartsPerWorkbook),
+    warnings: z.array(importedWorkbookWarningSchema).max(20).optional(),
   })
   .strict();
 

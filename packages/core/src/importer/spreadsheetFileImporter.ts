@@ -513,7 +513,7 @@ async function parseXlsxWithFortuneExcel(
     throw new Error("工作簿不包含可导入的工作表");
   }
   const metadata = readXlsxMetadata(bytes);
-  const charts = await parseXlsxCharts(bytes);
+  const { charts, warnings } = await parseXlsxCharts(bytes);
   return {
     name: workbookNameFromFile(input.fileName),
     sheets: parsedSheets.map((sheet, index) => {
@@ -526,6 +526,7 @@ async function parseXlsxWithFortuneExcel(
       };
     }),
     charts,
+    ...(warnings.length > 0 ? { warnings } : {}),
   };
 }
 

@@ -18,6 +18,13 @@ export class XlsxChartImportError extends Error {
   }
 }
 
+export class XlsxChartUnsupportedError extends XlsxChartImportError {
+  constructor(message: string) {
+    super(message);
+    this.name = "XlsxChartUnsupportedError";
+  }
+}
+
 export function localName(name: string): string {
   const separator = name.indexOf(":");
   return separator >= 0 ? name.slice(separator + 1) : name;

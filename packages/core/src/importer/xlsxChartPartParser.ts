@@ -1,5 +1,10 @@
-import { type ChartAnchor, type ChartSpec, parseChartSpec } from "../chart/chartModel.js";
-import type { ImportedChartInput } from "../excel/workbookImport.js";
+import {
+  type ChartAnchor,
+  type ChartSpec,
+  parseChartSpec,
+  type RangeReference,
+} from "../chart/chartModel.js";
+import type { ImportedChartInput, ImportedRangeReference } from "../excel/workbookImport.js";
 import { parseSeries } from "./xlsxChartFormula.js";
 import type { XlsxChartImportBudget } from "./xlsxChartLimits.js";
 import {
@@ -12,6 +17,7 @@ import {
   richTextContent,
   textContent,
   XlsxChartImportError,
+  XlsxChartUnsupportedError,
   type XmlNode,
 } from "./xlsxXml.js";
 
@@ -29,10 +35,10 @@ function parseChartTitle(root: XmlNode, path: string): string | undefined {
   if (literal) return textContent(literal) || undefined;
 
   if (child(tx, "strRef")) {
-    throw new XlsxChartImportError(`暂不支持引用单元格的 XLSX 图表标题：${path}`);
+    throw new XlsxChartUnsupportedError(`暂不支持引用单元格的 XLSX 图表标题：${path}`);
   }
 
-  throw new XlsxChartImportError(`暂不支持的 XLSX 图表标题格式：${path}`);
+  throw new XlsxChartUnsupportedError(`暂不支持的 XLSX 图表标题格式：${path}`);
 }
 
 function numberText(node: XmlNode | undefined, path: string): number {
@@ -99,6 +105,22 @@ type ChartGroup = {
   axisIds: string[];
 };
 
+function toImportedReference(reference: RangeReference): ImportedRangeReference {
+  const { sheetId, ...range } = reference;
+  return { ...range, sheetKey: sheetId };
+}
+
+// Excel writes showBubbleSize and showLeaderLines defaults even when no data
+// labels are displayed. Only flags that make a label itself visible affect the
+// ChartSpec round-trip.
+const DATA_LABEL_VISIBILITY_ELEMENTS = new Set([
+  "showLegendKey",
+  "showVal",
+  "showCatName",
+  "showSerName",
+  "showPercent",
+]);
+
 function chartGroups(plotArea: XmlNode, path: string): ChartGroup[] {
   const groups: ChartGroup[] = [];
   for (const node of plotArea.children) {
@@ -115,7 +137,7 @@ function chartGroups(plotArea: XmlNode, path: string): ChartGroup[] {
       ].includes(type)
     ) {
       if (type.endsWith("Chart")) {
-        throw new XlsxChartImportError(`暂不支持的 XLSX 图表类型：${type}`);
+        throw new XlsxChartUnsupportedError(`暂不支持的 XLSX 图表类型：${type}`);
       }
       continue;
     }
@@ -136,10 +158,10 @@ function chartGroups(plotArea: XmlNode, path: string): ChartGroup[] {
     const barDirectionNode = child(node, "barDir");
     const barDirection = barDirectionNode ? attribute(barDirectionNode, "val") : undefined;
     if (mapped === "bar" && barDirection === "bar") {
-      throw new XlsxChartImportError(`暂不支持横向条形图：${path}`);
+      throw new XlsxChartUnsupportedError(`暂不支持横向条形图：${path}`);
     }
     if (mapped === "bar" && barDirection != null && barDirection !== "col") {
-      throw new XlsxChartImportError(`暂不支持的柱形图方向：${path}`);
+      throw new XlsxChartUnsupportedError(`暂不支持的柱形图方向：${path}`);
     }
     const groupingNode = child(node, "grouping");
     const grouping = groupingNode ? attribute(groupingNode, "val") : undefined;
@@ -150,18 +172,18 @@ function chartGroups(plotArea: XmlNode, path: string): ChartGroup[] {
           ? "standard"
           : undefined;
     if (expectedGrouping && grouping != null && grouping !== expectedGrouping) {
-      throw new XlsxChartImportError(`暂不支持的 XLSX 图表分组方式：${path}`);
+      throw new XlsxChartUnsupportedError(`暂不支持的 XLSX 图表分组方式：${path}`);
     }
     if (mapped === "doughnut") {
       const holeSize = child(node, "holeSize");
       if (holeSize && attribute(holeSize, "val") !== "58") {
-        throw new XlsxChartImportError(`暂不支持的 XLSX 环形图孔径：${path}`);
+        throw new XlsxChartUnsupportedError(`暂不支持的 XLSX 环形图孔径：${path}`);
       }
     }
     if (mapped === "radar") {
       const radarStyle = child(node, "radarStyle");
       if (radarStyle && attribute(radarStyle, "val") !== "marker") {
-        throw new XlsxChartImportError(`暂不支持的 XLSX 雷达图样式：${path}`);
+        throw new XlsxChartUnsupportedError(`暂不支持的 XLSX 雷达图样式：${path}`);
       }
     }
     groups.push({
@@ -173,7 +195,8 @@ function chartGroups(plotArea: XmlNode, path: string): ChartGroup[] {
         .filter((axis): axis is string => axis != null),
     });
   }
-  if (groups.length === 0) throw new XlsxChartImportError(`XLSX 图表没有可支持的图表组：${path}`);
+  if (groups.length === 0)
+    throw new XlsxChartUnsupportedError(`XLSX 图表没有可支持的图表组：${path}`);
   if (groups.some((group) => group.series.length === 0)) {
     throw new XlsxChartImportError(`XLSX 图表组没有数据系列：${path}`);
   }
@@ -188,30 +211,31 @@ function assertUnsupportedPresentation(root: XmlNode, groups: readonly ChartGrou
     : undefined;
   const unsupported = [child(chart, "spPr"), child(chart, "txPr"), child(chart, "view3D")];
   if (unsupported.some(Boolean)) {
-    throw new XlsxChartImportError(`XLSX 图表包含尚未建模的展示属性：${path}`);
+    throw new XlsxChartUnsupportedError(`XLSX 图表包含尚未建模的展示属性：${path}`);
   }
   if (legend && legendPosition !== "t") {
-    throw new XlsxChartImportError(`XLSX 图表包含尚未建模的展示属性：${path}`);
+    throw new XlsxChartUnsupportedError(`XLSX 图表包含尚未建模的展示属性：${path}`);
   }
 
   for (const group of groups) {
     const dataLabels = child(group.node, "dLbls");
     const hasVisibleDataLabels = dataLabels?.children.some(
-      (node) => attribute(node, "val") !== "0",
+      (node) =>
+        DATA_LABEL_VISIBILITY_ELEMENTS.has(localName(node.name)) && attribute(node, "val") !== "0",
     );
     if (hasVisibleDataLabels) {
-      throw new XlsxChartImportError(`XLSX 图表包含尚未建模的系列展示属性：${path}`);
+      throw new XlsxChartUnsupportedError(`XLSX 图表包含尚未建模的系列展示属性：${path}`);
     }
     for (const series of group.series) {
       if (child(series, "txPr")) {
-        throw new XlsxChartImportError(`XLSX 图表包含尚未建模的系列样式：${path}`);
+        throw new XlsxChartUnsupportedError(`XLSX 图表包含尚未建模的系列样式：${path}`);
       }
     }
   }
 
   for (const axis of plotAreaAxes(root)) {
     if (child(axis, "title") || child(axis, "spPr") || child(axis, "txPr")) {
-      throw new XlsxChartImportError(`XLSX 图表包含尚未建模的坐标轴展示属性：${path}`);
+      throw new XlsxChartUnsupportedError(`XLSX 图表包含尚未建模的坐标轴展示属性：${path}`);
     }
   }
 }
@@ -234,6 +258,9 @@ export function parseChart(
 ): ImportedChartInput {
   const plotArea = descendant(root, "plotArea");
   if (!plotArea) throw new XlsxChartImportError(`XLSX 图表缺少绘图区：${path}`);
+  if (descendant(root, "pivotSource")) {
+    throw new XlsxChartUnsupportedError(`暂不支持 XLSX 透视图表：${path}`);
+  }
   const groups = chartGroups(plotArea, path);
   assertUnsupportedPresentation(root, groups, path);
   budget.assertSeriesCount(
@@ -243,16 +270,16 @@ export function parseChart(
   const hasPie = groups.some((group) => group.type === "pie" || group.type === "doughnut");
   const hasScatter = groups.some((group) => group.type === "scatter");
   if ((hasPie || hasScatter) && groups.length > 1) {
-    throw new XlsxChartImportError(`暂不支持包含饼图或散点图的组合图：${path}`);
+    throw new XlsxChartUnsupportedError(`暂不支持包含饼图或散点图的组合图：${path}`);
   }
   const type: ChartSpec["type"] = groups.length === 1 ? groups[0].type : "combo";
   if (type === "combo" && groups.some((group) => !["bar", "line", "area"].includes(group.type))) {
-    throw new XlsxChartImportError(`XLSX 组合图包含当前模型不支持的图表类型：${path}`);
+    throw new XlsxChartUnsupportedError(`XLSX 组合图包含当前模型不支持的图表类型：${path}`);
   }
   if (type === "combo") {
     const firstAxes = groups[0]?.axisIds.join(",");
     if (groups.some((group) => group.axisIds.join(",") !== firstAxes)) {
-      throw new XlsxChartImportError(`暂不支持带第二坐标轴的组合图：${path}`);
+      throw new XlsxChartUnsupportedError(`暂不支持带第二坐标轴的组合图：${path}`);
     }
   }
   let seriesIndex = 0;
@@ -298,12 +325,9 @@ export function parseChart(
     sheetKey: chart.sheetKey,
     series: validated.series.map((item) => ({
       ...item,
-      categoryRef: item.categoryRef
-        ? { ...item.categoryRef, sheetKey: item.categoryRef.sheetId }
-        : undefined,
-      valueRef: { ...item.valueRef, sheetKey: item.valueRef.sheetId },
-      name:
-        typeof item.name === "object" ? { ...item.name, sheetKey: item.name.sheetId } : item.name,
+      categoryRef: item.categoryRef ? toImportedReference(item.categoryRef) : undefined,
+      valueRef: toImportedReference(item.valueRef),
+      name: typeof item.name === "object" ? toImportedReference(item.name) : item.name,
     })),
   };
 }

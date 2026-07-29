@@ -79,9 +79,6 @@ export async function importStoredWorkbook(
         .markOrphaned(sourceAsset.id, error instanceof Error ? error.message : "Excel 导入失败")
         .catch(() => undefined);
     }
-    if (error instanceof ImportValidationError) {
-      throw new WorkbookImportError(error.message, error.code, error.statusCode, error.details);
-    }
     if (error instanceof WorkbookImportError) throw error;
     const limitExceeded = error instanceof XlsxSafetyLimitError;
     throw new WorkbookImportError(

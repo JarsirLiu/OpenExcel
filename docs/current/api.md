@@ -47,6 +47,12 @@ DELETE /api/workspaces/:workspacePublicId/workbooks/:workbookPublicId
 GET    /api/workspaces/:workspacePublicId/workbooks/:workbookPublicId/template
 ```
 
+The workbook import endpoint can return HTTP 201 while reporting optional
+features that were detected but are not modeled by the editor. Each uploaded
+workbook may include `warnings` with a stable `feature` and `count`; these
+warnings do not prevent sheet and supported-object import. Structural XLSX
+errors and safety-limit violations still return an error response.
+
 ## Sheet content
 
 ```text

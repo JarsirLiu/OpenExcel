@@ -1,4 +1,4 @@
-import type { ChartSpec, SheetCommand } from "@openexcel/core";
+import type { ChartSpec, ImportedWorkbookWarning, SheetCommand } from "@openexcel/core";
 import { chartDependencySheetIds } from "@openexcel/core";
 import { downloadBlob, XLSX_MIME_TYPE } from "@/shared/lib";
 import { API_BASE, apiFetch, readErrorMessage } from "./http";
@@ -92,6 +92,14 @@ export interface WorkbookCreateResult {
     order: number;
   };
 }
+
+export type WorkbookImportResult = {
+  id: number;
+  publicId: string;
+  name: string;
+  sheets: number;
+  warnings?: ImportedWorkbookWarning[];
+};
 
 export async function fetchWorkbooks(
   workspaceId: number,
@@ -224,7 +232,7 @@ export async function importWorkbooks(
   workspaceId: number,
   file: File,
   options?: { signal?: AbortSignal },
-): Promise<{ id: number; publicId: string; name: string; sheets: number }[]> {
+): Promise<WorkbookImportResult[]> {
   if (file.size > MAX_IMPORT_REQUEST_BYTES) {
     throw new Error("上传文件超过 100 MB 限制，请拆分或精简文件后重试");
   }

@@ -7,6 +7,7 @@ import type { ChartMutation } from "@/features/workbook/charts/chartMutation";
 import { t } from "@/lib/i18n";
 import { toast } from "@/shared/lib";
 import { patchWorkbookWithDelta } from "../workbook/utils/patchWorkbook";
+import { importWarningMessage } from "./importWarnings";
 import { getSheetIndexAfterDeletion, normalizeSheetIndex } from "./sheetIndex";
 import { useSheetNavigation } from "./useSheetNavigation";
 import { useWorkbookCatalog, type WorkbookInitial } from "./useWorkbookCatalog";
@@ -284,23 +285,29 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
             : "";
           const message =
             imported.error instanceof Error ? imported.error.message : t("workbook_upload_failed");
+          const warning = importWarningMessage(imported.results);
           toast({
             message: t("workbook_upload_error", {
               progress,
               message: t("workbook_upload_failed"),
               file,
-              error: message,
+              error: warning ? `${message}\n${warning}` : message,
             }),
             variant: "error",
           });
           return imported.completedFiles > 0;
         }
+        const warning = importWarningMessage(imported.results);
         toast({
-          message:
+          message: [
             files.length === 1
               ? t("workbook_upload_completed")
               : t("uploaded_workbook_count", { count: files.length }),
-          variant: "success",
+            warning,
+          ]
+            .filter(Boolean)
+            .join("\n"),
+          variant: warning ? "warning" : "success",
         });
         return imported.results.length > 0;
       } catch (error) {

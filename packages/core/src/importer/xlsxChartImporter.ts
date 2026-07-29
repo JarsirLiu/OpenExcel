@@ -1,5 +1,5 @@
 import JSZip from "jszip";
-import type { ImportedChartInput } from "../excel/workbookImport.js";
+import type { ImportedChartInput, ImportedWorkbookWarning } from "../excel/workbookImport.js";
 import {
   DEFAULT_XLSX_CHART_IMPORT_LIMITS,
   XlsxChartImportBudget,
@@ -19,7 +19,25 @@ import {
   descendant,
   readRequiredXml,
   XlsxChartImportError,
+  XlsxChartUnsupportedError,
 } from "./xlsxXml.js";
+
+export type XlsxChartImportResult = {
+  charts: ImportedChartInput[];
+  warnings: ImportedWorkbookWarning[];
+};
+
+function recordUnsupportedFeature(
+  warnings: ImportedWorkbookWarning[],
+  feature: ImportedWorkbookWarning["feature"],
+): void {
+  const existing = warnings.find((warning) => warning.feature === feature);
+  if (existing) {
+    existing.count += 1;
+    return;
+  }
+  warnings.push({ code: "UNSUPPORTED_FEATURE", feature, count: 1 });
+}
 
 async function parseDrawing(
   zip: JSZip,
@@ -27,6 +45,7 @@ async function parseDrawing(
   anchorSheetKey: string,
   sheetKeyByName: ReadonlyMap<string, string>,
   budget: XlsxChartImportBudget,
+  warnings: ImportedWorkbookWarning[],
 ): Promise<ImportedChartInput[]> {
   const root = await readRequiredXml(zip, drawingPath);
   const relationships = await readRelationships(zip, relationshipPath(drawingPath));
@@ -41,17 +60,25 @@ async function parseDrawing(
     const chartPath = resolveTarget(drawingPath, relation.target);
     const chartIndex = budget.beginChart(chartPath);
     const chartXml = await readRequiredXml(zip, chartPath);
-    charts.push(
-      parseChart(
-        chartXml,
-        anchorSheetKey,
-        parseAnchor(anchor, `${drawingPath}:${anchor.name}`),
-        sheetKeyByName,
-        chartIndex,
-        chartPath,
-        budget,
-      ),
-    );
+    try {
+      charts.push(
+        parseChart(
+          chartXml,
+          anchorSheetKey,
+          parseAnchor(anchor, `${drawingPath}:${anchor.name}`),
+          sheetKeyByName,
+          chartIndex,
+          chartPath,
+          budget,
+        ),
+      );
+    } catch (error) {
+      if (error instanceof XlsxChartUnsupportedError) {
+        recordUnsupportedFeature(warnings, "charts");
+        continue;
+      }
+      throw error;
+    }
   }
   return charts;
 }
@@ -59,12 +86,27 @@ async function parseDrawing(
 export async function parseXlsxCharts(
   bytes: Uint8Array | ArrayBuffer,
   limits: XlsxChartImportLimits = DEFAULT_XLSX_CHART_IMPORT_LIMITS,
-): Promise<ImportedChartInput[]> {
+): Promise<XlsxChartImportResult> {
   let zip: JSZip;
   try {
     zip = await JSZip.loadAsync(bytes);
   } catch (error) {
     throw new XlsxChartImportError("无法读取 XLSX ZIP 容器", { cause: error });
+  }
+
+  const packageEntries = Object.keys(zip.files);
+  const warnings: ImportedWorkbookWarning[] = [];
+  if (packageEntries.some((path) => /^xl\/(?:threadedComments\/|comments)/i.test(path))) {
+    recordUnsupportedFeature(warnings, "comments");
+  }
+  if (packageEntries.some((path) => /^xl\/pivot(?:Tables|Cache)\//i.test(path))) {
+    recordUnsupportedFeature(warnings, "pivotTables");
+  }
+  if (packageEntries.some((path) => /^xl\/externalLinks\//i.test(path))) {
+    recordUnsupportedFeature(warnings, "externalLinks");
+  }
+  if (packageEntries.some((path) => /^xl\/vbaProject\.bin$/i.test(path))) {
+    recordUnsupportedFeature(warnings, "macros");
   }
 
   const workbookPath = "xl/workbook.xml";
@@ -99,9 +141,11 @@ export async function parseXlsxCharts(
       sheet.path,
     );
     const drawingPath = resolveTarget(sheet.path, drawingRelation.target);
-    charts.push(...(await parseDrawing(zip, drawingPath, sheet.key, sheetKeyByName, budget)));
+    charts.push(
+      ...(await parseDrawing(zip, drawingPath, sheet.key, sheetKeyByName, budget, warnings)),
+    );
   }
-  return charts;
+  return { charts, warnings };
 }
 
 export {

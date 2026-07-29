@@ -5,6 +5,7 @@ import { ChatSidebar } from "@/features/chat/ChatSidebar";
 import { useSessionWorkspace } from "@/features/session/useSessionWorkspace";
 import type { ChartMutation } from "@/features/workbook/charts/chartMutation";
 import { useSheetActivation } from "@/features/workbook/editor/SheetActivationContext";
+import { importWarningMessage } from "@/features/workspace/importWarnings";
 import {
   createProject,
   createProjectFromImport,
@@ -192,7 +193,9 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
       }
 
       try {
-        const workspace = await createProjectFromImport(file);
+        const { workspace, imported } = await createProjectFromImport(file);
+        const warning = importWarningMessage(imported);
+        if (warning) toast({ message: warning, variant: "warning" });
         navigate(routePaths.workspace(workspace.publicId));
       } catch (error) {
         toast({

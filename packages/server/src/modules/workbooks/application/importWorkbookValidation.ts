@@ -151,6 +151,7 @@ function normalizeWorkbook(workbook: ImportedWorkbookPayload) {
     results,
     sheetKeys: results.map((sheet) => sheet.key),
     charts: workbook.charts,
+    warnings: workbook.warnings,
   };
 }
 

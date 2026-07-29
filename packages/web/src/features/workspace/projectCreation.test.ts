@@ -28,7 +28,7 @@ describe("project creation flows", () => {
     mocks.importWorkbooks.mockReset();
     mocks.createWorkspace.mockResolvedValue({ id: 7, publicId: "ws_7", name: "新项目", order: 0 });
     mocks.createWorkbook.mockResolvedValue({ id: 8 });
-    mocks.importWorkbooks.mockResolvedValue([{ id: 8 }]);
+    mocks.importWorkbooks.mockResolvedValue([{ id: 8, publicId: "wb_8", name: "预算", sheets: 1 }]);
   });
 
   it("creates only a project from the sidebar project action", async () => {
@@ -49,7 +49,10 @@ describe("project creation flows", () => {
 
   it("imports directly into a new project without creating a blank workbook", async () => {
     const file = new File(["data"], "report.xlsx");
-    await expect(createProjectFromImport(file)).resolves.toMatchObject({ id: 7 });
+    await expect(createProjectFromImport(file)).resolves.toMatchObject({
+      workspace: { id: 7 },
+      imported: [{ id: 8 }],
+    });
 
     expect(mocks.createWorkspace).toHaveBeenCalledWith("新项目");
     expect(mocks.importWorkbooks).toHaveBeenCalledWith(7, file);
