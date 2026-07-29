@@ -1,10 +1,4 @@
-import {
-  DEFAULT_MAX_CONVERSATION_TURNS,
-  DEFAULT_MAX_USER_INPUT_TOKENS,
-  DEFAULT_READ_SHEET_DATA_BUDGET_TOKENS,
-  DEFAULT_TOOL_RESULT_BUDGET_TOKENS,
-  DEFAULT_TOOL_RESULT_MAX_TOKENS,
-} from "@openexcel/agent";
+import { DEFAULT_MAX_USER_INPUT_TOKENS } from "@openexcel/agent";
 import { config as loadDotenv } from "dotenv";
 import { environmentFile } from "./infra/runtimePaths.js";
 
@@ -22,11 +16,7 @@ export interface ModelConfig {
   timeoutMs: number;
   contextWindowTokens: number;
   outputReserveTokens: number;
-  maxConversationTurns: number;
   maxUserInputTokens: number;
-  toolResultBudgetTokens: number;
-  toolResultMaxTokens: number;
-  readSheetDataBudgetTokens: number;
 }
 
 let cachedConfig: ModelConfig | null = null;
@@ -83,30 +73,10 @@ export function createModelConfig(env: NodeJS.ProcessEnv): ModelConfig {
     timeoutMs: readNonNegativeInt(env, "MODEL_TIMEOUT_MS", 120_000),
     contextWindowTokens: readPositiveInt(env, "MODEL_CONTEXT_WINDOW_TOKENS", 180_000),
     outputReserveTokens: readPositiveInt(env, "MODEL_OUTPUT_RESERVE_TOKENS", 16_000),
-    maxConversationTurns: readPositiveInt(
-      env,
-      "MODEL_MAX_CONVERSATION_TURNS",
-      DEFAULT_MAX_CONVERSATION_TURNS,
-    ),
     maxUserInputTokens: readPositiveInt(
       env,
       "MODEL_MAX_USER_INPUT_TOKENS",
       DEFAULT_MAX_USER_INPUT_TOKENS,
-    ),
-    toolResultBudgetTokens: readPositiveInt(
-      env,
-      "MODEL_TOOL_RESULT_BUDGET_TOKENS",
-      DEFAULT_TOOL_RESULT_BUDGET_TOKENS,
-    ),
-    toolResultMaxTokens: readPositiveInt(
-      env,
-      "MODEL_TOOL_RESULT_MAX_TOKENS",
-      DEFAULT_TOOL_RESULT_MAX_TOKENS,
-    ),
-    readSheetDataBudgetTokens: readPositiveInt(
-      env,
-      "MODEL_READ_SHEET_DATA_BUDGET_TOKENS",
-      DEFAULT_READ_SHEET_DATA_BUDGET_TOKENS,
     ),
   };
 }

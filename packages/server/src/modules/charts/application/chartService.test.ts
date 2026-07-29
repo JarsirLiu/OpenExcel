@@ -1,7 +1,12 @@
 import type { ChartSpec } from "@openexcel/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as repository from "../infrastructure/chartRepository.js";
-import { buildChartSpec, buildUpdatedChartSpec, listCharts } from "./chartService.js";
+import {
+  buildChartSpec,
+  buildUpdatedChartSpec,
+  listCharts,
+  listChartsPage,
+} from "./chartService.js";
 
 vi.mock("../infrastructure/chartRepository.js", () => ({
   createChart: vi.fn(),
@@ -73,5 +78,21 @@ describe("chartService", () => {
 
     await expect(listCharts(1, 7)).resolves.toEqual([baseChart]);
     expect(repository.findChartsForWorkbook).toHaveBeenCalledWith(1, 7);
+  });
+
+  it("returns a bounded chart page and continuation offset", async () => {
+    vi.mocked(repository.findChartsForWorkbook).mockResolvedValue([
+      storedChart(baseChart),
+      storedChart({ ...baseChart, id: "chart_second" }),
+    ] as never);
+
+    await expect(listChartsPage(1, 7, { offset: 10, limit: 1 })).resolves.toEqual({
+      charts: [baseChart],
+      nextOffset: 11,
+    });
+    expect(repository.findChartsForWorkbook).toHaveBeenCalledWith(1, 7, {
+      offset: 10,
+      limit: 1,
+    });
   });
 });

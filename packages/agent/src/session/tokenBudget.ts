@@ -1,4 +1,4 @@
-import { estimateTokens } from "./contextWindow.js";
+import { estimateTokens, toEstimableToolDefinitions } from "./contextWindow.js";
 
 export type TokenObservationSource = "provider" | "estimate" | "mixed";
 
@@ -92,42 +92,6 @@ export function normalizeModelStepUsage(value: unknown): ModelStepUsage | undefi
   };
 }
 
-function estimateContext(context: TokenContextSnapshot, estimator: TokenEstimator): number {
-  return Math.max(
-    1,
-    estimator.estimate({
-      messages: context.messages,
-      systemPrompt: context.systemPrompt,
-      toolDefinitions: toEstimableToolDefinitions(context.toolDefinitions),
-      pendingToolResults: context.pendingToolResults,
-    }),
-  );
-}
-
-function toEstimableToolDefinitions(value: unknown): unknown {
-  if (!Array.isArray(value)) return value;
-
-  return value.map((tool) => {
-    if (!isRecord(tool) || !isRecord(tool.inputSchema)) return tool;
-    const schema = tool.inputSchema as SchemaWithJsonSchema;
-    if (typeof schema.toJSONSchema !== "function") return tool;
-
-    try {
-      return { ...tool, inputSchema: schema.toJSONSchema() };
-    } catch {
-      return { ...tool, inputSchema: { type: "object" } };
-    }
-  });
-}
-
-type SchemaWithJsonSchema = {
-  toJSONSchema?: () => unknown;
-};
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
 type ConfirmedBaseline = {
   inputTokens: number;
   contextTokens: number;
@@ -147,7 +111,7 @@ export class TokenUsageTracker {
   constructor(private readonly estimator: TokenEstimator = defaultTokenEstimator) {}
 
   predict(context: TokenContextSnapshot): TokenBudgetSnapshot {
-    const estimatedContextTokens = estimateContext(context, this.estimator);
+    const estimatedContextTokens = estimateModelContextTokensWithEstimator(context, this.estimator);
     if (!this.baseline || this.baseline.contextRevision !== this.contextRevision) {
       return {
         observation: {
@@ -174,7 +138,7 @@ export class TokenUsageTracker {
   }
 
   recordStepFinished(step: ModelStepFinished, context: TokenContextSnapshot): TokenBudgetSnapshot {
-    const estimatedContextTokens = estimateContext(context, this.estimator);
+    const estimatedContextTokens = estimateModelContextTokensWithEstimator(context, this.estimator);
     const usage = step.usage;
     if (usage) {
       this.baseline = {
@@ -210,4 +174,19 @@ export class TokenUsageTracker {
     this.contextRevision += 1;
     this.baseline = undefined;
   }
+}
+
+function estimateModelContextTokensWithEstimator(
+  context: TokenContextSnapshot,
+  estimator: TokenEstimator,
+): number {
+  return Math.max(
+    1,
+    estimator.estimate({
+      messages: context.messages,
+      systemPrompt: context.systemPrompt,
+      toolDefinitions: toEstimableToolDefinitions(context.toolDefinitions),
+      pendingToolResults: context.pendingToolResults,
+    }),
+  );
 }

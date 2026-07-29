@@ -2,13 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockFindFirst = vi.fn();
 const mockFindMany = vi.fn();
-const mockListCharts = vi.fn();
+const mockListChartsPage = vi.fn();
 
 vi.mock("../../../infra/database/db.js", () => ({
   prisma: { sheet: { findFirst: mockFindFirst, findMany: mockFindMany } },
 }));
 vi.mock("../../charts/application/chartService.js", () => ({
-  listCharts: mockListCharts,
+  listChartsPage: mockListChartsPage,
 }));
 
 const { readSheetData } = await import("./readSheetData.js");
@@ -23,8 +23,8 @@ describe("sheet read tools", () => {
   beforeEach(() => {
     mockFindFirst.mockReset();
     mockFindMany.mockReset();
-    mockListCharts.mockReset();
-    mockListCharts.mockResolvedValue([]);
+    mockListChartsPage.mockReset();
+    mockListChartsPage.mockResolvedValue({ charts: [], nextOffset: null });
     mockFindMany.mockResolvedValue([{ id: 1, name: "Sheet1" }]);
   });
 
@@ -165,7 +165,7 @@ describe("sheet read tools", () => {
       workbookId: 3,
       uploadedData: JSON.stringify([
         { r: 0, c: 0, v: { v: "目标" } },
-        { r: 0, c: 1, v: { v: "目标" } },
+        { r: 0, c: 2, v: { v: "目标" } },
         { r: 1, c: 0, v: { v: "目标" } },
       ]),
       config: null,
@@ -178,6 +178,29 @@ describe("sheet read tools", () => {
     );
 
     expect(result.matches).toEqual([{ range: "A1:A2", count: 2, reason: "value=目标" }]);
+  });
+
+  it("paginates cell matches without changing the search semantics", async () => {
+    mockFindFirst.mockResolvedValue({
+      id: 1,
+      name: "Sheet1",
+      sheetNo: 1,
+      workbookId: 3,
+      uploadedData: JSON.stringify([
+        { r: 0, c: 0, v: { v: "目标" } },
+        { r: 0, c: 2, v: { v: "目标" } },
+      ]),
+      config: null,
+      workbook: { workspaceId: 1, id: 3, name: "Workbook" },
+    });
+
+    const result = await findSheetCells.execute(
+      { sheetId: 1, range: "A1:C1", query: { value: "目标" }, limit: 1 },
+      context(),
+    );
+
+    expect(result.matches).toHaveLength(1);
+    expect(result.nextOffset).toBe(1);
   });
 
   it("reads one object category per call", async () => {
@@ -193,10 +216,34 @@ describe("sheet read tools", () => {
 
     const result = await readSheetObjects.execute({ sheetId: 1, objectType: "filters" }, context());
 
-    expect(mockListCharts).not.toHaveBeenCalled();
+    expect(mockListChartsPage).not.toHaveBeenCalled();
     expect(result).toMatchObject({
       objectType: "filters",
       objects: [{ kind: "filter", range: "A1:B3" }],
+      nextOffset: null,
+    });
+  });
+
+  it("pages chart object summaries at the database query boundary", async () => {
+    mockFindFirst.mockResolvedValue({
+      id: 1,
+      name: "Sheet1",
+      sheetNo: 1,
+      workbookId: 3,
+      uploadedData: "[]",
+      config: null,
+      workbook: { workspaceId: 1, id: 3, name: "Workbook" },
+    });
+
+    await readSheetObjects.execute(
+      { sheetId: 1, objectType: "charts", offset: 20, limit: 10 },
+      context(),
+    );
+
+    expect(mockListChartsPage).toHaveBeenCalledWith(1, 3, {
+      sheetId: 1,
+      offset: 20,
+      limit: 10,
     });
   });
 

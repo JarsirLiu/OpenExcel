@@ -3,6 +3,7 @@ import { defineServerTool } from "../../../shared/tools/serverTool.js";
 import { deleteChartMutation } from "../application/chartMutationService.js";
 
 export const deleteChart = defineServerTool("deleteChart", {
+  resultBudget: { maxTokens: 1_000, compact: (value) => value },
   execute: async (input, { context, db, toolCallId }) => {
     const result = await deleteChartMutation(context.workspaceId, input.chartId, {
       runId: context.runId,

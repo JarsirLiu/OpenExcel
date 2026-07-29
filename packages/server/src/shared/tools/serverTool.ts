@@ -1,3 +1,4 @@
+import type { ToolResultPolicy } from "@openexcel/agent";
 import { type ExcelToolInput, type ExcelToolName, excelToolSpecs } from "@openexcel/core";
 import type { z } from "zod";
 import type { Prisma } from "../../infra/database/prismaTypes.js";
@@ -10,7 +11,6 @@ import {
 
 export type ToolResultBudgetContext = {
   maxTokens: number;
-  policy: "generic" | "paged-structured";
 };
 
 export type ServerToolExecutionOptions<Context> = {
@@ -37,6 +37,7 @@ export type ServerToolDefinition<Name extends ExcelToolName = ExcelToolName> = {
   contextScope: "run" | "workspace";
   contextSchema: z.ZodTypeAny;
   outputSchema: (typeof excelToolSpecs)[Name]["outputSchema"];
+  resultBudget: ToolResultPolicy;
   execute(
     input: ExcelToolInput<Name>,
     options: ServerToolExecutionOptions<ServerToolContext<Name>>,
@@ -51,10 +52,12 @@ export type ServerToolRuntimeDefinition = {
   contextScope: "run" | "workspace";
   contextSchema: z.ZodTypeAny;
   outputSchema: z.ZodTypeAny;
+  resultBudget: ToolResultPolicy;
   execute(input: unknown, options: ServerToolExecutionOptions<unknown>): Promise<unknown>;
 };
 
 type ServerToolConfig<Name extends ExcelToolName> = {
+  resultBudget: Omit<ToolResultPolicy, "validate">;
   execute: (
     input: ExcelToolInput<Name>,
     options: ServerToolExecutionOptions<ServerToolContext<Name>>,
@@ -73,6 +76,10 @@ export function defineServerTool<const Name extends ExcelToolName>(
     contextScope: spec.needsRunContext ? "run" : "workspace",
     contextSchema: spec.needsRunContext ? runToolContextSchema : workspaceToolContextSchema,
     outputSchema: spec.outputSchema,
+    resultBudget: {
+      ...config.resultBudget,
+      validate: (value) => spec.outputSchema.safeParse(value).success,
+    },
     execute: config.execute,
   };
 }

@@ -35,6 +35,7 @@ function serializeContinuation(continuation: SheetReadContinuation | null) {
 }
 
 export const readSheetData = defineServerTool("readSheetData", {
+  resultBudget: { maxTokens: 8_000, compact: (value) => value },
   execute: async (
     { sheetId, range, continuation }: ReadSheetDataInput,
     { context, resultBudget },

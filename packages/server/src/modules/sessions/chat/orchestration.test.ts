@@ -7,24 +7,7 @@ import { buildRunToolset, createConcreteToolExecutor } from "./orchestration.js"
 
 describe("buildRunToolset", () => {
   it("binds run-scoped tools to the active run", () => {
-    const { toolsContext } = buildRunToolset(
-      {
-        baseUrl: "http://model",
-        apiKey: "test-key",
-        modelName: "test-model",
-        maxRetries: 2,
-        timeoutMs: 120_000,
-        contextWindowTokens: 180_000,
-        outputReserveTokens: 16_000,
-        maxConversationTurns: 20,
-        maxUserInputTokens: 16_000,
-        toolResultBudgetTokens: 10_000,
-        toolResultMaxTokens: 4_000,
-        readSheetDataBudgetTokens: 4_000,
-      },
-      3,
-      19,
-    );
+    const { toolsContext } = buildRunToolset(3, 19);
 
     expect(toolsContext.readSheetData).toEqual({ workspaceId: 3 });
     expect(toolsContext.createChart).toEqual({ runId: 19, workspaceId: 3 });
@@ -38,6 +21,7 @@ describe("buildRunToolset", () => {
     });
     const fakeManifest = (Object.keys(excelToolSpecs) as ExcelToolName[]).map((name) =>
       defineServerTool(name, {
+        resultBudget: { maxTokens: 1_000, compact: (value) => value },
         execute: async (input, options) => {
           if (name === "createChart") {
             await execute(input, options);
@@ -98,6 +82,7 @@ describe("buildRunToolset", () => {
     const execute = vi.fn();
     const fakeManifest = (Object.keys(excelToolSpecs) as ExcelToolName[]).map((name) =>
       defineServerTool(name, {
+        resultBudget: { maxTokens: 1_000, compact: (value) => value },
         execute: async () => undefined as never,
       }),
     );
@@ -119,6 +104,7 @@ describe("buildRunToolset", () => {
     const execute = vi.fn();
     const fakeManifest = (Object.keys(excelToolSpecs) as ExcelToolName[]).map((name) =>
       defineServerTool(name, {
+        resultBudget: { maxTokens: 1_000, compact: (value) => value },
         execute: async () => {
           execute();
           return undefined as never;

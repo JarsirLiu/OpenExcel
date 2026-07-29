@@ -73,6 +73,19 @@ export class ToolRateLimitError extends Error implements ToolError {
   }
 }
 
+export class ToolConcurrencyError extends Error implements ToolError {
+  readonly kind: ToolErrorKind = "rate_limit";
+  readonly retryable = true;
+
+  constructor(
+    public readonly message: string,
+    public readonly details?: Record<string, unknown>,
+  ) {
+    super(message);
+    this.name = "ToolConcurrencyError";
+  }
+}
+
 export function isToolError(error: unknown): error is ToolError {
   return error instanceof Error && "kind" in error;
 }

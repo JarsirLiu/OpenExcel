@@ -2,15 +2,18 @@ import { ToolNotFoundError } from "@openexcel/agent";
 import { projectSheetObjects } from "@openexcel/core";
 import { defineServerTool } from "../../../shared/tools/serverTool.js";
 import { deserializeSheet } from "../../../shared/utils/sheetSerialization.js";
-import { listCharts } from "../../charts/application/chartService.js";
+import { listChartsPage } from "../../charts/application/chartService.js";
 import { findSheetForWorkspace, findSheetsForWorkbook } from "../infrastructure/sheetRepository.js";
 
 export const readSheetObjects = defineServerTool("readSheetObjects", {
-  execute: async ({ sheetId, objectType }, { context }) => {
+  resultBudget: { maxTokens: 8_000, compact: (value) => value },
+  execute: async ({ sheetId, objectType, offset = 0, limit = 50 }, { context }) => {
     const sheet = await findSheetForWorkspace(sheetId, context.workspaceId);
     if (!sheet) throw new ToolNotFoundError(`Sheet ${sheetId} 不存在`);
-    const charts =
-      objectType === "charts" ? await listCharts(context.workspaceId, sheet.workbookId) : [];
+    const chartPage =
+      objectType === "charts"
+        ? await listChartsPage(context.workspaceId, sheet.workbookId, { sheetId, offset, limit })
+        : { charts: [], nextOffset: null };
     const workbookSheets =
       objectType === "charts"
         ? await findSheetsForWorkbook(sheet.workbookId, context.workspaceId)
@@ -27,10 +30,11 @@ export const readSheetObjects = defineServerTool("readSheetObjects", {
           sheetName: sheet.name,
           sheetNames: new Map(workbookSheets.map((item) => [String(item.id), item.name])),
           config: parsed.config,
-          charts,
+          charts: chartPage.charts,
         },
         objectType,
       ),
+      nextOffset: chartPage.nextOffset,
     };
   },
 });

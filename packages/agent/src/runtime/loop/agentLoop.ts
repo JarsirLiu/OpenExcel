@@ -10,7 +10,6 @@ import {
 } from "ai";
 import { resolveModelForPurpose } from "../../model.js";
 import {
-  DEFAULT_MAX_CONVERSATION_TURNS,
   DEFAULT_MAX_USER_INPUT_TOKENS,
   DEFAULT_OUTPUT_RESERVE_TOKENS,
   trimMessagesToContextWindow,
@@ -81,9 +80,9 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
   const contextWindow = trimMessagesToContextWindow(messagesForContext, {
     contextWindowTokens: input.contextWindowTokens,
     outputReserveTokens: input.outputReserveTokens,
-    maxConversationTurns: input.maxConversationTurns ?? DEFAULT_MAX_CONVERSATION_TURNS,
     maxUserInputTokens: input.maxUserInputTokens ?? DEFAULT_MAX_USER_INPUT_TOKENS,
     systemPrompt: input.systemPrompt,
+    toolDefinitions: input.tools,
   });
   const timeout = input.timeout ?? { totalMs: 120_000, toolMs: 120_000 };
   const agentAbortController = new AbortController();

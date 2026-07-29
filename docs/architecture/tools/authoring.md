@@ -39,6 +39,19 @@ For large data, return a compact rectangular projection with a clear range and
 use a separate, on-demand object or metadata read. Do not return a verbose
 JSON record for every cell by default.
 
+Treat result-size controls as a tool concern, not as a shared conversation
+quota. Every tool manifest must declare its own per-call maximum and a
+tool-owned model projection function. A tool that can return large data should
+add a domain-specific page or continuation contract and shrink the page before
+execution returns. There is no run-level or per-turn tool-result quota:
+automatic context compaction owns conversation growth, while the per-call
+policy protects the next model request from one oversized result.
+
+The projection must preserve the Core output contract. Generic JSON truncation
+is forbidden because it can remove required fields or change the meaning of a
+result. If a projection cannot fit its declared limit, the tool must fail with
+a structured model-visible error and let the current transaction roll back.
+
 ## 3. Implement the server executor
 
 Create the concrete executor in the owning server module's `tools/` directory

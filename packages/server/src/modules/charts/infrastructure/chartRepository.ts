@@ -41,10 +41,23 @@ async function assertChartReferencesBelongToWorkbook(
   return { workbookId, sheetId };
 }
 
-export async function findChartsForWorkbook(workspaceId: number, workbookId: number) {
+export type ChartListOptions = {
+  sheetId?: number;
+  offset?: number;
+  limit?: number;
+};
+
+export async function findChartsForWorkbook(
+  workspaceId: number,
+  workbookId: number,
+  options: ChartListOptions = {},
+) {
+  const { sheetId, offset, limit } = options;
   return prisma.chart.findMany({
-    where: { workbookId, workbook: { workspaceId } },
+    where: { workbookId, ...(sheetId != null ? { sheetId } : {}), workbook: { workspaceId } },
     orderBy: [{ order: "asc" }, { id: "asc" }],
+    ...(offset != null ? { skip: offset } : {}),
+    ...(limit != null ? { take: limit + 1 } : {}),
   });
 }
 

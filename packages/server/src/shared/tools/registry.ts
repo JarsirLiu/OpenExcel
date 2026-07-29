@@ -54,6 +54,14 @@ export function createServerToolRegistry<const T extends readonly ServerToolRunt
     ) {
       throw new Error(`Server tool contract mismatch: ${tool.name}`);
     }
+    if (
+      !tool.resultBudget ||
+      !Number.isInteger(tool.resultBudget.maxTokens) ||
+      tool.resultBudget.maxTokens <= 0 ||
+      typeof tool.resultBudget.compact !== "function"
+    ) {
+      throw new Error(`Server tool result budget contract mismatch: ${tool.name}`);
+    }
     const expectedContextScope = spec.needsRunContext ? "run" : "workspace";
     const expectedContextSchema = spec.needsRunContext
       ? runToolContextSchema

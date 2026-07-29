@@ -9,6 +9,7 @@ function manifestWithout(name: ExcelToolName): readonly ServerToolRuntimeDefinit
     .filter((toolName) => toolName !== name)
     .map((toolName) =>
       defineServerTool(toolName, {
+        resultBudget: { maxTokens: 1_000, compact: (value) => value },
         execute: async () => undefined as never,
       }),
     );
@@ -24,6 +25,7 @@ describe("createServerToolRegistry", () => {
   it("rejects duplicate registrations", () => {
     const manifest = manifestWithout("createChart");
     const createChart = defineServerTool("createChart", {
+      resultBudget: { maxTokens: 1_000, compact: (value) => value },
       execute: async () => undefined as never,
     });
 
@@ -35,6 +37,7 @@ describe("createServerToolRegistry", () => {
   it("rejects a server definition that replaces the Core input schema", () => {
     const manifest = manifestWithout("createChart");
     const createChart = defineServerTool("createChart", {
+      resultBudget: { maxTokens: 1_000, compact: (value) => value },
       execute: async () => undefined as never,
     });
     const mismatched = { ...createChart, inputSchema: z.object({ wrong: z.string() }) };
@@ -47,6 +50,7 @@ describe("createServerToolRegistry", () => {
   it("rejects a server definition that replaces the Core output schema", () => {
     const manifest = manifestWithout("createChart");
     const createChart = defineServerTool("createChart", {
+      resultBudget: { maxTokens: 1_000, compact: (value) => value },
       execute: async () => undefined as never,
     });
     const mismatched = { ...createChart, outputSchema: z.any() };
@@ -56,9 +60,23 @@ describe("createServerToolRegistry", () => {
     );
   });
 
+  it("rejects a server definition without a result budget policy", () => {
+    const manifest = manifestWithout("createChart");
+    const createChart = defineServerTool("createChart", {
+      resultBudget: { maxTokens: 1_000, compact: (value) => value },
+      execute: async () => undefined as never,
+    });
+    const missingBudget = { ...createChart, resultBudget: undefined as never };
+
+    expect(() => createServerToolRegistry([...manifest, missingBudget])).toThrow(
+      "Server tool result budget contract mismatch: createChart",
+    );
+  });
+
   it("rejects a server definition with the wrong context contract", () => {
     const manifest = manifestWithout("createChart");
     const createChart = defineServerTool("createChart", {
+      resultBudget: { maxTokens: 1_000, compact: (value) => value },
       execute: async () => undefined as never,
     });
     const mismatched = {

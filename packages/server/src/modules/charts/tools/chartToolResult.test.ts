@@ -1,31 +1,39 @@
+import { excelToolSpecs } from "@openexcel/core";
 import { describe, expect, it } from "vitest";
-import { toCreateChartToolResult, toUpdateChartToolResult } from "./chartToolResult.js";
+import { toCreateChartToolResult } from "./chartToolResult.js";
 
-describe("chart tool results", () => {
-  it("maps a persistence chart record to a model DTO", () => {
-    expect(
-      toCreateChartToolResult({
-        id: 12,
-        publicId: "chart-12",
-        workbookId: 14,
-        sheetId: 32,
-        order: 0,
-        spec: "{}",
-        createdAt: new Date("2026-07-26T08:00:00.000Z"),
-        updatedAt: new Date("2026-07-26T08:00:00.000Z"),
-      }),
-    ).toEqual({
-      success: true,
-      chartId: "chart-12",
-      workbookId: 14,
-      sheetId: 32,
-    });
-  });
+describe("toCreateChartToolResult", () => {
+  it("bounds chart diagnostics while preserving counts and schema validity", () => {
+    const result = toCreateChartToolResult(
+      { publicId: "chart-1", workbookId: 1, sheetId: 2 },
+      {
+        categoryCount: 100,
+        missingCategoryIndexes: Array.from({ length: 100 }, (_, index) => index),
+        series: Array.from({ length: 25 }, (_, seriesIndex) => ({
+          seriesId: `series-${seriesIndex}`,
+          name: `Series ${seriesIndex}`,
+          pointCount: 100,
+          missingValueIndexes: Array.from({ length: 100 }, (_, index) => index),
+          nonNumericValueIndexes: [],
+          formulaCells: Array.from({ length: 100 }, (_, index) => `A${index + 1}`),
+          unresolvedFormulaCells: [],
+        })),
+      },
+    );
 
-  it("keeps update results independent from persistence fields", () => {
-    expect(toUpdateChartToolResult({ id: 12, publicId: "chart-12" }, "chart-12")).toEqual({
-      success: true,
-      chartId: "chart-12",
+    expect(result.dataQuality).toMatchObject({
+      categoryCount: 100,
+      missingCategoryIndexes: Array.from({ length: 20 }, (_, index) => index),
+      missingCategoryIndexesTruncated: true,
+      seriesCount: 25,
+      seriesTruncated: true,
     });
+    expect(result.dataQuality?.series).toHaveLength(20);
+    expect(result.dataQuality?.series[0]).toMatchObject({
+      missingValueIndexes: Array.from({ length: 20 }, (_, index) => index),
+      formulaCells: Array.from({ length: 20 }, (_, index) => `A${index + 1}`),
+      indexesTruncated: true,
+    });
+    expect(excelToolSpecs.createChart.outputSchema.safeParse(result).success).toBe(true);
   });
 });

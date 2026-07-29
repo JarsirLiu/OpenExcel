@@ -5,6 +5,7 @@ import { toCreateChartSpec } from "./chartToolInput.js";
 import { toCreateChartToolResult } from "./chartToolResult.js";
 
 export const createChart = defineServerTool("createChart", {
+  resultBudget: { maxTokens: 2_000, compact: (value) => value },
   execute: async (input, { context, db, toolCallId }) => {
     const spec = buildChartSpec(toCreateChartSpec(input));
     const dataQuality = await inspectChartDataForWorkspace(context.workspaceId, spec, db);

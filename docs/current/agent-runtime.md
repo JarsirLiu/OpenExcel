@@ -28,9 +28,33 @@ The Server obtains concrete tools from `serverToolRegistry`, validates input and
 execution context, invokes the tool, validates output, and converts it to
 model-safe JSON. The Agent adapter does not own Excel-specific tool logic.
 
-`ToolResultBudget` limits total output and per-tool output. `readSheetData`
-uses a paged budget. Each `prepareStep` uses the budget to determine the tools
-available for that step.
+Every registered tool declares its own per-call result policy: a maximum
+model-visible size and a tool-owned model projection function. The generic
+Agent budget adapter only invokes that policy and verifies the resulting size;
+it never truncates arbitrary tool JSON. The projection is validated against
+the tool output schema before the result is committed to the tool ledger.
+
+There is no shared result quota, per-turn result quota, or cumulative
+`readSheetData` budget. Repeated calls remain available. A model step may issue
+at most 10 tool calls, and no more than 10 may be active concurrently. The
+system prompt tells the model to split larger batches, and the Agent adapter
+enforces the same limit: calls after the first 10 in a step receive a
+model-visible `rate_limit` ToolError and do not enter the executor. They still
+produce the normal tool lifecycle and tool-call/tool-result pairing, so the
+model can retry them after the batch finishes.
+
+Large tools must page or otherwise reduce their own domain result;
+`readSheetData` shrinks one page to its own per-call limit and returns a
+continuation for the next call. `findSheetCells`, `readSheetObjects`, and
+`listCharts` return bounded pages with `nextOffset`. `createChart` bounds its
+data-quality diagnostic indexes and series summary while preserving counts and
+truncation markers. If a tool cannot produce a valid bounded result, it returns
+a structured tool error instead of silently corrupting its result shape.
+
+Tool result limits are not model context limits. A result limit protects one
+tool response and prevents a single read from flooding the next model request.
+Conversation growth is handled by the context window and compaction system
+described below.
 
 ### Tool call lifecycle
 
@@ -131,6 +155,28 @@ recovery worker or the next acquisition attempt can reclaim it; this is a
 temporary infrastructure outage, not a permanent conversation lock.
 
 ## Context compaction
+
+The Agent's model-input budget is calculated as:
+
+```text
+input budget = context window - output reserve - fixed model context
+fixed model context = system prompt + active tool definitions
+model input = fixed model context + selected transcript/messages
+```
+
+The initial transcript trim includes the system prompt and the model-facing
+tool schemas. Per-step token observations use the provider's confirmed input
+token count when available and estimate changes from the complete context
+shape, including the active tool schemas. These observations are diagnostic
+and drive compaction; they do not cap the number of conversation turns or tool
+calls in a Run.
+
+Conversation history is persisted independently of model context selection.
+The context window selects as many complete recent turns as fit after fixed
+context and output reservation. Automatic compaction summarizes older turns
+when the configured trigger is reached. Context trimming or compaction never
+deletes the canonical transcript from the database and is not a history
+retention policy.
 
 The Agent currently provides token estimation and observation, window trimming,
 summary generation, transcript safety boundaries, a checkpoint store,

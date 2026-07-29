@@ -29,6 +29,27 @@ describe("trimMessagesToContextWindow", () => {
     expect(result.messages).toHaveLength(1);
   });
 
+  it("reserves space for model-facing tool schemas", () => {
+    const result = trimMessagesToContextWindow([{ role: "user", content: "问题" }], {
+      contextWindowTokens: 100,
+      outputReserveTokens: 20,
+      systemPrompt: "system",
+      toolDefinitions: [
+        {
+          name: "largeToolSchema",
+          description: "tool",
+          inputSchema: { type: "object", properties: { value: { type: "string" } } },
+        },
+      ],
+    });
+
+    expect(result.toolDefinitionTokens).toBeGreaterThan(0);
+    expect(result.fixedContextTokens).toBe(result.systemPromptTokens + result.toolDefinitionTokens);
+    expect(result.budgetTokens).toBe(
+      100 - 20 - result.systemPromptTokens - result.toolDefinitionTokens,
+    );
+  });
+
   it("truncates an oversized latest text message instead of dropping the request", () => {
     const result = trimMessagesToContextWindow(
       [{ role: "user", content: "很长的请求 ".repeat(1_000) }],
@@ -39,7 +60,7 @@ describe("trimMessagesToContextWindow", () => {
     expect(result.messages[0].content).toContain("内容已按上下文预算截断");
   });
 
-  it("keeps complete recent turns instead of splitting tool messages", () => {
+  it("keeps as many complete turns as fit instead of splitting tool messages", () => {
     const messages = [
       { role: "user", content: "第一轮" },
       { role: "assistant", parts: [{ type: "tool-readSheetData", state: "output" }] },
@@ -50,14 +71,13 @@ describe("trimMessagesToContextWindow", () => {
     ];
 
     const result = trimMessagesToContextWindow(messages, {
-      maxConversationTurns: 2,
       contextWindowTokens: 10_000,
       outputReserveTokens: 0,
     });
 
-    expect(result.messages).toEqual(messages.slice(2));
-    expect(result.conversationTurns).toBe(2);
-    expect(result.droppedTurns).toBe(1);
+    expect(result.messages).toEqual(messages);
+    expect(result.conversationTurns).toBe(3);
+    expect(result.droppedTurns).toBe(0);
   });
 
   it("caps each oversized user message before building model context", () => {

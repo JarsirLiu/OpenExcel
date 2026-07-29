@@ -13,6 +13,7 @@ import { createSheetToolMutationId } from "./sheetToolCommand.js";
 import { toSheetToolPatchResult } from "./sheetToolResult.js";
 
 export const mergeCells = defineServerTool("mergeCells", {
+  resultBudget: { maxTokens: 4_000, compact: (value) => value },
   execute: async (input, options) => {
     return runSheetMutation(
       { ...options.context, db: options.db },

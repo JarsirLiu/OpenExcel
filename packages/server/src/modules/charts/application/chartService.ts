@@ -97,6 +97,20 @@ export async function listCharts(workspaceId: number, workbookId: number) {
   return records.map(deserializeChartSpec);
 }
 
+export async function listChartsPage(
+  workspaceId: number,
+  workbookId: number,
+  options: repository.ChartListOptions & { limit: number },
+) {
+  const records = await repository.findChartsForWorkbook(workspaceId, workbookId, options);
+  const charts = records.slice(0, options.limit).map(deserializeChartSpec);
+  const offset = options.offset ?? 0;
+  return {
+    charts,
+    nextOffset: records.length > options.limit ? offset + options.limit : null,
+  };
+}
+
 export async function findChartsReferencingSheet(
   workspaceId: number,
   workbookId: number,

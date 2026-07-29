@@ -1,4 +1,4 @@
-import type { ChartDataQuality } from "@openexcel/core";
+import type { ChartDataQuality, ChartSeriesDataQuality } from "@openexcel/core";
 
 type ChartMutationRecord = {
   publicId?: unknown;
@@ -6,12 +6,35 @@ type ChartMutationRecord = {
   sheetId?: unknown;
 };
 
+const MAX_DIAGNOSTIC_SERIES = 20;
+const MAX_DIAGNOSTIC_INDEXES = 20;
+
+type BoundedSeriesQuality = Omit<
+  ChartSeriesDataQuality,
+  "missingValueIndexes" | "nonNumericValueIndexes" | "formulaCells" | "unresolvedFormulaCells"
+> & {
+  missingValueIndexes: number[];
+  nonNumericValueIndexes: number[];
+  formulaCells: string[];
+  unresolvedFormulaCells: string[];
+  indexesTruncated?: boolean;
+};
+
+export type BoundedChartDataQuality = {
+  categoryCount: number;
+  missingCategoryIndexes: number[];
+  missingCategoryIndexesTruncated?: boolean;
+  series: BoundedSeriesQuality[];
+  seriesCount: number;
+  seriesTruncated?: boolean;
+};
+
 export type CreateChartToolResult = {
   success: true;
   chartId: string;
   workbookId: number;
   sheetId: number;
-  dataQuality?: ChartDataQuality;
+  dataQuality?: BoundedChartDataQuality;
 };
 
 export type UpdateChartToolResult = {
@@ -47,7 +70,38 @@ export function toCreateChartToolResult(
     chartId: result.publicId,
     workbookId: asPositiveInteger(result.workbookId, "workbook id"),
     sheetId: asPositiveInteger(result.sheetId, "sheet id"),
-    ...(dataQuality ? { dataQuality } : {}),
+    ...(dataQuality ? { dataQuality: summarizeChartDataQuality(dataQuality) } : {}),
+  };
+}
+
+function boundedValues<T>(values: readonly T[]) {
+  return values.slice(0, MAX_DIAGNOSTIC_INDEXES);
+}
+
+function summarizeChartDataQuality(dataQuality: ChartDataQuality): BoundedChartDataQuality {
+  const series = dataQuality.series.slice(0, MAX_DIAGNOSTIC_SERIES).map((item) => ({
+    ...item,
+    missingValueIndexes: boundedValues(item.missingValueIndexes),
+    nonNumericValueIndexes: boundedValues(item.nonNumericValueIndexes),
+    formulaCells: boundedValues(item.formulaCells),
+    unresolvedFormulaCells: boundedValues(item.unresolvedFormulaCells),
+    ...(item.missingValueIndexes.length > MAX_DIAGNOSTIC_INDEXES ||
+    item.nonNumericValueIndexes.length > MAX_DIAGNOSTIC_INDEXES ||
+    item.formulaCells.length > MAX_DIAGNOSTIC_INDEXES ||
+    item.unresolvedFormulaCells.length > MAX_DIAGNOSTIC_INDEXES
+      ? { indexesTruncated: true }
+      : {}),
+  }));
+
+  return {
+    categoryCount: dataQuality.categoryCount,
+    missingCategoryIndexes: boundedValues(dataQuality.missingCategoryIndexes),
+    ...(dataQuality.missingCategoryIndexes.length > MAX_DIAGNOSTIC_INDEXES
+      ? { missingCategoryIndexesTruncated: true }
+      : {}),
+    series,
+    seriesCount: dataQuality.series.length,
+    ...(dataQuality.series.length > MAX_DIAGNOSTIC_SERIES ? { seriesTruncated: true } : {}),
   };
 }
 

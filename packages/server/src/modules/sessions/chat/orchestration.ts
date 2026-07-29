@@ -64,16 +64,11 @@ export async function acquireChatRunLease(
   );
 }
 
-export function buildRunToolset(
-  config: ReturnType<typeof loadModelConfig>,
-  workspaceId: number,
-  runId: number,
-) {
+export function buildRunToolset(workspaceId: number, runId: number) {
   const toolResultBudget = new ToolResultBudget({
-    totalTokens: config.toolResultBudgetTokens,
-    maxResultTokens: config.toolResultMaxTokens,
-    toolBudgets: { readSheetData: config.readSheetDataBudgetTokens },
-    toolPolicies: { readSheetData: { kind: "paged-structured" } },
+    toolPolicies: Object.fromEntries(
+      Object.values(serverToolRegistry).map((tool) => [tool.name, tool.resultBudget]),
+    ),
   });
 
   const toolsContext = buildToolContexts(workspaceId, runId);
@@ -108,7 +103,7 @@ export function createConcreteToolExecutor(
         | {
             toolContexts?: Record<string, unknown>;
             db?: Prisma.TransactionClient;
-            resultBudget?: { maxTokens: number; policy: "generic" | "paged-structured" };
+            resultBudget?: { maxTokens: number };
           }
         | undefined;
       const baseContext = executionContext?.toolContexts?.[toolName] ?? toolsContext[tool.name];
@@ -181,21 +176,20 @@ export async function streamChat(workspaceId: number, sessionId: number, turn: C
     });
 
     const { toolResultBudget, toolsContext, toolDefinitions } = buildRunToolset(
-      config,
       workspaceId,
       lease.run.id,
     );
-    const toolNames = Object.keys(serverToolRegistry) as ExcelToolName[];
     const executionContext = {
       toolContexts: toolsContext,
       resultBudget: toolResultBudget,
       workspaceId,
     };
     const concreteToolExecutor = createConcreteToolExecutor(serverToolRegistry, toolsContext);
-    const toolExecutor = wrapToolExecutorWithResultBudget(
-      createIdempotentToolExecutor(lease.run.id, concreteToolExecutor),
+    const budgetedToolExecutor = wrapToolExecutorWithResultBudget(
+      concreteToolExecutor,
       toolResultBudget,
     );
+    const toolExecutor = createIdempotentToolExecutor(lease.run.id, budgetedToolExecutor);
 
     const workspace = await loadWorkspaceChatContext(workspaceId);
     const resolvedMessages = transcript.map((entry) => ({
@@ -222,7 +216,6 @@ export async function streamChat(workspaceId: number, sessionId: number, turn: C
         workspaceId,
         sessionId,
       ),
-      maxConversationTurns: config.maxConversationTurns,
       maxUserInputTokens: config.maxUserInputTokens,
       timeout: {
         totalMs: config.timeoutMs,
@@ -234,9 +227,6 @@ export async function streamChat(workspaceId: number, sessionId: number, turn: C
       executionContext,
       persistenceBarrier: createAgentPersistenceBarrier(lease.run.id),
       eventSink: eventStream.sink,
-      prepareStep: async () => ({
-        activeTools: toolNames.filter((name) => !toolResultBudget.isToolExhausted(name)),
-      }),
       abortSignal: runCancellation.signal,
     }).run();
 

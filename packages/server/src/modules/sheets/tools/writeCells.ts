@@ -74,6 +74,7 @@ function affectedRange(cells: SheetChangeCell) {
 }
 
 export const writeCells = defineServerTool("writeCells", {
+  resultBudget: { maxTokens: 4_000, compact: (value) => value },
   execute: async (input, options) => {
     const { sheetId, operations } = input;
     return runSheetMutation(

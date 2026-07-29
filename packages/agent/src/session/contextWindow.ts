@@ -1,6 +1,5 @@
 export const DEFAULT_CONTEXT_WINDOW_TOKENS = 180_000;
 export const DEFAULT_OUTPUT_RESERVE_TOKENS = 16_000;
-export const DEFAULT_MAX_CONVERSATION_TURNS = 20;
 export const DEFAULT_MAX_USER_INPUT_TOKENS = 16_000;
 
 type MessageLike = {
@@ -9,6 +8,13 @@ type MessageLike = {
   parts?: ReadonlyArray<unknown> | null;
   [key: string]: unknown;
 };
+
+export interface ModelContextTokenInput {
+  messages?: unknown;
+  systemPrompt?: unknown;
+  toolDefinitions?: unknown;
+  pendingToolResults?: unknown;
+}
 
 function stringify(value: unknown): string {
   try {
@@ -39,6 +45,43 @@ export function estimateTokens(value: unknown): number {
   }
 
   return Math.max(1, Math.ceil(tokens));
+}
+
+type SchemaWithJsonSchema = {
+  toJSONSchema?: () => unknown;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+export function toEstimableToolDefinitions(value: unknown): unknown {
+  if (!Array.isArray(value)) return value;
+
+  return value.map((tool) => {
+    if (!isRecord(tool) || !isRecord(tool.inputSchema)) return tool;
+    const schema = tool.inputSchema as SchemaWithJsonSchema;
+    if (typeof schema.toJSONSchema !== "function") return tool;
+
+    try {
+      return { ...tool, inputSchema: schema.toJSONSchema() };
+    } catch {
+      return { ...tool, inputSchema: { type: "object" } };
+    }
+  });
+}
+
+/** Estimates the complete model input shape, including model-facing schemas. */
+export function estimateModelContextTokens(input: ModelContextTokenInput): number {
+  return Math.max(
+    1,
+    estimateTokens({
+      messages: input.messages,
+      systemPrompt: input.systemPrompt,
+      toolDefinitions: toEstimableToolDefinitions(input.toolDefinitions),
+      pendingToolResults: input.pendingToolResults,
+    }),
+  );
 }
 
 function truncateText(text: string, maxTokens: number): string {
@@ -190,8 +233,8 @@ export interface ContextWindowOptions {
   contextWindowTokens?: number;
   outputReserveTokens?: number;
   systemPrompt?: string;
-  maxConversationTurns?: number;
   maxUserInputTokens?: number;
+  toolDefinitions?: unknown;
 }
 
 export interface ContextWindowResult<T> {
@@ -202,6 +245,9 @@ export interface ContextWindowResult<T> {
   conversationTurns: number;
   truncatedUserMessages: number;
   budgetTokens: number;
+  fixedContextTokens: number;
+  systemPromptTokens: number;
+  toolDefinitionTokens: number;
 }
 
 function groupConversationTurns<T extends MessageLike>(messages: T[]): T[][] {
@@ -234,12 +280,12 @@ export function trimMessagesToContextWindow<T extends MessageLike>(
     0,
     options.outputReserveTokens ?? DEFAULT_OUTPUT_RESERVE_TOKENS,
   );
-  const systemTokens = options.systemPrompt ? estimateTokens(options.systemPrompt) : 0;
-  const budgetTokens = Math.max(1, contextWindowTokens - outputReserveTokens - systemTokens);
-  const maxConversationTurns = Math.max(
-    1,
-    options.maxConversationTurns ?? DEFAULT_MAX_CONVERSATION_TURNS,
-  );
+  const systemPromptTokens = options.systemPrompt ? estimateTokens(options.systemPrompt) : 0;
+  const toolDefinitionTokens = options.toolDefinitions
+    ? estimateTokens(toEstimableToolDefinitions(options.toolDefinitions))
+    : 0;
+  const fixedContextTokens = systemPromptTokens + toolDefinitionTokens;
+  const budgetTokens = Math.max(1, contextWindowTokens - outputReserveTokens - fixedContextTokens);
   const maxUserInputTokens = Math.max(
     1,
     options.maxUserInputTokens ?? DEFAULT_MAX_USER_INPUT_TOKENS,
@@ -247,12 +293,11 @@ export function trimMessagesToContextWindow<T extends MessageLike>(
   const normalized = limitUserMessages(messages, maxUserInputTokens);
   const allTurns = groupConversationTurns(normalized.messages);
   const turnGroups = allTurns.filter((group) => group.some((message) => message.role === "user"));
-  const recentTurns = turnGroups.slice(-maxConversationTurns);
 
   const selected: T[] = [];
   let estimatedTokens = 0;
-  for (let index = recentTurns.length - 1; index >= 0; index -= 1) {
-    const turn = recentTurns[index];
+  for (let index = turnGroups.length - 1; index >= 0; index -= 1) {
+    const turn = turnGroups[index];
     const turnTokens = estimateTokens(turn);
     if (selected.length === 0 && turnTokens > budgetTokens) {
       const latestTurn = truncateLatestTurn(turn, budgetTokens);
@@ -276,5 +321,8 @@ export function trimMessagesToContextWindow<T extends MessageLike>(
     conversationTurns: selected.filter((message) => message.role === "user").length,
     truncatedUserMessages: normalized.truncatedCount,
     budgetTokens,
+    fixedContextTokens,
+    systemPromptTokens,
+    toolDefinitionTokens,
   };
 }

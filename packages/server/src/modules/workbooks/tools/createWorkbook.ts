@@ -3,6 +3,7 @@ import * as runRepo from "../../sessions/runs/repository.js";
 import { createWorkbook as createWorkbookUseCase } from "../application/createWorkbook.js";
 
 export const createWorkbook = defineServerTool("createWorkbook", {
+  resultBudget: { maxTokens: 2_000, compact: (value) => value },
   execute: async (input, { context, db }) => {
     const result = await createWorkbookUseCase(
       context.workspaceId,

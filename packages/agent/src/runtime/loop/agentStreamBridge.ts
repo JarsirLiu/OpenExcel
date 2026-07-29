@@ -193,6 +193,7 @@ export function createAgentStreamBridge(options: AgentStreamBridgeOptions): Agen
         throw state.loopError;
       }
       await toolLifecycle.reconcileStep(step);
+      tools.resetToolCallBatch();
     },
 
     async finishPendingTools(error) {
@@ -254,6 +255,7 @@ export function createAgentStreamBridge(options: AgentStreamBridgeOptions): Agen
       state.failurePhase = undefined;
       streamedText = "";
       streamedReasoning = "";
+      tools.resetToolCallBatch();
     },
 
     getState() {

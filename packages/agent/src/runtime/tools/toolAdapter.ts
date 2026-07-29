@@ -1,9 +1,10 @@
 import { type ToolSet, tool } from "ai";
 import type { AgentToolDefinition, ToolExecutor } from "../contracts.js";
 import { AgentProtocolError } from "../events/types.js";
-import { isToolError, type ToolError } from "./errors.js";
+import { isToolError, ToolConcurrencyError, type ToolError } from "./errors.js";
 import { validateToolInput } from "./inputValidation.js";
 import { toModelSafeJsonValue } from "./modelSafeJson.js";
+import { createToolConcurrencyGate, MAX_PARALLEL_TOOL_CALLS } from "./toolConcurrency.js";
 
 export interface ToolAdapterHooks {
   onToolStart?: (event: {
@@ -20,6 +21,10 @@ export interface ToolAdapterHooks {
     source?: "adapter";
   }) => void | Promise<void>;
 }
+
+export type AgentToolSet = ToolSet & {
+  resetToolCallBatch: () => void;
+};
 
 function throwIfAborted(signal: AbortSignal | undefined) {
   if (!signal?.aborted) return;
@@ -49,7 +54,8 @@ export function createAgentToolSet(
   executor: ToolExecutor,
   executionContext: unknown,
   hooks: ToolAdapterHooks = {},
-): ToolSet {
+): AgentToolSet {
+  const concurrencyGate = createToolConcurrencyGate(MAX_PARALLEL_TOOL_CALLS);
   const tools = Object.fromEntries(
     definitions.map((definition) => [
       definition.name,
@@ -74,63 +80,91 @@ export function createAgentToolSet(
             input,
           });
 
-          const validationResult = validateToolInput(
-            definition.inputSchema,
-            input,
-            definition.name,
-          );
-          if (!validationResult.success && validationResult.error) {
+          const releaseConcurrency = concurrencyGate.tryAcquire();
+          if (!releaseConcurrency) {
+            const error = new ToolConcurrencyError(
+              `Too many parallel tool calls. At most ${MAX_PARALLEL_TOOL_CALLS} tool calls may execute at once. Retry this call after the current batch finishes.`,
+              {
+                maxParallelToolCalls: MAX_PARALLEL_TOOL_CALLS,
+                toolName: definition.name,
+                toolCallId,
+              },
+            );
             await hooks.onToolFinish?.({
               toolName: definition.name,
               toolCallId,
               input,
-              error: validationResult.error,
+              error,
               source: "adapter",
             });
-            return toolErrorResult(validationResult.error);
+            return toolErrorResult(error);
           }
-          input = validationResult.data;
-
-          const executionOptions = {
-            toolName: definition.name,
-            toolCallId,
-            input,
-            abortSignal: executeOptions?.abortSignal,
-            context: executionContext,
-          };
-
-          let finished = false;
-          const finish = async (event: { output?: unknown; error?: unknown }) => {
-            if (finished) return;
-            finished = true;
-            await hooks.onToolFinish?.({
-              toolName: definition.name,
-              toolCallId,
-              input,
-              ...event,
-              source: "adapter",
-            });
-          };
 
           try {
-            throwIfAborted(executionOptions.abortSignal);
-            const output = toModelSafeJsonValue(await executor.execute(executionOptions));
-            await finish({ output });
-            return output;
-          } catch (error) {
-            const cancelled = isAbortError(error, executionOptions.abortSignal);
-            if (cancelled) {
-              await finish({ error: { kind: "cancelled", message: "工具执行已中断" } });
-              throw error;
+            const validationResult = validateToolInput(
+              definition.inputSchema,
+              input,
+              definition.name,
+            );
+            if (!validationResult.success && validationResult.error) {
+              await hooks.onToolFinish?.({
+                toolName: definition.name,
+                toolCallId,
+                input,
+                error: validationResult.error,
+                source: "adapter",
+              });
+              return toolErrorResult(validationResult.error);
             }
-            await finish({ error });
-            if (!isToolError(error)) throw error;
-            return toolErrorResult(error);
+            input = validationResult.data;
+
+            const executionOptions = {
+              toolName: definition.name,
+              toolCallId,
+              input,
+              abortSignal: executeOptions?.abortSignal,
+              context: executionContext,
+            };
+
+            let finished = false;
+            const finish = async (event: { output?: unknown; error?: unknown }) => {
+              if (finished) return;
+              finished = true;
+              await hooks.onToolFinish?.({
+                toolName: definition.name,
+                toolCallId,
+                input,
+                ...event,
+                source: "adapter",
+              });
+            };
+
+            try {
+              throwIfAborted(executionOptions.abortSignal);
+              const output = toModelSafeJsonValue(await executor.execute(executionOptions));
+              await finish({ output });
+              return output;
+            } catch (error) {
+              const cancelled = isAbortError(error, executionOptions.abortSignal);
+              if (cancelled) {
+                await finish({ error: { kind: "cancelled", message: "工具执行已中断" } });
+                throw error;
+              }
+              await finish({ error });
+              if (!isToolError(error)) throw error;
+              return toolErrorResult(error);
+            }
+          } finally {
+            releaseConcurrency();
           }
         },
       } as any),
     ]),
   );
 
-  return tools as ToolSet;
+  Object.defineProperty(tools, "resetToolCallBatch", {
+    value: () => concurrencyGate.resetBatch(),
+    enumerable: false,
+  });
+  return tools as AgentToolSet;
 }

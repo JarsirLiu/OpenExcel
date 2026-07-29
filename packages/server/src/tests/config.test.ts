@@ -17,11 +17,7 @@ describe("environment model config", () => {
       timeoutMs: 120_000,
       contextWindowTokens: 180_000,
       outputReserveTokens: 16_000,
-      maxConversationTurns: 20,
       maxUserInputTokens: 16_000,
-      toolResultBudgetTokens: 32_000,
-      toolResultMaxTokens: 8_000,
-      readSheetDataBudgetTokens: 24_000,
     });
   });
 
@@ -41,11 +37,7 @@ describe("environment model config", () => {
       timeoutMs: 90_000,
       contextWindowTokens: 120_000,
       outputReserveTokens: 12_000,
-      maxConversationTurns: 20,
       maxUserInputTokens: 16_000,
-      toolResultBudgetTokens: 32_000,
-      toolResultMaxTokens: 8_000,
-      readSheetDataBudgetTokens: 24_000,
     });
   });
 

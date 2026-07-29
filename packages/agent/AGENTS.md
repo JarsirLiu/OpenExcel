@@ -45,7 +45,8 @@ The current codebase is intentionally small and focused:
 - `src/runtime/loop/agentLoop.ts` - complete model/tool loop
 - `src/runtime/contracts.ts` - provider-neutral runtime ports and results
 - `src/runtime/tools/toolAdapter.ts` - Agent tools to AI SDK tools
-- `src/runtime/tools/toolResultBudget.ts` - tool result token budgets and truncation
+- `src/runtime/tools/toolConcurrency.ts` - shared tool-call limit and batch gate
+- `src/runtime/tools/toolResultBudget.ts` - tool-owned result policies and model projections
 - `src/runtime/events/events.ts` - provider-neutral event sequencing
 - UI message streaming is provided by the Server's AgentEvent NDJSON subscription; the Agent only produces provider-neutral events.
 - `src/runtime/stream/referencePart.ts` - chat reference conversion

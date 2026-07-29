@@ -62,7 +62,6 @@ describe.skipIf(!runRealModelAcceptance)("real model context compaction acceptan
       compactionCheckpointStore: checkpointStore,
       contextWindowTokens: 32_768,
       outputReserveTokens: 2_000,
-      maxConversationTurns: 20,
       maxUserInputTokens: 16_000,
       timeout: { totalMs: 180_000, toolMs: 30_000 },
       maxRetries: 1,

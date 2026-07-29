@@ -1,5 +1,6 @@
 import type { LanguageModel } from "ai";
-import { defaultTokenEstimator, type ModelStepBudgetEvent } from "../../session/tokenBudget.js";
+import { estimateModelContextTokens } from "../../session/contextWindow.js";
+import type { ModelStepBudgetEvent } from "../../session/tokenBudget.js";
 import { appendResponseMessages } from "../../session/transcript.js";
 import type { AgentToolDefinition, AgentTranscriptMessage } from "../contracts.js";
 import { createContextBudgetPlan, shouldCompact } from "./compaction/budgetPlanner.js";
@@ -128,7 +129,7 @@ export class ContextCompactionCoordinator {
     const actualTools = this.options.tools
       .filter((tool) => activeTools === undefined || activeTools.includes(tool.name))
       .map(({ name, description, inputSchema }) => ({ name, description, inputSchema }));
-    const estimatedContextTokens = defaultTokenEstimator.estimate({
+    const estimatedContextTokens = estimateModelContextTokens({
       messages: input.messages,
       systemPrompt: input.instructions,
       toolDefinitions: actualTools,

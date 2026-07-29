@@ -21,6 +21,21 @@ const sheetReadContinuationSchema = z.object({
   nextCol: z.coerce.number().int().positive().describe("下一页起始列号，从 1 开始"),
 });
 
+const toolPageInputSchema = {
+  offset: z.coerce.number().int().nonnegative().max(100_000).optional().describe("结果起始偏移量"),
+  limit: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(50)
+    .optional()
+    .describe("单次返回的最大结果数，默认 50"),
+};
+
+const toolPageOutputSchema = z.object({
+  nextOffset: z.number().int().nonnegative().nullable(),
+});
+
 const sheetCellStyleSchema = z
   .object({
     fill: z.string().trim().min(1).optional(),
@@ -343,6 +358,7 @@ const sheetCellMatchesOutputSchema = z.object({
       reason: z.string().min(1),
     }),
   ),
+  ...toolPageOutputSchema.shape,
 });
 
 const sheetObjectOutputSchema = z.object({
@@ -375,6 +391,7 @@ const sheetObjectOutputSchema = z.object({
       }),
     ]),
   ),
+  ...toolPageOutputSchema.shape,
 });
 
 const sheetMutationOutputSchema = sheetChangePatchOutputSchema.extend({
@@ -445,6 +462,7 @@ const chartCreatedOutputSchema = z.object({
     .object({
       categoryCount: z.number().int().nonnegative(),
       missingCategoryIndexes: z.array(z.number().int().nonnegative()),
+      missingCategoryIndexesTruncated: z.boolean().optional(),
       series: z.array(
         z.object({
           seriesId: z.string().min(1),
@@ -454,8 +472,10 @@ const chartCreatedOutputSchema = z.object({
           nonNumericValueIndexes: z.array(z.number().int().nonnegative()),
           formulaCells: z.array(z.string()),
           unresolvedFormulaCells: z.array(z.string()),
+          indexesTruncated: z.boolean().optional(),
         }),
       ),
+      seriesTruncated: z.boolean().optional(),
     })
     .optional(),
 });
@@ -527,21 +547,23 @@ export const excelToolSpecs = {
   },
   findSheetCells: {
     description:
-      "在指定 Sheet 的范围内定位满足值、值类型、公式或直接格式条件的单元格。只返回合并后的 A1 区域、数量和查询原因，不返回完整数据矩阵；找到区域后再调用 readSheetData 读取内容。未传 range 时搜索已使用区域；查找空单元格时必须传入足够小的范围。颜色属于格式条件，不能写进 values。",
+      "在指定 Sheet 的范围内定位满足值、值类型、公式或直接格式条件的单元格。只返回合并后的 A1 区域、数量和查询原因，不返回完整数据矩阵；找到区域后再调用 readSheetData 读取内容。未传 range 时搜索已使用区域；查找空单元格时必须传入足够小的范围。颜色属于格式条件，不能写进 values。匹配结果按 offset/limit 分页，返回 nextOffset 时继续读取。",
     inputSchema: z.object({
       sheetId: z.coerce.number().int().positive().describe("Sheet ID"),
       range: sheetDataRangeSchema.optional().describe("搜索范围，例如 A1:Z100；默认已使用区域"),
       query: sheetCellQuerySchema,
+      ...toolPageInputSchema,
     }),
     needsRunContext: false,
     outputSchema: sheetCellMatchesOutputSchema,
   },
   readSheetObjects: {
     description:
-      "读取指定 Sheet 的一种 Excel 对象摘要。必须指定 objectType：charts、filters、tables 或 pivotTables。返回模型决策所需的引用和范围，不返回 OOXML、ECharts option 或完整绘图缓存。",
+      "读取指定 Sheet 的一种 Excel 对象摘要。必须指定 objectType：charts、filters、tables 或 pivotTables。返回模型决策所需的引用和范围，不返回 OOXML、ECharts option 或完整绘图缓存。结果按 offset/limit 分页，返回 nextOffset 时继续读取。",
     inputSchema: z.object({
       sheetId: z.coerce.number().int().positive().describe("Sheet ID"),
       objectType: z.enum(["charts", "filters", "tables", "pivotTables"]),
+      ...toolPageInputSchema,
     }),
     needsRunContext: false,
     outputSchema: sheetObjectOutputSchema,
@@ -722,10 +744,17 @@ export const excelToolSpecs = {
     inputSchema: z.object({ chartId: z.string().trim().min(1) }),
   },
   listCharts: {
-    description: "列出指定工作簿中的真实 Excel 图表及其数据引用。",
-    inputSchema: z.object({ workbookId: z.coerce.number().int().positive() }),
+    description:
+      "列出指定工作簿中的真实 Excel 图表及其数据引用。结果按 offset/limit 分页，返回 nextOffset 时继续读取。",
+    inputSchema: z.object({
+      workbookId: z.coerce.number().int().positive(),
+      ...toolPageInputSchema,
+    }),
     needsRunContext: false,
-    outputSchema: z.array(chartSpecSchema),
+    outputSchema: z.object({
+      charts: z.array(chartSpecSchema),
+      ...toolPageOutputSchema.shape,
+    }),
   },
 } satisfies Record<string, ExcelToolSpec>;
 

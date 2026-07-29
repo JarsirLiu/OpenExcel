@@ -130,6 +130,45 @@ describe("createAgentToolSet", () => {
     );
   });
 
+  it("rejects calls beyond the parallel execution limit as model-visible results", async () => {
+    let release!: () => void;
+    const blocker = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const execute = vi.fn().mockImplementation(() => blocker);
+    const onToolFinish = vi.fn();
+    const tools = createAgentToolSet(
+      [{ name: "readSheetData", description: "Read a sheet", inputSchema: z.object({}) }],
+      { execute },
+      undefined,
+      { onToolFinish },
+    );
+
+    const calls = Array.from({ length: 11 }, (_, index) =>
+      (tools.readSheetData as any).execute({}, { toolCallId: `call-${index}` }),
+    );
+    await Promise.resolve();
+    await expect(calls[10]).resolves.toMatchObject({
+      isError: true,
+      error: {
+        kind: "rate_limit",
+        details: { maxParallelToolCalls: 10 },
+        retryable: true,
+      },
+    });
+    expect(execute).toHaveBeenCalledTimes(10);
+
+    release();
+    await Promise.all(calls.slice(0, 10));
+    expect(onToolFinish).toHaveBeenCalledTimes(11);
+
+    (tools as any).resetToolCallBatch();
+    await expect(
+      (tools.readSheetData as any).execute({}, { toolCallId: "call-next-batch" }),
+    ).resolves.toBeNull();
+    expect(execute).toHaveBeenCalledTimes(11);
+  });
+
   it("rethrows unexpected executor errors instead of hiding them from diagnostics", async () => {
     const execute = vi.fn().mockRejectedValue(new Error("programmer bug"));
     const onToolFinish = vi.fn();

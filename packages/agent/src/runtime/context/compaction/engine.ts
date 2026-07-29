@@ -1,3 +1,4 @@
+import { toEstimableToolDefinitions } from "../../../session/contextWindow.js";
 import { defaultTokenEstimator, type TokenEstimator } from "../../../session/tokenBudget.js";
 import { createContextSummaryMessage } from "../modelContextAssembler.js";
 import {
@@ -115,7 +116,7 @@ export class ContextCompactionEngine {
     const contextTokens = this.estimator.estimate({
       messages: [createContextSummaryMessage(summary), ...selection.recentMessages],
       systemPrompt: baseSystemPrompt,
-      toolDefinitions: input.modelContext?.toolDefinitions,
+      toolDefinitions: toEstimableToolDefinitions(input.modelContext?.toolDefinitions),
     });
     if (contextTokens > plan.regularInputBudget) {
       throw new ContextCompactionError(

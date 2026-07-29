@@ -10,5 +10,6 @@ export {
   findChartsReferencingSheet,
   getChartRecord,
   listCharts,
+  listChartsPage,
   type UpdateChartInput,
 } from "./chartService.js";

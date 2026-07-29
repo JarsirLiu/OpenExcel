@@ -85,6 +85,7 @@ export {
 export {
   isToolError,
   ToolBusinessError,
+  ToolConcurrencyError,
   type ToolError,
   type ToolErrorKind,
   ToolExecutionError,
@@ -104,13 +105,12 @@ export {
   toModelSafeJsonValue,
 } from "./runtime/tools/modelSafeJson.js";
 export {
+  type AgentToolSet,
   createAgentToolSet,
   type ToolAdapterHooks,
 } from "./runtime/tools/toolAdapter.js";
+export { MAX_PARALLEL_TOOL_CALLS } from "./runtime/tools/toolConcurrency.js";
 export {
-  DEFAULT_READ_SHEET_DATA_BUDGET_TOKENS,
-  DEFAULT_TOOL_RESULT_BUDGET_TOKENS,
-  DEFAULT_TOOL_RESULT_MAX_TOKENS,
   ToolResultBudget,
   type ToolResultBudgetOptions,
   type ToolResultBudgetSnapshot,
@@ -124,10 +124,11 @@ export {
 } from "./session/context.js";
 export {
   DEFAULT_CONTEXT_WINDOW_TOKENS,
-  DEFAULT_MAX_CONVERSATION_TURNS,
   DEFAULT_MAX_USER_INPUT_TOKENS,
   DEFAULT_OUTPUT_RESERVE_TOKENS,
+  estimateModelContextTokens,
   estimateTokens,
+  toEstimableToolDefinitions,
   trimMessagesToContextWindow,
 } from "./session/contextWindow.js";
 export {

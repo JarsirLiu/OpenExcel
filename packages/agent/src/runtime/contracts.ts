@@ -80,7 +80,6 @@ export interface AgentRunnerInput {
   timeout?: AgentTimeoutConfiguration;
   contextWindowTokens?: number;
   outputReserveTokens?: number;
-  maxConversationTurns?: number;
   maxUserInputTokens?: number;
   compaction?: ContextCompactionPolicy;
   compactionCheckpointStore?: ContextCheckpointStore;

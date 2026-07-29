@@ -4,6 +4,7 @@ import { toUpdateChartPatch } from "./chartToolInput.js";
 import { toUpdateChartToolResult } from "./chartToolResult.js";
 
 export const updateChart = defineServerTool("updateChart", {
+  resultBudget: { maxTokens: 1_000, compact: (value) => value },
   execute: async (input, { context, db, toolCallId }) => {
     const result = await updateChartMutation(
       context.workspaceId,
