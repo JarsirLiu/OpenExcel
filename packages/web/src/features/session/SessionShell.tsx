@@ -86,7 +86,7 @@ export function SessionShell({
   if (workspaceId == null) {
     return (
       <div className={styles.container}>
-        <div className={styles.emptyState}>{t("loading_workspace", "加载工作区中...")}</div>
+        <div className={styles.emptyState}>{t("loading_workspace")}</div>
       </div>
     );
   }
@@ -109,7 +109,7 @@ export function SessionShell({
     >
       <div className={styles.container}>
         <SessionHeader
-          sessionName={currentSession?.name ?? t("ai_chat", "AI 对话")}
+          sessionName={currentSession?.name ?? t("ai_chat")}
           currentSessionId={currentSessionId}
           onToggleHistory={() => setHistoryOpen(!historyOpen)}
           onNewSession={handleNewSession}

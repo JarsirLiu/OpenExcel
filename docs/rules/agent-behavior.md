@@ -46,6 +46,10 @@ task. Do not silently turn a one-off correction into a permanent rule.
 - Do not hide a broken boundary with a full reload, duplicated state, broad query, fallback branch, or unchecked cast.
 - Comments should explain a non-obvious decision or invariant, not narrate straightforward code.
 - Keep tests close to the behavior they protect and focus them on observable contracts and failure modes.
+- Use English for new or modified comments and docstrings. Put new user-visible
+  copy in the Web i18n resources and use stable error codes plus parameters at
+  non-UI boundaries. Follow [the i18n rule](i18n.md); migrate legacy strings
+  incrementally when touching a file.
 
 ## Scope and safety
 

@@ -4,8 +4,8 @@ import { t } from "@/lib/i18n";
 export function RouteErrorBoundary() {
   const error = useRouteError();
 
-  let title = t("error_boundary_title", "页面出错了");
-  let message = t("error_boundary_message", "发生了意外错误，请重试。");
+  let title = t("error_boundary_title");
+  let message = t("error_boundary_message");
 
   if (isRouteErrorResponse(error)) {
     title = `${error.status} ${error.statusText}`;
@@ -52,7 +52,7 @@ export function RouteErrorBoundary() {
             cursor: "pointer",
           }}
         >
-          {t("retry", "重试")}
+          {t("retry")}
         </button>
       </div>
     </div>

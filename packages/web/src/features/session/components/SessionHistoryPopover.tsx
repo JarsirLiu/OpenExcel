@@ -18,12 +18,12 @@ export function SessionHistoryPopover({
   return (
     <div className={styles.content}>
       <div className={styles.heading}>
-        <span>{t("conversation_history", "历史对话")}</span>
+        <span>{t("conversation_history")}</span>
       </div>
       {sessions.length === 0 ? (
-        <div className={styles.empty}>{t("no_history", "暂无历史记录")}</div>
+        <div className={styles.empty}>{t("no_history")}</div>
       ) : (
-        <ul className={styles.list} aria-label={t("conversation_history", "历史对话")}>
+        <ul className={styles.list} aria-label={t("conversation_history")}>
           {sessions.map((session) => {
             const isActive = session.id === currentSessionId;
             return (
@@ -40,7 +40,7 @@ export function SessionHistoryPopover({
                   type="button"
                   onClick={() => onDeleteSession(session.id)}
                   className={styles.deleteBtn}
-                  aria-label={`${t("delete", "删除")} ${session.name}`}
+                  aria-label={`${t("delete")} ${session.name}`}
                 >
                   <svg
                     width="15"

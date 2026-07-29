@@ -1,6 +1,7 @@
 import { renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import {
+  collectChartMutationToolCallIds,
   collectSheetPatchUpdates,
   collectWorkbookMutationToolCallIds,
   collectWorkbookRefreshToolCallIds,
@@ -355,7 +356,38 @@ describe("collectWorkbookRefreshToolCallIds", () => {
 
     expect(
       collectWorkbookRefreshToolCallIds(messages, new Set(), { sheetDeltasHandled: true }),
-    ).toEqual(["tool-chart"]);
+    ).toEqual([]);
+  });
+
+  it("keeps chart mutations in the chart refresh channel", () => {
+    const messages = [
+      {
+        role: "assistant",
+        parts: [
+          {
+            toolCallId: "tool-sheet",
+            type: "tool-writeCells",
+            state: "output-available",
+            input: { sheetId: 31 },
+            output: {
+              sheetInfo: { sheetId: 31, sheetNo: 1, sheetName: "Sheet1" },
+              changeSummary: { changedCellCount: 1, rangeOperationCount: 0 },
+              delta: { type: "write", cells: [{ row: 1, col: 1, value: "x" }] },
+            },
+          },
+          {
+            toolCallId: "tool-chart",
+            type: "tool-updateChart",
+            state: "output-available",
+            input: { chartId: "chart-1" },
+            output: { success: true },
+          },
+        ],
+      },
+    ];
+
+    expect(collectChartMutationToolCallIds(messages, new Set())).toEqual(["tool-chart"]);
+    expect(collectWorkbookMutationToolCallIds(messages, new Set())).toEqual(["tool-sheet"]);
   });
 });
 

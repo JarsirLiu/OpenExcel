@@ -117,7 +117,7 @@ export function WorkbookHeader({
           </span>
         ) : (
           <button onClick={onUploadNewWorkbookClick} className={styles.pillBtn}>
-            <FileIcon /> {t("upload", "导入工作簿")}
+            <FileIcon /> {t("upload")}
           </button>
         )}
       </div>

@@ -36,6 +36,7 @@
 | Change an AI tool | [current/tools.md](current/tools.md), [architecture/tools/README.md](architecture/tools/README.md) |
 | Change an API, database model, or resource authorization | [current/api.md](current/api.md), [current/data-model.md](current/data-model.md), and `packages/server/AGENTS.md` |
 | Change the Web editor, charts, or layout | [current/architecture.md](current/architecture.md), [rules/web-ui.md](rules/web-ui.md), and `packages/web/AGENTS.md` |
+| Change user-visible copy, locale handling, or errors shown in Web | [current/i18n.md](current/i18n.md), [rules/i18n.md](rules/i18n.md), and `packages/web/AGENTS.md` |
 | Change tests | [rules/testing.md](rules/testing.md) |
 | Decide how to approach a change or apply developer preferences | [rules/agent-behavior.md](rules/agent-behavior.md) |
 
@@ -60,6 +61,7 @@ runtime.
 - [Current Agent runtime](current/agent-runtime.md)
 - [Current Sheet synchronization](current/spreadsheet-sync.md)
 - [Current AI tools](current/tools.md)
+- [Current internationalization](current/i18n.md)
 
 ## Engineering rules
 
@@ -68,6 +70,7 @@ runtime.
 - [Testing](rules/testing.md)
 - [Tool authoring](rules/tool-authoring.md)
 - [Web and UI](rules/web-ui.md)
+- [Internationalization](rules/i18n.md)
 - [Change workflow](rules/change-workflow.md)
 
 ## Isolated material

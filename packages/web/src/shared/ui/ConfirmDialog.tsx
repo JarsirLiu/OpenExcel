@@ -58,10 +58,10 @@ export function ConfirmDialog() {
         <div className={styles.message}>{options.message}</div>
         <div className={styles.actions}>
           <Button variant="ghost" onClick={() => handleClose(false)}>
-            {options.cancelText ?? t("cancel", "取消")}
+            {options.cancelText ?? t("cancel")}
           </Button>
           <Button variant="danger" onClick={() => handleClose(true)}>
-            {options.confirmText ?? t("confirm", "确认")}
+            {options.confirmText ?? t("confirm")}
           </Button>
         </div>
       </div>

@@ -54,12 +54,12 @@ const UserMenu = ({
 
   return (
     <div ref={ref} className={styles.userMenu}>
-      <Tooltip label={t("account_menu", "账号菜单")}>
+      <Tooltip label={t("account_menu")}>
         <button
           type="button"
           onClick={() => setOpen(!open)}
           className={styles.iconButton}
-          aria-label={t("account_menu", "账号菜单")}
+          aria-label={t("account_menu")}
         >
           <svg
             width={16}
@@ -114,7 +114,7 @@ const UserMenu = ({
                 <polyline points="16 17 21 12 16 7" />
                 <line x1="21" y1="12" x2="9" y2="12" />
               </svg>
-              {t("sign_out", "退出登录")}
+              {t("sign_out")}
             </button>
           </div>
         </div>
@@ -142,24 +142,24 @@ export function SessionHeader({
       <div className={styles.actions}>
         {!presentationMode && (
           <>
-            <Tooltip label={t("history", "历史")}>
+            <Tooltip label={t("history")}>
               <button
                 type="button"
                 onClick={onToggleHistory}
                 className={styles.pillBtn}
-                aria-label={t("history", "历史")}
+                aria-label={t("history")}
               >
-                {t("history", "历史")}
+                {t("history")}
               </button>
             </Tooltip>
-            <Tooltip label={t("new_chat", "新建对话")}>
+            <Tooltip label={t("new_chat")}>
               <button
                 type="button"
                 onClick={onNewSession}
                 className={`${styles.pillBtn} ${styles.plusBtn} ${styles.plusBtnSolid} ${
                   isCreatingSession ? styles.plusBtnLoading : ""
                 }`}
-                aria-label={t("new_chat", "新建对话")}
+                aria-label={t("new_chat")}
                 disabled={isCreatingSession}
               >
                 <span className={styles.plusBtnIcon}>

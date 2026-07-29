@@ -8,6 +8,9 @@ navigation entry for this repository.
 Read `docs/current/` and `docs/rules/` for current facts and mandatory rules.
 Documents under `docs/design/`, `docs/proposals/`, and `docs/issues/` are not
 descriptions of the current runtime unless the task explicitly asks about them.
+For user-visible copy, locale handling, or error-display changes, also read
+[docs/rules/i18n.md](docs/rules/i18n.md) and
+[docs/current/i18n.md](docs/current/i18n.md).
 
 Read [docs/rules/agent-behavior.md](docs/rules/agent-behavior.md) before making
 changes. It defines the repository's engineering judgment, scope discipline,
@@ -25,6 +28,10 @@ OpenExcel is a pnpm monorepo. Main packages live under `packages/`:
 - `packages/agent` - model/tooling and chat session utilities
 
 Keep feature code inside the owning package’s `src/` tree. Avoid generated output such as `dist/` or `node_modules/`. For package-boundary changes, update `docs/current/architecture.md` and `docs/rules/package-boundaries.md`; for Agent loop, context, tool, retry, event, or recovery changes, update `docs/current/agent-runtime.md`. For tool design and implementation workflow, read [docs/architecture/tools/README.md](docs/architecture/tools/README.md) and [docs/architecture/tools/authoring.md](docs/architecture/tools/authoring.md). Read package-specific guides like `packages/server/AGENTS.md` before touching server code.
+New or modified code comments and docstrings must be in English. New
+user-visible copy must use the Web i18n resources; migrate legacy hardcoded
+copy incrementally when the file is touched. See
+[docs/rules/i18n.md](docs/rules/i18n.md).
 
 ## Build, Test, and Development Commands
 - `pnpm dev` - run web and server in parallel

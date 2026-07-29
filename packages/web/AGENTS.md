@@ -4,6 +4,9 @@ This file is the working guide for maintainers editing `packages/web`.
 Read it together with [../../AGENTS.md](../../AGENTS.md) and
 [docs/current/architecture.md](../../docs/current/architecture.md) before changing the web
 application.
+For user-visible copy, locale behavior, or API error display, also read
+[../../docs/current/i18n.md](../../docs/current/i18n.md) and
+[../../docs/rules/i18n.md](../../docs/rules/i18n.md).
 
 ## 1. What this package owns
 
@@ -84,9 +87,17 @@ transition must leave the active document usable and expose a retry state.
 Files under `src/api/` translate HTTP requests and responses into typed values.
 They must not contain component state, layout decisions, or workbook business
 rules. Keep error normalization at this boundary or in a small shared HTTP
-helper.
+helper. New errors should preserve `errorCode` and structured `params` for the
+UI to translate; do not add localized display sentences to API contracts.
 
-### 4.2 Workspace and session
+### 4.2 Internationalized UI
+
+Use `@/lib/i18n` and the shared locale resources for new or modified UI copy,
+including labels, placeholders, tooltips, dialogs, toasts, and accessibility
+names. Do not add fallback sentences to `t()`. Existing hardcoded copy is
+migrated incrementally when its file is touched.
+
+### 4.3 Workspace and session
 
 Workspace code selects resources and coordinates lifecycle. Session code owns
 conversation lifecycle. Neither should reach into FortuneSheet internals or
@@ -96,7 +107,7 @@ Page-level components may compose hooks, but keep use-case commands in focused
 hooks/services so a component does not own catalog loading, document merging,
 chat streaming, and layout calculations at once.
 
-### 4.3 Workbook and Sheet editor
+### 4.4 Workbook and Sheet editor
 
 `ExcelGrid` and FortuneSheet adapters are integration boundaries. Keep the
 third-party instance isolated behind adapter/hooks. Do not expose FortuneSheet
@@ -106,7 +117,7 @@ Sheet data mutations, workbook structure mutations, chart mutations, and UI
 layout mutations are different command types. They may be coordinated by a
 use case, but one command must not silently perform another kind of mutation.
 
-### 4.4 Charts
+### 4.5 Charts
 
 Chart code has three layers:
 
@@ -123,7 +134,7 @@ Dragging and resizing may update placement only. Data invalidation may update
 render data only. Rendering a changed chart must not recreate the FortuneSheet
 instance or reset selection, scroll, or active-sheet state.
 
-### 4.5 Chat and tool results
+### 4.6 Chat and tool results
 
 Chat transport parses server events and presentation components render them.
 Tool-result UI should emit typed, narrow navigation/mutation intents. It must

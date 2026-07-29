@@ -59,7 +59,7 @@ export function useChatConversation({
   const [compactionStatus, setCompactionStatus] = useState(store.compactionStatus);
   const [contextUsage, setContextUsage] = useState(store.contextUsage);
   const [historicalRefreshIds] = useState<Set<string>>(() => new Set());
-  const hasPrimedWorkbookMutationHistoryRef = useRef(false);
+  const hasPrimedMutationHistoryRef = useRef(false);
   const pendingWorkspaceRefreshRef = useRef(false);
   const pendingChartsRefreshRef = useRef(false);
   const wasStreamingRef = useRef(false);
@@ -122,12 +122,12 @@ export function useChatConversation({
     const chartToolCallIds = collectChartMutationToolCallIds(messages, historicalRefreshIds);
     const toolCallIds = [...workbookToolCallIds, ...chartToolCallIds];
     if (toolCallIds.length === 0) {
-      hasPrimedWorkbookMutationHistoryRef.current = true;
+      hasPrimedMutationHistoryRef.current = true;
       return;
     }
     for (const toolCallId of toolCallIds) historicalRefreshIds.add(toolCallId);
-    if (!hasPrimedWorkbookMutationHistoryRef.current) {
-      hasPrimedWorkbookMutationHistoryRef.current = true;
+    if (!hasPrimedMutationHistoryRef.current) {
+      hasPrimedMutationHistoryRef.current = true;
       return;
     }
     if (sessionId != null) markCanUndo();

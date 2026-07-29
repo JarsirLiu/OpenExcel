@@ -140,7 +140,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
             type="button"
             onClick={handleAttachClick}
             className={styles.attachBtn}
-            title={t("upload_file", "上传文件")}
+            title={t("upload_file")}
           >
             <AttachIcon />
           </button>
@@ -155,9 +155,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
           </button>
         </div>
       </div>
-      <div className={styles.disclaimer}>
-        {t("ai_disclaimer", "以上内容由 AI 生成，仅供参考和借鉴")}
-      </div>
+      <div className={styles.disclaimer}>{t("ai_disclaimer")}</div>
     </div>
   );
 });

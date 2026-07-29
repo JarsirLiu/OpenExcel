@@ -87,14 +87,14 @@ export function AuthScreen({
           OpenExcel
         </Link>
         <Link className={styles.catalogLink} to={routePaths.demos}>
-          案例库
+          {t("demo_catalog")}
         </Link>
       </nav>
 
       <div className={styles.hero}>
         <div className={styles.content}>
           <h1 className={styles.headline}>
-            {mode === "login" ? "AI 操控 Excel，表格工作事半功倍" : "从一张表，开始完成整项工作。"}
+            {mode === "login" ? t("auth_login_headline") : t("auth_register_headline")}
           </h1>
 
           {isAuthenticated ? (
@@ -107,7 +107,7 @@ export function AuthScreen({
                 className={styles.startButton}
                 onClick={() => void handleStart()}
               >
-                <span>{submitting ? t("processing", "处理中…") : "立即开始"}</span>
+                <span>{submitting ? t("processing") : t("start")}</span>
                 {!submitting && (
                   <svg aria-hidden="true" viewBox="0 0 20 20">
                     <path d="M4 10h11M11 6l4 4-4 4" />
@@ -120,24 +120,24 @@ export function AuthScreen({
               <form className={styles.form} onSubmit={(event) => void handleSubmit(event)}>
                 {mode === "register" && (
                   <label className={styles.field} htmlFor="auth-display-name">
-                    <span>{t("display_name", "显示名称")}</span>
+                    <span>{t("display_name")}</span>
                     <Input
                       id="auth-display-name"
                       value={displayName}
                       onChange={(event) => setDisplayName(event.target.value)}
-                      placeholder="你的姓名"
+                      placeholder={t("display_name_placeholder")}
                       autoComplete="name"
                     />
                   </label>
                 )}
 
                 <label className={styles.field} htmlFor="auth-email">
-                  <span>{t("email", "邮箱地址")}</span>
+                  <span>{t("email")}</span>
                   <Input
                     id="auth-email"
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
-                    placeholder="name@organization.cn"
+                    placeholder={t("email_placeholder")}
                     type="email"
                     autoComplete="email"
                     required
@@ -145,12 +145,12 @@ export function AuthScreen({
                 </label>
 
                 <label className={styles.field} htmlFor="auth-password">
-                  <span>{t("password", "密码")}</span>
+                  <span>{t("password")}</span>
                   <Input
                     id="auth-password"
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
-                    placeholder="输入登录密码"
+                    placeholder={t("password_placeholder")}
                     type="password"
                     autoComplete={mode === "login" ? "current-password" : "new-password"}
                     required
@@ -166,20 +166,18 @@ export function AuthScreen({
                   className={styles.submit}
                 >
                   {submitting
-                    ? t("processing", "处理中…")
+                    ? t("processing")
                     : mode === "login"
-                      ? t("sign_in", "登录")
-                      : t("create_account", "创建账号")}
+                      ? t("sign_in")
+                      : t("create_account")}
                 </Button>
               </form>
 
               <div className={styles.formFooter}>
                 <p className={styles.switch}>
-                  {mode === "login"
-                    ? t("no_account", "还没有账号？")
-                    : t("has_account", "已有账号？")}
+                  {mode === "login" ? t("no_account") : t("has_account")}
                   <button type="button" className={styles.switchLink} onClick={onSwitchMode}>
-                    {mode === "login" ? t("sign_up", "注册") : t("sign_in", "登录")}
+                    {mode === "login" ? t("sign_up") : t("sign_in")}
                   </button>
                 </p>
               </div>

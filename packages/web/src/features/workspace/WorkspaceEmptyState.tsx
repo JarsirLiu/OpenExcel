@@ -20,15 +20,9 @@ export function WorkspaceEmptyState({ hasWorkspace, onCreateWorkbook, onImportWo
         <span />
       </div>
       <h1 id="empty-workspace-title">
-        {hasWorkspace
-          ? t("empty_workspace_title", "开始使用这个项目")
-          : t("empty_projects_title", "开始使用 OpenExcel")}
+        {hasWorkspace ? t("empty_workspace_title") : t("empty_projects_title")}
       </h1>
-      <p>
-        {hasWorkspace
-          ? t("empty_workspace_description", "创建一个工作簿，或导入已有的 Excel 文件")
-          : t("empty_projects_description", "创建项目后，你可以在其中管理工作簿并进行对话")}
-      </p>
+      <p>{hasWorkspace ? t("empty_workspace_description") : t("empty_projects_description")}</p>
       <div className={styles.actions}>
         <button
           type="button"
@@ -36,7 +30,7 @@ export function WorkspaceEmptyState({ hasWorkspace, onCreateWorkbook, onImportWo
           onClick={() => void onCreateWorkbook()}
         >
           <span aria-hidden="true">+</span>
-          {t("new_workbook", "新建工作簿")}
+          {t("new_workbook")}
         </button>
         <button
           type="button"
@@ -44,7 +38,7 @@ export function WorkspaceEmptyState({ hasWorkspace, onCreateWorkbook, onImportWo
           onClick={() => inputRef.current?.click()}
         >
           <span aria-hidden="true">↑</span>
-          {t("import_workbook", "导入 Excel")}
+          {t("import_workbook")}
         </button>
       </div>
       <input

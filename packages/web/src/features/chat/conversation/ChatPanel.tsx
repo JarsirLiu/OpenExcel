@@ -117,7 +117,7 @@ export function ChatPanel({
       {error && (
         <div className={styles.error}>
           <Alert variant="error">
-            {t("chat_failed", "对话失败")}：{error.message}
+            {t("chat_failed")}：{error.message}
           </Alert>
         </div>
       )}
@@ -134,7 +134,7 @@ export function ChatPanel({
                 strokeLinejoin="round"
               />
             </svg>
-            {t("scroll_to_bottom", "回到底部")}
+            {t("scroll_to_bottom")}
           </button>
         </div>
       )}

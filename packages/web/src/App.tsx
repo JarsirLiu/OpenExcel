@@ -100,8 +100,8 @@ export function NotFoundPage() {
     >
       <div style={{ textAlign: "center" }}>
         <h1>404</h1>
-        <p>{t("page_not_found", "页面不存在")}</p>
-        <Link to={routePaths.home}>{t("back_home", "返回首页")}</Link>
+        <p>{t("page_not_found")}</p>
+        <Link to={routePaths.home}>{t("back_home")}</Link>
       </div>
     </div>
   );

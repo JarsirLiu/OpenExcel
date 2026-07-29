@@ -164,11 +164,9 @@ export function collectWorkbookMutationToolCallIds(
   messages: ReadonlyArray<SheetPatchMessageLike>,
   seenToolCallIds: ReadonlySet<string>,
 ): string[] {
-  const workbookToolCallIds = collectWorkbookRefreshToolCallIds(messages, seenToolCallIds, {
+  return collectWorkbookRefreshToolCallIds(messages, seenToolCallIds, {
     sheetDeltasHandled: false,
   });
-  const seen = new Set([...seenToolCallIds, ...workbookToolCallIds]);
-  return [...workbookToolCallIds, ...collectChartMutationToolCallIds(messages, seen)];
 }
 
 export function collectWorkbookRefreshToolCallIds(
@@ -191,11 +189,6 @@ export function collectWorkbookRefreshToolCallIds(
   const structureUpdates = collectWorkbookStructureUpdates(messages, seenAfterPatchUpdates);
   for (const update of structureUpdates) {
     toolCallIds.add(update.toolCallId);
-  }
-
-  const seenAfterStructureUpdates = new Set(seenAfterPatchUpdates);
-  for (const update of structureUpdates) {
-    seenAfterStructureUpdates.add(update.toolCallId);
   }
 
   return Array.from(toolCallIds);

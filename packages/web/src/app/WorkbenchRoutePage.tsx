@@ -50,7 +50,7 @@ function LoadingScreen() {
           OpenExcel
         </div>
         <div style={{ marginTop: 12, color: "var(--text-secondary)", fontSize: 13 }}>
-          {t("loading", "加载中…")}
+          {t("loading")}
         </div>
       </div>
     </div>

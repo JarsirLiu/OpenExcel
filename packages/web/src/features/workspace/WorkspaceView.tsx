@@ -83,7 +83,7 @@ export function WorkspaceView({
   }, []);
 
   if (loading && !currentWorkbook) {
-    return <div className={styles.loading}>{t("loading", "加载中...")}</div>;
+    return <div className={styles.loading}>{t("loading")}</div>;
   }
 
   if (!loading && currentWorkbook == null && transition == null) {
@@ -143,14 +143,14 @@ export function WorkspaceView({
         />
         {transition?.status === "loading" && (
           <div className={styles.transitionOverlay} role="status" aria-live="polite">
-            <span>{t("switchingWorkbook", "正在切换工作簿…")}</span>
+            <span>{t("switchingWorkbook")}</span>
           </div>
         )}
         {transition?.status === "failed" && (
           <div className={styles.transitionError} role="alert">
-            <span>{transition.error ?? t("workbookLoadFailed", "工作簿加载失败")}</span>
+            <span>{transition.error ?? t("workbookLoadFailed")}</span>
             <button type="button" onClick={onRetryWorkbookTransition}>
-              {t("retry", "重试")}
+              {t("retry")}
             </button>
           </div>
         )}

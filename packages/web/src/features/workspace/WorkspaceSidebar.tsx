@@ -265,7 +265,7 @@ export function WorkspaceSidebar({
         <div className={styles.header}>
           <span className={styles.sectionLabel}>
             <small>{readOnly ? "DEMO SPACE" : "WORKSPACE"}</small>
-            <strong>{t("workspaces", "工作区")}</strong>
+            <strong>{t("workspaces")}</strong>
           </span>
           <button
             className={styles.toggleBtn}
@@ -519,7 +519,7 @@ export function WorkspaceSidebar({
                 strokeLinecap="round"
               />
             </svg>
-            {t("new_workspace", "新建项目")}
+            {t("new_workspace")}
           </button>
         )}
       </div>
