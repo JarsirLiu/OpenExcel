@@ -2,7 +2,7 @@
 
 This file is the working guide for maintainers editing `packages/web`.
 Read it together with [../../AGENTS.md](../../AGENTS.md) and
-[docs/architecture.md](../../docs/architecture.md) before changing the web
+[docs/current/architecture.md](../../docs/current/architecture.md) before changing the web
 application.
 
 ## 1. What this package owns
@@ -192,7 +192,7 @@ Before submitting a web change, check:
 - Are layout dimensions derived from the parent contract rather than offsets?
 - Are async responses guarded against stale workbook or sheet identity?
 - Are tests added for the observable regression?
-- Did a package-boundary change require an update to `docs/architecture.md`?
+- Did a package-boundary change require an update to `docs/current/architecture.md`?
 
 The guiding principle is:
 

@@ -5,11 +5,11 @@ tools. It describes the boundaries between the shared contract, Agent runtime,
 server execution, and web projection. It does not replace the detailed
 protocol documents:
 
-- [Architecture](../../architecture.md) defines durable package boundaries.
-- [Agent Loop](../../agent-loop.md) defines event ordering, tool lifecycle,
+- [Current Architecture](../../current/architecture.md) defines current package boundaries.
+- [Current Agent Runtime](../../current/agent-runtime.md) defines event ordering, tool lifecycle,
   persistence barriers, cancellation, and recovery.
-- [AI Spreadsheet Tools](../../ai-spreadsheet-tools.md) defines model-facing
-  data contracts and token budgets.
+- [Current AI Tools](../../current/tools.md) defines the current model-facing
+  data contracts and tool list.
 
 ## Layers
 

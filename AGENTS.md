@@ -1,5 +1,22 @@
 # Repository Guidelines
 
+## AI reading protocol
+
+Before changing code, read [docs/README.md](docs/README.md). It is the default
+navigation entry for this repository.
+
+Read `docs/current/` and `docs/rules/` for current facts and mandatory rules.
+Documents under `docs/design/`, `docs/proposals/`, and `docs/issues/` are not
+descriptions of the current runtime unless the task explicitly asks about them.
+
+Read [docs/rules/agent-behavior.md](docs/rules/agent-behavior.md) before making
+changes. It defines the repository's engineering judgment, scope discipline,
+documentation behavior, verification expectations, and process for promoting
+repeated developer feedback into stable rules.
+
+The current code and tests are the evidence for runtime behavior. If a document
+and the code disagree, do not silently treat a proposal as implemented.
+
 ## Project Structure & Module Organization
 OpenExcel is a pnpm monorepo. Main packages live under `packages/`:
 - `packages/web` - React/Vite UI, workbook editor, and chat composer
@@ -7,7 +24,7 @@ OpenExcel is a pnpm monorepo. Main packages live under `packages/`:
 - `packages/core` - shared spreadsheet primitives and Excel conversion logic
 - `packages/agent` - model/tooling and chat session utilities
 
-Keep feature code inside the owning package’s `src/` tree. Avoid generated output such as `dist/` or `node_modules/`. For package-boundary changes, update `docs/architecture.md`; for Agent loop, context, tool, retry, event, or recovery changes, update `docs/agent-loop.md`. For tool design and implementation workflow, read [docs/architecture/tools/README.md](docs/architecture/tools/README.md) and [docs/architecture/tools/authoring.md](docs/architecture/tools/authoring.md). Read package-specific guides like `packages/server/AGENTS.md` before touching server code.
+Keep feature code inside the owning package’s `src/` tree. Avoid generated output such as `dist/` or `node_modules/`. For package-boundary changes, update `docs/current/architecture.md` and `docs/rules/package-boundaries.md`; for Agent loop, context, tool, retry, event, or recovery changes, update `docs/current/agent-runtime.md`. For tool design and implementation workflow, read [docs/architecture/tools/README.md](docs/architecture/tools/README.md) and [docs/architecture/tools/authoring.md](docs/architecture/tools/authoring.md). Read package-specific guides like `packages/server/AGENTS.md` before touching server code.
 
 ## Build, Test, and Development Commands
 - `pnpm dev` - run web and server in parallel
@@ -34,7 +51,7 @@ This repo uses TypeScript ESM. Follow the existing style: 2-space indentation, s
 
 ## Testing Guidelines
 
-See [docs/testing-guidelines.md](docs/testing-guidelines.md) for the full specification.
+See [docs/rules/testing.md](docs/rules/testing.md) for the repository testing rules.
 
 ### Quick Reference
 - **Vitest** is the test framework across all packages.

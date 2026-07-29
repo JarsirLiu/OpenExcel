@@ -17,8 +17,8 @@ Before editing code, classify the behavior:
 - Tool progress and result display: `packages/web`.
 
 If the feature crosses layers, define a narrow contract in Core first and keep
-each layer responsible for only its own part. Read [Architecture](../../architecture.md)
-and [Agent Loop](../../agent-loop.md) before changing shared events or runtime
+each layer responsible for only its own part. Read [Current Architecture](../../current/architecture.md)
+and [Current Agent Runtime](../../current/agent-runtime.md) before changing shared events or runtime
 behavior.
 
 ## 2. Define the canonical contract
@@ -73,7 +73,7 @@ an `error`, never both. Schema errors, authorization failures, business
 validation failures, and execution failures are tool results the model can
 correct from; they must not silently leave a pending tool or fail the whole
 conversation. Cancellation and persistence failure follow the terminal rules
-in [Agent Loop](../../agent-loop.md).
+in [Current Agent Runtime](../../current/agent-runtime.md).
 
 ## 5. Verify the change
 
@@ -87,6 +87,6 @@ Add focused tests for the contract and the executor. At minimum, cover:
 - result size or pagination behavior for large output.
 
 Then run the narrowest relevant package tests, typecheck, and `git diff --check`.
-If the change crosses a package boundary, update [Architecture](../../architecture.md).
+If the change crosses a package boundary, update [Current Architecture](../../current/architecture.md).
 If it changes loop, event, retry, persistence, or recovery semantics, update
-[Agent Loop](../../agent-loop.md) as well.
+[Current Agent Runtime](../../current/agent-runtime.md) as well.

@@ -1,11 +1,11 @@
 # Server Agent Notes
 
 This file is the working guide for any AI or maintainer editing `packages/server`.
-Read it together with [docs/architecture.md](../../docs/architecture.md) and
-[docs/agent-loop.md](../../docs/agent-loop.md) before making changes.
+Read it together with [docs/current/architecture.md](../../docs/current/architecture.md) and
+[docs/current/agent-runtime.md](../../docs/current/agent-runtime.md) before making changes.
 
-`docs/agent-loop.md` is the detailed source of truth for Agent execution and
-reliability. `docs/architecture.md` only defines stable package boundaries.
+`docs/current/agent-runtime.md` is the current source of truth for Agent execution
+and reliability. `docs/current/architecture.md` only defines stable package boundaries.
 
 ## 1. What this package owns
 
@@ -242,7 +242,7 @@ Do not move spreadsheet core transforms into server if they already belong in `@
 
 ## 10. Testing expectations
 
-See [docs/testing-guidelines.md](../../docs/testing-guidelines.md) for the full specification.
+See [docs/rules/testing.md](../../docs/rules/testing.md) for the repository testing rules.
 
 Before landing server changes, update or add tests for the changed behavior.
 

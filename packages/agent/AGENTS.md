@@ -1,11 +1,11 @@
 # Agent Layer Notes
 
 This file is the working guide for any AI or maintainer editing `packages/agent`.
-Read it together with [docs/agent-loop.md](../../docs/agent-loop.md) and
-[docs/architecture.md](../../docs/architecture.md) before making changes.
+Read it together with [docs/current/agent-runtime.md](../../docs/current/agent-runtime.md) and
+[docs/current/architecture.md](../../docs/current/architecture.md) before making changes.
 
-`docs/agent-loop.md` is the detailed source of truth for Agent behavior. The
-architecture document only defines stable package boundaries.
+`docs/current/agent-runtime.md` is the current source of truth for Agent behavior.
+The current architecture document only defines stable package boundaries.
 
 ## 1. What this package owns
 
@@ -47,7 +47,7 @@ The current codebase is intentionally small and focused:
 - `src/runtime/tools/toolAdapter.ts` - Agent tools to AI SDK tools
 - `src/runtime/tools/toolResultBudget.ts` - tool result token budgets and truncation
 - `src/runtime/events/events.ts` - provider-neutral event sequencing
-- UI message stream transport 已由 server 的 AgentEvent NDJSON 订阅取代；Agent 只产生 provider-neutral 事件
+- UI message streaming is provided by the Server's AgentEvent NDJSON subscription; the Agent only produces provider-neutral events.
 - `src/runtime/stream/referencePart.ts` - chat reference conversion
 - `src/runtime/errors/formatAIError.ts` - model error formatting
 
