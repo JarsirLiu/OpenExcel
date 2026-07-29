@@ -22,6 +22,7 @@ vi.mock("../../model.js", () => ({
   resolveModelForPurpose: vi.fn(() => ({ modelId: "test-model" })),
 }));
 
+import { ToolExecutionError } from "../tools/errors.js";
 import { runAgentLoop } from "./agentLoop.js";
 
 function createModelStream(options: {
@@ -400,7 +401,9 @@ describe("runAgentLoop", () => {
           inputSchema: {},
         },
       ],
-      toolExecutor: { execute: vi.fn().mockRejectedValue(new Error("Sheet 不存在")) },
+      toolExecutor: {
+        execute: vi.fn().mockRejectedValue(new ToolExecutionError("Sheet 不存在")),
+      },
       eventSink: { publish: vi.fn() },
       persistenceBarrier: { persist: vi.fn() },
     } as any);

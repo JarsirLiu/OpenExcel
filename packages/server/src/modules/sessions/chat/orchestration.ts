@@ -6,6 +6,7 @@ import {
   formatAIError,
   type ToolExecutionRequest,
   type ToolExecutor,
+  ToolInputValidationError,
   ToolResultBudget,
   toModelSafeJsonValue,
   wrapToolExecutorWithResultBudget,
@@ -113,7 +114,7 @@ export function createConcreteToolExecutor(
       const baseContext = executionContext?.toolContexts?.[toolName] ?? toolsContext[tool.name];
       const parsedInput = tool.inputSchema.safeParse(input);
       if (!parsedInput.success) {
-        throw new Error(
+        throw new ToolInputValidationError(
           `${toolName}: 输入参数验证失败: ${parsedInput.error.issues
             .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
             .join("; ")}`,

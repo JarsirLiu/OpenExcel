@@ -48,7 +48,7 @@ export type AgentTimeoutConfiguration =
 export type AgentRunStatus = "completed" | "cancelled" | "failed";
 
 export type AgentFailureKind = "execution" | "persistence";
-export type AgentFailurePhase = "model" | "persistence";
+export type AgentFailurePhase = "model" | "tool" | "persistence";
 
 export interface AgentRunCompletion {
   status: AgentRunStatus;

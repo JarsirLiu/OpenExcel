@@ -412,7 +412,7 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
         failureStepIndex:
           isAborted && flushError == null
             ? undefined
-            : streamState.failurePhase === "model"
+            : streamState.failurePhase === "model" || streamState.failurePhase === "tool"
               ? stepIndex
               : undefined,
       });

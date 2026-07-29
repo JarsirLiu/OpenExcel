@@ -1,3 +1,4 @@
+import { ToolNotFoundError } from "@openexcel/agent";
 import { prisma } from "../../../infra/database/db.js";
 import type { Prisma } from "../../../infra/database/prismaTypes.js";
 import {
@@ -35,7 +36,7 @@ export async function runSheetMutation<T extends RevisionedResult>(
       where: { id: sheetId, workbook: { workspaceId: context.workspaceId } },
       include: { workbook: true },
     });
-    if (!sheet) throw new Error(`Sheet ${sheetId} 不存在`);
+    if (!sheet) throw new ToolNotFoundError(`Sheet ${sheetId} 不存在`);
 
     throwIfAborted(abortSignal);
     const result = await mutation(sheet, tx);

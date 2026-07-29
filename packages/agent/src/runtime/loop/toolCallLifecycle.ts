@@ -1,6 +1,8 @@
 import type { OrderedAgentEventEmitter } from "../events/orderedEmitter.js";
+import { AgentProtocolError } from "../events/types.js";
 
 type EventEmitter = Pick<OrderedAgentEventEmitter, "emit">;
+export type ToolFinishSource = "adapter" | "provider" | "reconciliation" | "terminal";
 
 export interface ToolCallLifecycleOptions {
   turnId?: string;
@@ -16,9 +18,10 @@ export interface ToolCallLifecycle {
     input?: unknown;
     output?: unknown;
     error?: unknown;
+    source?: ToolFinishSource;
   }): Promise<void>;
   reconcileStep(step: unknown): Promise<void>;
-  finishPending(error: unknown): Promise<void>;
+  finishPending(error: unknown): Promise<number>;
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -40,6 +43,27 @@ function errorMessageOf(value: Record<string, unknown>) {
     (typeof candidate === "string" && candidate) ||
     "工具调用参数无效"
   );
+}
+
+function modelToolErrorOf(value: unknown) {
+  const output = asRecord(value);
+  return output.isError === true && Object.hasOwn(output, "error") ? output.error : undefined;
+}
+
+function lifecycleErrorOf(value: unknown) {
+  if (!(value instanceof Error)) return value;
+  const record = value as Error & {
+    kind?: unknown;
+    details?: unknown;
+    retryable?: unknown;
+  };
+  return {
+    kind: typeof record.kind === "string" ? record.kind : "internal_error",
+    message: value.message,
+    ...(record.details && typeof record.details === "object" ? { details: record.details } : {}),
+    ...(typeof record.retryable === "boolean" ? { retryable: record.retryable } : {}),
+    ...(value.name !== "Error" ? { name: value.name } : {}),
+  };
 }
 
 export function createToolCallLifecycle(options: ToolCallLifecycleOptions): ToolCallLifecycle {
@@ -71,11 +95,28 @@ export function createToolCallLifecycle(options: ToolCallLifecycleOptions): Tool
     input?: unknown;
     output?: unknown;
     error?: unknown;
+    source?: ToolFinishSource;
   }) {
     if (finishedToolCallIds.has(event.toolCallId)) return;
+    await start({
+      toolName: event.toolName,
+      toolCallId: event.toolCallId,
+      ...(event.input !== undefined ? { input: event.input } : {}),
+    });
     finishedToolCallIds.add(event.toolCallId);
+    const hasError = event.error !== undefined;
+    const started = startedToolCalls.get(event.toolCallId);
     await options.emitter.emit("tool.finished", {
-      ...event,
+      toolName: event.toolName,
+      toolCallId: event.toolCallId,
+      ...(event.input !== undefined
+        ? { input: event.input }
+        : started?.input !== undefined
+          ? { input: started.input }
+          : {}),
+      outcome: hasError ? "failed" : "completed",
+      ...(event.source ? { source: event.source } : {}),
+      ...(hasError ? { error: lifecycleErrorOf(event.error) } : { output: event.output }),
       turnId: options.turnId,
       stepIndex: options.getStepIndex(),
       messageId: assistantMessageId,
@@ -98,7 +139,12 @@ export function createToolCallLifecycle(options: ToolCallLifecycleOptions): Tool
       const call = asRecord(candidate);
       const toolCallId = toolCallIdOf(call);
       const toolName = typeof call.toolName === "string" ? call.toolName : undefined;
-      if (!toolCallId || !toolName) continue;
+      if (!toolCallId || !toolName) {
+        throw new AgentProtocolError("Completed model step contains an invalid tool call", {
+          eventType: "step.finished",
+          details: { toolCall: call },
+        });
+      }
 
       await start({ toolName, toolCallId, input: call.input });
       if (finishedToolCallIds.has(toolCallId)) continue;
@@ -114,33 +160,51 @@ export function createToolCallLifecycle(options: ToolCallLifecycleOptions): Tool
             message: "工具调用未返回结果",
             retryable: true,
           },
+          source: "reconciliation",
         });
-        continue;
+        throw new AgentProtocolError(`Tool call ${toolCallId} did not produce a result`, {
+          eventType: "step.finished",
+          details: { toolCallId, toolName },
+        });
       }
 
-      const hasError = result.type === "tool-error" || result.error !== undefined;
+      const modelError = modelToolErrorOf(result.output);
+      const hasError =
+        result.type === "tool-error" || result.error !== undefined || modelError !== undefined;
       const errorMessage = errorMessageOf(result);
       await finish({
         toolName,
         toolCallId,
         input: result.input ?? call.input,
         ...(hasError
-          ? { error: { kind: "tool_call_failed", message: errorMessage, retryable: true } }
+          ? {
+              error: {
+                kind: "tool_call_failed",
+                message:
+                  modelError === undefined ? errorMessage : errorMessageOf({ error: modelError }),
+                retryable: true,
+              },
+            }
           : { output: result.output }),
+        source: "reconciliation",
       });
     }
   }
 
   async function finishPending(error: unknown) {
+    let pendingCount = 0;
     for (const [toolCallId, toolCall] of startedToolCalls) {
       if (finishedToolCallIds.has(toolCallId)) continue;
+      pendingCount += 1;
       await finish({
         toolName: toolCall.toolName,
         toolCallId,
         input: toolCall.input,
         error,
+        source: "terminal",
       });
     }
+    return pendingCount;
   }
 
   return { start, finish, reconcileStep, finishPending };

@@ -1,3 +1,4 @@
+import { ToolNotFoundError } from "@openexcel/agent";
 import { defineServerTool } from "../../../shared/tools/serverTool.js";
 import * as runRepo from "../../sessions/runs/repository.js";
 import { createSheet as createSheetUseCase } from "../application/createSheet.js";
@@ -12,7 +13,7 @@ export const createSheet = defineServerTool("createSheet", {
       db,
     );
     if (!result) {
-      throw new Error(`Workbook ${input.workbookId} 不存在`);
+      throw new ToolNotFoundError(`Workbook ${input.workbookId} 不存在`);
     }
     await runRepo.upsertRunSheetSnapshot(
       {

@@ -39,6 +39,22 @@ export class AgentPersistenceError extends Error {
   }
 }
 
+export class AgentProtocolError extends Error {
+  readonly code = "agent_protocol_error";
+  readonly eventType?: string;
+  readonly details?: Record<string, unknown>;
+
+  constructor(
+    message: string,
+    options?: { eventType?: string; details?: Record<string, unknown> },
+  ) {
+    super(message);
+    this.name = "AgentProtocolError";
+    this.eventType = options?.eventType;
+    this.details = options?.details;
+  }
+}
+
 export interface AgentEventEmitter {
   emit(type: AgentEventType, payload?: unknown): Promise<AgentEvent>;
 }

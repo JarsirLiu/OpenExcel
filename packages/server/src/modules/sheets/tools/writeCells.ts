@@ -1,3 +1,4 @@
+import { ToolInputValidationError } from "@openexcel/agent";
 import {
   type ExcelToolInput,
   MAX_WRITE_CELLS_PER_CALL,
@@ -25,7 +26,7 @@ function expandOperations(
     }
     if (operation.type === "cell") {
       if (cells.length >= MAX_WRITE_CELLS_PER_CALL) {
-        throw new Error("单次 writeCells 最多写入 10000 个单元格");
+        throw new ToolInputValidationError("单次 writeCells 最多写入 10000 个单元格");
       }
       const cell: SheetChangeCell = {
         row: operation.row,
@@ -40,7 +41,7 @@ function expandOperations(
     const rangeSize =
       (operation.endRow - operation.startRow + 1) * (operation.endCol - operation.startCol + 1);
     if (cells.length + rangeSize > MAX_WRITE_CELLS_PER_CALL) {
-      throw new Error("单次 writeCells 最多写入 10000 个单元格");
+      throw new ToolInputValidationError("单次 writeCells 最多写入 10000 个单元格");
     }
     for (let row = operation.startRow; row <= operation.endRow; row++) {
       for (let col = operation.startCol; col <= operation.endCol; col++) {

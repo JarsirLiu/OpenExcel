@@ -76,7 +76,7 @@ export type {
 } from "./runtime/contracts.js";
 export { formatAIError } from "./runtime/errors/formatAIError.js";
 export { isContextOverflowError } from "./runtime/errors/isContextOverflowError.js";
-export { AgentPersistenceError } from "./runtime/events/types.js";
+export { AgentPersistenceError, AgentProtocolError } from "./runtime/events/types.js";
 export {
   AgentRunner,
   type AgentRunnerInput,
@@ -84,6 +84,7 @@ export {
 } from "./runtime/loop/agentRunner.js";
 export {
   isToolError,
+  ToolBusinessError,
   type ToolError,
   type ToolErrorKind,
   ToolExecutionError,

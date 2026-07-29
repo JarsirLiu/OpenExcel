@@ -92,7 +92,7 @@ export async function findRunProjectionState(
 ) {
   return prisma.agentRun.findFirst({
     where: { id: runId, sessionId, session: { workspaceId }, status: { not: "reverted" } },
-    select: { id: true, lastEventSequence: true },
+    select: { id: true, lastEventSequence: true, status: true },
   });
 }
 
@@ -111,13 +111,31 @@ export async function persistRunCheckpoint(checkpoint: RunCheckpoint) {
 async function writeCheckpoint(checkpoint: RunCheckpoint) {
   return prisma.$transaction(async (tx) => {
     const existing = await tx.agentRunCheckpoint.findUnique({ where: { runId: checkpoint.runId } });
-    if (existing && existing.checkpointSequence >= checkpoint.checkpointSequence) return false;
+    if (existing && existing.checkpointSequence > checkpoint.checkpointSequence) return false;
 
     if (!existing) {
       await tx.agentRunCheckpoint.create({
         data: {
           runId: checkpoint.runId,
           checkpointSequence: checkpoint.checkpointSequence,
+          transcript: encode(checkpoint.transcript),
+          reasoning: checkpoint.reasoning,
+          toolState: encode(checkpoint.toolState),
+          ...(checkpoint.contextCheckpoint
+            ? {
+                contextCheckpoint: encode(checkpoint.contextCheckpoint),
+                contextVersion: checkpoint.contextCheckpoint.version,
+              }
+            : {}),
+        },
+      });
+      return true;
+    }
+
+    if (existing.checkpointSequence === checkpoint.checkpointSequence) {
+      await tx.agentRunCheckpoint.update({
+        where: { runId: checkpoint.runId },
+        data: {
           transcript: encode(checkpoint.transcript),
           reasoning: checkpoint.reasoning,
           toolState: encode(checkpoint.toolState),

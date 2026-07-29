@@ -3,7 +3,11 @@ import { formatAIError } from "@openexcel/agent";
 import { findAgentEventsByRun, persistRunLifecycleEvent } from "./agentEventRepository.js";
 import { findRunCheckpoint, persistRunCheckpoint } from "./checkpointRepository.js";
 import * as runRepo from "./repository.js";
-import { projectRunCheckpoint, projectRunTranscriptEntries } from "./runCheckpointProjector.js";
+import {
+  projectRunCheckpoint,
+  projectRunTranscriptEntries,
+  terminalStatusForRunStatus,
+} from "./runCheckpointProjector.js";
 import type { AcquiredRunLease } from "./runLease.js";
 import { completeRunAndUpdateUndoCheckpoint } from "./undoCheckpoint.js";
 
@@ -97,6 +101,8 @@ export function createRunFinalizer(options: {
           projectionEvents,
           options.lease
             .transcript as import("@openexcel/agent").ContextTranscriptEntry<AgentTranscriptMessage>[],
+          undefined,
+          terminalStatusForRunStatus(outcome.status),
         );
         const projectedCheckpoint = projectRunCheckpoint(projectionEvents, transcript);
         const currentCheckpoint = await findRunCheckpoint(options.lease.run.id);

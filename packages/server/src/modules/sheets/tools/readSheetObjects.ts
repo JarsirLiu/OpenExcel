@@ -1,3 +1,4 @@
+import { ToolNotFoundError } from "@openexcel/agent";
 import { projectSheetObjects } from "@openexcel/core";
 import { defineServerTool } from "../../../shared/tools/serverTool.js";
 import { deserializeSheet } from "../../../shared/utils/sheetSerialization.js";
@@ -7,7 +8,7 @@ import { findSheetForWorkspace, findSheetsForWorkbook } from "../infrastructure/
 export const readSheetObjects = defineServerTool("readSheetObjects", {
   execute: async ({ sheetId, objectType }, { context }) => {
     const sheet = await findSheetForWorkspace(sheetId, context.workspaceId);
-    if (!sheet) throw new Error(`Sheet ${sheetId} 不存在`);
+    if (!sheet) throw new ToolNotFoundError(`Sheet ${sheetId} 不存在`);
     const charts =
       objectType === "charts" ? await listCharts(context.workspaceId, sheet.workbookId) : [];
     const workbookSheets =

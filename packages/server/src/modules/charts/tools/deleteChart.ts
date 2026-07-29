@@ -1,3 +1,4 @@
+import { ToolNotFoundError } from "@openexcel/agent";
 import { defineServerTool } from "../../../shared/tools/serverTool.js";
 import { deleteChartMutation } from "../application/chartMutationService.js";
 
@@ -9,7 +10,7 @@ export const deleteChart = defineServerTool("deleteChart", {
       mutationId: `ai:${context.runId}:${toolCallId}`,
       commandHash: JSON.stringify(input),
     });
-    if (!result) throw new Error(`Chart ${input.chartId} 不存在`);
+    if (!result) throw new ToolNotFoundError(`Chart ${input.chartId} 不存在`);
     return { success: true as const, chartId: input.chartId };
   },
 });

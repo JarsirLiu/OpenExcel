@@ -1,7 +1,7 @@
 import { type ToolSet, tool } from "ai";
 import type { AgentToolDefinition, ToolExecutor } from "../contracts.js";
-import { AgentPersistenceError } from "../events/types.js";
-import { toToolError } from "./errors.js";
+import { AgentProtocolError } from "../events/types.js";
+import { isToolError, type ToolError } from "./errors.js";
 import { validateToolInput } from "./inputValidation.js";
 import { toModelSafeJsonValue } from "./modelSafeJson.js";
 
@@ -17,6 +17,7 @@ export interface ToolAdapterHooks {
     input: unknown;
     output?: unknown;
     error?: unknown;
+    source?: "adapter";
   }) => void | Promise<void>;
 }
 
@@ -31,7 +32,7 @@ function isAbortError(error: unknown, signal: AbortSignal | undefined) {
   return signal?.aborted || (error instanceof Error && error.name === "AbortError");
 }
 
-function toolErrorResult(error: ReturnType<typeof toToolError>) {
+function toolErrorResult(error: ToolError) {
   return {
     isError: true,
     error: {
@@ -59,7 +60,13 @@ export function createAgentToolSet(
           throwIfAborted(executeOptions?.abortSignal);
           const toolCallId = executeOptions?.toolCallId;
           if (typeof toolCallId !== "string" || toolCallId.length === 0) {
-            throw new Error(`Tool ${definition.name} execution is missing toolCallId`);
+            throw new AgentProtocolError(
+              `Tool ${definition.name} execution is missing toolCallId`,
+              {
+                eventType: "tool-call",
+                details: { toolName: definition.name },
+              },
+            );
           }
           await hooks.onToolStart?.({
             toolName: definition.name,
@@ -78,6 +85,7 @@ export function createAgentToolSet(
               toolCallId,
               input,
               error: validationResult.error,
+              source: "adapter",
             });
             return toolErrorResult(validationResult.error);
           }
@@ -100,6 +108,7 @@ export function createAgentToolSet(
               toolCallId,
               input,
               ...event,
+              source: "adapter",
             });
           };
 
@@ -114,13 +123,9 @@ export function createAgentToolSet(
               await finish({ error: { kind: "cancelled", message: "工具执行已中断" } });
               throw error;
             }
-            const toolError = toToolError(error);
-            await finish({ error: toolError });
-            if (error instanceof AgentPersistenceError) throw error;
-            // A business/tool failure is a model-visible tool result. The
-            // model must be allowed to explain the failure or choose another
-            // step; only cancellation and persistence failures abort the run.
-            return toolErrorResult(toolError);
+            await finish({ error });
+            if (!isToolError(error)) throw error;
+            return toolErrorResult(error);
           }
         },
       } as any),

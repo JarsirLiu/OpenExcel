@@ -1,15 +1,17 @@
-export class SheetNotFoundError extends Error {
+import { ToolBusinessError, ToolNotFoundError } from "@openexcel/agent";
+
+export class SheetNotFoundError extends ToolNotFoundError {
   constructor(sheetId: number) {
     super(`Sheet ${sheetId} 不存在`);
     this.name = "SheetNotFoundError";
   }
 }
 
-export class SheetRevisionConflictError extends Error {
+export class SheetRevisionConflictError extends ToolBusinessError {
   readonly sheetId: number;
 
   constructor(sheetId: number) {
-    super(`Sheet ${sheetId} 已被其他操作修改`);
+    super(`Sheet ${sheetId} 已被其他操作修改`, { sheetId }, true);
     this.name = "SheetRevisionConflictError";
     this.sheetId = sheetId;
   }

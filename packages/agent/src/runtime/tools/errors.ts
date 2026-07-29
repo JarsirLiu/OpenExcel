@@ -1,5 +1,6 @@
 export type ToolErrorKind =
   | "validation_failed"
+  | "business_failed"
   | "execution_failed"
   | "not_found"
   | "permission_denied"
@@ -32,6 +33,18 @@ export class ToolExecutionError extends Error implements ToolError {
   ) {
     super(message);
     this.name = "ToolExecutionError";
+  }
+}
+
+export class ToolBusinessError extends Error implements ToolError {
+  readonly kind: ToolErrorKind = "business_failed";
+  constructor(
+    public readonly message: string,
+    public readonly details?: Record<string, unknown>,
+    public readonly retryable: boolean = false,
+  ) {
+    super(message);
+    this.name = "ToolBusinessError";
   }
 }
 

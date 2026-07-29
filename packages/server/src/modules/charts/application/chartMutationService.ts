@@ -1,3 +1,4 @@
+import { ToolNotFoundError } from "@openexcel/agent";
 import { type ChartSpec, chartDependencySheetIds } from "@openexcel/core";
 import type { Prisma } from "../../../infra/database/prismaTypes.js";
 import * as runRepository from "../../sessions/runs/repository.js";
@@ -47,7 +48,7 @@ async function replayReceipt(context: ChartRunContext) {
   return findChartMutationReceipt(context.db, receipt.mutationId, receipt.commandHash);
 }
 
-export class ChartMutationNotFoundError extends Error {
+export class ChartMutationNotFoundError extends ToolNotFoundError {
   constructor(chartId: string) {
     super(`Chart ${chartId} 不存在`);
     this.name = "ChartMutationNotFoundError";

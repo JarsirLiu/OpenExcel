@@ -12,7 +12,13 @@ type ProjectedMessage = {
   parts: Map<string, ProjectedPart>;
 };
 
-type TerminalRunStatus = "completed" | "cancelled" | "failed";
+export type TerminalRunStatus = "completed" | "cancelled" | "failed";
+
+export function terminalStatusForRunStatus(status: string): TerminalRunStatus | undefined {
+  if (status === "completed" || status === "cancelled" || status === "failed") return status;
+  if (status === "recovery_required") return "failed";
+  return undefined;
+}
 
 function payloadOf(event: AgentEvent): EventPayload | null {
   return event.payload && typeof event.payload === "object"
@@ -57,6 +63,30 @@ function closePendingTools(messages: Map<string, ProjectedMessage>, status: Term
       part.value.errorText = errorText;
     }
   }
+}
+
+function closePendingTranscriptTools(
+  messages: AgentTranscriptMessage[],
+  status: TerminalRunStatus,
+) {
+  const errorText = status === "cancelled" ? "工具执行已中断" : "运行已终止，工具结果未完成";
+  return messages.map((message) => {
+    if (message.role !== "assistant" || !Array.isArray(message.parts)) return message;
+    let changed = false;
+    const parts = message.parts.map((part) => {
+      if (!part || typeof part !== "object") return part;
+      const value = part as Record<string, unknown>;
+      if (value.state !== "input-available" && value.state !== "input-streaming") return part;
+      changed = true;
+      return {
+        ...value,
+        state: "output-error",
+        ...(value.input === undefined ? { input: {} } : {}),
+        errorText,
+      };
+    });
+    return changed ? ({ ...message, parts } as AgentTranscriptMessage) : message;
+  });
 }
 
 function assistantMessageId(payload: EventPayload | null) {
@@ -255,9 +285,9 @@ export function projectRunTranscript(
   if (userMessage && !containsMessage(base, userMessage)) base.push(userMessage);
 
   const streamed = projectStreamedAssistantMessages(events, terminalStatus);
-  return streamed.length > 0
-    ? mergeProjectedMessages(base, streamed)
-    : (fallbackTranscript ?? base);
+  const projected =
+    streamed.length > 0 ? mergeProjectedMessages(base, streamed) : (fallbackTranscript ?? base);
+  return terminalStatus ? closePendingTranscriptTools(projected, terminalStatus) : projected;
 }
 
 /** Projects durable events onto the session transcript while preserving stable cursors. */

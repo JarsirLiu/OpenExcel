@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
+import { AgentProtocolError } from "../events/types.js";
+import { ToolExecutionError } from "./errors.js";
 import { createAgentToolSet } from "./toolAdapter.js";
 
 describe("createAgentToolSet", () => {
@@ -43,6 +45,7 @@ describe("createAgentToolSet", () => {
       toolCallId: "call-1",
       input: { sheetId: 7 },
       output: { ok: true },
+      source: "adapter",
     });
   });
 
@@ -98,7 +101,7 @@ describe("createAgentToolSet", () => {
   });
 
   it("returns a model-visible error result when tool execution fails", async () => {
-    const execute = vi.fn().mockRejectedValue(new Error("Sheet 不存在"));
+    const execute = vi.fn().mockRejectedValue(new ToolExecutionError("Sheet 不存在"));
     const onToolFinish = vi.fn();
     const tools = createAgentToolSet(
       [
@@ -127,6 +130,27 @@ describe("createAgentToolSet", () => {
     );
   });
 
+  it("rethrows unexpected executor errors instead of hiding them from diagnostics", async () => {
+    const execute = vi.fn().mockRejectedValue(new Error("programmer bug"));
+    const onToolFinish = vi.fn();
+    const tools = createAgentToolSet(
+      [{ name: "readSheetData", description: "Read a sheet", inputSchema: z.object({}) }],
+      { execute },
+      undefined,
+      { onToolFinish },
+    );
+
+    await expect(
+      (tools.readSheetData as any).execute({}, { toolCallId: "call-unexpected" }),
+    ).rejects.toThrow("programmer bug");
+    expect(onToolFinish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolCallId: "call-unexpected",
+        error: expect.objectContaining({ message: "programmer bug" }),
+      }),
+    );
+  });
+
   it("rejects tool execution without a provider call id", async () => {
     const execute = vi.fn();
     const tools = createAgentToolSet(
@@ -135,8 +159,8 @@ describe("createAgentToolSet", () => {
       undefined,
     );
 
-    await expect((tools.readSheetData as any).execute({}, {})).rejects.toThrow(
-      "missing toolCallId",
+    await expect((tools.readSheetData as any).execute({}, {})).rejects.toBeInstanceOf(
+      AgentProtocolError,
     );
     expect(execute).not.toHaveBeenCalled();
   });
@@ -194,6 +218,7 @@ describe("createAgentToolSet", () => {
       toolCallId: "call-cancel-during-execution",
       input: {},
       error: { kind: "cancelled", message: "工具执行已中断" },
+      source: "adapter",
     });
   });
 });

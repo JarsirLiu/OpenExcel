@@ -121,4 +121,23 @@ describe("agent persistence adapters", () => {
     expect(execute).toHaveBeenCalledOnce();
     expect(mocks.failToolExecutionUsing).not.toHaveBeenCalled();
   });
+
+  it("does not downgrade a failed-tool ledger write into a model-visible tool error", async () => {
+    mocks.claimToolExecutionUsing.mockResolvedValue({ kind: "execute" });
+    const businessError = new Error("tool failed");
+    const ledgerError = new Error("ledger unavailable");
+    mocks.failToolExecutionUsing.mockRejectedValue(ledgerError);
+    const executor = createIdempotentToolExecutor(9, {
+      execute: vi.fn().mockRejectedValue(businessError),
+    });
+
+    await expect(
+      executor.execute({
+        toolName: "createChart",
+        input: { sheetId: 11 },
+        toolCallId: "call-4",
+        context: {},
+      }),
+    ).rejects.toBeInstanceOf(AgentPersistenceError);
+  });
 });

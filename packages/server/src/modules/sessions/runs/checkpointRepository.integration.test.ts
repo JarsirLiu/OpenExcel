@@ -86,4 +86,39 @@ describe("checkpointRepository (SQLite)", () => {
       }),
     ).resolves.toBe(true);
   });
+
+  it("allows same-sequence transcript repair without moving the boundary", async () => {
+    await expect(
+      repository.persistRunCheckpoint({
+        runId: 1,
+        checkpointSequence: 4,
+        transcript: [
+          {
+            role: "assistant",
+            parts: [
+              {
+                type: "tool-createChart",
+                toolCallId: "call-1",
+                state: "output-error",
+                input: {},
+                errorText: "运行已终止，工具结果未完成",
+              },
+            ],
+          },
+        ],
+        reasoning: "",
+        toolState: [{ type: "tool.started", payload: { toolCallId: "call-1" } }],
+      }),
+    ).resolves.toBe(true);
+
+    await expect(repository.findRunCheckpoint(1)).resolves.toMatchObject({
+      checkpointSequence: 4,
+      transcript: [
+        {
+          role: "assistant",
+          parts: [{ state: "output-error", toolCallId: "call-1" }],
+        },
+      ],
+    });
+  });
 });

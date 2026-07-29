@@ -180,6 +180,46 @@ describe("projectStreamedAssistantMessages", () => {
     ]);
   });
 
+  it("closes pending tools when recovery has no terminal lifecycle event", () => {
+    expect(
+      projectRunTranscript(
+        [],
+        [
+          {
+            id: "turn-1-assistant",
+            role: "assistant",
+            parts: [
+              {
+                id: "tool-call-1",
+                type: "tool-createChart",
+                toolCallId: "call-1",
+                state: "input-available",
+                input: { sheetId: 7 },
+              },
+            ],
+          },
+        ],
+        undefined,
+        "failed",
+      ),
+    ).toEqual([
+      {
+        id: "turn-1-assistant",
+        role: "assistant",
+        parts: [
+          {
+            id: "tool-call-1",
+            type: "tool-createChart",
+            toolCallId: "call-1",
+            state: "output-error",
+            input: { sheetId: 7 },
+            errorText: "运行已终止，工具结果未完成",
+          },
+        ],
+      },
+    ]);
+  });
+
   it("groups all model steps into one assistant message", () => {
     expect(
       projectStreamedAssistantMessages([

@@ -109,4 +109,65 @@ describe("projectRunCheckpointForRun", () => {
     expect(mocks.findAgentEventsForProjection).not.toHaveBeenCalled();
     expect(mocks.persistRunCheckpoint).not.toHaveBeenCalled();
   });
+
+  it("repairs a pending tool in a recovery checkpoint without a new event", async () => {
+    const checkpoint = {
+      runId: 4,
+      checkpointSequence: 3,
+      transcript: [
+        {
+          cursor: 0,
+          message: {
+            id: "assistant-4",
+            role: "assistant",
+            parts: [
+              {
+                id: "tool-call-1",
+                type: "tool-writeCells",
+                toolCallId: "call-1",
+                state: "input-available",
+                input: { sheetId: 7 },
+              },
+            ],
+          },
+        },
+      ],
+      reasoning: "",
+      toolState: [{ type: "tool.started", payload: { toolCallId: "call-1" } }],
+    };
+    mocks.findRunProjectionState.mockResolvedValue({
+      id: 4,
+      lastEventSequence: 3,
+      status: "recovery_required",
+    });
+    mocks.findRunCheckpoint.mockResolvedValueOnce(checkpoint).mockResolvedValue(checkpoint);
+
+    await projectRunCheckpointForRun(1, 2, 4);
+
+    expect(mocks.persistRunCheckpoint).toHaveBeenCalledWith({
+      runId: 4,
+      checkpointSequence: 3,
+      reasoning: "",
+      toolState: checkpoint.toolState,
+      transcript: [
+        {
+          cursor: 0,
+          message: {
+            id: "assistant-4",
+            role: "assistant",
+            parts: [
+              {
+                id: "tool-call-1",
+                type: "tool-writeCells",
+                toolCallId: "call-1",
+                state: "output-error",
+                input: { sheetId: 7 },
+                errorText: "运行已终止，工具结果未完成",
+              },
+            ],
+          },
+        },
+      ],
+    });
+  });
 });

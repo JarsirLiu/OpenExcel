@@ -62,18 +62,24 @@ manifest entry without a Core contract is invalid.
 
 ## 4. Preserve lifecycle behavior
 
-The Agent emits `tool.started` as soon as it observes `tool-input-start` or a
-complete `tool-call`, before slow construction, validation, authorization, or
-execution. The event is a progress fact, not proof that a side effect was
-committed.
+The Agent emits `tool.started` as soon as it observes the earliest provider
+marker for a call, such as `tool-input-start`, `tool-input-available`, or a
+complete `tool-call`, before slow argument completion, validation,
+authorization, or execution. The execution hook is only a fallback for
+providers that do not expose an earlier marker. The event is a progress fact,
+not proof that a side effect is committed.
 
 The executor or runtime must produce one matching `tool.finished` for every
-started call. The finished event must contain either a structured `output` or
-an `error`, never both. Schema errors, authorization failures, business
-validation failures, and execution failures are tool results the model can
-correct from; they must not silently leave a pending tool or fail the whole
-conversation. Cancellation and persistence failure follow the terminal rules
-in [Current Agent Runtime](../../current/agent-runtime.md).
+started call. The finished event must declare exactly one outcome:
+`outcome: "completed"` with a structured `output`, or
+`outcome: "failed"` with a structured `error`, never both. Schema errors,
+authorization failures, business validation failures, and execution failures
+must be returned as model-visible tool results, using an explicit `ToolError`
+type. Unknown exceptions must be rethrown after recording the failed lifecycle
+event so programming and infrastructure failures remain visible. They must
+not silently leave a pending tool or be converted into a generic recoverable
+tool error. Cancellation, protocol, and persistence failure follow the
+terminal rules in [Current Agent Runtime](../../current/agent-runtime.md).
 
 ## 5. Verify the change
 

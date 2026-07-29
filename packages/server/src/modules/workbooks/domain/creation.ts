@@ -1,3 +1,5 @@
+import { ToolNotFoundError } from "@openexcel/agent";
+
 export type SheetInitializationPayload = {
   columns: string;
   merges: string;
@@ -12,7 +14,7 @@ export type SourceSheetPayload = {
   config: string | null;
 };
 
-export class WorkbookCreationError extends Error {
+export class WorkbookCreationError extends ToolNotFoundError {
   statusCode: number;
   code: "SOURCE_SHEET_NOT_FOUND";
 

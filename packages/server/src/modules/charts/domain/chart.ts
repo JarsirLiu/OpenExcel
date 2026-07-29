@@ -1,3 +1,4 @@
+import { ToolInputValidationError } from "@openexcel/agent";
 import { type ChartSpec, parseChartSpec } from "@openexcel/core";
 
 export class ChartStorageError extends Error {
@@ -7,7 +8,7 @@ export class ChartStorageError extends Error {
   }
 }
 
-export class ChartValidationError extends Error {
+export class ChartValidationError extends ToolInputValidationError {
   constructor(message: string) {
     super(message);
     this.name = "ChartValidationError";

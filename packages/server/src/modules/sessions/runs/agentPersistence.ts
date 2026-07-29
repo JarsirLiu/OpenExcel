@@ -11,6 +11,7 @@ import {
   claimToolExecutionUsing,
   completeToolExecutionUsing,
   failToolExecutionUsing,
+  ToolExecutionConflictError,
 } from "./toolExecutionRepository.js";
 
 function serializeJson(value: unknown): string | null {
@@ -63,12 +64,18 @@ export function createIdempotentToolExecutor(runId: number, executor: ToolExecut
           : undefined;
       const execute = () =>
         prisma.$transaction(async (tx) => {
-          const claim = await claimToolExecutionUsing(tx, {
-            runId,
-            toolCallId: request.toolCallId,
-            toolName: request.toolName,
-            input: request.input,
-          });
+          let claim: Awaited<ReturnType<typeof claimToolExecutionUsing>>;
+          try {
+            claim = await claimToolExecutionUsing(tx, {
+              runId,
+              toolCallId: request.toolCallId,
+              toolName: request.toolName,
+              input: request.input,
+            });
+          } catch (error) {
+            if (error instanceof ToolExecutionConflictError) throw error;
+            throw new AgentPersistenceError(error);
+          }
           if (claim.kind === "replay") return { kind: "replay" as const, output: claim.output };
 
           let output: unknown;
@@ -79,7 +86,11 @@ export function createIdempotentToolExecutor(runId: number, executor: ToolExecut
                 : { db: tx };
             output = await executor.execute({ ...request, context });
           } catch (error) {
-            await failToolExecutionUsing(tx, runId, request.toolCallId, error);
+            try {
+              await failToolExecutionUsing(tx, runId, request.toolCallId, error);
+            } catch (persistenceError) {
+              throw new AgentPersistenceError(persistenceError);
+            }
             return { kind: "failed" as const, error };
           }
 

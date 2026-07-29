@@ -1,4 +1,4 @@
-import { estimateTokens } from "@openexcel/agent";
+import { estimateTokens, ToolNotFoundError } from "@openexcel/agent";
 import type { ExcelToolInput } from "@openexcel/core";
 import {
   parseSheetToolRange,
@@ -40,7 +40,7 @@ export const readSheetData = defineServerTool("readSheetData", {
     { context, resultBudget },
   ) => {
     const sheet = await findSheetForWorkspace(sheetId, context.workspaceId);
-    if (!sheet) throw new Error(`Sheet ${sheetId} 不存在`);
+    if (!sheet) throw new ToolNotFoundError(`Sheet ${sheetId} 不存在`);
 
     const coreContinuation = toCoreContinuation(continuation);
     const requestedRange: SheetToolRange | undefined = range

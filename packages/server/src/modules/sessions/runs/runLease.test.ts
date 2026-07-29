@@ -156,6 +156,42 @@ describe("acquireRunLease", () => {
     });
   });
 
+  it("allows the next turn after a terminal run releases its lease", async () => {
+    mocks.sessionFindFirst
+      .mockResolvedValueOnce({
+        id: 7,
+        leaseOwnerId: null,
+        leaseExpiresAt: null,
+        version: 3,
+      })
+      .mockResolvedValueOnce({
+        id: 7,
+        leaseOwnerId: null,
+        leaseExpiresAt: null,
+        version: 4,
+      });
+
+    const firstLease = await acquireRunLease({
+      workspaceId: 1,
+      sessionId: 7,
+      requestId: "req-terminal-1",
+      inputText: "first",
+      appendUserTurn: (messages) => messages,
+    });
+    await firstLease.release();
+
+    const secondLease = await acquireRunLease({
+      workspaceId: 1,
+      sessionId: 7,
+      requestId: "req-terminal-2",
+      inputText: "second",
+      appendUserTurn: (messages) => messages,
+    });
+
+    expect(secondLease.sessionVersion).toBe(5);
+    expect(mocks.agentRunCreate).toHaveBeenCalledTimes(2);
+  });
+
   it("continues holding the lease when the client disconnects without explicit cancellation", async () => {
     // A client disconnect without an explicit cancel must keep the lease alive.
     const now = new Date("2026-07-23T00:00:00.000Z");

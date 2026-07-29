@@ -7,7 +7,27 @@ import {
   persistRunCheckpoint,
   type RunCheckpoint,
 } from "./checkpointRepository.js";
-import { projectRunCheckpoint, projectRunTranscriptEntries } from "./runCheckpointProjector.js";
+import {
+  projectRunCheckpoint,
+  projectRunTranscriptEntries,
+  terminalStatusForRunStatus,
+} from "./runCheckpointProjector.js";
+
+async function repairTerminalCheckpoint(
+  runId: number,
+  checkpoint: RunCheckpoint,
+  terminalStatus: NonNullable<ReturnType<typeof terminalStatusForRunStatus>>,
+) {
+  const transcript = projectRunTranscriptEntries(
+    [],
+    checkpoint.transcript as import("@openexcel/agent").ContextTranscriptEntry<AgentTranscriptMessage>[],
+    undefined,
+    terminalStatus,
+  );
+  const repaired = projectRunCheckpoint([], transcript, checkpoint);
+  await persistRunCheckpoint({ runId, ...repaired });
+  return findRunCheckpoint(runId);
+}
 
 /**
  * Closes the durable projection gap before a session history read.
@@ -26,18 +46,27 @@ export async function projectRunCheckpointForRun(
   const baseCheckpoint =
     currentRunCheckpoint ?? (await findLatestSessionCheckpoint(workspaceId, sessionId));
   const checkpointSequence = currentRunCheckpoint?.checkpointSequence ?? -1;
+  const terminalStatus = terminalStatusForRunStatus(run.status);
   if (run.lastEventSequence <= checkpointSequence) {
+    if (baseCheckpoint && terminalStatus) {
+      return repairTerminalCheckpoint(run.id, baseCheckpoint, terminalStatus);
+    }
     return baseCheckpoint;
   }
 
   const persistedEvents = await findAgentEventsForProjection(run.id, checkpointSequence);
-  if (persistedEvents.length === 0) return baseCheckpoint;
+  if (persistedEvents.length === 0) {
+    if (baseCheckpoint && terminalStatus) {
+      return repairTerminalCheckpoint(run.id, baseCheckpoint, terminalStatus);
+    }
+    return baseCheckpoint;
+  }
 
   const events = persistedEvents;
   const baseTranscript = (currentRunCheckpoint?.transcript ??
     baseCheckpoint?.transcript ??
     []) as import("@openexcel/agent").ContextTranscriptEntry<AgentTranscriptMessage>[];
-  const transcript = projectRunTranscriptEntries(events, baseTranscript);
+  const transcript = projectRunTranscriptEntries(events, baseTranscript, undefined, terminalStatus);
   const checkpoint = projectRunCheckpoint(events, transcript, currentRunCheckpoint ?? undefined);
 
   await persistRunCheckpoint({ runId: run.id, ...checkpoint });

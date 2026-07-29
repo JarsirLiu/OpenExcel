@@ -32,6 +32,80 @@ model-safe JSON. The Agent adapter does not own Excel-specific tool logic.
 uses a paged budget. Each `prepareStep` uses the budget to determine the tools
 available for that step.
 
+### Tool call lifecycle
+
+The Agent exposes one provider-neutral lifecycle for every model tool call:
+
+| Event | Meaning | Required timing |
+| --- | --- | --- |
+| `tool.started` | The Agent has observed a tool name and call id. This is a progress fact, not proof of execution or a committed mutation. | Emit from the earliest provider stream marker (`tool-input-start`, `tool-input-available`, or complete `tool-call`). The execution adapter is only a fallback. |
+| `tool.finished` with `outcome: "completed"` | The executor returned a model-safe output. | Emit after execution and output validation, before the next model step can consume the result. |
+| `tool.finished` with `outcome: "failed"` | The call reached a terminal error outcome. | Emit exactly once, with a structured `error`. The `source` identifies `adapter`, `provider`, `reconciliation`, or `terminal`. |
+
+The `toolCallId` is the lifecycle identity. Repeated provider chunks,
+reconciliation, retries, and stream callbacks must converge on one start and
+one finish for that id. `tool.finished` contains exactly one terminal outcome:
+`output` or `error`, never both.
+
+The Web can render a pending tool immediately after `tool.started`, even while
+the model is still streaming a large argument object. It must not infer that a
+mutation has committed from this event.
+
+### Tool failures and model continuation
+
+Only explicitly classified tool failures are returned from the Agent tool
+adapter as a normal model-visible result:
+
+```json
+{
+  "isError": true,
+  "error": {
+    "kind": "business_failed",
+    "message": "...",
+    "details": {},
+    "retryable": false
+  }
+}
+```
+
+The AI SDK therefore records a tool result for the original call and can start
+the next model step. The model receives the exact structured error and can
+correct its input, choose another tool, or explain the limitation. Tools must
+use a typed `ToolError` such as `ToolInputValidationError`, `ToolBusinessError`,
+or `ToolNotFoundError` for this path.
+
+An unknown exception is not a model-visible tool failure. The Agent records a
+failed lifecycle event with `kind: "internal_error"` and rethrows the original
+exception so the Run becomes diagnosable. This prevents programming bugs and
+infrastructure failures from being silently presented as recoverable business
+errors.
+
+Provider stream protocol errors follow the same boundary. A recognized tool
+event with a missing required field raises `AgentProtocolError`; it is not
+silently ignored. Reconciliation may close the Web's pending tool state with a
+`source: "reconciliation"` failure, but a missing tool result then aborts the
+Run. That lifecycle event is not a substitute for a model tool result.
+The same rule applies when the provider invokes its final callback while any
+tool call is still pending: the Agent emits a terminal lifecycle failure to
+close the Web state, then raises `AgentProtocolError` and marks the Run failed.
+The terminal lifecycle event is diagnostic UI state only; it never authorizes
+the model loop or transcript projection to continue as if a tool result existed.
+
+Every persisted assistant tool part must therefore end in one of two
+model-valid states: `output-available` with `output`, or `output-error` with
+`input` and `errorText`. If the durable event log ends after `tool.started`,
+the recovery projector closes the part as `output-error` (using `{}` when the
+input was never persisted). On the next turn, the AI SDK can convert this
+assistant tool part into the required tool-call/tool-result pair. This is a
+history repair for protocol validity, not a claim that the model received a
+successful result or that the mutation committed.
+
+Cancellation, event persistence failure, tool execution ledger failure, and
+unrecoverable model protocol failures are different boundaries. They may stop
+the Run because continuing would lose ordering, durability, or a valid model
+conversation. In particular, a failure while recording a failed tool must not
+be downgraded to an ordinary tool error.
+
 ## Events and connections
 
 Current events cover Run, step, message, reasoning, tool, and context-compaction
@@ -39,6 +113,22 @@ lifecycle stages. Server event persistence is independent of the HTTP
 subscriber. Closing a browser connection cancels the reader but does not
 directly terminate the server Run. An explicit cancellation request triggers
 Run cancellation.
+
+### Next-turn availability after failure
+
+A tool business failure ends neither the Run nor the conversation: the
+structured tool result is returned to the model and the model may continue the
+same Run. An infrastructure failure may terminate the current Run as
+`failed` or `recovery_required`, depending on whether the durable boundary is
+known. In both cases, the Run finalizer must release the session lease in its
+`finally` path.
+
+The next user turn is blocked only while the session has a live, unexpired
+lease for a `running` Run. Terminal Run status, including `failed` and
+`recovery_required`, must not by itself block a new turn. If lease release is
+also unavailable because the database is down, the lease expires and the
+recovery worker or the next acquisition attempt can reclaim it; this is a
+temporary infrastructure outage, not a permanent conversation lock.
 
 ## Context compaction
 

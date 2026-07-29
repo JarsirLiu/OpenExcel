@@ -47,12 +47,24 @@ tool or invents a result.
    not redeclare a competing schema.
 3. Every registered Core tool must have exactly one server manifest entry when
    it is executable. Update the registry and manifest tests together.
-4. `tool.started` means the Agent observed a call and entered its lifecycle;
-   it must be emitted before potentially slow validation or execution.
-5. Every started call ends with exactly one `tool.finished`, including schema,
-   authorization, business, and execution failures. Expected tool failures are
-   returned to the model as structured error results so the loop can continue.
-6. Persistence, workbook mutation, and tool execution bookkeeping remain
+4. `tool.started` means the Agent observed a tool name and call id. Emit it
+   from the earliest provider stream marker, before potentially slow argument
+   completion, validation, authorization, or execution. The executor hook is a
+   fallback, not the normal start signal.
+5. Every started call ends with exactly one `tool.finished`. A completed call
+   has `outcome: "completed"` and `output`; a failed call has
+   `outcome: "failed"` and `error`. These outcomes are mutually exclusive.
+6. Only explicitly classified schema, authorization, business, and execution
+   failures are returned to the model as structured tool results. Unknown
+   exceptions are recorded for diagnostics and rethrown. Cancellation,
+   persistence failure, and unrecoverable protocol failure are separate
+   terminal boundaries. If the provider ends a stream with a pending tool,
+   close the lifecycle for Web observability but raise a protocol error; never
+   treat that terminal event as a model-consumed tool result.
+   Persisted tool parts must still be closed as either `output-available` or
+   `output-error`; recovery may synthesize the latter for the next transcript
+   projection when the event log ends after `tool.started`.
+7. Persistence, workbook mutation, and tool execution bookkeeping remain
    server responsibilities. Do not put Prisma or HTTP code in Core or Agent.
-7. Keep ordinary results compact. Add object-specific reads or projections for
+8. Keep ordinary results compact. Add object-specific reads or projections for
    optional metadata instead of expanding every cell into a large JSON object.
