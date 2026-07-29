@@ -116,6 +116,7 @@ describe("workbookToXlsx", () => {
 
     expect(chartXml).toContain("销售趋势");
     expect(chartXml).toContain('<c:marker><c:symbol val="circle"/></c:marker>');
+    expect(chartXml).not.toContain("</c:dLbls><c:marker>");
     expect(chartXml).not.toContain('<c:marker val="1"/>');
     expect(chartXml).toContain('<c:legend><c:legendPos val="t"/>');
     expect(chartXml).toContain('<c:showVal val="0"/>');
@@ -132,6 +133,10 @@ describe("workbookToXlsx", () => {
     expect(drawingXml).toContain('r:id="rId1"');
     expect(drawingRelationships).toContain('Target="../charts/chart1.xml"');
     expect(worksheetRelationships).toContain('Target="../drawings/drawing1.xml"');
+
+    const reopened = new ExcelJS.Workbook();
+    await reopened.xlsx.load(buffer);
+    expect(reopened.getWorksheet("销售明细")).toBeDefined();
   });
 
   it("rejects chart references outside the exported workbook", async () => {

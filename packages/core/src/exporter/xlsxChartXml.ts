@@ -71,17 +71,21 @@ function seriesXml(
 ): string {
   const name = seriesName(series, resolveSheetName);
   const title = name ? name : "";
+  const marker =
+    chartType === "line" || chartType === "scatter"
+      ? '<c:marker><c:symbol val="circle"/></c:marker>'
+      : "";
 
   if (chartType === "scatter") {
     if (!series.categoryRef) {
       throw new Error(`Scatter chart series requires a category reference: ${series.id}`);
     }
-    return `<c:ser><c:idx val="${index}"/><c:order val="${index}"/>${title}${scatterReference("xVal", series.categoryRef, resolveSheetName)}${scatterReference("yVal", series.valueRef, resolveSheetName)}</c:ser>`;
+    return `<c:ser><c:idx val="${index}"/><c:order val="${index}"/>${title}${seriesStyleXml(chartType, index)}${marker}${scatterReference("xVal", series.categoryRef, resolveSheetName)}${scatterReference("yVal", series.valueRef, resolveSheetName)}</c:ser>`;
   }
 
   const style =
     chartType === "pie" || chartType === "doughnut" ? "" : seriesStyleXml(chartType, index);
-  return `<c:ser><c:idx val="${index}"/><c:order val="${index}"/>${title}${style}${categoryReference(series, resolveSheetName)}${valueReference(series, resolveSheetName)}</c:ser>`;
+  return `<c:ser><c:idx val="${index}"/><c:order val="${index}"/>${title}${style}${marker}${categoryReference(series, resolveSheetName)}${valueReference(series, resolveSheetName)}</c:ser>`;
 }
 
 function titleXml(title: string | undefined): string {
@@ -115,7 +119,7 @@ function chartGroupXml(
     return `<c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:varyColors val="0"/>${seriesMarkup}<c:dLbls><c:showLegendKey val="0"/><c:showVal val="0"/><c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="0"/></c:dLbls><c:gapWidth val="150"/><c:axId val="${categoryAxisId}"/><c:axId val="${valueAxisId}"/></c:barChart>`;
   }
   if (type === "line") {
-    return `<c:lineChart><c:grouping val="standard"/><c:varyColors val="0"/>${seriesMarkup}<c:dLbls><c:showLegendKey val="0"/><c:showVal val="0"/><c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="0"/></c:dLbls><c:marker><c:symbol val="circle"/></c:marker><c:axId val="${categoryAxisId}"/><c:axId val="${valueAxisId}"/></c:lineChart>`;
+    return `<c:lineChart><c:grouping val="standard"/><c:varyColors val="0"/>${seriesMarkup}<c:dLbls><c:showLegendKey val="0"/><c:showVal val="0"/><c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="0"/></c:dLbls><c:axId val="${categoryAxisId}"/><c:axId val="${valueAxisId}"/></c:lineChart>`;
   }
   if (type === "area") {
     return `<c:areaChart><c:grouping val="standard"/><c:varyColors val="0"/>${seriesMarkup}<c:dLbls><c:showLegendKey val="0"/><c:showVal val="0"/><c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="0"/></c:dLbls><c:dropLines/><c:axId val="${categoryAxisId}"/><c:axId val="${valueAxisId}"/></c:areaChart>`;

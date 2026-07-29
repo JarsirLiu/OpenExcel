@@ -1,5 +1,5 @@
 import type { ChartSpec } from "@openexcel/core";
-import { BarChart, LineChart, PieChart, ScatterChart } from "echarts/charts";
+import { BarChart, LineChart, PieChart, RadarChart, ScatterChart } from "echarts/charts";
 import {
   GridComponent,
   LegendComponent,
@@ -17,6 +17,7 @@ use([
   BarChart,
   LineChart,
   PieChart,
+  RadarChart,
   ScatterChart,
   GridComponent,
   LegendComponent,

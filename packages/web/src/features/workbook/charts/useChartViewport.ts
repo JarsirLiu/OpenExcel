@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
-import { createSheetViewport, type SheetViewport } from "./sheetViewport";
+import {
+  createSheetViewport,
+  createVisibleCellViewport,
+  type SheetViewport,
+  type SheetViewportState,
+} from "./sheetViewport";
 
 type Props = {
   containerRef: React.RefObject<HTMLDivElement | null>;
@@ -7,7 +12,7 @@ type Props = {
   sheetId: string;
 };
 
-type RawViewport = Omit<SheetViewport, "rectToViewport">;
+type RawViewport = SheetViewportState;
 
 const EMPTY_VIEWPORT: RawViewport = {
   left: 0,
@@ -18,14 +23,11 @@ const EMPTY_VIEWPORT: RawViewport = {
   cellOriginTop: 0,
 };
 
-function rectRelativeTo(rect: DOMRect, parent: DOMRect) {
-  return { left: rect.left - parent.left, top: rect.top - parent.top };
-}
-
 /**
- * Adapts FortuneSheet's DOM coordinates to the chart layer's local viewport.
- * FortuneSheet's container is the grid viewport; its canvas is the coordinate
- * origin used by the chart anchor geometry.
+ * Adapts FortuneSheet's content coordinates to the visible cell viewport.
+ * FortuneSheet redraws its canvas when the custom scrollbars move instead of
+ * moving the canvas element, so the logical scrollbar positions are part of
+ * the chart coordinate conversion.
  */
 export function useChartViewport({ containerRef, layerRef, sheetId }: Props): SheetViewport {
   const [viewport, setViewport] = useState<RawViewport>(EMPTY_VIEWPORT);
@@ -36,27 +38,22 @@ export function useChartViewport({ containerRef, layerRef, sheetId }: Props): Sh
     if (!root || !layer) return;
 
     const sheetViewport = root.querySelector<HTMLElement>(".fortune-sheet-container");
-    const cellCanvas = root.querySelector<HTMLElement>(".fortune-sheet-canvas");
+    const cellArea = root.querySelector<HTMLElement>(".fortune-cell-area");
+    const horizontalScrollbar = root.querySelector<HTMLElement>(".luckysheet-scrollbar-x");
+    const verticalScrollbar = root.querySelector<HTMLElement>(".luckysheet-scrollbar-y");
     const offsetParent = layer.offsetParent as HTMLElement | null;
-    if (!sheetViewport || !cellCanvas || !offsetParent) {
+    if (!sheetViewport || !cellArea || !offsetParent) {
       layer.dataset.ready = "false";
       setViewport(EMPTY_VIEWPORT);
       return;
     }
 
     const parentRect = offsetParent.getBoundingClientRect();
-    const sheetRect = sheetViewport.getBoundingClientRect();
-    const cellRect = cellCanvas.getBoundingClientRect();
-    const sheetOffset = rectRelativeTo(sheetRect, parentRect);
-    const cellOffset = rectRelativeTo(cellRect, sheetRect);
-    const next: RawViewport = {
-      left: sheetOffset.left,
-      top: sheetOffset.top,
-      width: sheetRect.width,
-      height: sheetRect.height,
-      cellOriginLeft: cellOffset.left,
-      cellOriginTop: cellOffset.top,
-    };
+    const cellRect = cellArea.getBoundingClientRect();
+    const next = createVisibleCellViewport(parentRect, cellRect, {
+      left: horizontalScrollbar?.scrollLeft ?? 0,
+      top: verticalScrollbar?.scrollTop ?? 0,
+    });
 
     layer.style.left = `${next.left}px`;
     layer.style.top = `${next.top}px`;
@@ -88,9 +85,9 @@ export function useChartViewport({ containerRef, layerRef, sheetId }: Props): Sh
     const resizeObserver = new ResizeObserver(syncViewport);
     resizeObserver.observe(root);
     const sheetViewport = root.querySelector<HTMLElement>(".fortune-sheet-container");
-    const cellCanvas = root.querySelector<HTMLElement>(".fortune-sheet-canvas");
+    const cellArea = root.querySelector<HTMLElement>(".fortune-cell-area");
     if (sheetViewport) resizeObserver.observe(sheetViewport);
-    if (cellCanvas) resizeObserver.observe(cellCanvas);
+    if (cellArea) resizeObserver.observe(cellArea);
     window.addEventListener("resize", syncViewport);
 
     return () => {

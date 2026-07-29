@@ -22,6 +22,10 @@ const activeSheetSource = readFileSync(
   resolve(process.cwd(), "src/features/workbook/editor/useFortuneSheetActiveSheet.ts"),
   "utf8",
 );
+const rendererSource = readFileSync(
+  resolve(process.cwd(), "src/features/workbook/charts/ChartRenderer.tsx"),
+  "utf8",
+);
 
 describe("ChartOverlay integration boundary", () => {
   it("keeps chart interaction outside FortuneSheet's private overlay node", () => {
@@ -34,7 +38,10 @@ describe("ChartOverlay integration boundary", () => {
     expect(overlaySource).not.toContain("rowHeaderWidth");
     expect(overlaySource).not.toContain("columnHeaderHeight");
     expect(viewportSource).toContain("fortune-sheet-container");
-    expect(viewportSource).toContain("fortune-sheet-canvas");
+    expect(viewportSource).toContain("fortune-cell-area");
+    expect(viewportSource).not.toContain("fortune-sheet-canvas");
+    expect(viewportSource).toContain("luckysheet-scrollbar-x");
+    expect(viewportSource).toContain("luckysheet-scrollbar-y");
     expect(viewportSource).toContain("cellOriginLeft");
     expect(viewportSource).toContain("cellOriginTop");
     expect(gridSource).toContain(activeSheetLayerKey);
@@ -43,5 +50,6 @@ describe("ChartOverlay integration boundary", () => {
     expect(gridSource).toContain("layerRef={chartLayerRef}");
     expect(activationSource).toContain("currentSheetIndex");
     expect(activeSheetSource).toContain("luckysheet-sheets-item-active");
+    expect(rendererSource).toContain("RadarChart");
   });
 });
