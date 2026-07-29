@@ -79,7 +79,8 @@ function seriesXml(
     return `<c:ser><c:idx val="${index}"/><c:order val="${index}"/>${title}${scatterReference("xVal", series.categoryRef, resolveSheetName)}${scatterReference("yVal", series.valueRef, resolveSheetName)}</c:ser>`;
   }
 
-  const style = chartType === "pie" ? "" : seriesStyleXml(chartType, index);
+  const style =
+    chartType === "pie" || chartType === "doughnut" ? "" : seriesStyleXml(chartType, index);
   return `<c:ser><c:idx val="${index}"/><c:order val="${index}"/>${title}${style}${categoryReference(series, resolveSheetName)}${valueReference(series, resolveSheetName)}</c:ser>`;
 }
 
@@ -122,6 +123,12 @@ function chartGroupXml(
   if (type === "pie") {
     return `<c:pieChart><c:varyColors val="1"/>${seriesMarkup}<c:dLbls><c:showLegendKey val="0"/><c:showVal val="0"/><c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="0"/></c:dLbls></c:pieChart>`;
   }
+  if (type === "doughnut") {
+    return `<c:doughnutChart><c:varyColors val="1"/><c:holeSize val="58"/>${seriesMarkup}<c:dLbls><c:showLegendKey val="0"/><c:showVal val="0"/><c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="0"/></c:dLbls></c:doughnutChart>`;
+  }
+  if (type === "radar") {
+    return `<c:radarChart><c:radarStyle val="marker"/><c:varyColors val="0"/>${seriesMarkup}<c:dLbls><c:showLegendKey val="0"/><c:showVal val="0"/><c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="0"/></c:dLbls><c:axId val="${categoryAxisId}"/><c:axId val="${valueAxisId}"/></c:radarChart>`;
+  }
   if (type === "scatter") {
     return `<c:scatterChart><c:scatterStyle val="lineMarker"/><c:varyColors val="0"/>${seriesMarkup}<c:dLbls><c:showLegendKey val="0"/><c:showVal val="0"/><c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="0"/></c:dLbls><c:axId val="${categoryAxisId}"/><c:axId val="${valueAxisId}"/></c:scatterChart>`;
   }
@@ -162,7 +169,7 @@ export function createChartXml(
     )
     .join("");
   const hasScatter = groups.some(({ type }) => type === "scatter");
-  const hasCartesian = groups.some(({ type }) => type !== "pie");
+  const hasCartesian = groups.some(({ type }) => type !== "pie" && type !== "doughnut");
   if (hasScatter && groups.some(({ type }) => type !== "scatter")) {
     throw new Error("Scatter charts cannot be combined with other chart types");
   }
@@ -173,7 +180,7 @@ export function createChartXml(
       : "";
 
   const legend =
-    chart.type !== "pie" && chart.series.length > 1
+    chart.type !== "pie" && chart.type !== "doughnut" && chart.series.length > 1
       ? '<c:legend><c:legendPos val="t"/><c:layout/><c:overlay val="0"/></c:legend>'
       : "";
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><c:chartSpace xmlns:c="${CHART_NS}" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><c:date1904 val="0"/><c:lang val="zh-CN"/><c:roundedCorners val="0"/><c:chart>${titleXml(chart.title)}<c:plotArea><c:layout/>${groupsXml}${axes}</c:plotArea>${legend}<c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/></c:chart><c:printSettings><c:headerFooter/><c:pageMargins b="0.75" l="0.7" r="0.7" t="0.75" header="0.3" footer="0.3"/><c:pageSetup/></c:printSettings></c:chartSpace>`;

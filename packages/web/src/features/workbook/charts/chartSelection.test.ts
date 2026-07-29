@@ -110,7 +110,7 @@ describe("buildChartDraft", () => {
 
   it("keeps chart types that require paired dimensions explicit", () => {
     const row = { startRow: 0, endRow: 0, startCol: 0, endCol: 2 };
-    expect(chartSelectionError(row, "pie")).toContain("两列数据");
-    expect(chartSelectionError(row, "scatter")).toContain("二维数据");
+    expect(chartSelectionError(row, "pie")).toBe("pieDataRange");
+    expect(chartSelectionError(row, "scatter")).toBe("scatterDataRange");
   });
 });

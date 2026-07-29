@@ -136,6 +136,26 @@ describe("chart model", () => {
     expect(result.success).toBe(false);
   });
 
+  it("uses pie-shaped constraints for doughnut charts", () => {
+    const result = chartSpecSchema.safeParse({
+      ...chart(),
+      type: "doughnut",
+      series: [{ ...chart().series[0], categoryRef: chart().series[0].categoryRef }],
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("requires categories for radar charts", () => {
+    const result = chartSpecSchema.safeParse({
+      ...chart(),
+      type: "radar",
+      series: [{ ...chart().series[0], categoryRef: undefined }],
+    });
+
+    expect(result.success).toBe(false);
+  });
+
   it("rejects two-dimensional data ranges instead of guessing their meaning", () => {
     const result = chartSpecSchema.safeParse({
       ...chart(),

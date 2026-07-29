@@ -140,10 +140,31 @@ function chartRangeLength(range: z.infer<typeof chartRangeSchema>): number {
 const chartSeriesSchema = z
   .object({
     id: z.string().trim().min(1),
-    name: z.string().trim().min(1).optional(),
+    name: z.union([z.string().trim().min(1), chartRangeSchema]).optional(),
     categoryRef: chartRangeSchema.optional(),
     valueRef: chartRangeSchema,
-    chartType: z.enum(["bar", "line", "pie", "area", "scatter"]).optional(),
+    chartType: z.enum(["bar", "line", "pie", "doughnut", "area", "scatter", "radar"]).optional(),
+  })
+  .superRefine((series, ctx) => {
+    if (
+      series.categoryRef &&
+      chartRangeLength(series.categoryRef) !== chartRangeLength(series.valueRef)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["valueRef"],
+        message: "Category and value ranges must have the same length",
+      });
+    }
+  });
+
+const chartCreateSeriesSchema = z
+  .object({
+    id: z.string().trim().min(1).optional(),
+    name: z.union([z.string().trim().min(1), chartRangeSchema]).optional(),
+    categoryRef: chartRangeSchema.optional(),
+    valueRef: chartRangeSchema,
+    chartType: z.enum(["bar", "line", "pie", "doughnut", "area", "scatter", "radar"]).optional(),
   })
   .superRefine((series, ctx) => {
     if (
@@ -162,10 +183,11 @@ const chartCreateSchema = z
   .object({
     workbookId: z.coerce.number().int().positive().describe("工作簿 ID"),
     sheetId: z.coerce.number().int().positive().describe("图表所在 Sheet ID"),
-    type: z.enum(["bar", "line", "pie", "area", "scatter", "combo"]),
+    type: z.enum(["bar", "line", "pie", "doughnut", "area", "scatter", "radar", "combo"]),
     title: z.string().optional(),
     anchor: chartAnchorSchema,
-    sourceRange: chartSourceRangeSchema,
+    sourceRange: chartSourceRangeSchema.optional(),
+    series: z.array(chartCreateSeriesSchema).min(1).optional(),
     seriesTypes: z
       .array(chartComboSeriesTypeSchema)
       .min(1)
@@ -173,31 +195,45 @@ const chartCreateSchema = z
       .describe("组合图中各数据系列的类型，顺序对应数据源生成的系列"),
   })
   .superRefine((chart, ctx) => {
-    const rows = chart.sourceRange.endRow - chart.sourceRange.startRow + 1;
-    const columns = chart.sourceRange.endCol - chart.sourceRange.startCol + 1;
+    if ((chart.sourceRange == null) === (chart.series == null)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["sourceRange"],
+        message: "Provide exactly one chart data source: sourceRange or series",
+      });
+    }
+
+    const rows = chart.sourceRange ? chart.sourceRange.endRow - chart.sourceRange.startRow + 1 : 0;
+    const columns = chart.sourceRange
+      ? chart.sourceRange.endCol - chart.sourceRange.startCol + 1
+      : 0;
     const isTable = rows >= 2 && columns >= 2;
-    if (chart.type === "pie" && (!isTable || columns !== 2)) {
+    if (
+      chart.sourceRange &&
+      (chart.type === "pie" || chart.type === "doughnut") &&
+      (!isTable || columns !== 2)
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["sourceRange"],
-        message: "Pie charts require a two-column table: category and value",
+        message: "Pie and doughnut charts require a two-column table: category and value",
       });
     }
-    if (chart.type === "scatter" && !isTable) {
+    if (chart.sourceRange && (chart.type === "scatter" || chart.type === "radar") && !isTable) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["sourceRange"],
-        message: "Scatter charts require a table with an X column",
+        message: "Scatter and radar charts require a table with a category column",
       });
     }
-    if (chart.seriesTypes && chart.type !== "combo") {
+    if (chart.seriesTypes && (chart.type !== "combo" || chart.series != null)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["seriesTypes"],
-        message: "Series types are only valid for combo charts",
+        message: "seriesTypes are only valid for combo charts using sourceRange",
       });
     }
-    if (chart.type === "combo" && chart.seriesTypes) {
+    if (chart.sourceRange && chart.type === "combo" && chart.seriesTypes) {
       const expectedSeriesCount = isTable ? columns - 1 : 1;
       if (chart.seriesTypes.length !== expectedSeriesCount) {
         ctx.addIssue({
@@ -205,6 +241,46 @@ const chartCreateSchema = z
           path: ["seriesTypes"],
           message: `Combo charts require ${expectedSeriesCount} series types for this source range`,
         });
+      }
+    }
+
+    if (chart.series) {
+      if ((chart.type === "pie" || chart.type === "doughnut") && chart.series.length !== 1) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["series"],
+          message: "Pie and doughnut charts require exactly one series",
+        });
+      }
+      for (const [index, series] of chart.series.entries()) {
+        if (
+          (chart.type === "pie" ||
+            chart.type === "doughnut" ||
+            chart.type === "scatter" ||
+            chart.type === "radar") &&
+          !series.categoryRef
+        ) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["series", index, "categoryRef"],
+            message: `${chart.type} charts require categoryRef`,
+          });
+        }
+        if (chart.type === "combo") {
+          if (!series.chartType || !["bar", "line", "area"].includes(series.chartType)) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ["series", index, "chartType"],
+              message: "Combo chart series must use bar, line, or area",
+            });
+          }
+        } else if (series.chartType) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["series", index, "chartType"],
+            message: "chartType is only valid for combo charts",
+          });
+        }
       }
     }
   });
@@ -278,7 +354,7 @@ const sheetObjectOutputSchema = z.object({
       z.object({
         kind: z.literal("chart"),
         id: z.string().min(1),
-        type: z.enum(["bar", "line", "pie", "area", "scatter", "combo"]),
+        type: z.enum(["bar", "line", "pie", "doughnut", "area", "scatter", "radar", "combo"]),
         title: z.string().nullable(),
         anchor: z.string().min(1),
         series: z.array(
@@ -287,7 +363,9 @@ const sheetObjectOutputSchema = z.object({
             name: z.string().nullable(),
             categoryRange: z.string().nullable(),
             valueRange: z.string().min(1),
-            chartType: z.enum(["bar", "line", "pie", "area", "scatter"]).nullable(),
+            chartType: z
+              .enum(["bar", "line", "pie", "doughnut", "area", "scatter", "radar"])
+              .nullable(),
           }),
         ),
       }),
@@ -363,6 +441,23 @@ const chartCreatedOutputSchema = z.object({
   chartId: z.string().min(1),
   workbookId: z.number().int().positive(),
   sheetId: z.number().int().positive(),
+  dataQuality: z
+    .object({
+      categoryCount: z.number().int().nonnegative(),
+      missingCategoryIndexes: z.array(z.number().int().nonnegative()),
+      series: z.array(
+        z.object({
+          seriesId: z.string().min(1),
+          name: z.string(),
+          pointCount: z.number().int().nonnegative(),
+          missingValueIndexes: z.array(z.number().int().nonnegative()),
+          nonNumericValueIndexes: z.array(z.number().int().nonnegative()),
+          formulaCells: z.array(z.string()),
+          unresolvedFormulaCells: z.array(z.string()),
+        }),
+      ),
+    })
+    .optional(),
 });
 
 const chartUpdatedOutputSchema = z.object({
@@ -597,7 +692,7 @@ export const excelToolSpecs = {
   },
   createChart: {
     description:
-      '在工作簿中创建真实 Excel 图表。传入一个连续数据源矩形范围即可，系统会按 Excel 规则将首行作为系列标题、首列作为分类并生成多个系列；单行和单列范围也支持。anchor 必须是扁平对象，推荐使用 twoCell，例如 { kind: "twoCell", from: { row: 2, col: 8 }, to: { row: 16, col: 14 } }，不要传字符串范围或嵌套 oneOf。创建组合图时可额外传入 seriesTypes 指定每个系列为 bar、line 或 area，但不需要传入具体数据值。图表、系列和引用会作为独立对象保存，并可随工作簿导出为 XLSX；行列号从 1 开始，Sheet ID 必须是真实 ID。',
+      "在工作簿中创建真实 Excel 图表。数据源有两种模式：sourceRange 用于连续矩形表格，按首行系列标题、首列分类自动生成多个系列；series 用于显式指定每个系列的 categoryRef、valueRef 和 name，因此可以引用不连续列、不同 Sheet 或不同区域。sourceRange 和 series 只能二选一。饼图、环形图需要分类和数值，散点图需要 X 轴分类引用，雷达图需要分类轴和一个或多个数值系列；组合图的显式系列必须指定 bar、line 或 area。图表、系列和引用会作为独立对象保存，并可随工作簿导出为 XLSX；行列号从 1 开始，Sheet ID 必须是真实 ID。",
     needsRunContext: true,
     outputSchema: chartCreatedOutputSchema,
     inputSchema: chartCreateSchema,
@@ -610,7 +705,9 @@ export const excelToolSpecs = {
     inputSchema: z.object({
       chartId: z.string().trim().min(1),
       patch: z.object({
-        type: z.enum(["bar", "line", "pie", "area", "scatter", "combo"]).optional(),
+        type: z
+          .enum(["bar", "line", "pie", "doughnut", "area", "scatter", "radar", "combo"])
+          .optional(),
         title: z.string().nullable().optional(),
         sheetId: z.coerce.number().int().positive().optional(),
         anchor: chartAnchorSchema.optional(),

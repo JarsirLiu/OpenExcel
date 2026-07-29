@@ -83,7 +83,10 @@ export function parseSeries(
   const valueRef = parseFormulaReference(valueNode, sheetKeyByName, path);
   if (!valueRef) throw new XlsxChartImportError(`XLSX 图表系列缺少数值引用：${path}`);
   const categoryRef = parseFormulaReference(categoryNode, sheetKeyByName, path);
-  if ((scatter || chartType === "pie") && !categoryRef) {
+  if (
+    (scatter || chartType === "pie" || chartType === "doughnut" || chartType === "radar") &&
+    !categoryRef
+  ) {
     throw new XlsxChartImportError(`XLSX 图表系列缺少分类引用：${path}`);
   }
 

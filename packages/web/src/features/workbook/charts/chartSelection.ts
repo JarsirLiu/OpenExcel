@@ -15,6 +15,7 @@ export type ChartSelection = {
 export type ChartSelectionKind = "table" | "row" | "column";
 
 export type ChartDraft = Omit<ChartSpec, "id">;
+export type ChartSelectionError = "invalidDataRange" | "pieDataRange" | "scatterDataRange";
 
 export function normalizeChartSelection(
   selection: FortuneSelection | undefined,
@@ -46,16 +47,19 @@ export function chartSelectionKind(selection: ChartSelection | null): ChartSelec
 export function chartSelectionError(
   selection: ChartSelection | null,
   type: ChartSpec["type"],
-): string | null {
-  if (!selection) return "请选择至少两个横向或纵向单元格，或一个包含分类列的二维数据区域";
+): ChartSelectionError | null {
+  if (!selection) return "invalidDataRange";
 
   const kind = chartSelectionKind(selection);
-  if (!kind) return "请选择至少两个横向或纵向单元格，或一个包含分类列的二维数据区域";
-  if (type === "pie" && (kind !== "table" || selection.endCol - selection.startCol + 1 !== 2)) {
-    return "饼图需要两列数据：第一列为分类，第二列为数值";
+  if (!kind) return "invalidDataRange";
+  if (
+    (type === "pie" || type === "doughnut") &&
+    (kind !== "table" || selection.endCol - selection.startCol + 1 !== 2)
+  ) {
+    return "pieDataRange";
   }
-  if (type === "scatter" && kind !== "table") {
-    return "散点图需要二维数据：第一列为 X 值，后续列为 Y 值";
+  if ((type === "scatter" || type === "radar") && kind !== "table") {
+    return "scatterDataRange";
   }
   return null;
 }

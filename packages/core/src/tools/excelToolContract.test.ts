@@ -30,6 +30,85 @@ describe("Excel tool contract", () => {
     expect(result.success).toBe(false);
   });
 
+  it("accepts explicit chart series for non-contiguous data", () => {
+    const result = excelToolSpecs.createChart.inputSchema.safeParse({
+      workbookId: 1,
+      sheetId: 10,
+      type: "line",
+      anchor: { kind: "absolute", xEmu: 0, yEmu: 0, widthEmu: 100, heightEmu: 100 },
+      series: [
+        {
+          name: "Revenue",
+          categoryRef: {
+            sheetId: 10,
+            startRow: 2,
+            startCol: 1,
+            endRow: 10,
+            endCol: 1,
+          },
+          valueRef: {
+            sheetId: 10,
+            startRow: 2,
+            startCol: 3,
+            endRow: 10,
+            endCol: 3,
+          },
+        },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts doughnut and radar chart types without changing the series contract", () => {
+    const common = {
+      workbookId: 1,
+      sheetId: 10,
+      anchor: { kind: "absolute" as const, xEmu: 0, yEmu: 0, widthEmu: 100, heightEmu: 100 },
+    };
+
+    expect(
+      excelToolSpecs.createChart.inputSchema.safeParse({
+        ...common,
+        type: "doughnut",
+        sourceRange: { sheetId: 10, startRow: 1, startCol: 1, endRow: 10, endCol: 2 },
+      }).success,
+    ).toBe(true);
+    expect(
+      excelToolSpecs.createChart.inputSchema.safeParse({
+        ...common,
+        type: "radar",
+        sourceRange: { sheetId: 10, startRow: 1, startCol: 1, endRow: 10, endCol: 3 },
+      }).success,
+    ).toBe(true);
+  });
+
+  it("requires exactly one chart data source", () => {
+    const common = {
+      workbookId: 1,
+      sheetId: 10,
+      type: "line" as const,
+      anchor: { kind: "absolute" as const, xEmu: 0, yEmu: 0, widthEmu: 100, heightEmu: 100 },
+    };
+    const sourceRange = { sheetId: 10, startRow: 1, startCol: 1, endRow: 4, endCol: 2 };
+    const series = [
+      {
+        valueRef: {
+          sheetId: 10,
+          startRow: 1,
+          startCol: 2,
+          endRow: 4,
+          endCol: 2,
+        },
+      },
+    ];
+
+    expect(
+      excelToolSpecs.createChart.inputSchema.safeParse({ ...common, sourceRange, series }).success,
+    ).toBe(false);
+    expect(excelToolSpecs.createChart.inputSchema.safeParse(common).success).toBe(false);
+  });
+
   it("requires every model-visible tool to declare a structured output contract", () => {
     for (const tool of Object.values(excelToolSpecs)) {
       expect(tool.needsRunContext).toEqual(expect.any(Boolean));

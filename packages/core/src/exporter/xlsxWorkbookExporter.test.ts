@@ -143,4 +143,24 @@ describe("workbookToXlsx", () => {
       }),
     ).rejects.toThrow("unknown sheet");
   });
+
+  it("exports doughnut and radar chart groups", async () => {
+    const buffer = await workbookToXlsx({
+      workbookId: "workbook-1",
+      sheets: [{ id: "sheet-1", name: "Sheet1", celldata: [] }],
+      charts: [
+        { ...chart(), id: "doughnut-1", type: "doughnut" },
+        { ...chart(), id: "radar-1", type: "radar" },
+      ],
+    });
+
+    const zip = await JSZip.loadAsync(buffer);
+    const doughnutXml = await zip.file("xl/charts/chart1.xml")?.async("string");
+    const radarXml = await zip.file("xl/charts/chart2.xml")?.async("string");
+
+    expect(doughnutXml).toContain("<c:doughnutChart>");
+    expect(doughnutXml).toContain('<c:holeSize val="58"/>');
+    expect(radarXml).toContain("<c:radarChart>");
+    expect(radarXml).toContain('<c:radarStyle val="marker"/>');
+  });
 });

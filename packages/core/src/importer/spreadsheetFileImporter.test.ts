@@ -99,12 +99,12 @@ async function configuredXlsxBytes(): Promise<ArrayBuffer> {
   return workbook.xlsx.writeBuffer();
 }
 
-async function chartXlsxBytes(): Promise<ArrayBuffer> {
+async function chartXlsxBytes(type: "line" | "doughnut" | "radar" = "line"): Promise<ArrayBuffer> {
   const chart: ChartSpec = {
     id: "chart-1",
     workbookId: "workbook-1",
     sheetId: "sheet-1",
-    type: "line",
+    type,
     title: "销售趋势",
     anchor: {
       kind: "twoCell",
@@ -318,6 +318,17 @@ describe("parseSpreadsheetFile", () => {
         },
       ],
     });
+  });
+
+  it.each(["doughnut", "radar"] as const)("imports %s charts from generated XLSX", async (type) => {
+    const result = await parseSpreadsheetFile({
+      fileName: `${type}.xlsx`,
+      format: "xlsx",
+      bytes: await chartXlsxBytes(type),
+    });
+
+    expect(result.charts).toHaveLength(1);
+    expect(result.charts[0]?.type).toBe(type);
   });
 
   it("enforces chart limits while reading the XLSX package", async () => {

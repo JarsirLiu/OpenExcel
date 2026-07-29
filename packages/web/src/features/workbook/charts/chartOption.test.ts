@@ -33,4 +33,32 @@ describe("buildChartOption", () => {
     expect(option.legend).toMatchObject({ top: 38 });
     expect(option.grid).toMatchObject({ top: 72 });
   });
+
+  it("renders doughnut charts through the pie series with an inner radius", () => {
+    const option = buildChartOption({ ...chart, type: "doughnut" } as ChartSpec, {
+      categories: ["A", "B"],
+      series: [{ id: "series-1", name: "Total", data: [10, 20] }],
+    });
+
+    expect(option.series).toEqual([
+      expect.objectContaining({ type: "pie", radius: ["42%", "72%"] }),
+    ]);
+  });
+
+  it("renders radar charts with one indicator per category", () => {
+    const option = buildChartOption({ ...chart, type: "radar" } as ChartSpec, {
+      categories: ["Quality", "Speed"],
+      series: [{ id: "series-1", name: "Product A", data: [8, 6] }],
+    });
+
+    expect(option.radar).toMatchObject({
+      indicator: [
+        { name: "Quality", max: 8 },
+        { name: "Speed", max: 6 },
+      ],
+    });
+    expect(option.series).toEqual([
+      expect.objectContaining({ type: "radar", data: [{ name: "Product A", value: [8, 6] }] }),
+    ]);
+  });
 });

@@ -93,7 +93,7 @@ export function parseAnchor(anchor: XmlNode, path: string): ChartAnchor {
 }
 
 type ChartGroup = {
-  type: "bar" | "line" | "area" | "pie" | "scatter";
+  type: "bar" | "line" | "area" | "pie" | "doughnut" | "scatter" | "radar";
   node: XmlNode;
   series: XmlNode[];
   axisIds: string[];
@@ -103,7 +103,17 @@ function chartGroups(plotArea: XmlNode, path: string): ChartGroup[] {
   const groups: ChartGroup[] = [];
   for (const node of plotArea.children) {
     const type = localName(node.name);
-    if (!["barChart", "lineChart", "areaChart", "pieChart", "scatterChart"].includes(type)) {
+    if (
+      ![
+        "barChart",
+        "lineChart",
+        "areaChart",
+        "pieChart",
+        "doughnutChart",
+        "scatterChart",
+        "radarChart",
+      ].includes(type)
+    ) {
       if (type.endsWith("Chart")) {
         throw new XlsxChartImportError(`暂不支持的 XLSX 图表类型：${type}`);
       }
@@ -118,7 +128,11 @@ function chartGroups(plotArea: XmlNode, path: string): ChartGroup[] {
             ? "area"
             : type === "pieChart"
               ? "pie"
-              : "scatter";
+              : type === "doughnutChart"
+                ? "doughnut"
+                : type === "scatterChart"
+                  ? "scatter"
+                  : "radar";
     const barDirectionNode = child(node, "barDir");
     const barDirection = barDirectionNode ? attribute(barDirectionNode, "val") : undefined;
     if (mapped === "bar" && barDirection === "bar") {
@@ -137,6 +151,18 @@ function chartGroups(plotArea: XmlNode, path: string): ChartGroup[] {
           : undefined;
     if (expectedGrouping && grouping != null && grouping !== expectedGrouping) {
       throw new XlsxChartImportError(`暂不支持的 XLSX 图表分组方式：${path}`);
+    }
+    if (mapped === "doughnut") {
+      const holeSize = child(node, "holeSize");
+      if (holeSize && attribute(holeSize, "val") !== "58") {
+        throw new XlsxChartImportError(`暂不支持的 XLSX 环形图孔径：${path}`);
+      }
+    }
+    if (mapped === "radar") {
+      const radarStyle = child(node, "radarStyle");
+      if (radarStyle && attribute(radarStyle, "val") !== "marker") {
+        throw new XlsxChartImportError(`暂不支持的 XLSX 雷达图样式：${path}`);
+      }
     }
     groups.push({
       type: mapped,
@@ -214,7 +240,7 @@ export function parseChart(
     groups.reduce((total, group) => total + group.series.length, 0),
     path,
   );
-  const hasPie = groups.some((group) => group.type === "pie");
+  const hasPie = groups.some((group) => group.type === "pie" || group.type === "doughnut");
   const hasScatter = groups.some((group) => group.type === "scatter");
   if ((hasPie || hasScatter) && groups.length > 1) {
     throw new XlsxChartImportError(`暂不支持包含饼图或散点图的组合图：${path}`);

@@ -52,6 +52,12 @@ tool catalog from the registry.
 - A single `writeCells` call can write at most 10,000 cells.
 - `readSheetObjects` currently accepts `charts`, `filters`, `tables`, and `pivotTables`; exact support is defined by Core projections and tests.
 - Chart tools write the persisted `ChartSpec`; they do not use ECharts options as the domain model.
+- `createChart` supports two mutually exclusive data-source modes:
+  - `sourceRange`: a continuous row, column, or rectangular table. For a table, the first row supplies series names and the first column supplies categories.
+  - `series`: explicit `categoryRef`, `valueRef`, and optional `name` per series. Use this for non-contiguous columns, independent ranges, or values stored on different Sheets within the same workbook.
+- Pie and doughnut charts require one category reference, one value series, and a two-column source table when using `sourceRange`. Scatter charts require an X-axis category reference. Radar charts require a category reference and support multiple value series. Combo charts require an explicit `chartType` of `bar`, `line`, or `area` for every series.
+- `createChart` returns optional `dataQuality` diagnostics with missing category/value indexes, non-numeric value indexes, formula cells, and formula cells without a numeric cached value. The chart tool does not evaluate formulas.
+- Chart validation no longer removes empty or text-only series from a valid chart spec. It rejects a chart only when no series contains any numeric value, while preserving incomplete references for diagnosis and later refresh.
 - Tool outputs must pass schema validation and be converted to model-safe JSON.
 
 ## Code entrypoints

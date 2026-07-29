@@ -1,11 +1,14 @@
 export type {
   ChartData,
+  ChartDataQuality,
   ChartDataSheet,
   ChartSeriesData,
+  ChartSeriesDataQuality,
 } from "./chart/chartAnalysis.js";
 export {
   chartDependencySheetIds,
   chartReferenceLength,
+  inspectChartData,
   resolveChartData,
 } from "./chart/chartAnalysis.js";
 export type { ChartCommand, ChartCommandResult, ChartUpdate } from "./chart/chartCommands.js";

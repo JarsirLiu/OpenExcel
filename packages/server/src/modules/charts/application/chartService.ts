@@ -1,8 +1,10 @@
 import {
   type ChartAnchor,
+  type ChartDataQuality,
   type ChartSeriesSpec,
   type ChartSpec,
   chartDependencySheetIds,
+  inspectChartData,
   parseChartSpec,
 } from "@openexcel/core";
 import type { Prisma } from "../../../infra/database/prismaTypes.js";
@@ -49,6 +51,35 @@ export async function normalizeChartSpecForWorkspace(
   }
 
   return normalizeChartSpecForSheets(
+    spec,
+    existingSheets.map((sheet) => ({
+      id: String(sheet.id),
+      celldata: sheetRecordToSnapshot(sheet).celldata,
+    })),
+  );
+}
+
+export async function inspectChartDataForWorkspace(
+  workspaceId: number,
+  spec: ChartSpec,
+  db?: Prisma.TransactionClient,
+): Promise<ChartDataQuality> {
+  const sheetIds = chartDependencySheetIds(spec).map((sheetId) =>
+    parseChartRelationId(sheetId, "sheetId"),
+  );
+  const sheets = db
+    ? await db.sheet.findMany({
+        where: { id: { in: sheetIds }, workbook: { workspaceId } },
+        select: { id: true, uploadedData: true, config: true, merges: true },
+      })
+    : await Promise.all(sheetIds.map((sheetId) => findSheetForWorkspace(sheetId, workspaceId)));
+  const existingSheets = sheets.filter(
+    (sheet): sheet is NonNullable<typeof sheet> => sheet != null,
+  );
+  if (existingSheets.length !== new Set(sheetIds).size) {
+    throw new ChartValidationError("图表引用的 Sheet 不存在或不属于当前工作区");
+  }
+  return inspectChartData(
     spec,
     existingSheets.map((sheet) => ({
       id: String(sheet.id),

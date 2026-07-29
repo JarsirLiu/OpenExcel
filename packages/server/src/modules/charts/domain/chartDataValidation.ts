@@ -40,7 +40,7 @@ function rangeValues(
   );
 }
 
-/** Removes source-range columns that cannot produce any numeric chart values. */
+/** Validates that a chart has at least one numeric value without rewriting its references. */
 export function normalizeChartSpecForCellData(
   spec: ChartSpec,
   celldata: readonly FortuneCell[],
@@ -48,10 +48,7 @@ export function normalizeChartSpecForCellData(
   return normalizeChartSpecForSheets(spec, [{ id: spec.sheetId, celldata }]);
 }
 
-/**
- * Validates chart series against the current workbook data and removes
- * references that cannot produce a numeric series.
- */
+/** Validates chart series against the current workbook data without hiding bad references. */
 export function normalizeChartSpecForSheets(
   spec: ChartSpec,
   sheets: readonly ChartDataSheet[],
@@ -64,13 +61,13 @@ export function normalizeChartSpecForSheets(
       ),
     ]),
   );
-  const series = spec.series.filter((_, index) =>
+  const hasNumericSeries = spec.series.some((_, index) =>
     rangeValues(cellsBySheet, spec, index).some((value) => numericValue(value) !== null),
   );
 
-  if (series.length === 0) {
+  if (!hasNumericSeries) {
     throw new ChartValidationError("图表数据范围中没有可绘制的数值列");
   }
 
-  return parseChartSpec({ ...spec, series });
+  return parseChartSpec(spec);
 }

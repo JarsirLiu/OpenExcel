@@ -96,7 +96,7 @@ const importedChartSchema = z
   .object({
     id: z.string().trim().min(1).max(255),
     sheetKey: z.string().trim().min(1).max(255),
-    type: z.enum(["bar", "line", "pie", "area", "scatter", "combo"]),
+    type: z.enum(["bar", "line", "pie", "doughnut", "area", "scatter", "radar", "combo"]),
     title: z.string().max(255).optional(),
     anchor: importedChartAnchorSchema,
     series: z

@@ -1,3 +1,5 @@
+import type { ChartDataQuality } from "@openexcel/core";
+
 type ChartMutationRecord = {
   publicId?: unknown;
   workbookId?: unknown;
@@ -9,6 +11,7 @@ export type CreateChartToolResult = {
   chartId: string;
   workbookId: number;
   sheetId: number;
+  dataQuality?: ChartDataQuality;
 };
 
 export type UpdateChartToolResult = {
@@ -30,7 +33,10 @@ function asPositiveInteger(value: unknown, field: string): number {
   return value;
 }
 
-export function toCreateChartToolResult(value: unknown): CreateChartToolResult {
+export function toCreateChartToolResult(
+  value: unknown,
+  dataQuality?: ChartDataQuality,
+): CreateChartToolResult {
   const result = asRecord(value);
   if (typeof result.publicId !== "string" || result.publicId.length === 0) {
     throw new Error("Chart mutation returned an invalid chart id");
@@ -41,6 +47,7 @@ export function toCreateChartToolResult(value: unknown): CreateChartToolResult {
     chartId: result.publicId,
     workbookId: asPositiveInteger(result.workbookId, "workbook id"),
     sheetId: asPositiveInteger(result.sheetId, "sheet id"),
+    ...(dataQuality ? { dataQuality } : {}),
   };
 }
 

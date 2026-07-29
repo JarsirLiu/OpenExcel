@@ -10,7 +10,7 @@ import type { CreateChartInput, UpdateChartInput } from "../application/chartSer
 
 type CreateChartToolInput = ExcelToolInput<"createChart">;
 type UpdateChartToolPatch = ExcelToolInput<"updateChart">["patch"];
-type ToolRange = CreateChartToolInput["sourceRange"];
+type ToolRange = NonNullable<CreateChartToolInput["sourceRange"]>;
 type ToolAnchor = CreateChartToolInput["anchor"];
 type ToolCell = NonNullable<ToolAnchor["from"]>;
 type ToolSeries = NonNullable<UpdateChartToolPatch["series"]>[number];
@@ -25,6 +25,11 @@ function range(reference: ToolRange): RangeReference {
     start: { row: reference.startRow - 1, col: reference.startCol - 1 },
     end: { row: reference.endRow - 1, col: reference.endCol - 1 },
   };
+}
+
+function seriesName(name: ToolSeries["name"]): string | RangeReference | undefined {
+  if (name == null || typeof name === "string") return name;
+  return range(name);
 }
 
 function anchor(input: ToolAnchor): ChartAnchor {
@@ -51,7 +56,7 @@ function anchor(input: ToolAnchor): ChartAnchor {
 function series(input: ToolSeries): ChartSeriesSpec {
   return {
     id: input.id,
-    name: input.name,
+    name: seriesName(input.name),
     categoryRef: input.categoryRef ? range(input.categoryRef) : undefined,
     valueRef: range(input.valueRef),
     chartType: input.chartType,
@@ -59,11 +64,17 @@ function series(input: ToolSeries): ChartSeriesSpec {
 }
 
 export function toCreateChartSpec(input: CreateChartToolInput, id?: string): CreateChartInput {
-  const sourceRange: ChartSourceRange = {
-    sheetId: String(input.sourceRange.sheetId),
-    start: { row: input.sourceRange.startRow - 1, col: input.sourceRange.startCol - 1 },
-    end: { row: input.sourceRange.endRow - 1, col: input.sourceRange.endCol - 1 },
-  };
+  const series = input.series?.map((item, index) => ({
+    ...item,
+    id: item.id ?? `series-${index + 1}`,
+  }));
+  const sourceRange: ChartSourceRange | undefined = input.sourceRange
+    ? {
+        sheetId: String(input.sourceRange.sheetId),
+        start: { row: input.sourceRange.startRow - 1, col: input.sourceRange.startCol - 1 },
+        end: { row: input.sourceRange.endRow - 1, col: input.sourceRange.endCol - 1 },
+      }
+    : undefined;
 
   return {
     id,
@@ -72,7 +83,15 @@ export function toCreateChartSpec(input: CreateChartToolInput, id?: string): Cre
     type: input.type,
     title: input.title,
     anchor: anchor(input.anchor),
-    series: chartSeriesFromSourceRange(sourceRange, input.type, input.seriesTypes),
+    series: series
+      ? series.map((item) => ({
+          id: item.id,
+          name: seriesName(item.name),
+          categoryRef: item.categoryRef ? range(item.categoryRef) : undefined,
+          valueRef: range(item.valueRef),
+          chartType: item.chartType,
+        }))
+      : chartSeriesFromSourceRange(sourceRange!, input.type, input.seriesTypes),
   };
 }
 

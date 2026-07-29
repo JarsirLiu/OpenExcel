@@ -59,11 +59,18 @@ export function chartSeriesFromSourceRange(
     );
   }
 
-  if (type === "pie" && (kind !== "table" || source.end.col - source.start.col + 1 !== 2)) {
-    throw new ChartSourceRangeError("Pie charts require a two-column table: category and value");
+  if (
+    (type === "pie" || type === "doughnut") &&
+    (kind !== "table" || source.end.col - source.start.col + 1 !== 2)
+  ) {
+    throw new ChartSourceRangeError(
+      "Pie and doughnut charts require a two-column table: category and value",
+    );
   }
-  if (type === "scatter" && kind !== "table") {
-    throw new ChartSourceRangeError("Scatter charts require a table with an X column");
+  if ((type === "scatter" || type === "radar") && kind !== "table") {
+    throw new ChartSourceRangeError(
+      "Scatter and radar charts require a table with a category column",
+    );
   }
 
   const seriesCount = kind === "table" ? source.end.col - source.start.col : 1;
@@ -117,5 +124,5 @@ export function chartSeriesFromSourceRange(
     });
   }
 
-  return type === "pie" ? series.slice(0, 1) : series;
+  return type === "pie" || type === "doughnut" ? series.slice(0, 1) : series;
 }

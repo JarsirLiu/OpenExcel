@@ -61,6 +61,71 @@ describe("chartToolInput", () => {
     expect(spec.series.map((item) => item.chartType)).toEqual(["line", "area"]);
   });
 
+  it("converts explicit series so non-contiguous columns do not need a helper table", () => {
+    const spec = toCreateChartSpec(
+      {
+        workbookId: 7,
+        sheetId: 11,
+        type: "line",
+        anchor: { kind: "oneCell", from: { row: 1, col: 4 }, widthEmu: 100, heightEmu: 200 },
+        series: [
+          {
+            name: "Revenue",
+            categoryRef: {
+              sheetId: 11,
+              startRow: 2,
+              startCol: 1,
+              endRow: 5,
+              endCol: 1,
+            },
+            valueRef: {
+              sheetId: 11,
+              startRow: 2,
+              startCol: 3,
+              endRow: 5,
+              endCol: 3,
+            },
+          },
+          {
+            name: "Profit",
+            categoryRef: {
+              sheetId: 11,
+              startRow: 2,
+              startCol: 1,
+              endRow: 5,
+              endCol: 1,
+            },
+            valueRef: {
+              sheetId: 11,
+              startRow: 2,
+              startCol: 13,
+              endRow: 5,
+              endCol: 13,
+            },
+          },
+        ],
+      },
+      "chart-explicit",
+    );
+
+    expect(spec.series).toEqual([
+      {
+        id: "series-1",
+        name: "Revenue",
+        categoryRef: { sheetId: "11", start: { row: 1, col: 0 }, end: { row: 4, col: 0 } },
+        valueRef: { sheetId: "11", start: { row: 1, col: 2 }, end: { row: 4, col: 2 } },
+        chartType: undefined,
+      },
+      {
+        id: "series-2",
+        name: "Profit",
+        categoryRef: { sheetId: "11", start: { row: 1, col: 0 }, end: { row: 4, col: 0 } },
+        valueRef: { sheetId: "11", start: { row: 1, col: 12 }, end: { row: 4, col: 12 } },
+        chartType: undefined,
+      },
+    ]);
+  });
+
   it("converts update references without changing omitted fields", () => {
     expect(
       toUpdateChartPatch({

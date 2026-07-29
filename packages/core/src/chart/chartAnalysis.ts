@@ -1,5 +1,6 @@
 import type { FortuneCell } from "../excel/celldataUtils.js";
 import type { ChartSeriesSpec, ChartSpec, RangeReference } from "./chartModel.js";
+import { cellAddressToA1 } from "./chartReference.js";
 
 export type ChartDataSheet = {
   id: string;
@@ -16,6 +17,22 @@ export type ChartSeriesData = {
 export type ChartData = {
   categories: string[];
   series: ChartSeriesData[];
+};
+
+export type ChartSeriesDataQuality = {
+  seriesId: string;
+  name: string;
+  pointCount: number;
+  missingValueIndexes: number[];
+  nonNumericValueIndexes: number[];
+  formulaCells: string[];
+  unresolvedFormulaCells: string[];
+};
+
+export type ChartDataQuality = {
+  categoryCount: number;
+  missingCategoryIndexes: number[];
+  series: ChartSeriesDataQuality[];
 };
 
 export function chartReferenceLength(reference: RangeReference): number {
@@ -36,7 +53,7 @@ export function chartDependencySheetIds(spec: ChartSpec): string[] {
 
 type IndexedChartDataSheet = {
   id: string;
-  cells: ReadonlyMap<string, unknown>;
+  cells: ReadonlyMap<string, FortuneCell["v"]>;
 };
 
 function cellKey(row: number, col: number): string {
@@ -46,14 +63,13 @@ function cellKey(row: number, col: number): string {
 function indexSheet(sheet: ChartDataSheet): IndexedChartDataSheet {
   return {
     id: sheet.id,
-    cells: new Map(
-      sheet.celldata.map((cell) => [cellKey(cell.r, cell.c), cell.v?.v ?? cell.v?.m ?? null]),
-    ),
+    cells: new Map(sheet.celldata.map((cell) => [cellKey(cell.r, cell.c), cell.v])),
   };
 }
 
 function cellValue(sheet: IndexedChartDataSheet, row: number, col: number): unknown {
-  return sheet.cells.get(cellKey(row, col)) ?? null;
+  const value = sheet.cells.get(cellKey(row, col));
+  return value?.v ?? value?.m ?? null;
 }
 
 function textValue(value: unknown): string {
@@ -124,5 +140,76 @@ export function resolveChartData(
     categories:
       categories.length > 0 ? categories : Array.from({ length }, (_, index) => String(index + 1)),
     series,
+  };
+}
+
+function cellAt(
+  sheetById: ReadonlyMap<string, IndexedChartDataSheet>,
+  reference: RangeReference,
+  offset: number,
+): FortuneCell | null {
+  const sheet = sheetById.get(reference.sheetId);
+  if (!sheet) return null;
+  const vertical = reference.start.col === reference.end.col;
+  const row = reference.start.row + (vertical ? offset : 0);
+  const col = reference.start.col + (vertical ? 0 : offset);
+  const value = sheet.cells.get(cellKey(row, col));
+  return value == null ? null : ({ r: row, c: col, v: value } as FortuneCell);
+}
+
+function cellText(value: FortuneCell | null): string {
+  const raw = value?.v?.v ?? value?.v?.m;
+  return raw == null ? "" : String(raw);
+}
+
+export function inspectChartData(
+  chart: ChartSpec,
+  sheets: readonly ChartDataSheet[],
+): ChartDataQuality {
+  const sheetById = new Map(sheets.map((sheet) => [sheet.id, indexSheet(sheet)]));
+  const categoryReference = chart.series[0]?.categoryRef;
+  const categoryCount = categoryReference ? chartReferenceLength(categoryReference) : 0;
+  const missingCategoryIndexes = categoryReference
+    ? Array.from({ length: categoryCount }, (_, index) => index).filter(
+        (index) => cellText(cellAt(sheetById, categoryReference, index)).trim() === "",
+      )
+    : [];
+
+  return {
+    categoryCount,
+    missingCategoryIndexes,
+    series: chart.series.map((item) => {
+      const pointCount = chartReferenceLength(item.valueRef);
+      const missingValueIndexes: number[] = [];
+      const nonNumericValueIndexes: number[] = [];
+      const formulaCells: string[] = [];
+      const unresolvedFormulaCells: string[] = [];
+      for (let index = 0; index < pointCount; index += 1) {
+        const cell = cellAt(sheetById, item.valueRef, index);
+        const rawValue = cell?.v?.v ?? cell?.v?.m;
+        const numeric = numericValue(rawValue);
+        if (numeric === null) {
+          if (rawValue == null || (typeof rawValue === "string" && rawValue.trim() === "")) {
+            missingValueIndexes.push(index);
+          } else {
+            nonNumericValueIndexes.push(index);
+          }
+        }
+        if (cell?.v?.f) {
+          const address = cellAddressToA1({ row: cell.r, col: cell.c });
+          formulaCells.push(address);
+          if (numeric === null) unresolvedFormulaCells.push(address);
+        }
+      }
+      return {
+        seriesId: item.id,
+        name: seriesName(sheetById, item),
+        pointCount,
+        missingValueIndexes,
+        nonNumericValueIndexes,
+        formulaCells,
+        unresolvedFormulaCells,
+      };
+    }),
   };
 }

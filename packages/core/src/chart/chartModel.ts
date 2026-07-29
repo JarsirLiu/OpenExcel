@@ -66,7 +66,7 @@ const chartSeriesSchema = z.object({
   name: chartSeriesNameSchema.optional(),
   categoryRef: rangeReferenceSchema.optional(),
   valueRef: rangeReferenceSchema,
-  chartType: z.enum(["bar", "line", "pie", "area", "scatter"]).optional(),
+  chartType: z.enum(["bar", "line", "pie", "doughnut", "area", "scatter", "radar"]).optional(),
 });
 
 export const chartSpecSchema = z
@@ -74,7 +74,7 @@ export const chartSpecSchema = z
     id: z.string().min(1),
     workbookId: z.string().min(1),
     sheetId: z.string().min(1),
-    type: z.enum(["bar", "line", "pie", "area", "scatter", "combo"]),
+    type: z.enum(["bar", "line", "pie", "doughnut", "area", "scatter", "radar", "combo"]),
     title: z.string().optional(),
     anchor: chartAnchorSchema,
     series: z.array(chartSeriesSchema).min(1),
@@ -114,28 +114,28 @@ export const chartSpecSchema = z
         message: "all chart series must use the same category reference",
       });
     }
-    if (chart.type === "pie" && chart.series.length !== 1) {
+    if ((chart.type === "pie" || chart.type === "doughnut") && chart.series.length !== 1) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["series"],
-        message: "pie charts must contain exactly one series",
+        message: "pie and doughnut charts must contain exactly one series",
       });
     }
 
     for (const [index, series] of chart.series.entries()) {
-      if (chart.type === "pie" && series.categoryRef == null) {
+      if ((chart.type === "pie" || chart.type === "doughnut") && series.categoryRef == null) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["series", index, "categoryRef"],
-          message: "pie charts require category references",
+          message: "pie and doughnut charts require category references",
         });
       }
 
-      if (chart.type === "scatter" && series.categoryRef == null) {
+      if ((chart.type === "scatter" || chart.type === "radar") && series.categoryRef == null) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["series", index, "categoryRef"],
-          message: "scatter charts require x-axis references",
+          message: "scatter and radar charts require category references",
         });
       }
 

@@ -63,12 +63,22 @@ describe("chartSourceRange", () => {
         "pie",
       ),
     ).toThrow(ChartSourceRangeError);
+    expect(
+      chartSeriesFromSourceRange({ ...source, end: { row: 3, col: 1 } }, "doughnut"),
+    ).toHaveLength(1);
+    expect(() =>
+      chartSeriesFromSourceRange(
+        { sheetId: "sheet-1", start: { row: 0, col: 0 }, end: { row: 0, col: 2 } },
+        "doughnut",
+      ),
+    ).toThrow(ChartSourceRangeError);
     expect(() =>
       chartSeriesFromSourceRange(
         { sheetId: "sheet-1", start: { row: 0, col: 0 }, end: { row: 0, col: 2 } },
         "scatter",
       ),
     ).toThrow(ChartSourceRangeError);
+    expect(chartSeriesFromSourceRange(source, "radar")).toHaveLength(2);
   });
 
   it("preserves explicit series types for combo charts", () => {

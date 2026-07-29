@@ -1,8 +1,10 @@
 import type { ChartSpec } from "@openexcel/core";
 import { useEffect, useState } from "react";
+import { useI18n } from "@/lib/i18n";
+import type { TranslationKey } from "@/lib/locales/en-US";
 import { ChartIcon } from "./ChartIcon";
 import styles from "./ChartInsertDialog.module.css";
-import type { ChartSelection } from "./chartSelection";
+import type { ChartSelection, ChartSelectionError } from "./chartSelection";
 import { buildChartDraft, chartSelectionError, chartSelectionSize } from "./chartSelection";
 
 type Props = {
@@ -15,13 +17,24 @@ type Props = {
   onCreate: (draft: Omit<ChartSpec, "id">) => Promise<void>;
 };
 
-const chartTypes: { value: ChartSpec["type"]; label: string }[] = [
-  { value: "bar", label: "柱形图" },
-  { value: "line", label: "折线图" },
-  { value: "area", label: "面积图" },
-  { value: "pie", label: "饼图" },
-  { value: "scatter", label: "散点图" },
+const chartTypes: { value: ChartSpec["type"]; labelKey: TranslationKey }[] = [
+  { value: "bar", labelKey: "chart_type_bar" },
+  { value: "line", labelKey: "chart_type_line" },
+  { value: "area", labelKey: "chart_type_area" },
+  { value: "pie", labelKey: "chart_type_pie" },
+  { value: "doughnut", labelKey: "chart_type_doughnut" },
+  { value: "scatter", labelKey: "chart_type_scatter" },
+  { value: "radar", labelKey: "chart_type_radar" },
 ];
+
+function selectionErrorMessage(
+  error: ChartSelectionError,
+  translate: (key: TranslationKey) => string,
+): string {
+  if (error === "pieDataRange") return translate("chart_pie_data_error");
+  if (error === "scatterDataRange") return translate("chart_scatter_data_error");
+  return translate("chart_select_data_error");
+}
 
 function ChartTypeIcon({ type }: { type: ChartSpec["type"] }) {
   if (type === "line" || type === "area") {
@@ -55,6 +68,15 @@ function ChartTypeIcon({ type }: { type: ChartSpec["type"] }) {
     );
   }
 
+  if (type === "doughnut") {
+    return (
+      <svg aria-hidden="true" viewBox="0 0 28 24" fill="none">
+        <circle cx="14" cy="12" r="8" stroke="currentColor" strokeWidth="4" opacity=".75" />
+        <path d="M14 4a8 8 0 0 1 7.2 4.5" stroke="currentColor" strokeWidth="4" />
+      </svg>
+    );
+  }
+
   if (type === "scatter") {
     return (
       <svg aria-hidden="true" viewBox="0 0 28 24" fill="none">
@@ -63,6 +85,25 @@ function ChartTypeIcon({ type }: { type: ChartSpec["type"] }) {
         <circle cx="13" cy="10" r="2" fill="currentColor" opacity=".75" />
         <circle cx="19" cy="13" r="2" fill="currentColor" />
         <circle cx="22" cy="6" r="2" fill="currentColor" opacity=".75" />
+      </svg>
+    );
+  }
+
+  if (type === "radar") {
+    return (
+      <svg aria-hidden="true" viewBox="0 0 28 24" fill="none">
+        <path d="m14 3 8 6-3 10H9L6 9l8-6Z" stroke="currentColor" strokeWidth="1.5" />
+        <path
+          d="m14 7 4 3-1.5 5h-5L10 10l4-3Z"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          opacity=".7"
+        />
+        <path
+          d="M14 3v4M6 9l4 1M22 9l-4 1M9 19l2.5-4M19 19l-2.5-4"
+          stroke="currentColor"
+          strokeWidth="1.2"
+        />
       </svg>
     );
   }
@@ -86,6 +127,7 @@ export function ChartInsertDialog({
   onClose,
   onCreate,
 }: Props) {
+  const { t } = useI18n();
   const [type, setType] = useState<ChartSpec["type"]>("bar");
   const [title, setTitle] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -103,7 +145,7 @@ export function ChartInsertDialog({
   const submit = async () => {
     const selectionError = chartSelectionError(selection, type);
     if (selectionError) {
-      setError(selectionError);
+      setError(selectionErrorMessage(selectionError, t));
       return;
     }
     if (!selection) return;
@@ -115,7 +157,7 @@ export function ChartInsertDialog({
       setTitle("");
       onClose();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "创建图表失败");
+      setError(cause instanceof Error ? cause.message : t("chart_create_failed"));
     } finally {
       setSubmitting(false);
     }
@@ -136,11 +178,16 @@ export function ChartInsertDialog({
               <ChartIcon />
             </span>
             <div>
-              <h2 id="chart-dialog-title">插入图表</h2>
-              <p>根据单行、单列或二维选区生成可编辑图表</p>
+              <h2 id="chart-dialog-title">{t("chart_insert_title")}</h2>
+              <p>{t("chart_insert_description")}</p>
             </div>
           </div>
-          <button type="button" className={styles.close} onClick={onClose} aria-label="关闭">
+          <button
+            type="button"
+            className={styles.close}
+            onClick={onClose}
+            aria-label={t("chart_close")}
+          >
             ×
           </button>
         </div>
@@ -154,18 +201,18 @@ export function ChartInsertDialog({
               <span />
             </div>
             <div className={styles.selectionContent}>
-              <strong>数据区域</strong>
+              <strong>{t("chart_data_region")}</strong>
               <span>
                 {sheetName} ·{" "}
-                {hasValidSelection ? `${size.rows} 行 × ${size.columns} 列` : "未选择"}
+                {hasValidSelection ? `${size.rows} × ${size.columns}` : t("chart_not_selected")}
               </span>
             </div>
             <span className={styles.selectionStatus}>
-              {hasValidSelection ? "已选中" : "待选择"}
+              {hasValidSelection ? t("chart_selected") : t("chart_not_selected")}
             </span>
           </div>
           <fieldset className={styles.typeGroup}>
-            <legend>图表类型</legend>
+            <legend>{t("chart_type_label")}</legend>
             <div className={styles.typeGrid}>
               {chartTypes.map((item) => (
                 <button
@@ -178,17 +225,17 @@ export function ChartInsertDialog({
                   <span className={styles.typeIcon}>
                     <ChartTypeIcon type={item.value} />
                   </span>
-                  <span>{item.label}</span>
+                  <span>{t(item.labelKey)}</span>
                 </button>
               ))}
             </div>
           </fieldset>
           <label className={styles.field}>
-            <span>标题</span>
+            <span>{t("chart_title_label")}</span>
             <input
               value={title}
               onChange={(event) => setTitle(event.target.value)}
-              placeholder="可选"
+              placeholder={t("chart_optional_title")}
             />
           </label>
           {error ? <p className={styles.error}>{error}</p> : null}
@@ -200,16 +247,16 @@ export function ChartInsertDialog({
             onClick={onClose}
             disabled={submitting}
           >
-            取消
+            {t("cancel")}
           </button>
           <button
             type="button"
             className={styles.primary}
             onClick={() => void submit()}
             disabled={submitting}
-            aria-label="确认创建图表"
+            aria-label={t("chart_create")}
           >
-            {submitting ? "生成中..." : "确认生成图表"}
+            {submitting ? t("chart_creating") : t("chart_create")}
           </button>
         </div>
       </section>

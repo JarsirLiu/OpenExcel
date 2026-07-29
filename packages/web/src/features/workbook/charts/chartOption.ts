@@ -14,7 +14,7 @@ function chartType(
 }
 
 export function buildChartOption(chart: ChartSpec, data: ChartRenderData): EChartsOption {
-  if (chart.type === "pie") {
+  if (chart.type === "pie" || chart.type === "doughnut") {
     const firstSeries = data.series[0];
     return {
       title: chart.title ? { text: chart.title, top: 8 } : undefined,
@@ -22,10 +22,38 @@ export function buildChartOption(chart: ChartSpec, data: ChartRenderData): EChar
       series: [
         {
           type: "pie",
+          radius: chart.type === "doughnut" ? ["42%", "72%"] : "68%",
           name: firstSeries?.name,
           data: data.categories.map((name, index) => ({
             name,
             value: firstSeries?.data[index] ?? 0,
+          })),
+        },
+      ],
+    };
+  }
+
+  if (chart.type === "radar") {
+    const indicator = data.categories.map((name, index) => ({
+      name,
+      max: Math.max(1, ...data.series.map((series) => Math.abs(series.data[index] ?? 0))),
+    }));
+    return {
+      title: chart.title ? { text: chart.title, top: 8 } : undefined,
+      tooltip: { trigger: "item" },
+      color: [...CHART_PALETTE],
+      legend: data.series.length > 1 ? { top: chart.title ? 38 : 12 } : undefined,
+      radar: {
+        indicator,
+        center: ["50%", chart.title || data.series.length > 1 ? "55%" : "52%"],
+        radius: "62%",
+      },
+      series: [
+        {
+          type: "radar",
+          data: data.series.map((series) => ({
+            name: series.name,
+            value: series.data.map((value) => value ?? 0),
           })),
         },
       ],
