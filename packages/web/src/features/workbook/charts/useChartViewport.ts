@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   createSheetViewport,
   createVisibleCellViewport,
@@ -25,12 +25,13 @@ const EMPTY_VIEWPORT: RawViewport = {
 
 /**
  * Adapts FortuneSheet's content coordinates to the visible cell viewport.
- * FortuneSheet redraws its canvas when the custom scrollbars move instead of
- * moving the canvas element, so the logical scrollbar positions are part of
- * the chart coordinate conversion.
+ * FortuneSheet redraws its canvas when the custom scrollbars move and mirrors
+ * the resulting position to the cell area. The cell area is therefore the
+ * single scroll-coordinate source for charts.
  */
 export function useChartViewport({ containerRef, layerRef, sheetId }: Props): SheetViewport {
   const [viewport, setViewport] = useState<RawViewport>(EMPTY_VIEWPORT);
+  const syncFrameRef = useRef<number | null>(null);
 
   const syncViewport = useCallback(() => {
     const root = containerRef.current;
@@ -39,8 +40,6 @@ export function useChartViewport({ containerRef, layerRef, sheetId }: Props): Sh
 
     const sheetViewport = root.querySelector<HTMLElement>(".fortune-sheet-container");
     const cellArea = root.querySelector<HTMLElement>(".fortune-cell-area");
-    const horizontalScrollbar = root.querySelector<HTMLElement>(".luckysheet-scrollbar-x");
-    const verticalScrollbar = root.querySelector<HTMLElement>(".luckysheet-scrollbar-y");
     const offsetParent = layer.offsetParent as HTMLElement | null;
     if (!sheetViewport || !cellArea || !offsetParent) {
       layer.dataset.ready = "false";
@@ -51,8 +50,8 @@ export function useChartViewport({ containerRef, layerRef, sheetId }: Props): Sh
     const parentRect = offsetParent.getBoundingClientRect();
     const cellRect = cellArea.getBoundingClientRect();
     const next = createVisibleCellViewport(parentRect, cellRect, {
-      left: horizontalScrollbar?.scrollLeft ?? 0,
-      top: verticalScrollbar?.scrollTop ?? 0,
+      left: cellArea.scrollLeft,
+      top: cellArea.scrollTop,
     });
 
     layer.style.left = `${next.left}px`;
@@ -72,13 +71,24 @@ export function useChartViewport({ containerRef, layerRef, sheetId }: Props): Sh
     );
   }, [containerRef, layerRef]);
 
+  const scheduleViewportSync = useCallback(() => {
+    if (syncFrameRef.current !== null) return;
+    syncFrameRef.current = requestAnimationFrame(() => {
+      syncFrameRef.current = null;
+      syncViewport();
+    });
+  }, [syncViewport]);
+
   useLayoutEffect(() => {
     const root = containerRef.current;
     const layer = layerRef.current;
     if (!root || !layer) return;
 
     syncViewport();
-    const frame = requestAnimationFrame(syncViewport);
+    syncFrameRef.current = requestAnimationFrame(() => {
+      syncFrameRef.current = null;
+      syncViewport();
+    });
     const parent = layer.parentElement ?? root;
     const observer = new MutationObserver(syncViewport);
     observer.observe(parent, { childList: true, subtree: true });
@@ -93,7 +103,10 @@ export function useChartViewport({ containerRef, layerRef, sheetId }: Props): Sh
     return () => {
       observer.disconnect();
       resizeObserver.disconnect();
-      cancelAnimationFrame(frame);
+      if (syncFrameRef.current !== null) {
+        cancelAnimationFrame(syncFrameRef.current);
+        syncFrameRef.current = null;
+      }
       window.removeEventListener("resize", syncViewport);
       layer.dataset.ready = "false";
     };
@@ -103,17 +116,15 @@ export function useChartViewport({ containerRef, layerRef, sheetId }: Props): Sh
     const root = containerRef.current;
     if (!root) return;
 
-    const scrollbars = [
-      root.querySelector<HTMLElement>(".luckysheet-scrollbar-x"),
-      root.querySelector<HTMLElement>(".luckysheet-scrollbar-y"),
-    ].filter((element): element is HTMLElement => element !== null);
-    const handleScroll = () => syncViewport();
-    for (const scrollbar of scrollbars) scrollbar.addEventListener("scroll", handleScroll);
+    const handleScroll = () => scheduleViewportSync();
+    // FortuneSheet creates and replaces its custom scrollbars asynchronously.
+    // Capture the event on the stable root so the binding survives that DOM lifecycle.
+    root.addEventListener("scroll", handleScroll, true);
 
     return () => {
-      for (const scrollbar of scrollbars) scrollbar.removeEventListener("scroll", handleScroll);
+      root.removeEventListener("scroll", handleScroll, true);
     };
-  }, [containerRef, syncViewport]);
+  }, [containerRef, scheduleViewportSync]);
 
   return useMemo(
     () =>

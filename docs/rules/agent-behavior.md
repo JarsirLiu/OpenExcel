@@ -44,6 +44,7 @@ task. Do not silently turn a one-off correction into a permanent rule.
 - Prefer precise types and existing schemas. Use `any` only when the external or runtime boundary genuinely requires it.
 - Keep domain rules in the owning domain package and keep adapters thin.
 - Do not hide a broken boundary with a full reload, duplicated state, broad query, fallback branch, or unchecked cast.
+- At an integration boundary, select one authoritative runtime signal and make its owner explicit. Do not add compatibility reads, fallback sources, or parallel state to mask uncertain ownership; repair the boundary or its contract instead.
 - Comments should explain a non-obvious decision or invariant, not narrate straightforward code.
 - Keep tests close to the behavior they protect and focus them on observable contracts and failure modes.
 - Use English for new or modified comments and docstrings. Put new user-visible

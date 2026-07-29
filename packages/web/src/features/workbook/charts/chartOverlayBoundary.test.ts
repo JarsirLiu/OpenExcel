@@ -40,8 +40,9 @@ describe("ChartOverlay integration boundary", () => {
     expect(viewportSource).toContain("fortune-sheet-container");
     expect(viewportSource).toContain("fortune-cell-area");
     expect(viewportSource).not.toContain("fortune-sheet-canvas");
-    expect(viewportSource).toContain("luckysheet-scrollbar-x");
-    expect(viewportSource).toContain("luckysheet-scrollbar-y");
+    expect(viewportSource).toContain("cellArea.scrollLeft");
+    expect(viewportSource).toContain("cellArea.scrollTop");
+    expect(viewportSource).toContain('root.addEventListener("scroll", handleScroll, true)');
     expect(viewportSource).toContain("cellOriginLeft");
     expect(viewportSource).toContain("cellOriginTop");
     expect(gridSource).toContain(activeSheetLayerKey);
