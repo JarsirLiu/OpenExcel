@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchWorkbooks, type WorkbookMeta } from "@/api/workbooks";
-import { fetchWorkspaces, type Workspace } from "@/api/workspaces";
+import {
+  deleteWorkspace as deleteWorkspaceApi,
+  fetchWorkspaces,
+  type Workspace,
+} from "@/api/workspaces";
 import { sortWorkbooks } from "./workbookOrdering";
 
 const STORAGE_KEY = "openexcel:activeWorkspaceId";
@@ -113,7 +117,7 @@ export function useWorkspaceState(
     saveWorkspaceId(activeWorkspaceId);
   }, [activeWorkspaceId]);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (): Promise<Workspace[]> => {
     setLoading(true);
     try {
       const list = await fetchWorkspaces();
@@ -122,15 +126,25 @@ export function useWorkspaceState(
         if (prev != null && list.some((w) => w.id === prev)) return prev;
         return list[0]?.id ?? null;
       });
+      return list;
     } finally {
       setLoading(false);
     }
-  }, [fetchAllWorkbooks]);
+  }, []);
+
+  const removeWorkspace = useCallback(
+    async (workspaceId: number) => {
+      await deleteWorkspaceApi(workspaceId);
+      return refresh();
+    },
+    [refresh],
+  );
 
   return {
     workspaces,
     activeWorkspaceId,
     loading,
+    removeWorkspace,
     refresh,
     workbooksMap,
     refreshWorkbooks: fetchAllWorkbooks,

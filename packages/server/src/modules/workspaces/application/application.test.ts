@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   findWorkspaces: vi.fn(),
   findWorkspace: vi.fn(),
-  countWorkspaces: vi.fn(),
   renameWorkspace: vi.fn(),
   deleteWorkspace: vi.fn(),
   provisionWorkspaceResources: vi.fn(),
@@ -12,7 +11,6 @@ const mocks = vi.hoisted(() => ({
 vi.mock("../infrastructure/workspaceRepository.js", () => ({
   findWorkspaces: mocks.findWorkspaces,
   findWorkspace: mocks.findWorkspace,
-  countWorkspaces: mocks.countWorkspaces,
   renameWorkspace: mocks.renameWorkspace,
   deleteWorkspace: mocks.deleteWorkspace,
 }));
@@ -29,7 +27,6 @@ describe("workspace application", () => {
   beforeEach(() => {
     mocks.findWorkspaces.mockReset();
     mocks.findWorkspace.mockReset();
-    mocks.countWorkspaces.mockReset();
     mocks.renameWorkspace.mockReset();
     mocks.deleteWorkspace.mockReset();
     mocks.provisionWorkspaceResources.mockReset();
@@ -66,12 +63,9 @@ describe("workspace application", () => {
     await expect(renameWorkspace(5, 42, "  新名称  ")).resolves.toEqual({ id: 5, name: "新名称" });
   });
 
-  it("rejects deleting the last workspace", async () => {
+  it("allows deleting the last workspace", async () => {
     mocks.findWorkspace.mockResolvedValueOnce({ id: 5, ownerUserId: 42 });
-    mocks.countWorkspaces.mockResolvedValueOnce(1);
-    await expect(deleteWorkspace(5, 42)).rejects.toMatchObject({
-      message: "Cannot delete the last workspace",
-      statusCode: 400,
-    });
+    await expect(deleteWorkspace(5, 42)).resolves.toEqual({ success: true });
+    expect(mocks.deleteWorkspace).toHaveBeenCalledWith(5);
   });
 });

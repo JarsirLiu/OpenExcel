@@ -3,7 +3,7 @@ import { useCallback, useRef, useState } from "react";
 import type { WorkbookMeta } from "@/api/workbooks";
 import { downloadWorkbook } from "@/api/workbooks";
 import type { Workspace } from "@/api/workspaces";
-import { deleteWorkspace, renameWorkspace } from "@/api/workspaces";
+import { renameWorkspace } from "@/api/workspaces";
 import { t } from "@/lib/i18n";
 import { confirm } from "@/shared/lib";
 import {
@@ -17,6 +17,7 @@ type Props = {
   activeWorkspaceId: number | null;
   onWorkspaceSelect: (workspace: Workspace) => void;
   onWorkspaceCreate: () => Promise<Workspace>;
+  onWorkspaceDelete: (workspaceId: number) => Promise<void>;
   workspaces: Workspace[];
   onRefresh: () => void;
   workbooksMap: Map<number, WorkbookMeta[]>;
@@ -34,6 +35,7 @@ export function WorkspaceSidebar({
   activeWorkspaceId,
   onWorkspaceSelect,
   onWorkspaceCreate,
+  onWorkspaceDelete,
   workspaces,
   onRefresh,
   workbooksMap,
@@ -41,10 +43,11 @@ export function WorkspaceSidebar({
   onWorkbookSelect,
   onWorkbookDelete,
   onWorkbookCreate,
-  homeLabel = "返回首页",
+  homeLabel,
   readOnly = false,
   layout,
 }: Props) {
+  const resolvedHomeLabel = homeLabel ?? t("back_home");
   const {
     collapsed,
     width: sidebarWidth,
@@ -79,7 +82,7 @@ export function WorkspaceSidebar({
       const ws = await onWorkspaceCreate();
       onWorkspaceSelect(ws);
     } catch (e) {
-      console.error("创建项目失败:", e);
+      console.error("Failed to create project:", e);
     }
   }, [onWorkspaceCreate, onWorkspaceSelect, readOnly]);
 
@@ -116,7 +119,7 @@ export function WorkspaceSidebar({
       setEditingId(null);
       void onRefresh();
     } catch (e) {
-      console.error("修改项目名称失败:", e);
+      console.error("Failed to rename project:", e);
     }
   }, [editingId, editValue, onRefresh, readOnly]);
 
@@ -142,27 +145,19 @@ export function WorkspaceSidebar({
       e.stopPropagation();
       setEditingId(null);
       const ok = await confirm({
-        title: "删除项目",
-        message: `确认删除「${ws.name}」？此操作不可恢复。`,
-        confirmText: "删除",
-        cancelText: "取消",
+        title: t("delete_workspace"),
+        message: t("confirm_delete_named", { name: ws.name }),
+        confirmText: t("delete"),
+        cancelText: t("cancel"),
       });
       if (!ok) return;
       try {
-        await deleteWorkspace(ws.id);
-        if (ws.id === activeWorkspaceId) {
-          const remaining = workspaces.filter((w) => w.id !== ws.id);
-          if (remaining.length > 0) {
-            onWorkspaceSelect(remaining[0]);
-          }
-        } else {
-          void onRefresh();
-        }
+        await onWorkspaceDelete(ws.id);
       } catch (e) {
-        console.error("删除项目失败:", e);
+        console.error("Failed to delete project:", e);
       }
     },
-    [activeWorkspaceId, onRefresh, onWorkspaceSelect, readOnly, workspaces],
+    [onWorkspaceDelete, readOnly],
   );
 
   const handleWorkbookDeleteClick = useCallback(
@@ -170,16 +165,16 @@ export function WorkspaceSidebar({
       if (readOnly) return;
       e.stopPropagation();
       const ok = await confirm({
-        title: "删除工作簿",
-        message: `确认删除「${wb.name}」？此操作不可恢复。`,
-        confirmText: "删除",
-        cancelText: "取消",
+        title: t("delete_workbook"),
+        message: t("confirm_delete_named", { name: wb.name }),
+        confirmText: t("delete"),
+        cancelText: t("cancel"),
       });
       if (!ok) return;
       try {
         await onWorkbookDelete(wb.id);
       } catch (e) {
-        console.error("删除工作簿失败:", e);
+        console.error("Failed to delete workbook:", e);
       }
     },
     [onWorkbookDelete, readOnly],
@@ -201,8 +196,8 @@ export function WorkspaceSidebar({
       <button
         className={styles.collapsedHomeButton}
         onClick={onNavigateHome}
-        aria-label={homeLabel}
-        title={homeLabel}
+        aria-label={resolvedHomeLabel}
+        title={resolvedHomeLabel}
       >
         <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
           <rect x="1.5" y="1.5" width="13" height="13" rx="3" stroke="currentColor" />
@@ -212,8 +207,8 @@ export function WorkspaceSidebar({
       <button
         className={styles.expandBtn}
         onClick={onToggleCollapsed}
-        aria-label="展开工作区侧边栏"
-        title="Expand sidebar"
+        aria-label={t("expand_sidebar")}
+        title={t("expand_sidebar")}
       >
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
           <path
@@ -232,8 +227,8 @@ export function WorkspaceSidebar({
         <button
           className={styles.homeButton}
           onClick={onNavigateHome}
-          aria-label={homeLabel}
-          title={homeLabel}
+          aria-label={resolvedHomeLabel}
+          title={resolvedHomeLabel}
         >
           <span className={styles.homeMark} aria-hidden="true">
             <svg width="17" height="17" viewBox="0 0 18 18" fill="none">
@@ -264,14 +259,14 @@ export function WorkspaceSidebar({
         </button>
         <div className={styles.header}>
           <span className={styles.sectionLabel}>
-            <small>{readOnly ? "DEMO SPACE" : "WORKSPACE"}</small>
+            <small>{readOnly ? t("demo_space") : t("workspaces")}</small>
             <strong>{t("workspaces")}</strong>
           </span>
           <button
             className={styles.toggleBtn}
             onClick={onToggleCollapsed}
-            aria-label="收起工作区侧边栏"
-            title="Collapse sidebar"
+            aria-label={t("collapse_sidebar")}
+            title={t("collapse_sidebar")}
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
               <path
@@ -353,7 +348,7 @@ export function WorkspaceSidebar({
                           <button
                             className={styles.editBtn}
                             onClick={(e) => handleStartEdit(e, ws)}
-                            title="重命名"
+                            title={t("rename")}
                           >
                             <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                               <path
@@ -368,7 +363,7 @@ export function WorkspaceSidebar({
                           <button
                             className={styles.deleteBtn}
                             onClick={(e) => void handleDelete(e, ws)}
-                            title="删除"
+                            title={t("delete")}
                           >
                             <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                               <path
@@ -432,7 +427,7 @@ export function WorkspaceSidebar({
                                   e.stopPropagation();
                                   void downloadWorkbook(ws.id, wb.id, wb.name);
                                 }}
-                                title="下载"
+                                title={t("download")}
                               >
                                 <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
                                   <path
@@ -453,7 +448,7 @@ export function WorkspaceSidebar({
                               <button
                                 className={styles.workbookDeleteBtn}
                                 onClick={(e) => void handleWorkbookDeleteClick(e, wb)}
-                                title="删除"
+                                title={t("delete")}
                               >
                                 <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
                                   <path
@@ -479,7 +474,7 @@ export function WorkspaceSidebar({
                       <button
                         className={styles.workbookCreateBtn}
                         onClick={(e) => handleCreateWorkbook(e, ws.id)}
-                        title="新建工作簿"
+                        title={t("new_workbook")}
                       >
                         <span className={styles.plusIcon}>
                           <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
@@ -491,7 +486,7 @@ export function WorkspaceSidebar({
                             />
                           </svg>
                         </span>
-                        新建工作簿
+                        {t("new_workbook")}
                       </button>
                     )}
                   </div>
@@ -505,8 +500,8 @@ export function WorkspaceSidebar({
           <div className={styles.demoNote}>
             <span className={styles.demoNoteIcon}>R</span>
             <span>
-              <strong>只读回放空间</strong>
-              <small>数据会随流程自动更新</small>
+              <strong>{t("read_only_demo_space")}</strong>
+              <small>{t("demo_data_auto_updates")}</small>
             </span>
           </div>
         ) : (

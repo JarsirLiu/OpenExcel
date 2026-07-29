@@ -1,7 +1,8 @@
-import type { LoaderFunctionArgs } from "react-router-dom";
+import { type LoaderFunctionArgs, redirect } from "react-router-dom";
 import { fetchSessions } from "@/api/sessions";
 import { fetchWorkbooks } from "@/api/workbooks";
 import { fetchWorkspaces } from "@/api/workspaces";
+import { routePaths } from "@/app/routePaths";
 
 export async function workspaceLoader({ params, request }: LoaderFunctionArgs) {
   if (!params.workspacePublicId) {
@@ -10,6 +11,9 @@ export async function workspaceLoader({ params, request }: LoaderFunctionArgs) {
 
   const workspaces = await fetchWorkspaces({ signal: request.signal });
   const workspace = workspaces.find((item) => item.publicId === params.workspacePublicId);
+  if (!workspace && workspaces.length === 0) {
+    throw redirect(routePaths.workspaceRoot);
+  }
   if (!workspace) {
     throw new Response(null, { status: 404, statusText: "Workspace not found" });
   }

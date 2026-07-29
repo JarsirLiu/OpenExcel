@@ -27,10 +27,6 @@ export async function renameWorkspace(id: number, name: string) {
   });
 }
 
-export async function countWorkspaces(ownerUserId: number) {
-  return prisma.workspace.count({ where: { ownerUserId } });
-}
-
 export async function deleteWorkspace(id: number) {
   await prisma.workspace.delete({ where: { id } });
 }

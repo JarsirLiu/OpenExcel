@@ -15,9 +15,11 @@ import { useWorkspaceState } from "@/features/workspace/useWorkspaceState";
 import { useWorkspaceView } from "@/features/workspace/useWorkspaceView";
 import { WorkspaceSidebar } from "@/features/workspace/WorkspaceSidebar";
 import { WorkspaceView } from "@/features/workspace/WorkspaceView";
+import { t } from "@/lib/i18n";
 import { usePanelResize } from "@/shared/hooks/usePanelResize";
 import { toast } from "@/shared/lib";
 import type { WorkbenchRouteData } from "./routeData";
+import { routePaths } from "./routePaths";
 import styles from "./Workbench.module.css";
 
 type CurrentUser = { email: string; displayName: string };
@@ -38,6 +40,7 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
     activeWorkspaceId,
     loading: workspaceLoading,
     refresh: workspaceRefresh,
+    removeWorkspace,
     workbooksMap,
     refreshWorkbooks,
   } = useWorkspaceState(routeData?.workspaces, routeData?.workspace.id);
@@ -71,7 +74,7 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
 
   const handleWorkspaceSelect = useCallback(
     (workspace: { publicId: string }) => {
-      const targetPath = `/workspaces/${workspace.publicId}`;
+      const targetPath = routePaths.workspace(workspace.publicId);
       if (targetPath !== location.pathname) {
         navigate(targetPath);
       }
@@ -79,11 +82,28 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
     [location.pathname, navigate],
   );
 
+  const handleWorkspaceDelete = useCallback(
+    async (workspaceId: number) => {
+      const remaining = await removeWorkspace(workspaceId);
+      if (workspaceId !== selectedWorkspaceId) return;
+
+      const nextWorkspace = remaining[0];
+      navigate(
+        nextWorkspace ? routePaths.workspace(nextWorkspace.publicId) : routePaths.workspaceRoot,
+        { replace: true },
+      );
+    },
+    [navigate, removeWorkspace, selectedWorkspaceId],
+  );
+
   const handleWorkspaceCreate = useCallback(async () => {
     try {
       return await createProject();
     } catch (error) {
-      toast({ message: error instanceof Error ? error.message : "创建项目失败", variant: "error" });
+      toast({
+        message: error instanceof Error ? error.message : t("create_project_failed"),
+        variant: "error",
+      });
       throw error;
     }
   }, []);
@@ -155,9 +175,12 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
         return;
       }
       const workspace = await createProjectWithBlankWorkbook();
-      navigate(`/workspaces/${workspace.publicId}`);
+      navigate(routePaths.workspace(workspace.publicId));
     } catch (error) {
-      toast({ message: error instanceof Error ? error.message : "创建失败", variant: "error" });
+      toast({
+        message: error instanceof Error ? error.message : t("create_workbook_failed"),
+        variant: "error",
+      });
     }
   }, [navigate, refreshWorkbooks, selectedWorkspaceId, workbook.handleCreateWorkbook, workspaces]);
 
@@ -170,9 +193,12 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
 
       try {
         const workspace = await createProjectFromImport(file);
-        navigate(`/workspaces/${workspace.publicId}`);
+        navigate(routePaths.workspace(workspace.publicId));
       } catch (error) {
-        toast({ message: error instanceof Error ? error.message : "导入失败", variant: "error" });
+        toast({
+          message: error instanceof Error ? error.message : t("workbook_upload_failed"),
+          variant: "error",
+        });
       }
     },
     [handleWorkbookImport, navigate, selectedWorkspaceId],
@@ -246,6 +272,7 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
         activeWorkspaceId={selectedWorkspaceId}
         onWorkspaceSelect={handleWorkspaceSelect}
         onWorkspaceCreate={handleWorkspaceCreate}
+        onWorkspaceDelete={handleWorkspaceDelete}
         workspaces={workspaces}
         onRefresh={workspaceRefresh}
         workbooksMap={workbooksMap}

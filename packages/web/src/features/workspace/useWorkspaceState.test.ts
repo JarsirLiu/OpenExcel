@@ -3,13 +3,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { WorkbookMeta } from "@/api/workbooks";
 import type { Workspace } from "@/api/workspaces";
 
-const { fetchWorkbooks, fetchWorkspaces } = vi.hoisted(() => ({
+const { deleteWorkspace, fetchWorkbooks, fetchWorkspaces } = vi.hoisted(() => ({
+  deleteWorkspace: vi.fn(),
   fetchWorkbooks: vi.fn(),
   fetchWorkspaces: vi.fn(),
 }));
 
 vi.mock("@/api/workbooks", () => ({ fetchWorkbooks }));
-vi.mock("@/api/workspaces", () => ({ fetchWorkspaces }));
+vi.mock("@/api/workspaces", () => ({ deleteWorkspace, fetchWorkspaces }));
 
 import { useWorkspaceState } from "./useWorkspaceState";
 
@@ -40,6 +41,7 @@ describe("useWorkspaceState", () => {
   beforeEach(() => {
     fetchWorkbooks.mockReset();
     fetchWorkspaces.mockReset();
+    deleteWorkspace.mockReset();
   });
 
   it("discards an older catalog response when a refresh starts", async () => {
@@ -85,5 +87,21 @@ describe("useWorkspaceState", () => {
 
     await waitFor(() => expect(fetchWorkbooks).toHaveBeenCalledTimes(2));
     expect(fetchWorkbooks).toHaveBeenCalledTimes(2);
+  });
+
+  it("clears the active workspace after deleting the last workspace", async () => {
+    fetchWorkbooks.mockResolvedValue([]);
+    deleteWorkspace.mockResolvedValue(undefined);
+    fetchWorkspaces.mockResolvedValueOnce([]);
+
+    const { result } = renderHook(() => useWorkspaceState(workspaces, workspace.id));
+
+    await act(async () => {
+      await result.current.removeWorkspace(workspace.id);
+    });
+
+    expect(deleteWorkspace).toHaveBeenCalledWith(workspace.id);
+    expect(result.current.workspaces).toEqual([]);
+    expect(result.current.activeWorkspaceId).toBeNull();
   });
 });

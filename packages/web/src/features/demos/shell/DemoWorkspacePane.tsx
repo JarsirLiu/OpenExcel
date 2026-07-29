@@ -6,6 +6,7 @@ import { SheetActivationProvider } from "@/features/workbook/editor/SheetActivat
 import { useWorkspaceSidebarLayout } from "@/features/workspace/useWorkspaceSidebarLayout";
 import { WorkspaceSidebar } from "@/features/workspace/WorkspaceSidebar";
 import { WorkspaceView } from "@/features/workspace/WorkspaceView";
+import { t } from "@/lib/i18n";
 import type { DemoDefinition, DemoReplayFocus, DemoWorkbook } from "../runtime/replayTypes";
 import { toWorkbook } from "../runtime/replayWorkbookProjection";
 
@@ -97,10 +98,11 @@ export const DemoWorkspacePane = memo(function DemoWorkspacePane({
     <>
       <WorkspaceSidebar
         onNavigateHome={onNavigateHome}
-        homeLabel="返回案例库"
+        homeLabel={t("back_demo_catalog")}
         activeWorkspaceId={demoWorkspace.id}
         onWorkspaceSelect={() => undefined}
         onWorkspaceCreate={async () => demoWorkspace}
+        onWorkspaceDelete={async () => undefined}
         workspaces={[demoWorkspace]}
         onRefresh={() => undefined}
         workbooksMap={new Map([[demoWorkspace.id, workbookMetas]])}

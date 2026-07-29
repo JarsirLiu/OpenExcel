@@ -51,4 +51,18 @@ describe("workspaceLoader", () => {
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
   });
+
+  it("returns to the empty workspace welcome route when the catalog is empty", async () => {
+    fetchWorkspaces.mockResolvedValueOnce([]);
+
+    const redirectResponse = await workspaceLoader(
+      loaderArgs({ workspacePublicId: "deleted" }),
+    ).catch((error: unknown) => error);
+
+    expect(redirectResponse).toBeInstanceOf(Response);
+    expect((redirectResponse as Response).status).toBe(302);
+    expect((redirectResponse as Response).headers.get("location")).toBe("/workspaces");
+    expect(fetchWorkbooks).not.toHaveBeenCalled();
+    expect(fetchSessions).not.toHaveBeenCalled();
+  });
 });

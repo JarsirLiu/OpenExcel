@@ -4,6 +4,7 @@ import { listCharts } from "@/api/charts";
 import type { WorkbookFull } from "@/api/workbooks";
 import type { WorkbookStructureUpdate } from "@/features/sync/types";
 import type { ChartMutation } from "@/features/workbook/charts/chartMutation";
+import { t } from "@/lib/i18n";
 import { toast } from "@/shared/lib";
 import { patchWorkbookWithDelta } from "../workbook/utils/patchWorkbook";
 import { getSheetIndexAfterDeletion, normalizeSheetIndex } from "./sheetIndex";
@@ -255,7 +256,10 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
     async (files: File[]): Promise<boolean> => {
       if (workspaceId == null || files.length === 0) return false;
       if (files.length > MAX_IMPORT_WORKBOOKS) {
-        toast({ message: `一次最多选择 ${MAX_IMPORT_WORKBOOKS} 个文件`, variant: "error" });
+        toast({
+          message: t("max_workbook_import_count", { count: MAX_IMPORT_WORKBOOKS }),
+          variant: "error",
+        });
         return false;
       }
       try {
@@ -270,20 +274,40 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
         if (imported.error) {
           const progress =
             imported.completedFiles > 0
-              ? `已完成 ${imported.completedFiles}/${files.length} 个文件。`
+              ? t("workbook_upload_progress", {
+                  completed: imported.completedFiles,
+                  total: files.length,
+                })
               : "";
-          const file = imported.activeFileName ? `（文件：${imported.activeFileName}）` : "";
-          const message = imported.error instanceof Error ? imported.error.message : "上传失败";
-          toast({ message: `${progress}上传失败${file}：${message}`, variant: "error" });
+          const file = imported.activeFileName
+            ? t("workbook_upload_file", { name: imported.activeFileName })
+            : "";
+          const message =
+            imported.error instanceof Error ? imported.error.message : t("workbook_upload_failed");
+          toast({
+            message: t("workbook_upload_error", {
+              progress,
+              message: t("workbook_upload_failed"),
+              file,
+              error: message,
+            }),
+            variant: "error",
+          });
           return imported.completedFiles > 0;
         }
         toast({
-          message: files.length === 1 ? "上传完成" : `已上传 ${files.length} 个文件`,
+          message:
+            files.length === 1
+              ? t("workbook_upload_completed")
+              : t("uploaded_workbook_count", { count: files.length }),
           variant: "success",
         });
         return imported.results.length > 0;
       } catch (error) {
-        toast({ message: error instanceof Error ? error.message : "上传失败", variant: "error" });
+        toast({
+          message: error instanceof Error ? error.message : t("workbook_upload_failed"),
+          variant: "error",
+        });
         return false;
       }
     },
@@ -307,10 +331,10 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
             clearActiveWorkbook();
           }
         }
-        toast({ message: "工作簿已删除", variant: "success" });
+        toast({ message: t("workbook_deleted"), variant: "success" });
       } catch (error) {
         toast({
-          message: error instanceof Error ? error.message : "删除工作簿失败",
+          message: error instanceof Error ? error.message : t("delete_workbook_failed"),
           variant: "error",
         });
         throw error;
@@ -337,9 +361,12 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
         invalidateReferenceCache();
         requestWorkbookById(mutation.result.id);
         sheets.setCurrentSheetIndex(0);
-        toast({ message: "工作簿已创建", variant: "success" });
+        toast({ message: t("workbook_created"), variant: "success" });
       } catch (error) {
-        toast({ message: error instanceof Error ? error.message : "创建失败", variant: "error" });
+        toast({
+          message: error instanceof Error ? error.message : t("create_workbook_failed"),
+          variant: "error",
+        });
       }
     },
     [createWorkbookInCatalog, invalidateReferenceCache, requestWorkbookById, sheets, workspaceId],
@@ -355,9 +382,12 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
           updateWorkbookMetadata((workbook) => ({ ...workbook, name: newName }));
         }
         invalidateReferenceCache();
-        toast({ message: "工作簿已重命名", variant: "success" });
+        toast({ message: t("workbook_renamed"), variant: "success" });
       } catch (error) {
-        toast({ message: error instanceof Error ? error.message : "重命名失败", variant: "error" });
+        toast({
+          message: error instanceof Error ? error.message : t("rename_workbook_failed"),
+          variant: "error",
+        });
       }
     },
     [
