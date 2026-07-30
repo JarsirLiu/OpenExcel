@@ -12,6 +12,13 @@ export const DEFAULT_XLSX_CHART_IMPORT_LIMITS: XlsxChartImportLimits = {
   maxTotalSeries: 10_000,
 };
 
+export class XlsxChartImportLimitError extends XlsxChartImportError {
+  constructor(message: string, path: string) {
+    super(message, { cause: path });
+    this.name = "XlsxChartImportLimitError";
+  }
+}
+
 export class XlsxChartImportBudget {
   private chartCount = 0;
   private totalSeries = 0;
@@ -21,9 +28,9 @@ export class XlsxChartImportBudget {
   beginChart(path: string): number {
     this.chartCount += 1;
     if (this.chartCount > this.limits.maxChartsPerWorkbook) {
-      throw new XlsxChartImportError(
+      throw new XlsxChartImportLimitError(
         `XLSX 图表数量超过安全限制：${this.limits.maxChartsPerWorkbook}`,
-        { cause: path },
+        path,
       );
     }
     return this.chartCount - 1;
@@ -31,16 +38,16 @@ export class XlsxChartImportBudget {
 
   assertSeriesCount(count: number, path: string): void {
     if (count > this.limits.maxSeriesPerChart) {
-      throw new XlsxChartImportError(
+      throw new XlsxChartImportLimitError(
         `XLSX 单个图表系列数量超过安全限制：${this.limits.maxSeriesPerChart}`,
-        { cause: path },
+        path,
       );
     }
     this.totalSeries += count;
     if (this.totalSeries > this.limits.maxTotalSeries) {
-      throw new XlsxChartImportError(
+      throw new XlsxChartImportLimitError(
         `XLSX 图表系列总数超过安全限制：${this.limits.maxTotalSeries}`,
-        { cause: path },
+        path,
       );
     }
   }

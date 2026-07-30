@@ -148,6 +148,31 @@ async function chartXlsxBytes(type: "line" | "doughnut" | "radar" = "line"): Pro
   });
 }
 
+async function drawingWithoutRelationshipsXlsxBytes(): Promise<Uint8Array> {
+  const zip = new JSZip();
+  zip.file(
+    "xl/workbook.xml",
+    '<?xml version="1.0"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="数据" sheetId="1" r:id="rId1"/></sheets></workbook>',
+  );
+  zip.file(
+    "xl/_rels/workbook.xml.rels",
+    '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>',
+  );
+  zip.file(
+    "xl/worksheets/sheet1.xml",
+    '<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetData/><drawing r:id="rId1"/></worksheet>',
+  );
+  zip.file(
+    "xl/worksheets/_rels/sheet1.xml.rels",
+    '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing1.xml"/></Relationships>',
+  );
+  zip.file(
+    "xl/drawings/drawing1.xml",
+    '<?xml version="1.0"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing"><xdr:twoCellAnchor><xdr:from/><xdr:to/><xdr:cxnSp><xdr:nvCxnSpPr/><xdr:spPr/></xdr:cxnSp></xdr:twoCellAnchor></xdr:wsDr>',
+  );
+  return zip.generateAsync({ type: "uint8array" });
+}
+
 describe("parseSpreadsheetFile", () => {
   it("parses CSV bytes into the shared import model", async () => {
     const result = await parseSpreadsheetFile({
@@ -341,6 +366,13 @@ describe("parseSpreadsheetFile", () => {
         maxTotalSeries: 10_000,
       }),
     ).rejects.toThrow("图表数量超过安全限制");
+  });
+
+  it("ignores a non-chart drawing without a relationships part", async () => {
+    const result = await parseXlsxCharts(await drawingWithoutRelationshipsXlsxBytes());
+
+    expect(result.charts).toEqual([]);
+    expect(result.warnings).toEqual([]);
   });
 
   it("skips chart presentation that is not represented by ChartSpec", async () => {

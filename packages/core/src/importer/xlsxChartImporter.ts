@@ -3,6 +3,7 @@ import type { ImportedChartInput, ImportedWorkbookWarning } from "../excel/workb
 import {
   DEFAULT_XLSX_CHART_IMPORT_LIMITS,
   XlsxChartImportBudget,
+  XlsxChartImportLimitError,
   type XlsxChartImportLimits,
 } from "./xlsxChartLimits.js";
 import { parseAnchor, parseChart } from "./xlsxChartPartParser.js";
@@ -18,6 +19,7 @@ import {
   children,
   descendant,
   readRequiredXml,
+  readXml,
   XlsxChartImportError,
   XlsxChartUnsupportedError,
 } from "./xlsxXml.js";
@@ -48,15 +50,33 @@ async function parseDrawing(
   warnings: ImportedWorkbookWarning[],
 ): Promise<ImportedChartInput[]> {
   const root = await readRequiredXml(zip, drawingPath);
-  const relationships = await readRelationships(zip, relationshipPath(drawingPath));
+  const anchors = root.children.filter((node) => descendant(node, "chart"));
+  if (anchors.length === 0) return [];
+
+  const relationships = await readXml(zip, relationshipPath(drawingPath));
+  if (!relationships) {
+    recordUnsupportedFeature(warnings, "charts");
+    return [];
+  }
+  const relationshipMap = new Map<string, { target: string; type: string }>();
+  for (const relation of children(relationships, "Relationship")) {
+    const id = attribute(relation, "Id");
+    const target = attribute(relation, "Target");
+    const type = attribute(relation, "Type");
+    if (id && target && type) relationshipMap.set(id, { target, type });
+  }
   const charts: ImportedChartInput[] = [];
 
-  for (const anchor of root.children.filter((node) => descendant(node, "chart"))) {
+  for (const anchor of anchors) {
     const chartNode = descendant(anchor, "chart");
     const relationId = chartNode ? attribute(chartNode, "id") : undefined;
     if (!relationId) continue;
 
-    const relation = relationshipTarget(relationships, relationId, drawingPath);
+    const relation = relationshipMap.get(relationId);
+    if (!relation) {
+      recordUnsupportedFeature(warnings, "charts");
+      continue;
+    }
     const chartPath = resolveTarget(drawingPath, relation.target);
     const chartIndex = budget.beginChart(chartPath);
     const chartXml = await readRequiredXml(zip, chartPath);
@@ -74,6 +94,11 @@ async function parseDrawing(
       );
     } catch (error) {
       if (error instanceof XlsxChartUnsupportedError) {
+        recordUnsupportedFeature(warnings, "charts");
+        continue;
+      }
+      if (error instanceof XlsxChartImportLimitError) throw error;
+      if (error instanceof XlsxChartImportError) {
         recordUnsupportedFeature(warnings, "charts");
         continue;
       }
@@ -135,21 +160,40 @@ export async function parseXlsxCharts(
     const drawingId = attribute(child(worksheet, "drawing") ?? worksheet, "id");
     if (!drawingId) continue;
 
-    const drawingRelation = relationshipTarget(
-      await readRelationships(zip, relationshipPath(sheet.path)),
-      drawingId,
-      sheet.path,
-    );
+    let drawingRelation: { target: string; type: string };
+    try {
+      drawingRelation = relationshipTarget(
+        await readRelationships(zip, relationshipPath(sheet.path)),
+        drawingId,
+        sheet.path,
+      );
+    } catch (error) {
+      if (error instanceof XlsxChartImportError) {
+        recordUnsupportedFeature(warnings, "charts");
+        continue;
+      }
+      throw error;
+    }
     const drawingPath = resolveTarget(sheet.path, drawingRelation.target);
-    charts.push(
-      ...(await parseDrawing(zip, drawingPath, sheet.key, sheetKeyByName, budget, warnings)),
-    );
+    try {
+      charts.push(
+        ...(await parseDrawing(zip, drawingPath, sheet.key, sheetKeyByName, budget, warnings)),
+      );
+    } catch (error) {
+      if (error instanceof XlsxChartImportLimitError) throw error;
+      if (error instanceof XlsxChartImportError) {
+        recordUnsupportedFeature(warnings, "charts");
+        continue;
+      }
+      throw error;
+    }
   }
   return { charts, warnings };
 }
 
 export {
   DEFAULT_XLSX_CHART_IMPORT_LIMITS,
+  XlsxChartImportLimitError,
   type XlsxChartImportLimits,
 } from "./xlsxChartLimits.js";
 export { XlsxChartImportError } from "./xlsxXml.js";
