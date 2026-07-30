@@ -49,6 +49,7 @@ describe("runAgentLoop compaction lifecycle", () => {
       }),
     };
     let preparedContext: any;
+    const publishedEvents: any[] = [];
     let resolvePrepared!: () => void;
     let rejectPrepared!: (error: unknown) => void;
     const prepared = new Promise<void>((resolve, reject) => {
@@ -96,6 +97,7 @@ describe("runAgentLoop compaction lifecycle", () => {
     }));
 
     const result = await runAgentLoop({
+      turnId: "test-turn",
       modelConfig: { baseUrl: "http://model", apiKey: "test-key", modelName: "test-model" },
       transcript: [
         { cursor: 0, message: { role: "user", parts: [{ type: "text", text: "旧请求一" }] } },
@@ -126,7 +128,12 @@ describe("runAgentLoop compaction lifecycle", () => {
       compactionCheckpointStore: checkpointStore,
       contextWindowTokens: 10_000,
       outputReserveTokens: 100,
-      eventSink: { publish: vi.fn((event) => publishedTypes.push(event.type)) },
+      eventSink: {
+        publish: vi.fn((event) => {
+          publishedTypes.push(event.type);
+          publishedEvents.push(event);
+        }),
+      },
     } as any);
 
     await Promise.race([
@@ -144,8 +151,22 @@ describe("runAgentLoop compaction lifecycle", () => {
 
     expect(completion.status).toBe("completed");
     expect(publishedTypes).toEqual(
-      expect.arrayContaining(["context.compaction.started", "context.compaction.completed"]),
+      expect.arrayContaining([
+        "context.automatic_compaction.started",
+        "context.automatic_compaction.completed",
+      ]),
     );
+    const startedEvent = publishedEvents.find(
+      (event) => event.type === "context.automatic_compaction.started",
+    );
+    const completedEvent = publishedEvents.find(
+      (event) => event.type === "context.automatic_compaction.completed",
+    );
+    expect(startedEvent.payload).toMatchObject({ messageId: "test-turn-assistant" });
+    expect(completedEvent.payload).toMatchObject({
+      messageId: "test-turn-assistant",
+      compactionId: startedEvent.payload.compactionId,
+    });
     expect(preparedContext.messages[0]).toMatchObject({ role: "user" });
     expect(preparedContext.messages[0].parts[0].text).toContain("<context-summary>");
     expect(checkpoint).toMatchObject({
@@ -158,5 +179,81 @@ describe("runAgentLoop compaction lifecycle", () => {
         parts: [{ type: "text", text: expect.stringContaining("<context-summary>") }],
       }),
     );
+  });
+
+  it("resolves a failed completion when automatic compaction fails", async () => {
+    mocks.generateText.mockRejectedValue(new Error("summary unavailable"));
+    const publishedTypes: string[] = [];
+
+    mocks.streamText.mockImplementation((options: any) => ({
+      text: (async () => {
+        await options.onStepFinish({
+          stepNumber: 0,
+          finishReason: "stop",
+          usage: { inputTokens: 5_000 },
+          response: { messages: [] },
+          request: { messages: options.messages },
+        });
+        await options.prepareStep({
+          messages: options.messages,
+          instructions: options.system,
+          activeTools: [],
+        });
+        return "unreachable";
+      })(),
+      responseMessages: Promise.resolve([]),
+    }));
+
+    const result = await runAgentLoop({
+      turnId: "failed-compaction-turn",
+      modelConfig: { baseUrl: "http://model", apiKey: "test-key", modelName: "test-model" },
+      transcript: [
+        { cursor: 0, message: { role: "user", parts: [{ type: "text", text: "old request" }] } },
+        {
+          cursor: 1,
+          message: { role: "assistant", parts: [{ type: "text", text: "old answer" }] },
+        },
+        { cursor: 2, message: { role: "user", parts: [{ type: "text", text: "current" }] } },
+      ],
+      systemPrompt: "system",
+      workspace: [],
+      tools: [],
+      toolExecutor: { execute: vi.fn() },
+      compaction: {
+        triggerRatio: 0.5,
+        safetyMarginTokens: 0,
+        outputReserveTokens: 100,
+        summaryMaxTokens: 1_000,
+        keepRecentTokens: 100,
+        maxCompactionRetries: 1,
+      },
+      compactionContextKey: "session:failed-compaction",
+      compactionCheckpointStore: {
+        load: vi.fn(async () => null),
+        save: vi.fn(),
+      },
+      contextWindowTokens: 10_000,
+      outputReserveTokens: 100,
+      eventSink: {
+        publish: vi.fn((event) => publishedTypes.push(event.type)),
+      },
+    } as any);
+
+    const completion = await Promise.race([
+      result.completion,
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("failed compaction completion did not settle")), 2_000),
+      ),
+    ]);
+
+    expect(completion.status).toBe("failed");
+    expect(publishedTypes).toEqual(
+      expect.arrayContaining([
+        "context.automatic_compaction.started",
+        "context.automatic_compaction.failed",
+      ]),
+    );
+    expect(publishedTypes).not.toContain("context.automatic_compaction.completed");
+    expect(mocks.streamText).toHaveBeenCalledTimes(1);
   });
 });

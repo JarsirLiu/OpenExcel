@@ -10,7 +10,7 @@ import {
   contextUsageFromEvent,
   isNewerContextUsage,
 } from "../context/contextUsage";
-import type { ContextCompactionStatus } from "./contextCompactionStatus";
+import type { AutomaticContextCompactionState } from "./automaticContextCompactionStatus";
 
 type ChatEvent = import("../transport/chatEventStream").ChatEvent;
 
@@ -26,7 +26,6 @@ export class ConversationStore {
   #listeners = new Set<() => void>();
   #seenEventIds = new Set<string>();
   #seenEventSequences = new Map<string, Set<number>>();
-  #compactionStatus: ContextCompactionStatus = "idle";
   #contextUsage: ContextUsageSnapshot | null = null;
 
   constructor(initialMessages: readonly ChatMessage[] = []) {
@@ -35,10 +34,6 @@ export class ConversationStore {
 
   get messages() {
     return this.#messages;
-  }
-
-  get compactionStatus() {
-    return this.#compactionStatus;
   }
 
   get contextUsage() {
@@ -59,7 +54,6 @@ export class ConversationStore {
 
   replaceHistory(messages: readonly ChatMessage[]) {
     this.#messages = [...messages];
-    this.#compactionStatus = "idle";
     this.#seenEventIds.clear();
     this.#seenEventSequences.clear();
     this.#publish();
@@ -78,7 +72,6 @@ export class ConversationStore {
 
   appendOptimisticUserMessage(message: ChatMessage) {
     this.#messages = [...this.#messages, message];
-    this.#compactionStatus = "idle";
     this.#publish();
   }
 
@@ -92,7 +85,6 @@ export class ConversationStore {
     this.#seenEventSequences.set(runKey, sequences);
 
     if (event.type === "run.started") {
-      this.#compactionStatus = "idle";
       const payload = asRecord(event.payload);
       const userMessage = payload?.userMessage;
       if (
@@ -119,20 +111,20 @@ export class ConversationStore {
       return;
     }
 
-    if (event.type === "context.compaction.started") {
-      this.#compactionStatus = "running";
+    if (event.type === "context.automatic_compaction.started") {
+      this.#applyCompactionEvent(event, "running");
       this.#publish();
       return;
     }
 
-    if (event.type === "context.compaction.completed") {
-      this.#compactionStatus = "completed";
+    if (event.type === "context.automatic_compaction.completed") {
+      this.#applyCompactionEvent(event, "completed");
       this.#publish();
       return;
     }
 
-    if (event.type === "context.compaction.failed") {
-      this.#compactionStatus = "failed";
+    if (event.type === "context.automatic_compaction.failed") {
+      this.#applyCompactionEvent(event, "failed");
       this.#publish();
       return;
     }
@@ -152,10 +144,8 @@ export class ConversationStore {
       event.type === "run.cancelled" ||
       event.type === "run.failed"
     ) {
-      const compactionFailed = this.#compactionStatus === "running";
-      if (compactionFailed) this.#compactionStatus = "failed";
-      const toolsClosed = this.#closePendingTools(event.type);
-      if (compactionFailed && !toolsClosed) this.#publish();
+      this.#assertNoRunningAutomaticCompaction();
+      this.#closePendingTools(event.type);
     }
   }
 
@@ -194,9 +184,8 @@ export class ConversationStore {
 
   #applyToolEvent(event: ChatEvent) {
     const payload = asRecord(event.payload) ?? {};
-    const toolCallId = typeof payload.toolCallId === "string" ? payload.toolCallId : "";
-    const toolName = typeof payload.toolName === "string" ? payload.toolName : "";
-    if (!toolCallId || !toolName) return;
+    const toolCallId = requiredStringField(payload, "toolCallId");
+    const toolName = requiredStringField(payload, "toolName");
 
     const messageId = assistantMessageId(payload);
     const messageIndex = this.#messages.findIndex((message) => message.id === messageId);
@@ -255,6 +244,52 @@ export class ConversationStore {
     return changed;
   }
 
+  #assertNoRunningAutomaticCompaction() {
+    for (const message of this.#messages) {
+      if (message.role !== "assistant" || !Array.isArray(message.parts)) continue;
+      if (
+        message.parts.some(
+          (part) => part.type === "automatic-context-compaction" && part.status === "running",
+        )
+      ) {
+        throw new Error(`运行终止前自动压缩未结束: ${message.id ?? "unknown"}`);
+      }
+    }
+  }
+
+  #applyCompactionEvent(event: ChatEvent, status: AutomaticContextCompactionState) {
+    const payload = asRecord(event.payload);
+    const messageId = requiredStringField(payload, "messageId");
+    const compactionId = requiredStringField(payload, "compactionId");
+    const messageIndex = this.#messages.findIndex((message) => message.id === messageId);
+    if (messageIndex < 0) {
+      throw new Error(`自动压缩事件关联不到 assistant 消息: ${messageId}`);
+    }
+    const message = this.#messages[messageIndex];
+    if (message.role !== "assistant") {
+      throw new Error(`上下文压缩事件关联了非 assistant 消息: ${messageId}`);
+    }
+    const parts = (message.parts ?? []).map((part) => ({ ...part }));
+    const partIndex = parts.findIndex((part) => part.id === compactionId);
+    if (status === "running") {
+      if (partIndex >= 0) throw new Error(`上下文压缩已存在: ${compactionId}`);
+      parts.push({ id: compactionId, type: "automatic-context-compaction", status });
+    } else {
+      if (partIndex < 0) throw new Error(`收到未匹配的上下文压缩事件: ${compactionId}`);
+      if (parts[partIndex].type !== "automatic-context-compaction") {
+        throw new Error(`上下文压缩 ID 关联了错误的消息 part: ${compactionId}`);
+      }
+      if (parts[partIndex].status !== "running") {
+        throw new Error(`上下文压缩已处于终态: ${compactionId}`);
+      }
+      parts[partIndex] = { ...parts[partIndex], status };
+    }
+    const nextMessage = { ...message, parts };
+    this.#messages = this.#messages.map((candidate, index) =>
+      index === messageIndex ? nextMessage : candidate,
+    );
+  }
+
   removeAfterUserMessage(messageId: string) {
     const index = this.#messages.findIndex((message) => message.id === messageId);
     if (index < 0) throw new Error("会话消息与撤销结果不一致，无法更新本地状态");
@@ -281,20 +316,31 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
     : undefined;
 }
 
+function requiredStringField(value: Record<string, unknown> | undefined, field: string) {
+  const result = value?.[field];
+  if (typeof result !== "string" || result.length === 0) {
+    throw new Error(`事件缺少 ${field}`);
+  }
+  return result;
+}
+
 function isMessage(value: unknown): value is ChatMessage {
   const message = asRecord(value);
   return typeof message?.id === "string" && typeof message.role === "string";
 }
 
 function assistantMessageId(payload: Record<string, unknown> | undefined) {
-  if (typeof payload?.messageId === "string") return payload.messageId;
-  if (typeof payload?.turnId === "string" && payload.turnId.length > 0) {
-    return `${payload.turnId}-assistant`;
+  const value = payload?.messageId;
+  if (typeof value !== "string" || value.length === 0) {
+    throw new Error("assistant 事件缺少 messageId");
   }
-  return "assistant-live";
+  return value;
 }
 
 function partIdForDelta(event: ChatEvent, payload: Record<string, unknown>) {
-  if (typeof payload.partId === "string") return payload.partId;
-  return `${assistantMessageId(payload)}-${event.type === "reasoning.delta" ? "reasoning" : "text"}`;
+  const value = payload.partId;
+  if (typeof value !== "string" || value.length === 0) {
+    throw new Error(`${event.type} 事件缺少 partId`);
+  }
+  return value;
 }

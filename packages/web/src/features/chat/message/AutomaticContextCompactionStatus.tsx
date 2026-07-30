@@ -1,9 +1,11 @@
-import type { ContextCompactionStatus as CompactionStatus } from "../conversation/contextCompactionStatus";
-import styles from "./ContextCompactionStatus.module.css";
+import type { AutomaticContextCompactionState } from "../conversation/automaticContextCompactionStatus";
+import styles from "./AutomaticContextCompactionStatus.module.css";
 
-export function ContextCompactionStatus({ status }: { status: CompactionStatus }) {
-  if (status === "idle") return null;
-
+export function AutomaticContextCompactionStatus({
+  status,
+}: {
+  status: AutomaticContextCompactionState;
+}) {
   const isRunning = status === "running";
   const isFailed = status === "failed";
   const label = isRunning

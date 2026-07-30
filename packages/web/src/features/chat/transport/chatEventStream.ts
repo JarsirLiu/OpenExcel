@@ -10,9 +10,9 @@ export type ChatEvent = {
     | "tool.started"
     | "tool.finished"
     | "step.finished"
-    | "context.compaction.started"
-    | "context.compaction.completed"
-    | "context.compaction.failed"
+    | "context.automatic_compaction.started"
+    | "context.automatic_compaction.completed"
+    | "context.automatic_compaction.failed"
     | "run.completed"
     | "run.cancelled"
     | "run.failed";

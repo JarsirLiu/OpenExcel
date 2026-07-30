@@ -27,23 +27,110 @@ describe("ConversationStore", () => {
     expect(store.messages.at(-1)?.parts?.[0]).toMatchObject({ text: "答" });
   });
 
-  it("projects compaction lifecycle events without adding a transcript message", () => {
+  it("projects compaction lifecycle events inside the current assistant message", () => {
     const store = new ConversationStore();
-    const event = (type: "context.compaction.started" | "context.compaction.completed") => ({
+    const event = (
+      type: "context.automatic_compaction.started" | "context.automatic_compaction.completed",
+    ) => ({
       eventId: `event-${type}`,
       sequence: type.endsWith("started") ? 1 : 2,
       type,
       occurredAt: "2026-07-26T00:00:00.000Z",
-      payload: {},
+      payload: { messageId: "assistant-1", compactionId: "compaction-1" },
     });
 
-    store.applyEvent(event("context.compaction.started"));
-    expect(store.compactionStatus).toBe("running");
-    expect(store.messages).toEqual([]);
+    store.applyEvent({
+      eventId: "event-delta-before",
+      sequence: 0,
+      type: "message.delta",
+      occurredAt: "2026-07-26T00:00:00.000Z",
+      payload: { messageId: "assistant-1", partId: "text-1", delta: "之前" },
+    });
+    store.applyEvent(event("context.automatic_compaction.started"));
+    expect(store.messages).toMatchObject([
+      {
+        id: "assistant-1",
+        role: "assistant",
+        parts: [
+          { id: "text-1", type: "text", text: "之前" },
+          {
+            id: "compaction-1",
+            type: "automatic-context-compaction",
+            status: "running",
+          },
+        ],
+      },
+    ]);
 
-    store.applyEvent(event("context.compaction.completed"));
-    expect(store.compactionStatus).toBe("completed");
-    expect(store.messages).toEqual([]);
+    store.applyEvent(event("context.automatic_compaction.completed"));
+    expect(store.messages).toMatchObject([
+      {
+        id: "assistant-1",
+        parts: expect.arrayContaining([
+          {
+            id: "compaction-1",
+            type: "automatic-context-compaction",
+            status: "completed",
+          },
+        ]),
+      },
+    ]);
+    store.applyEvent({
+      eventId: "event-delta-after",
+      sequence: 3,
+      type: "message.delta",
+      occurredAt: "2026-07-26T00:00:00.000Z",
+      payload: { messageId: "assistant-1", partId: "text-1", delta: "之后" },
+    });
+    expect(store.messages).toHaveLength(1);
+    expect(store.messages[0].id).toBe("assistant-1");
+    expect(store.messages[0].parts).toContainEqual(
+      expect.objectContaining({
+        type: "automatic-context-compaction",
+        status: "completed",
+      }),
+    );
+    expect(store.messages[0].parts).toContainEqual(
+      expect.objectContaining({ id: "text-1", text: "之前之后" }),
+    );
+  });
+
+  it("rejects automatic compaction without an existing assistant message", () => {
+    const store = new ConversationStore();
+    expect(() =>
+      store.applyEvent({
+        eventId: "automatic-compaction-start",
+        sequence: 1,
+        type: "context.automatic_compaction.started",
+        occurredAt: "2026-07-26T00:00:00.000Z",
+        payload: { messageId: "missing-assistant", compactionId: "compaction-1" },
+      }),
+    ).toThrow("自动压缩事件关联不到 assistant 消息");
+  });
+
+  it("rejects terminal run events while automatic compaction is running", () => {
+    const store = new ConversationStore([
+      {
+        id: "assistant-1",
+        role: "assistant",
+        parts: [
+          {
+            id: "compaction-1",
+            type: "automatic-context-compaction",
+            status: "running",
+          },
+        ],
+      },
+    ]);
+    expect(() =>
+      store.applyEvent({
+        eventId: "run-failed",
+        sequence: 2,
+        type: "run.failed",
+        occurredAt: "2026-07-26T00:00:00.000Z",
+        payload: {},
+      }),
+    ).toThrow("运行终止前自动压缩未结束");
   });
 
   it("projects the latest step context usage without adding a message", () => {

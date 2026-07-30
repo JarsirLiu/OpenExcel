@@ -75,7 +75,7 @@ export function DemoChatSidebar({
           </div>
         </div>
         <div className={chatPanelStyles.container}>
-          <MessageList messages={messages} isStreaming={isStreaming} compactionStatus="idle" />
+          <MessageList messages={messages} isStreaming={isStreaming} />
           <ChatComposer
             isStreaming={isStreaming}
             onSend={onStart}

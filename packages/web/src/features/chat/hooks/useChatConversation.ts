@@ -56,7 +56,6 @@ export function useChatConversation({
   const store = storeRef.current;
   const liveSessionIdRef = useRef<number | null>(null);
   const [messages, setMessages] = useState(store.messages);
-  const [compactionStatus, setCompactionStatus] = useState(store.compactionStatus);
   const [contextUsage, setContextUsage] = useState(store.contextUsage);
   const [historicalRefreshIds] = useState<Set<string>>(() => new Set());
   const hasPrimedMutationHistoryRef = useRef(false);
@@ -68,7 +67,6 @@ export function useChatConversation({
     () =>
       store.subscribe(() => {
         setMessages(store.messages);
-        setCompactionStatus(store.compactionStatus);
         setContextUsage(store.contextUsage);
       }),
     [store],
@@ -178,7 +176,6 @@ export function useChatConversation({
 
   return {
     messages,
-    compactionStatus,
     contextUsage,
     historicalToolCallIds,
     error: run.error,

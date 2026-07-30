@@ -1,5 +1,6 @@
 import type { JSX } from "react";
 import { getMessageText } from "@/features/shared/messageUtils";
+import { AutomaticContextCompactionStatus } from "./AutomaticContextCompactionStatus";
 import styles from "./MessageItem.module.css";
 import { MessageMarkdown } from "./MessageMarkdown";
 import { ReasoningCard } from "./ReasoningCard";
@@ -164,6 +165,14 @@ function renderAssistantParts(msg: any, isMessageStreaming: boolean) {
       case "step-start":
         flushText();
         result.push(<div key={getPartKey(part, i)} className={styles.stepDivider} />);
+        break;
+      case "automatic-context-compaction":
+        flushText();
+        result.push(
+          <div key={getPartKey(part, i)}>
+            <AutomaticContextCompactionStatus status={part.status} />
+          </div>,
+        );
         break;
       default:
         if (part.type.startsWith("tool-")) {

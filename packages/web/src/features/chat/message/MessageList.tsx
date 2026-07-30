@@ -1,6 +1,4 @@
 import { useCallback, useEffect, useRef } from "react";
-import type { ContextCompactionStatus as CompactionStatus } from "../conversation/contextCompactionStatus";
-import { ContextCompactionStatus } from "./ContextCompactionStatus";
 import { MessageItem } from "./MessageItem";
 import styles from "./MessageList.module.css";
 import { MessageRenderBoundary } from "./MessageRenderBoundary";
@@ -8,7 +6,6 @@ import { MessageRenderBoundary } from "./MessageRenderBoundary";
 export function MessageList({
   messages,
   isStreaming,
-  compactionStatus,
   onRegenerate,
   onUndo,
   isUndoing,
@@ -20,7 +17,6 @@ export function MessageList({
 }: {
   messages: any[];
   isStreaming: boolean;
-  compactionStatus: CompactionStatus;
   onRegenerate?: () => void;
   onUndo?: () => void;
   isUndoing?: boolean;
@@ -144,81 +140,7 @@ export function MessageList({
           />
         </MessageRenderBoundary>
       ))}
-      <ContextCompactionStatus status={compactionStatus} />
       <div ref={messagesEndRef} />
-
-      {isStreaming &&
-        (() => {
-          const last = messages[messages.length - 1];
-          const showDots =
-            last?.role !== "assistant" ||
-            !last.parts?.some(
-              (p: any) =>
-                p?.type === "text" ||
-                (typeof p?.type === "string" && p.type.startsWith("tool-")) ||
-                p?.type === "reasoning",
-            );
-          if (!showDots) return null;
-          return (
-            <div style={{ marginBottom: 24 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 5 }}>
-                <div
-                  style={{
-                    width: 24,
-                    height: 24,
-                    borderRadius: "50%",
-                    background: "var(--avatar-ai)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "#fff",
-                    fontSize: 10,
-                    fontWeight: 600,
-                    flexShrink: 0,
-                    userSelect: "none",
-                  }}
-                >
-                  AI
-                </div>
-                <span style={{ fontSize: 13, fontWeight: 600, color: "var(--foreground)" }}>
-                  AI 助手
-                </span>
-              </div>
-              <div style={{ paddingLeft: 33, display: "flex", alignItems: "center", gap: 6 }}>
-                <span
-                  style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: "50%",
-                    background: "var(--hint-foreground)",
-                    animation: "pulse 1.4s infinite",
-                    display: "inline-block",
-                  }}
-                />
-                <span
-                  style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: "50%",
-                    background: "var(--hint-foreground)",
-                    animation: "pulse 1.4s infinite 0.2s",
-                    display: "inline-block",
-                  }}
-                />
-                <span
-                  style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: "50%",
-                    background: "var(--hint-foreground)",
-                    animation: "pulse 1.4s infinite 0.4s",
-                    display: "inline-block",
-                  }}
-                />
-              </div>
-            </div>
-          );
-        })()}
     </div>
   );
 }

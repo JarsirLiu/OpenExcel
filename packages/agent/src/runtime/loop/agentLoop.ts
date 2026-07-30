@@ -130,6 +130,8 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
   const tokenUsageTracker = new TokenUsageTracker();
   let compactionCoordinator: ContextCompactionCoordinator | undefined;
   let lastActiveTools: readonly string[] | undefined;
+  let activeCompactionId: string | undefined;
+  const assistantMessageId = `${input.turnId}-assistant`;
   if (input.compaction) {
     if (!input.compactionCheckpointStore || !input.compactionContextKey) {
       throw new Error("Context compaction requires a checkpoint store and context key");
@@ -150,18 +152,37 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
       convertToModelMessages: convertMessages,
       resetTokenBaseline: () => tokenUsageTracker.resetAfterCompaction(),
       onCompactionStarted: async () => {
-        await emitEvent("context.compaction.started", {});
+        if (activeCompactionId !== undefined) {
+          throw new Error("Context compaction started before the previous compaction completed");
+        }
+        activeCompactionId = crypto.randomUUID();
+        await emitEvent("context.automatic_compaction.started", {
+          compactionId: activeCompactionId,
+          messageId: assistantMessageId,
+        });
       },
       onCompactionCompleted: async (checkpoint) => {
-        await emitEvent("context.compaction.completed", {
+        if (activeCompactionId === undefined) {
+          throw new Error("Context compaction completed without a started compaction");
+        }
+        await emitEvent("context.automatic_compaction.completed", {
+          compactionId: activeCompactionId,
+          messageId: assistantMessageId,
           checkpointVersion: checkpoint.version,
           coveredTranscriptCursor: checkpoint.coveredTranscriptCursor,
         });
+        activeCompactionId = undefined;
       },
       onCompactionFailed: async (error) => {
-        await emitEvent("context.compaction.failed", {
+        if (activeCompactionId === undefined) {
+          throw new Error("Context compaction failed without a started compaction");
+        }
+        await emitEvent("context.automatic_compaction.failed", {
+          compactionId: activeCompactionId,
+          messageId: assistantMessageId,
           stage: error instanceof ContextCompactionError ? error.stage : "unknown",
         });
+        activeCompactionId = undefined;
       },
     });
     const initialContext = await compactionCoordinator.initialize();

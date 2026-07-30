@@ -141,7 +141,7 @@ be downgraded to an ordinary tool error.
 
 ## Events and connections
 
-Current events cover Run, step, message, reasoning, tool, and context-compaction
+Current events cover Run, step, message, reasoning, tool, and automatic-context-compaction
 lifecycle stages. Server event persistence is independent of the HTTP
 subscriber. Closing a browser connection cancels the reader but does not
 directly terminate the server Run. An explicit cancellation request triggers
@@ -183,7 +183,18 @@ calls in a Run.
 Conversation history is persisted independently of model context selection.
 The context window selects as many complete recent turns as fit after fixed
 context and output reservation. Automatic compaction summarizes older turns
-when the configured trigger is reached. Context trimming or compaction never
+when the configured trigger is reached. Automatic compaction pauses the
+current provider request, persists a checkpoint, rebuilds the active model
+context from that checkpoint, and continues the same Run and assistant turn.
+It does not wait for another user message and does not create a new assistant
+message.
+
+The automatic compaction lifecycle events carry the active assistant
+`messageId` and a stable per-compaction `compactionId`. The Web renders the
+lifecycle as an `automatic-context-compaction` part inside that assistant
+message. It is not a top-level system message and never enters the model-facing
+transcript. Manual compaction, when added, must use a separate event and part
+name. Context trimming or compaction never
 deletes the canonical transcript from the database and is not a history
 retention policy.
 

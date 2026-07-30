@@ -9,9 +9,7 @@ describe("MessageList", () => {
       role: "assistant",
       parts: [{ type: "text", text: "先读取数据。" }],
     };
-    const { container, rerender } = render(
-      <MessageList messages={[initialMessage]} isStreaming compactionStatus="idle" />,
-    );
+    const { container, rerender } = render(<MessageList messages={[initialMessage]} isStreaming />);
     const assistantElement = container.querySelector('[class*="assistantMsg"]');
 
     rerender(
@@ -23,7 +21,6 @@ describe("MessageList", () => {
           },
         ]}
         isStreaming
-        compactionStatus="idle"
       />,
     );
 
@@ -46,7 +43,6 @@ describe("MessageList", () => {
           },
         ]}
         isStreaming
-        compactionStatus="idle"
       />,
     );
 
@@ -54,17 +50,69 @@ describe("MessageList", () => {
     expect(screen.getByText("当前消息的思考")).toBeTruthy();
   });
 
-  it("shows compaction progress separately from conversation messages", () => {
-    const { rerender } = render(
-      <MessageList messages={[]} isStreaming compactionStatus="running" />,
+  it("renders compaction progress inside the assistant message", () => {
+    const { container, rerender } = render(
+      <MessageList
+        messages={[
+          {
+            id: "assistant-1",
+            role: "assistant",
+            parts: [
+              { type: "text", text: "之前" },
+              {
+                id: "compaction-1",
+                type: "automatic-context-compaction",
+                status: "running",
+              },
+            ],
+          },
+        ]}
+        isStreaming
+      />,
     );
 
     expect(screen.getByRole("status")).toHaveTextContent("正在压缩上下文...");
+    expect(container.querySelectorAll('[class*="assistantMsg"]')).toHaveLength(1);
 
-    rerender(<MessageList messages={[]} isStreaming compactionStatus="completed" />);
+    rerender(
+      <MessageList
+        messages={[
+          {
+            id: "assistant-1",
+            role: "assistant",
+            parts: [
+              { type: "text", text: "之前" },
+              {
+                id: "compaction-1",
+                type: "automatic-context-compaction",
+                status: "completed",
+              },
+            ],
+          },
+        ]}
+        isStreaming
+      />,
+    );
     expect(screen.getByRole("status")).toHaveTextContent("上下文已压缩");
 
-    rerender(<MessageList messages={[]} isStreaming compactionStatus="failed" />);
+    rerender(
+      <MessageList
+        messages={[
+          {
+            id: "assistant-1",
+            role: "assistant",
+            parts: [
+              {
+                id: "compaction-1",
+                type: "automatic-context-compaction",
+                status: "failed",
+              },
+            ],
+          },
+        ]}
+        isStreaming
+      />,
+    );
     expect(screen.getByRole("status")).toHaveTextContent("!上下文压缩失败");
   });
 });
