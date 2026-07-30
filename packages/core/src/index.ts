@@ -197,7 +197,15 @@ export type {
   SheetCellQuery,
   SheetCellQueryOptions,
 } from "./sheetTools/sheetCellQuery.js";
-export { findSheetCells } from "./sheetTools/sheetCellQuery.js";
+export { querySheetCells } from "./sheetTools/sheetCellQuery.js";
+export {
+  projectSheetOverview,
+  projectSheetTable,
+  type SheetOverviewProjection,
+  type SheetTableAnnotation,
+  type SheetTableProjection,
+  type SheetTableRow,
+} from "./sheetTools/sheetDataPresentation.js";
 export type {
   FormulaException,
   FormulaPattern,
@@ -217,10 +225,7 @@ export type {
   SheetObjectSource,
   SheetObjectType,
 } from "./sheetTools/sheetObjectProjection.js";
-export {
-  projectSheetObjects,
-  UnsupportedSheetObjectTypeError,
-} from "./sheetTools/sheetObjectProjection.js";
+export { projectSheetObjects } from "./sheetTools/sheetObjectProjection.js";
 export type {
   SheetReadContinuation,
   SheetReadPage,

@@ -120,7 +120,7 @@ describe("buildRunToolset", () => {
     await expect(
       createConcreteToolExecutor(registry, contexts).execute({
         toolName: "readSheetData",
-        input: { sheetId: 7 },
+        input: { sheetId: 7, operation: "overview" },
         toolCallId: "call-1",
         context: { toolContexts: { readSheetData: {} } },
       }),

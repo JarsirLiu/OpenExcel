@@ -40,8 +40,8 @@ describe("inventoryReconciliation demo", () => {
   it("replays reads before writes and finishes with a verification read", () => {
     expect(inventoryTimeline.map((step) => step.toolName).filter(Boolean)).toEqual([
       "readSheetData",
-      "findSheetCells",
-      "findSheetCells",
+      "readSheetData",
+      "readSheetData",
       "readSheetData",
       "writeCells",
       "readSheetData",

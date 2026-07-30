@@ -1,7 +1,7 @@
 import { normalizePreviewData, SheetPreview } from "./SheetPreview";
 import styles from "./ToolCallCard.module.css";
 
-const READ_ONLY_TOOLS = new Set(["readSheetData", "findSheetCells", "readSheetObjects"]);
+const READ_ONLY_TOOLS = new Set(["readSheetData", "readSheetObjects"]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -53,7 +53,6 @@ function getSheetLabel(output: unknown): string | null {
 function getToolSummary(toolName: string, output: unknown, input: unknown): string {
   const isSheetTool = [
     "readSheetData",
-    "findSheetCells",
     "readSheetObjects",
     "writeCells",
     "clearCells",
@@ -74,8 +73,6 @@ function getToolSummary(toolName: string, output: unknown, input: unknown): stri
   switch (toolName) {
     case "readSheetData":
       return `读取 ${sheetLabel}`;
-    case "findSheetCells":
-      return `定位 ${sheetLabel}`;
     case "readSheetObjects":
       return `读取对象 ${sheetLabel}`;
     case "writeCells":
@@ -95,8 +92,6 @@ function getSheetActionLabel(toolName: string): string {
   switch (toolName) {
     case "readSheetData":
       return "读取了 Sheet";
-    case "findSheetCells":
-      return "定位了 Sheet 单元格";
     case "readSheetObjects":
       return "读取了 Sheet 对象";
     case "writeCells":

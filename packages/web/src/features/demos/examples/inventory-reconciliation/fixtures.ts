@@ -634,13 +634,13 @@ export const inventoryTimeline: DemoStep[] = [
     id: "find-blue-cells",
     phase: "分析",
     title: "定位表3蓝色单价列",
-    toolName: "findSheetCells",
+    toolName: "readSheetData",
     toolInput: "在表3 A1:S14 中查找 style.fill 为蓝色的单元格，定位用户提到的「蓝色部分」单价列",
     toolOutput: "命中 2 片区域：D2:D12（进货单价）和 G2:G12（销售单价），共 22 个蓝色单元格",
     assistantText:
-      "用户在需求里提到「蓝色部分」对应单价列。readSheetData 不返回样式，我用 findSheetCells 按填充色定位到 D 列进货单价和 G 列销售单价是蓝色。",
+      "用户在需求里提到「蓝色部分」对应单价列。我用 readSheetData 的 find 操作按填充色定位到 D 列进货单价和 G 列销售单价是蓝色。",
     tokens: [
-      "用户在需求里提到「蓝色部分」对应单价列。readSheetData 不返回样式，我用 findSheetCells 按填充色定位到 D 列进货单价和 G 列销售单价是蓝色。",
+      "用户在需求里提到「蓝色部分」对应单价列。我用 readSheetData 的 find 操作按填充色定位到 D 列进货单价和 G 列销售单价是蓝色。",
     ],
     activeWorkbook: targetWorkbookName,
     activeSheet: targetSheetName,
@@ -651,13 +651,13 @@ export const inventoryTimeline: DemoStep[] = [
     id: "find-green-cells",
     phase: "分析",
     title: "定位表3绿色数量列",
-    toolName: "findSheetCells",
+    toolName: "readSheetData",
     toolInput: "在表3 A1:S14 中查找 style.fill 为绿色的单元格，定位用户提到的「绿色部分」数量列",
     toolOutput: "命中 7 片区域：E2:E12、H2:H12、J2:J12、L2:L12、O2:O12、P2:P12、Q2:Q12",
     assistantText:
-      "同样用 findSheetCells 定位绿色单元格：E(进货)、H(销售)、J(退货)、L(零售退货入库)、O(成本调整数量)、P(成本调整金额)、Q(期末存量) 共 7 列为绿色数量区域。",
+      "同样用 readSheetData 的 find 操作定位绿色单元格：E(进货)、H(销售)、J(退货)、L(零售退货入库)、O(成本调整数量)、P(成本调整金额)、Q(期末存量) 共 7 列为绿色数量区域。",
     tokens: [
-      "同样用 findSheetCells 定位绿色单元格：E(进货)、H(销售)、J(退货)、L(零售退货入库)、O(成本调整数量)、P(成本调整金额)、Q(期末存量) 共 7 列为绿色数量区域。",
+      "同样用 readSheetData 的 find 操作定位绿色单元格：E(进货)、H(销售)、J(退货)、L(零售退货入库)、O(成本调整数量)、P(成本调整金额)、Q(期末存量) 共 7 列为绿色数量区域。",
     ],
     activeWorkbook: targetWorkbookName,
     activeSheet: targetSheetName,

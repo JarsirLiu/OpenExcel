@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { findSheetCells } from "./sheetCellQuery.js";
+import { querySheetCells } from "./sheetCellQuery.js";
 
-describe("findSheetCells", () => {
+describe("querySheetCells", () => {
   it("finds a formatted column without putting style markers into values", () => {
-    const matches = findSheetCells(
+    const matches = querySheetCells(
       [
         { r: 0, c: 1, v: { v: "数量", m: "数量", bg: "#92d050" } },
         { r: 1, c: 1, v: { v: 2, m: "2", bg: "#92D050" } },
@@ -16,7 +16,7 @@ describe("findSheetCells", () => {
   });
 
   it("matches a formula pattern at the cell level", () => {
-    const matches = findSheetCells(
+    const matches = querySheetCells(
       [
         { r: 0, c: 1, v: { v: 10, m: "10", f: "=A1*10" } },
         { r: 1, c: 1, v: { v: 20, m: "20", f: "=A2*10" } },
@@ -28,7 +28,7 @@ describe("findSheetCells", () => {
   });
 
   it("locates date cells by semantic type", () => {
-    const matches = findSheetCells(
+    const matches = querySheetCells(
       [
         { r: 0, c: 0, v: { v: 44805, m: "2022/9/1", ct: { t: "d", fa: "m/d/yy" } } },
         { r: 1, c: 0, v: { v: 100, m: "100", ct: { t: "n" } } },
@@ -48,22 +48,22 @@ describe("findSheetCells", () => {
     ];
     const range = { startRow: 1, startCol: 1, endRow: 2, endCol: 1 };
 
-    expect(findSheetCells(celldata, { value: "目标" }, { range })).toEqual([
+    expect(querySheetCells(celldata, { value: "目标" }, { range })).toEqual([
       { range: "A1:A2", count: 2, reason: "value=目标" },
     ]);
-    expect(findSheetCells(celldata, { formula: "exists" }, { range })).toEqual([
+    expect(querySheetCells(celldata, { formula: "exists" }, { range })).toEqual([
       { range: "A1:A2", count: 2, reason: "formula=exists" },
     ]);
-    expect(findSheetCells(celldata, { style: { fill: "#92D050" } }, { range })).toEqual([
+    expect(querySheetCells(celldata, { style: { fill: "#92D050" } }, { range })).toEqual([
       { range: "A1:A2", count: 2, reason: "fill=#92D050" },
     ]);
-    expect(findSheetCells(celldata, { valueType: "formula" }, { range })).toEqual([
+    expect(querySheetCells(celldata, { valueType: "formula" }, { range })).toEqual([
       { range: "A1:A2", count: 2, reason: "type=formula" },
     ]);
   });
 
   it("finds sparse and explicit empty cells without confusing zero with empty", () => {
-    const matches = findSheetCells(
+    const matches = querySheetCells(
       [
         { r: 0, c: 0, v: { v: "商品", m: "商品" } },
         { r: 1, c: 0, v: { v: "可乐", m: "可乐" } },
@@ -83,7 +83,7 @@ describe("findSheetCells", () => {
 
   it("rejects an unbounded empty-cell search that exceeds the query limit", () => {
     expect(() =>
-      findSheetCells(
+      querySheetCells(
         [{ r: 0, c: 0, v: { v: "A", m: "A" } }],
         { valueType: "empty" },
         { range: { startRow: 1, startCol: 1, endRow: 1_001, endCol: 101 } },

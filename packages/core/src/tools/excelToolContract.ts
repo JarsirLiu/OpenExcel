@@ -64,6 +64,32 @@ const sheetCellQuerySchema = z
     message: "至少指定一个值、公式或格式条件",
   });
 
+const readSheetDataInputSchema = z.discriminatedUnion("operation", [
+  z.object({
+    sheetId: z.coerce.number().int().positive().describe("Sheet ID"),
+    operation: z.literal("overview").describe("读取 Sheet 的结构概览"),
+  }),
+  z.object({
+    sheetId: z.coerce.number().int().positive().describe("Sheet ID"),
+    operation: z.literal("range").describe("读取指定范围的数据和布局"),
+    range: sheetDataRangeSchema.optional().describe("A1 范围，例如 A1:D20；默认已使用区域"),
+    format: z
+      .enum(["compact", "exact"])
+      .default("compact")
+      .describe("compact 返回带列标题的紧凑布局；exact 返回完整二维矩阵"),
+    continuation: sheetReadContinuationSchema
+      .optional()
+      .describe("上一次读取返回的 continuation；传入后继续同一目标范围"),
+  }),
+  z.object({
+    sheetId: z.coerce.number().int().positive().describe("Sheet ID"),
+    operation: z.literal("find").describe("按值、类型、公式或格式查找单元格"),
+    range: sheetDataRangeSchema.optional().describe("搜索范围，例如 A1:Z100；默认已使用区域"),
+    query: sheetCellQuerySchema,
+    ...toolPageInputSchema,
+  }),
+]);
+
 const chartAnchorPointSchema = z.object({
   row: z.coerce.number().int().positive().describe("行号，从 1 开始"),
   col: z.coerce.number().int().positive().describe("列号，从 1 开始"),
@@ -311,7 +337,8 @@ const sheetSummaryOutputSchema = z.object({
   name: z.string(),
 });
 
-const sheetReadOutputSchema = z.object({
+const sheetReadExactOutputSchema = z.object({
+  mode: z.literal("exact"),
   workbook: workbookSummaryOutputSchema,
   sheet: sheetSummaryOutputSchema,
   range: z.string().min(1),
@@ -348,7 +375,54 @@ const sheetReadOutputSchema = z.object({
     .nullable(),
 });
 
+const sheetTableOutputSchema = z.object({
+  mode: z.literal("compact"),
+  workbook: workbookSummaryOutputSchema,
+  sheet: sheetSummaryOutputSchema,
+  range: z.string().min(1),
+  columns: z.array(z.string().min(1)),
+  rows: z.array(
+    z.object({
+      row: z.number().int().positive(),
+      values: z.array(z.union([z.string(), z.number(), z.boolean(), z.null()])),
+    }),
+  ),
+  merges: sheetReadExactOutputSchema.shape.merges,
+  formulaPatterns: sheetReadExactOutputSchema.shape.formulaPatterns,
+  annotations: z.array(
+    z.object({
+      cell: z.string().min(1),
+      formula: z.string().min(1).optional(),
+      date: z.string().min(1).optional(),
+      numberFormat: z.string().min(1).optional(),
+    }),
+  ),
+  continuation: sheetReadExactOutputSchema.shape.continuation,
+});
+
+const sheetOverviewOutputSchema = z.object({
+  mode: z.literal("overview"),
+  workbook: workbookSummaryOutputSchema,
+  sheet: sheetSummaryOutputSchema,
+  usedRange: z.string().min(1),
+  nonEmptyCellCount: z.number().int().nonnegative(),
+  mergeRanges: z.array(z.string().min(1)),
+  formulaPatterns: z.array(
+    z.object({
+      formulaR1C1: z.string().min(1),
+      count: z.number().int().positive(),
+    }),
+  ),
+  columns: z.array(
+    z.object({
+      column: z.string().min(1),
+      types: z.array(z.enum(["string", "number", "boolean", "date", "formula"])),
+    }),
+  ),
+});
+
 const sheetCellMatchesOutputSchema = z.object({
+  mode: z.literal("find"),
   workbook: workbookSummaryOutputSchema,
   sheet: sheetSummaryOutputSchema,
   matches: z.array(
@@ -361,37 +435,23 @@ const sheetCellMatchesOutputSchema = z.object({
   ...toolPageOutputSchema.shape,
 });
 
+const sheetReadOutputSchema = z.discriminatedUnion("mode", [
+  sheetOverviewOutputSchema,
+  sheetTableOutputSchema,
+  sheetReadExactOutputSchema,
+  sheetCellMatchesOutputSchema,
+]);
+
 const sheetObjectOutputSchema = z.object({
   workbook: workbookSummaryOutputSchema,
   sheet: sheetSummaryOutputSchema,
-  objectType: z.enum(["charts", "filters", "tables", "pivotTables"]),
+  objectType: z.literal("filters"),
   objects: z.array(
-    z.union([
-      z.object({
-        kind: z.literal("chart"),
-        id: z.string().min(1),
-        type: z.enum(["bar", "line", "pie", "doughnut", "area", "scatter", "radar", "combo"]),
-        title: z.string().nullable(),
-        anchor: z.string().min(1),
-        series: z.array(
-          z.object({
-            id: z.string().min(1),
-            name: z.string().nullable(),
-            categoryRange: z.string().nullable(),
-            valueRange: z.string().min(1),
-            chartType: z
-              .enum(["bar", "line", "pie", "doughnut", "area", "scatter", "radar"])
-              .nullable(),
-          }),
-        ),
-      }),
-      z.object({
-        kind: z.literal("filter"),
-        range: z.string().min(1),
-      }),
-    ]),
+    z.object({
+      kind: z.literal("filter"),
+      range: z.string().min(1),
+    }),
   ),
-  ...toolPageOutputSchema.shape,
 });
 
 const sheetMutationOutputSchema = sheetChangePatchOutputSchema.extend({
@@ -534,36 +594,17 @@ export const excelToolSpecs = {
   },
   readSheetData: {
     description:
-      "读取指定 Sheet 的矩形数据。返回 range 对应的二维 values、稀疏的 dateValues、压缩后的公式模式、非统一公式和合并区域；日期在 values 中保留 Excel 序列号，模型使用 dateValues 中的无时区字符串理解日期。null 是真实空单元格，数字 0 保持为 0，不推断表头，不返回样式或 Excel 对象。未传 range 时读取已使用区域；超过单次网格预算时返回 continuation，下一次原样传回 continuation 读取下一页。",
-    inputSchema: z.object({
-      sheetId: z.coerce.number().int().positive().describe("Sheet ID"),
-      range: sheetDataRangeSchema.optional().describe("A1 范围，例如 A1:D20；默认已使用区域"),
-      continuation: sheetReadContinuationSchema
-        .optional()
-        .describe("上一次读取返回的 continuation；传入后继续同一目标范围"),
-    }),
+      "读取指定 Sheet 的数据。operation=overview 返回低 token 的使用范围、合并区域、公式模式和列类型；operation=range 默认返回带列标题和行号的紧凑布局，format=exact 返回完整二维 values、日期、公式和合并区域；operation=find 按值、类型、公式或直接格式定位单元格。compact 中省略空尾列和空行，合并区域单独在 merges 中描述，日期在 annotations 中使用无时区字符串，公式缓存值按单元格保留，重复公式通过 formulaPatterns 表达。range 超过单次网格预算时返回 continuation，下一次原样传回 continuation。",
+    inputSchema: readSheetDataInputSchema,
     needsRunContext: false,
     outputSchema: sheetReadOutputSchema,
   },
-  findSheetCells: {
-    description:
-      "在指定 Sheet 的范围内定位满足值、值类型、公式或直接格式条件的单元格。只返回合并后的 A1 区域、数量和查询原因，不返回完整数据矩阵；找到区域后再调用 readSheetData 读取内容。未传 range 时搜索已使用区域；查找空单元格时必须传入足够小的范围。颜色属于格式条件，不能写进 values。匹配结果按 offset/limit 分页，返回 nextOffset 时继续读取。",
-    inputSchema: z.object({
-      sheetId: z.coerce.number().int().positive().describe("Sheet ID"),
-      range: sheetDataRangeSchema.optional().describe("搜索范围，例如 A1:Z100；默认已使用区域"),
-      query: sheetCellQuerySchema,
-      ...toolPageInputSchema,
-    }),
-    needsRunContext: false,
-    outputSchema: sheetCellMatchesOutputSchema,
-  },
   readSheetObjects: {
     description:
-      "读取指定 Sheet 的一种 Excel 对象摘要。必须指定 objectType：charts、filters、tables 或 pivotTables。返回模型决策所需的引用和范围，不返回 OOXML、ECharts option 或完整绘图缓存。结果按 offset/limit 分页，返回 nextOffset 时继续读取。",
+      "读取指定 Sheet 的筛选范围摘要。图表请使用 listCharts；Table 和 PivotTable 当前尚未建模，不在可用工具中暴露。",
     inputSchema: z.object({
       sheetId: z.coerce.number().int().positive().describe("Sheet ID"),
-      objectType: z.enum(["charts", "filters", "tables", "pivotTables"]),
-      ...toolPageInputSchema,
+      objectType: z.literal("filters"),
     }),
     needsRunContext: false,
     outputSchema: sheetObjectOutputSchema,

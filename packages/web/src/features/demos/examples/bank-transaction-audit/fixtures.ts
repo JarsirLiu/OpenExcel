@@ -394,7 +394,7 @@ export const bankAuditTimeline: DemoStep[] = [
     id: "find-missing-fields",
     phase: "核查",
     title: "定位缺失字段",
-    toolName: "findSheetCells",
+    toolName: "readSheetData",
     toolInput: "在「银行流水」A2:C17 中查找空单元格，检查流水号、交易时间和对方户名",
     toolOutput: "发现 1 个必填字段缺失：C5 对方户名为空；流水号和交易时间完整",
     assistantText: "必填字段检查发现一处问题：第 5 行的对方户名为空。流水号和交易时间没有缺失。",

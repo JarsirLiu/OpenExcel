@@ -53,9 +53,13 @@ produce the normal tool lifecycle and tool-call/tool-result pairing, so the
 model can retry them after the batch finishes.
 
 Large tools must page or otherwise reduce their own domain result;
-`readSheetData` shrinks one page to its own per-call limit and returns a
-continuation for the next call. `findSheetCells`, `readSheetObjects`, and
-`listCharts` return bounded pages with `nextOffset`. `createChart` bounds its
+`readSheetData` provides overview, compact range, exact range, and find
+operations. Range reads use a fixed row-major page cell budget and return a
+continuation; find reads return bounded pages with `nextOffset`. A result that
+cannot fit the declared model-result budget fails explicitly; it is not
+silently reshaped or partially truncated.
+`readSheetObjects` reads the active filter range and `listCharts` returns
+bounded workbook chart pages with `nextOffset`. `createChart` bounds its
 data-quality diagnostic indexes and series summary while preserving counts and
 truncation markers. If a tool cannot produce a valid bounded result, it returns
 a structured tool error instead of silently corrupting its result shape.

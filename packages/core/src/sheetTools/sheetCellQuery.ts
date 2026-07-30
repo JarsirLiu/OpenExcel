@@ -184,7 +184,7 @@ function buildMatches(cells: FortuneCell[], reason: string): SheetCellMatch[] {
   return matches;
 }
 
-export function findSheetCells(
+export function querySheetCells(
   celldata: readonly FortuneCell[],
   query: SheetCellQuery,
   options: SheetCellQueryOptions = {},

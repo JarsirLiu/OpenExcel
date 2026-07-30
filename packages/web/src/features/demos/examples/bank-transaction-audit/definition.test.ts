@@ -29,7 +29,7 @@ describe("bankTransactionAudit demo", () => {
     expect(bankAuditTimeline.map((step) => step.toolName).filter(Boolean)).toEqual([
       "readSheetData",
       "readSheetData",
-      "findSheetCells",
+      "readSheetData",
       "readSheetData",
       "readSheetData",
       "writeCells",

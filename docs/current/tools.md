@@ -29,7 +29,6 @@ tool catalog from the registry.
 ### Sheet
 
 - `readSheetData`
-- `findSheetCells`
 - `readSheetObjects`
 - `writeCells`
 - `clearCells`
@@ -46,11 +45,10 @@ tool catalog from the registry.
 ## Important contracts
 
 - AI tool row and column numbers are one-based. Core owns conversion to Core and persisted grid coordinates.
-- `readSheetData` returns a two-dimensional values projection, derived date values, formula patterns, formula errors, merge information, and an optional continuation.
-- `findSheetCells` returns matching A1-range summaries in pages. When `nextOffset` is not null, pass it back as `offset` to read the next page. Read the data separately when content is needed.
+- `readSheetData` is the unified Sheet read tool. `operation: "overview"` returns a low-token structural summary; `operation: "range"` returns either a compact column-header/row-number layout or the exact two-dimensional projection; `operation: "find"` returns matching A1-range summaries for values, types, formulas, and direct styles. Compact range reads keep cached values per cell, represent repeated formulas through `formulaPatterns`, and use `annotations` for dates and non-default number formats. Range reads use `continuation`; find reads use `offset` and `nextOffset`.
 - `writeCells`, `clearCells`, `mergeCells`, and `unmergeCells` use the SheetCommand write boundary.
 - A single `writeCells` call can write at most 10,000 cells.
-- `readSheetObjects` currently accepts `charts`, `filters`, `tables`, and `pivotTables`; exact support is defined by Core projections and tests. Chart summaries are paged with `offset`, `limit`, and `nextOffset`.
+- `readSheetObjects` currently reads the active filter range for a Sheet. Use `listCharts` for workbook chart definitions. Tables and PivotTables are not exposed until they have a complete object model.
 - Chart tools write the persisted `ChartSpec`; they do not use ECharts options as the domain model.
 - `createChart` supports two mutually exclusive data-source modes:
   - `sourceRange`: a continuous row, column, or rectangular table. For a table, the first row supplies series names and the first column supplies categories.
