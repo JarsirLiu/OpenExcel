@@ -34,6 +34,7 @@ export function ChatPanel({
 
   const {
     messages,
+    assistantActivity,
     contextUsage,
     error,
     canUndo,
@@ -102,6 +103,7 @@ export function ChatPanel({
       <MessageList
         messages={messages}
         isStreaming={isStreaming}
+        assistantActivity={assistantActivity}
         onRegenerate={onRegenerate}
         onUndo={sessionId != null && canUndo ? handleUndo : undefined}
         isUndoing={isUndoing}

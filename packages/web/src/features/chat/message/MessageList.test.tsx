@@ -3,13 +3,57 @@ import { describe, expect, it } from "vitest";
 import { MessageList } from "./MessageList";
 
 describe("MessageList", () => {
+  it("renders a transient assistant waiting row without adding a message", () => {
+    const { container } = render(
+      <MessageList
+        messages={[{ id: "user-1", role: "user", parts: [{ type: "text", text: "你好" }] }]}
+        isStreaming
+        assistantActivity={{
+          assistantMessageId: "assistant-1",
+          phase: "model-waiting",
+          showPulse: true,
+        }}
+      />,
+    );
+
+    expect(screen.getByLabelText("AI 正在响应")).toBeTruthy();
+    expect(container.querySelectorAll('[class*="assistantMsg"]').length).toBe(0);
+  });
+
+  it("renders the waiting pulse inside the active assistant message", () => {
+    const { container } = render(
+      <MessageList
+        messages={[{ id: "assistant-1", role: "assistant", parts: [] }]}
+        isStreaming
+        assistantActivity={{
+          assistantMessageId: "assistant-1",
+          phase: "model-waiting",
+          showPulse: true,
+        }}
+      />,
+    );
+
+    expect(screen.getByLabelText("AI 正在响应")).toBeTruthy();
+    expect(container.querySelectorAll('[class*="assistantMsg"]')).toHaveLength(1);
+  });
+
   it("keeps a streaming assistant message mounted as new parts arrive", () => {
     const initialMessage = {
       id: "assistant-active",
       role: "assistant",
       parts: [{ type: "text", text: "先读取数据。" }],
     };
-    const { container, rerender } = render(<MessageList messages={[initialMessage]} isStreaming />);
+    const { container, rerender } = render(
+      <MessageList
+        messages={[initialMessage]}
+        isStreaming
+        assistantActivity={{
+          assistantMessageId: "assistant-active",
+          phase: "responding",
+          showPulse: false,
+        }}
+      />,
+    );
     const assistantElement = container.querySelector('[class*="assistantMsg"]');
 
     rerender(
@@ -21,6 +65,11 @@ describe("MessageList", () => {
           },
         ]}
         isStreaming
+        assistantActivity={{
+          assistantMessageId: "assistant-active",
+          phase: "responding",
+          showPulse: false,
+        }}
       />,
     );
 
@@ -43,6 +92,11 @@ describe("MessageList", () => {
           },
         ]}
         isStreaming
+        assistantActivity={{
+          assistantMessageId: "assistant-active",
+          phase: "responding",
+          showPulse: false,
+        }}
       />,
     );
 
@@ -68,6 +122,11 @@ describe("MessageList", () => {
           },
         ]}
         isStreaming
+        assistantActivity={{
+          assistantMessageId: "assistant-1",
+          phase: "compacting",
+          showPulse: false,
+        }}
       />,
     );
 
@@ -91,6 +150,11 @@ describe("MessageList", () => {
           },
         ]}
         isStreaming
+        assistantActivity={{
+          assistantMessageId: "assistant-1",
+          phase: "compacting",
+          showPulse: false,
+        }}
       />,
     );
     expect(screen.getByRole("status")).toHaveTextContent("上下文已压缩");
@@ -111,6 +175,11 @@ describe("MessageList", () => {
           },
         ]}
         isStreaming
+        assistantActivity={{
+          assistantMessageId: "assistant-1",
+          phase: "compacting",
+          showPulse: false,
+        }}
       />,
     );
     expect(screen.getByRole("status")).toHaveTextContent("!上下文压缩失败");

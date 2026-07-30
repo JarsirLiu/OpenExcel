@@ -175,6 +175,7 @@ export function useChatConversation({
   );
 
   return {
+    assistantActivity: run.assistantActivity,
     messages,
     contextUsage,
     historicalToolCallIds,

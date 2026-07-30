@@ -1,5 +1,6 @@
 import type { JSX } from "react";
 import { getMessageText } from "@/features/shared/messageUtils";
+import { AssistantResponseIndicator } from "./AssistantResponseIndicator";
 import { AutomaticContextCompactionStatus } from "./AutomaticContextCompactionStatus";
 import styles from "./MessageItem.module.css";
 import { MessageMarkdown } from "./MessageMarkdown";
@@ -194,6 +195,7 @@ function renderAssistantParts(msg: any, isMessageStreaming: boolean) {
 export function MessageItem({
   msg,
   isMessageStreaming,
+  showModelWaitIndicator = false,
   isLastAssistantMessage,
   onRegenerate,
   onUndo,
@@ -202,6 +204,7 @@ export function MessageItem({
 }: {
   msg: any;
   isMessageStreaming: boolean;
+  showModelWaitIndicator?: boolean;
   isLastAssistantMessage: boolean;
   onRegenerate?: () => void;
   onUndo?: () => void;
@@ -230,6 +233,7 @@ export function MessageItem({
       </div>
       <div className={styles.msgBody}>
         {renderAssistantParts(msg, isMessageStreaming)}
+        {isMessageStreaming && showModelWaitIndicator && <AssistantResponseIndicator inline />}
         {!isMessageStreaming && msg.role === "assistant" && msg.parts && (
           <SheetChangeSummary parts={msg.parts} onNavigateSheet={onNavigateSheet} />
         )}

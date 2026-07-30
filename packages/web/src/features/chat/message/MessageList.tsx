@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
+import type { AssistantActivity } from "../conversation/assistantActivity";
+import { AssistantResponseIndicator } from "./AssistantResponseIndicator";
 import { MessageItem } from "./MessageItem";
 import styles from "./MessageList.module.css";
 import { MessageRenderBoundary } from "./MessageRenderBoundary";
@@ -6,6 +8,7 @@ import { MessageRenderBoundary } from "./MessageRenderBoundary";
 export function MessageList({
   messages,
   isStreaming,
+  assistantActivity,
   onRegenerate,
   onUndo,
   isUndoing,
@@ -17,6 +20,7 @@ export function MessageList({
 }: {
   messages: any[];
   isStreaming: boolean;
+  assistantActivity: AssistantActivity | null;
   onRegenerate?: () => void;
   onUndo?: () => void;
   isUndoing?: boolean;
@@ -58,11 +62,12 @@ export function MessageList({
   }, [handleScroll, hasOlder, onLoadOlder]);
 
   const lastAssistantMsg = [...messages].reverse().find((m) => m.role === "assistant");
-  const lastMessage = messages[messages.length - 1];
-  const activeAssistantMessageId =
-    isStreaming && lastMessage?.role === "assistant" && lastMessage.id != null
-      ? lastMessage.id
-      : null;
+  const activeAssistantMessageId = isStreaming
+    ? (assistantActivity?.assistantMessageId ?? null)
+    : null;
+  const activeAssistantMessage = activeAssistantMessageId
+    ? messages.find((message) => message.id === activeAssistantMessageId)
+    : undefined;
 
   return (
     <div ref={containerRef} className={styles.messageList}>
@@ -130,6 +135,9 @@ export function MessageList({
           <MessageItem
             msg={msg}
             isMessageStreaming={msg.id != null && msg.id === activeAssistantMessageId}
+            showModelWaitIndicator={
+              assistantActivity?.showPulse === true && msg.id === activeAssistantMessageId
+            }
             isLastAssistantMessage={
               !isStreaming && msg.role === "assistant" && msg.id === lastAssistantMsg?.id
             }
@@ -140,6 +148,9 @@ export function MessageList({
           />
         </MessageRenderBoundary>
       ))}
+      {isStreaming && assistantActivity && !activeAssistantMessage && (
+        <AssistantResponseIndicator showPulse={assistantActivity.showPulse} />
+      )}
       <div ref={messagesEndRef} />
     </div>
   );

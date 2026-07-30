@@ -75,6 +75,16 @@ export class ConversationStore {
     this.#publish();
   }
 
+  removeOptimisticUserMessage(messageId: string) {
+    const index = this.#messages.findIndex((message) => message.id === messageId);
+    if (index < 0) throw new Error(`乐观用户消息不存在: ${messageId}`);
+    if (this.#messages[index]?.role !== "user") {
+      throw new Error(`无法移除非 user 乐观消息: ${messageId}`);
+    }
+    this.#messages = this.#messages.filter((message) => message.id !== messageId);
+    this.#publish();
+  }
+
   applyEvent(event: ChatEvent) {
     if (this.#seenEventIds.has(event.eventId)) return;
     const runKey = event.runId == null ? "unscoped" : String(event.runId);

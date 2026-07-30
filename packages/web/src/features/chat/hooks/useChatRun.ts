@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cancelRun } from "@/api/chat";
 import type { ChatReferenceTarget } from "../composer/chatReferences";
+import type { AssistantActivity } from "../conversation/assistantActivity";
 import type { ConversationStore } from "../conversation/conversationStore";
 import { openChatEventStream } from "../transport/chatEventStream";
 
@@ -12,6 +13,9 @@ type ChatUserMessage = {
     | { type: "data-chat-reference"; data: { reference: ChatReferenceTarget } }
   >;
 };
+
+const PULSE_REVEAL_DELAY_MS = 400;
+const PULSE_MIN_VISIBLE_MS = 600;
 
 function createUserMessage(text: string, references: ChatReferenceTarget[]): ChatUserMessage {
   return {
@@ -46,13 +50,81 @@ export function useChatRun({
 }) {
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<Error | undefined>();
+  const [assistantActivity, setAssistantActivity] = useState<AssistantActivity | null>(null);
   const activeSessionIdRef = useRef<number | null>(sessionId);
   const activeRunRef = useRef<number | null>(null);
   const activeRequestControllerRef = useRef<AbortController | null>(null);
+  const assistantActivityRef = useRef<AssistantActivity | null>(null);
+  const pulseRevealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pulseHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pulseVisibleAtRef = useRef<number | null>(null);
   const cancelRequestedRef = useRef(false);
   const cancellationRequestRef = useRef<{ sessionId: number; runId: number } | null>(null);
   const generationRef = useRef(0);
   const mountedRef = useRef(true);
+
+  const clearPulseTimers = useCallback(() => {
+    if (pulseRevealTimerRef.current !== null) {
+      clearTimeout(pulseRevealTimerRef.current);
+      pulseRevealTimerRef.current = null;
+    }
+    if (pulseHideTimerRef.current !== null) {
+      clearTimeout(pulseHideTimerRef.current);
+      pulseHideTimerRef.current = null;
+    }
+  }, []);
+
+  const updateAssistantActivity = useCallback((activity: AssistantActivity | null) => {
+    assistantActivityRef.current = activity;
+    setAssistantActivity(activity);
+  }, []);
+
+  const clearAssistantActivity = useCallback(() => {
+    clearPulseTimers();
+    pulseVisibleAtRef.current = null;
+    updateAssistantActivity(null);
+  }, [clearPulseTimers, updateAssistantActivity]);
+
+  const startPulseReveal = useCallback(
+    (activity: AssistantActivity) => {
+      clearPulseTimers();
+      pulseVisibleAtRef.current = null;
+      updateAssistantActivity({ ...activity, showPulse: false });
+      pulseRevealTimerRef.current = setTimeout(() => {
+        pulseRevealTimerRef.current = null;
+        pulseVisibleAtRef.current = Date.now();
+        updateAssistantActivity({ ...activity, showPulse: true });
+      }, PULSE_REVEAL_DELAY_MS);
+    },
+    [clearPulseTimers, updateAssistantActivity],
+  );
+
+  const markAssistantResponding = useCallback(
+    (phase: AssistantActivity["phase"]) => {
+      const current = assistantActivityRef.current;
+      if (!current) return;
+      if (pulseRevealTimerRef.current !== null) {
+        clearTimeout(pulseRevealTimerRef.current);
+        pulseRevealTimerRef.current = null;
+      }
+      const visibleAt = pulseVisibleAtRef.current;
+      const remaining =
+        current.showPulse && visibleAt !== null
+          ? Math.max(0, PULSE_MIN_VISIBLE_MS - (Date.now() - visibleAt))
+          : 0;
+      const finish = () => {
+        pulseHideTimerRef.current = null;
+        pulseVisibleAtRef.current = null;
+        updateAssistantActivity({ ...current, phase, showPulse: false });
+      };
+      if (remaining === 0) finish();
+      else {
+        if (pulseHideTimerRef.current !== null) clearTimeout(pulseHideTimerRef.current);
+        pulseHideTimerRef.current = setTimeout(finish, remaining);
+      }
+    },
+    [updateAssistantActivity],
+  );
 
   const requestRunCancellation = useCallback(
     (runId: number, targetSessionId: number) => {
@@ -80,20 +152,22 @@ export function useChatRun({
       activeRunRef.current = null;
       cancelRequestedRef.current = false;
       cancellationRequestRef.current = null;
+      clearAssistantActivity();
       generationRef.current += 1;
       setIsStreaming(false);
       setError(undefined);
     }
     activeSessionIdRef.current = sessionId;
-  }, [sessionId]);
+  }, [clearAssistantActivity, sessionId]);
 
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
       activeRequestControllerRef.current?.abort();
+      clearAssistantActivity();
     };
-  }, []);
+  }, [clearAssistantActivity]);
 
   const sendMessage = useCallback(
     (text: string, references: ChatReferenceTarget[]) => {
@@ -102,9 +176,19 @@ export function useChatRun({
       setError(undefined);
       cancelRequestedRef.current = false;
       cancellationRequestRef.current = null;
+      clearAssistantActivity();
       let generation = generationRef.current;
       let streamSessionId = activeSessionIdRef.current;
+      const message = createUserMessage(text, references);
+      const assistantMessageId = `${message.id}-assistant`;
+      store.appendOptimisticUserMessage(message);
+      startPulseReveal({
+        assistantMessageId,
+        phase: "initial",
+        showPulse: false,
+      });
       const controller = new AbortController();
+      let requestStarted = false;
       activeRequestControllerRef.current = controller;
       setIsStreaming(true);
 
@@ -119,10 +203,9 @@ export function useChatRun({
             generation = generationRef.current;
           }
 
-          const message = createUserMessage(text, references);
-          store.appendOptimisticUserMessage(message);
           const responseSessionId = streamSessionId;
           const target = `/api/workspaces/${workspaceId}/sessions/${responseSessionId}/chat`;
+          requestStarted = true;
           for await (const event of openChatEventStream({
             api: target,
             body: { requestId: message.id, message },
@@ -139,6 +222,31 @@ export function useChatRun({
               continue;
             }
             store.applyEvent(event);
+            if (cancelRequestedRef.current) {
+              clearAssistantActivity();
+            } else if (event.type === "step.started") {
+              const current = assistantActivityRef.current;
+              if (current?.phase === "initial") {
+                updateAssistantActivity({ ...current, phase: "model-waiting" });
+              } else {
+                startPulseReveal({
+                  assistantMessageId: current?.assistantMessageId ?? assistantMessageId,
+                  phase: "model-waiting",
+                  showPulse: false,
+                });
+              }
+            } else if (event.type === "message.delta" || event.type === "reasoning.delta") {
+              markAssistantResponding("responding");
+            } else if (event.type === "tool.started") {
+              markAssistantResponding("tool-running");
+            } else if (event.type === "context.automatic_compaction.started") {
+              markAssistantResponding("compacting");
+            } else if (event.type === "context.automatic_compaction.completed") {
+              const current = assistantActivityRef.current;
+              if (current) updateAssistantActivity({ ...current, phase: "model-waiting" });
+            } else if (event.type === "step.finished") {
+              markAssistantResponding("responding");
+            }
             if (event.type === "run.started") {
               onUserTurnAccepted?.(responseSessionId);
             }
@@ -154,6 +262,7 @@ export function useChatRun({
                 }
               }
               activeRunRef.current = null;
+              clearAssistantActivity();
               setIsStreaming(false);
             }
           }
@@ -164,8 +273,12 @@ export function useChatRun({
             return;
           }
           activeRunRef.current = null;
+          clearAssistantActivity();
           setIsStreaming(false);
         } catch (sendError) {
+          if (!requestStarted && generationRef.current === generation && mountedRef.current) {
+            store.removeOptimisticUserMessage(message.id);
+          }
           if (
             controller.signal.aborted ||
             generationRef.current !== generation ||
@@ -174,6 +287,7 @@ export function useChatRun({
             return;
           }
           activeRunRef.current = null;
+          clearAssistantActivity();
           setIsStreaming(false);
           setError(sendError instanceof Error ? sendError : new Error(String(sendError)));
         } finally {
@@ -190,7 +304,11 @@ export function useChatRun({
       onSessionActivated,
       onUserTurnAccepted,
       requestRunCancellation,
+      clearAssistantActivity,
+      markAssistantResponding,
       store,
+      startPulseReveal,
+      updateAssistantActivity,
       workspaceId,
     ],
   );
@@ -205,14 +323,16 @@ export function useChatRun({
       activeRequestControllerRef.current = null;
       activeRunRef.current = null;
       setIsStreaming(false);
+      clearAssistantActivity();
       return;
     }
     // The run id is delivered in the response headers. Keep the request alive
     // until that callback can submit the cancellation for a just-created run.
     setIsStreaming(false);
-  }, [requestRunCancellation]);
+    clearAssistantActivity();
+  }, [clearAssistantActivity, requestRunCancellation]);
 
-  return { error, isStreaming, sendMessage, stop };
+  return { assistantActivity, error, isStreaming, sendMessage, stop };
 }
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
