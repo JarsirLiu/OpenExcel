@@ -46,7 +46,7 @@ tool catalog from the registry.
 
 - AI tool row and column numbers are one-based. Core owns conversion to Core and persisted grid coordinates.
 - `readSheetData` is the unified Sheet read tool. `operation: "overview"` returns a low-token structural summary; `operation: "range"` returns either a compact column-header/row-number layout or the exact two-dimensional projection; `operation: "find"` returns matching A1-range summaries for values, types, formulas, and direct styles. Compact range reads keep cached values per cell, represent repeated formulas through `formulaPatterns`, and use `annotations` for dates and non-default number formats. Range reads use `continuation`; find reads use `offset` and `nextOffset`.
-- `writeCells`, `clearCells`, `mergeCells`, and `unmergeCells` use the SheetCommand write boundary.
+- `writeCells`, `clearCells`, `mergeCells`, and `unmergeCells` use the SheetCommand write boundary. `writeCells` accepts non-overlapping A1-range operations in exactly one of `value`, strict 2D `values`, or relative-fill `formula` modes. Core owns the canonical A1 parser and range validation; the server passes the parsed range operation through to SheetCommand. Web previews use the authoritative `changeSummary.changedRanges` projection and do not expand the delta into a per-cell list.
 - A single `writeCells` call can write at most 10,000 cells.
 - `readSheetObjects` currently reads the active filter range for a Sheet. Use `listCharts` for workbook chart definitions. Tables and PivotTables are not exposed until they have a complete object model.
 - Chart tools write the persisted `ChartSpec`; they do not use ECharts options as the domain model.

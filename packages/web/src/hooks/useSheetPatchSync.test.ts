@@ -22,10 +22,12 @@ describe("collectSheetPatchUpdates", () => {
             input: { sheetId: 11 },
             output: {
               sheetInfo: { sheetId: 11, sheetNo: 2, sheetName: "Budget" },
-              changeSummary: { changedCellCount: 1, rangeOperationCount: 0 },
+              changeSummary: { changedCellCount: 1, changedRanges: ["B1"], operationCount: 1 },
               delta: {
                 type: "write",
-                cells: [{ row: 1, col: 2, value: "123" }],
+                operations: [
+                  { type: "range", startRow: 1, startCol: 2, endRow: 1, endCol: 2, value: "123" },
+                ],
               },
             },
           },
@@ -41,7 +43,7 @@ describe("collectSheetPatchUpdates", () => {
             input: { sheetId: 12 },
             output: {
               sheetInfo: { sheetId: 12, sheetNo: 3, sheetName: "Plan" },
-              changeSummary: { changedCellCount: 0, rangeOperationCount: 0 },
+              changeSummary: { changedCellCount: 0, changedRanges: [], operationCount: 0 },
               delta: null,
             },
           },
@@ -73,10 +75,19 @@ describe("collectSheetPatchUpdates", () => {
             input: { sheetId: 13 },
             output: {
               sheetInfo: { sheetId: 13, sheetNo: 4, sheetName: "Invalid" },
-              changeSummary: { changedCellCount: 0, rangeOperationCount: 0 },
+              changeSummary: { changedCellCount: 0, changedRanges: [], operationCount: 0 },
               delta: {
                 type: "write",
-                cells: [{ row: 0, col: 1, value: "invalid" }],
+                operations: [
+                  {
+                    type: "range",
+                    startRow: 0,
+                    startCol: 2,
+                    endRow: 0,
+                    endCol: 2,
+                    value: "invalid",
+                  },
+                ],
               },
             },
           },
@@ -101,7 +112,7 @@ describe("collectSheetPatchUpdates", () => {
             input: { sheetId: 14 },
             output: {
               sheetInfo: { sheetId: 14, sheetNo: 5, sheetName: "Clear" },
-              changeSummary: { changedCellCount: 4, rangeOperationCount: 0 },
+              changeSummary: { changedCellCount: 4, changedRanges: ["A1:C3"], operationCount: 2 },
               delta: {
                 type: "clear",
                 operations: [
@@ -270,7 +281,7 @@ describe("collectWorkbookMutationToolCallIds", () => {
             input: { sheetId: 31 },
             output: {
               sheetInfo: { sheetId: 31, sheetNo: 1, sheetName: "Sheet1" },
-              changeSummary: { changedCellCount: 1, rangeOperationCount: 0 },
+              changeSummary: { changedCellCount: 1, changedRanges: ["A1"], operationCount: 1 },
               delta: {
                 type: "clear",
                 operations: [{ type: "cell", row: 1, col: 1 }],
@@ -339,8 +350,13 @@ describe("collectWorkbookRefreshToolCallIds", () => {
             input: { sheetId: 31 },
             output: {
               sheetInfo: { sheetId: 31, sheetNo: 1, sheetName: "Sheet1" },
-              changeSummary: { changedCellCount: 1, rangeOperationCount: 0 },
-              delta: { type: "write", cells: [{ row: 1, col: 1, value: "x" }] },
+              changeSummary: { changedCellCount: 1, changedRanges: ["A1"], operationCount: 1 },
+              delta: {
+                type: "write",
+                operations: [
+                  { type: "range", startRow: 1, startCol: 1, endRow: 1, endCol: 1, value: "x" },
+                ],
+              },
             },
           },
           {
@@ -371,8 +387,13 @@ describe("collectWorkbookRefreshToolCallIds", () => {
             input: { sheetId: 31 },
             output: {
               sheetInfo: { sheetId: 31, sheetNo: 1, sheetName: "Sheet1" },
-              changeSummary: { changedCellCount: 1, rangeOperationCount: 0 },
-              delta: { type: "write", cells: [{ row: 1, col: 1, value: "x" }] },
+              changeSummary: { changedCellCount: 1, changedRanges: ["A1"], operationCount: 1 },
+              delta: {
+                type: "write",
+                operations: [
+                  { type: "range", startRow: 1, startCol: 1, endRow: 1, endCol: 1, value: "x" },
+                ],
+              },
             },
           },
           {
@@ -405,8 +426,13 @@ describe("useSheetPatchSync", () => {
             input: { sheetId: 31 },
             output: {
               sheetInfo: { sheetId: 31, sheetNo: 1, sheetName: "Sheet1" },
-              changeSummary: { changedCellCount: 1, rangeOperationCount: 0 },
-              delta: { type: "write", cells: [{ row: 1, col: 1, value: "old" }] },
+              changeSummary: { changedCellCount: 1, changedRanges: ["A1"], operationCount: 1 },
+              delta: {
+                type: "write",
+                operations: [
+                  { type: "range", startRow: 1, startCol: 1, endRow: 1, endCol: 1, value: "old" },
+                ],
+              },
             },
           },
         ],
@@ -424,8 +450,13 @@ describe("useSheetPatchSync", () => {
             input: { sheetId: 31 },
             output: {
               sheetInfo: { sheetId: 31, sheetNo: 1, sheetName: "Sheet1" },
-              changeSummary: { changedCellCount: 1, rangeOperationCount: 0 },
-              delta: { type: "write", cells: [{ row: 2, col: 2, value: "new" }] },
+              changeSummary: { changedCellCount: 1, changedRanges: ["B2"], operationCount: 1 },
+              delta: {
+                type: "write",
+                operations: [
+                  { type: "range", startRow: 2, startCol: 2, endRow: 2, endCol: 2, value: "new" },
+                ],
+              },
             },
           },
         ],
@@ -444,7 +475,7 @@ describe("useSheetPatchSync", () => {
     await waitFor(() => expect(onSheetChanged).toHaveBeenCalledOnce());
     expect(onSheetChanged).toHaveBeenCalledWith(31, {
       type: "write",
-      cells: [{ row: 2, col: 2, value: "new" }],
+      operations: [{ type: "range", startRow: 2, startCol: 2, endRow: 2, endCol: 2, value: "new" }],
     });
 
     rerender({ messages: nextMessages, historyReady: true });
@@ -464,8 +495,13 @@ describe("useSheetPatchSync", () => {
             input: { sheetId: 31 },
             output: {
               sheetInfo: { sheetId: 31, sheetNo: 1, sheetName: "Sheet1" },
-              changeSummary: { changedCellCount: 1, rangeOperationCount: 0 },
-              delta: { type: "write", cells: [{ row: 1, col: 1, value: "old" }] },
+              changeSummary: { changedCellCount: 1, changedRanges: ["A1"], operationCount: 1 },
+              delta: {
+                type: "write",
+                operations: [
+                  { type: "range", startRow: 1, startCol: 1, endRow: 1, endCol: 1, value: "old" },
+                ],
+              },
             },
           },
         ],
@@ -483,8 +519,13 @@ describe("useSheetPatchSync", () => {
             input: { sheetId: 31 },
             output: {
               sheetInfo: { sheetId: 31, sheetNo: 1, sheetName: "Sheet1" },
-              changeSummary: { changedCellCount: 1, rangeOperationCount: 0 },
-              delta: { type: "write", cells: [{ row: 2, col: 2, value: "new" }] },
+              changeSummary: { changedCellCount: 1, changedRanges: ["B2"], operationCount: 1 },
+              delta: {
+                type: "write",
+                operations: [
+                  { type: "range", startRow: 2, startCol: 2, endRow: 2, endCol: 2, value: "new" },
+                ],
+              },
             },
           },
         ],
@@ -502,7 +543,7 @@ describe("useSheetPatchSync", () => {
     await waitFor(() => expect(onSheetChanged).toHaveBeenCalledOnce());
     expect(onSheetChanged).toHaveBeenCalledWith(31, {
       type: "write",
-      cells: [{ row: 2, col: 2, value: "new" }],
+      operations: [{ type: "range", startRow: 2, startCol: 2, endRow: 2, endCol: 2, value: "new" }],
     });
   });
 
@@ -519,8 +560,20 @@ describe("useSheetPatchSync", () => {
             input: { sheetId: 31 },
             output: {
               sheetInfo: { sheetId: 31, sheetNo: 1, sheetName: "Sheet1" },
-              changeSummary: { changedCellCount: 1, rangeOperationCount: 0 },
-              delta: { type: "write", cells: [{ row: 1, col: 1, value: "current" }] },
+              changeSummary: { changedCellCount: 1, changedRanges: ["A1"], operationCount: 1 },
+              delta: {
+                type: "write",
+                operations: [
+                  {
+                    type: "range",
+                    startRow: 1,
+                    startCol: 1,
+                    endRow: 1,
+                    endCol: 1,
+                    value: "current",
+                  },
+                ],
+              },
             },
           },
         ],
@@ -536,8 +589,13 @@ describe("useSheetPatchSync", () => {
           input: { sheetId: 31 },
           output: {
             sheetInfo: { sheetId: 31, sheetNo: 1, sheetName: "Sheet1" },
-            changeSummary: { changedCellCount: 1, rangeOperationCount: 0 },
-            delta: { type: "write", cells: [{ row: 1, col: 1, value: "old" }] },
+            changeSummary: { changedCellCount: 1, changedRanges: ["A1"], operationCount: 1 },
+            delta: {
+              type: "write",
+              operations: [
+                { type: "range", startRow: 1, startCol: 1, endRow: 1, endCol: 1, value: "old" },
+              ],
+            },
           },
         },
       ],

@@ -69,4 +69,29 @@ describe("getMessages", () => {
   it("returns an empty transcript when no checkpoint exists", async () => {
     await expect(getMessages(3, 7)).resolves.toEqual({ messages: [], total: 0 });
   });
+
+  it("loads historical tool messages without validating their obsolete change summary", async () => {
+    const legacyMessage = {
+      role: "assistant",
+      parts: [
+        {
+          type: "tool-writeCells",
+          state: "output-available",
+          output: {
+            changeSummary: { changedCellCount: 1, rangeOperationCount: 0 },
+            delta: { type: "write", cells: [{ row: 1, col: 1, value: "old" }] },
+          },
+        },
+      ],
+    };
+    mocks.findLatestSessionCheckpoint.mockResolvedValue({
+      runId: 12,
+      checkpointSequence: 8,
+      transcript: [{ cursor: 0, message: legacyMessage }],
+      reasoning: "",
+      toolState: [],
+    });
+
+    await expect(getMessages(3, 7)).resolves.toEqual({ messages: [legacyMessage], total: 1 });
+  });
 });

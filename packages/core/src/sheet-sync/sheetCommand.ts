@@ -19,7 +19,8 @@ export type SheetCommandResult = {
   mutation: SheetMutation | null;
   changeSummary: {
     changedCellCount: number;
-    rangeOperationCount: number;
+    changedRanges: string[];
+    operationCount: number;
   };
   snapshot: SheetSnapshot;
 };

@@ -9,7 +9,10 @@ describe("sheetCommandFingerprint", () => {
       mutationId: "mutation-1",
       sheetId: 7,
       baseRevision: 2,
-      mutation: { type: "write", cells: [{ row: 1, col: 1, value: "x" }] },
+      mutation: {
+        type: "write",
+        operations: [{ type: "range", startRow: 1, startCol: 1, endRow: 1, endCol: 1, value: "x" }],
+      },
     };
     const second = JSON.parse(
       JSON.stringify({
@@ -30,7 +33,10 @@ describe("sheetCommandFingerprint", () => {
       mutationId: "mutation-1",
       sheetId: 7,
       baseRevision: 2,
-      mutation: { type: "write", cells: [{ row: 1, col: 1, value: "x" }] },
+      mutation: {
+        type: "write",
+        operations: [{ type: "range", startRow: 1, startCol: 1, endRow: 1, endCol: 1, value: "x" }],
+      },
     };
     const retry = { ...first, baseRevision: 3 };
 
@@ -45,14 +51,30 @@ describe("sheetCommandFingerprint", () => {
       baseRevision: 2,
       mutation: {
         type: "write",
-        cells: [{ row: 1, col: 1, value: "中文", formula: undefined }],
+        operations: [
+          {
+            type: "range",
+            startRow: 1,
+            startCol: 1,
+            endRow: 1,
+            endCol: 1,
+            value: "中文",
+            formula: undefined,
+          },
+        ],
       },
     };
     const withoutOptionalField = structuredClone(command);
-    if (withoutOptionalField.mutation.type !== "write") {
+    if (
+      withoutOptionalField.mutation.type !== "write" ||
+      !(
+        withoutOptionalField.mutation.type === "write" &&
+        "operations" in withoutOptionalField.mutation
+      )
+    ) {
       throw new Error("Expected a write mutation");
     }
-    delete withoutOptionalField.mutation.cells[0].formula;
+    delete withoutOptionalField.mutation.operations[0].formula;
 
     expect(sheetCommandFingerprint(command)).toBe(sheetCommandFingerprint(withoutOptionalField));
   });

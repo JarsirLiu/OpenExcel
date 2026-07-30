@@ -121,11 +121,7 @@ describe("Excel tool contract", () => {
       sheetId: 1,
       operations: [
         {
-          type: "range",
-          startRow: 1,
-          startCol: 1,
-          endRow: 1,
-          endCol: 10_001,
+          range: "A1:QZR1",
           value: "x",
         },
       ],
@@ -137,21 +133,31 @@ describe("Excel tool contract", () => {
   it("requires explicit date semantics for date writes", () => {
     const valid = excelToolSpecs.writeCells.inputSchema.safeParse({
       sheetId: 1,
-      operations: [{ type: "cell", row: 1, col: 1, value: "2022-09-01", valueType: "date" }],
+      operations: [{ range: "A1", value: "2022-09-01", valueType: "date" }],
     });
     const ordinaryFormula = excelToolSpecs.writeCells.inputSchema.safeParse({
       sheetId: 1,
-      operations: [{ type: "cell", row: 1, col: 1, value: "2022-09-01", formula: "=1" }],
+      operations: [{ range: "A1", formula: "=1" }],
     });
     const invalidDateFormula = excelToolSpecs.writeCells.inputSchema.safeParse({
       sheetId: 1,
-      operations: [
-        { type: "cell", row: 1, col: 1, value: "2022-09-01", valueType: "date", formula: "=1" },
-      ],
+      operations: [{ range: "A1", value: "2022-09-01", valueType: "date", formula: "=1" }],
     });
 
     expect(valid.success).toBe(true);
     expect(ordinaryFormula.success).toBe(true);
     expect(invalidDateFormula.success).toBe(false);
+  });
+
+  it("rejects overlapping ranges in one writeCells call", () => {
+    const result = excelToolSpecs.writeCells.inputSchema.safeParse({
+      sheetId: 1,
+      operations: [
+        { range: "A1:B2", value: "first" },
+        { range: "B2:C3", value: "second" },
+      ],
+    });
+
+    expect(result.success).toBe(false);
   });
 });

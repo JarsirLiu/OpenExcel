@@ -8,10 +8,35 @@ const snapshot: SheetSnapshot = {
 };
 
 describe("applySheetMutation", () => {
+  it("applies range writes without changing their ordered operation semantics", () => {
+    const result = applySheetMutation(
+      { celldata: [], config: null },
+      {
+        type: "write",
+        operations: [
+          { type: "range", startRow: 1, startCol: 1, endRow: 2, endCol: 2, value: "range" },
+          { type: "cell", row: 2, col: 2, value: "cell" },
+        ],
+      },
+    );
+
+    expect(result.snapshot.celldata).toEqual([
+      { r: 0, c: 0, v: { v: "range", m: "range" } },
+      { r: 0, c: 1, v: { v: "range", m: "range" } },
+      { r: 1, c: 0, v: { v: "range", m: "range" } },
+      { r: 1, c: 1, v: { v: "cell", m: "cell" } },
+    ]);
+    expect(result.changeSummary).toEqual({
+      changedCellCount: 4,
+      changedRanges: ["A1:B1", "A2:B2"],
+      operationCount: 2,
+    });
+  });
+
   it("updates content while preserving formatting", () => {
     const result = applySheetMutation(snapshot, {
       type: "write",
-      cells: [{ row: 1, col: 1, value: "new" }],
+      operations: [{ type: "range", startRow: 1, startCol: 1, endRow: 1, endCol: 1, value: "new" }],
     });
 
     expect(result.snapshot.celldata).toEqual([
@@ -37,7 +62,17 @@ describe("applySheetMutation", () => {
       },
       {
         type: "write",
-        cells: [{ row: 1, col: 1, value: "2023-01-15", valueType: "date" }],
+        operations: [
+          {
+            type: "range",
+            startRow: 1,
+            startCol: 1,
+            endRow: 1,
+            endCol: 1,
+            value: "2023-01-15",
+            valueType: "date",
+          },
+        ],
       },
     );
 
@@ -53,7 +88,17 @@ describe("applySheetMutation", () => {
       { celldata: [], config: null },
       {
         type: "write",
-        cells: [{ row: 1, col: 1, value: "2022-09-01 12:30:00", valueType: "date" }],
+        operations: [
+          {
+            type: "range",
+            startRow: 1,
+            startCol: 1,
+            endRow: 1,
+            endCol: 1,
+            value: "2022-09-01 12:30:00",
+            valueType: "date",
+          },
+        ],
       },
     );
 
@@ -62,6 +107,49 @@ describe("applySheetMutation", () => {
       m: "2022-09-01 12:30:00",
       ct: { t: "d", fa: "yyyy/m/d h:mm:ss" },
     });
+  });
+
+  it("writes a strict matrix without expanding the mutation contract", () => {
+    const result = applySheetMutation(
+      { celldata: [], config: null },
+      {
+        type: "write",
+        operations: [
+          {
+            type: "range",
+            startRow: 1,
+            startCol: 1,
+            endRow: 2,
+            endCol: 2,
+            values: [
+              ["A", 1],
+              ["B", 2],
+            ],
+          },
+        ],
+      },
+    );
+
+    expect(result.snapshot.celldata.map((cell) => cell.v.v)).toEqual(["A", 1, "B", 2]);
+    expect(result.changeSummary).toEqual({
+      changedCellCount: 4,
+      changedRanges: ["A1:B1", "A2:B2"],
+      operationCount: 1,
+    });
+  });
+
+  it("fills relative formula references across a range", () => {
+    const result = applySheetMutation(
+      { celldata: [], config: null },
+      {
+        type: "write",
+        operations: [
+          { type: "range", startRow: 2, startCol: 4, endRow: 4, endCol: 4, formula: "=B2*C2" },
+        ],
+      },
+    );
+
+    expect(result.snapshot.celldata.map((cell) => cell.v.f)).toEqual(["B2*C2", "B3*C3", "B4*C4"]);
   });
 
   it("applies merge state to both cells and config", () => {

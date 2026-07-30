@@ -1,15 +1,94 @@
 import { z } from "zod";
 import { chartSpecSchema } from "../chart/chartModel.js";
 import { sheetChangePatchOutputSchema } from "../chat/sheetChange.js";
+import {
+  assertWriteRangesDoNotOverlap,
+  parseWriteRange,
+  writeRangeCellCount,
+} from "../chat/writeRange.js";
 
 const writeCellValueSchema = z.union([z.string(), z.number(), z.boolean()]);
-const writeCellValueTypeSchema = z.literal("date");
+const writeCellValueTypeSchema = z.enum(["date", "string"]);
+const writeCellValuesSchema = z.array(z.array(writeCellValueSchema).min(1)).min(1);
+const writeRangeSchema = z.string().trim().min(1);
 const writeFormulaSchema = z
   .string()
   .trim()
   .min(1)
-  .describe("Excel 公式表达式，支持 A1 引用；可带或不带前导等号，系统会自动规范化");
-
+  .describe("Excel formula with A1 references; a leading equals sign is optional");
+const writeOperationSchema = z
+  .object({
+    range: writeRangeSchema.describe("A1 range, for example A2:D10"),
+    value: writeCellValueSchema.optional(),
+    values: writeCellValuesSchema.optional(),
+    valueType: writeCellValueTypeSchema.optional(),
+    formula: writeFormulaSchema.optional(),
+  })
+  .superRefine((operation, ctx) => {
+    const modes = [
+      operation.value !== undefined,
+      operation.values !== undefined,
+      operation.formula !== undefined,
+    ].filter(Boolean).length;
+    if (modes !== 1) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "A write operation must specify exactly one of value, values, or formula",
+      });
+    }
+    if (operation.formula !== undefined && operation.valueType !== undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["valueType"],
+        message: "Formula writes cannot specify valueType",
+      });
+    }
+    if (operation.valueType === "date") {
+      const values = operation.values ?? (operation.value === undefined ? [] : [operation.value]);
+      if (values.some((value) => typeof value !== "string")) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["valueType"],
+          message: "Date writes must contain only strings",
+        });
+      }
+    }
+    if (operation.values) {
+      const width = operation.values[0]?.length;
+      if (width === undefined || operation.values.some((row) => row.length !== width)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["values"],
+          message: "Every matrix row must have the same number of columns",
+        });
+      } else {
+        try {
+          const range = parseWriteRange(operation.range);
+          if (
+            operation.values.length !== range.endRow - range.startRow + 1 ||
+            width !== range.endCol - range.startCol + 1
+          ) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ["values"],
+              message: "Matrix dimensions must exactly match the A1 range",
+            });
+          }
+        } catch {
+          // The range schema reports malformed input separately.
+        }
+      }
+    }
+    try {
+      parseWriteRange(operation.range);
+    } catch {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["range"],
+        message: "The A1 range is invalid or outside the worksheet boundary",
+      });
+    }
+  });
 const sheetDataRangeSchema = z
   .string()
   .trim()
@@ -611,76 +690,43 @@ export const excelToolSpecs = {
   },
   writeCells: {
     description:
-      "批量写入单元格内容。使用 operations 数组，支持 cell 离散写入和 range 连续区域填充同一个值或公式。value 可以是字符串、数字或布尔值；修改真正的 Excel 日期时，必须传 valueType:'date' 和无时区的 YYYY-MM-DD 或 YYYY-MM-DD HH:mm:ss 字符串，不能自行计算 Excel 序列号。写公式时传入 formula，并且只有已知结果时才提供 value 作为缓存显示值。行号和列号都从 1 开始；该工具不修改样式、筛选、图表或其他 Excel 对象，也不负责通用公式重算；清空内容请使用 clearCells。",
+      "Write cell contents in non-overlapping A1 ranges. Each operation must use exactly one mode: value fills the range, values supplies an exact matrix, or formula fills the range using relative Excel references. Use valueType:'date' or valueType:'string' when date or text semantics must be preserved. Dates must be timezone-free strings. This tool does not modify styles, filters, charts, or other Excel objects; use clearCells to remove content.",
     needsRunContext: true,
     outputSchema: sheetMutationOutputSchema,
     inputSchema: z.object({
-      sheetId: z.coerce.number().describe("Sheet ID"),
+      sheetId: z.coerce.number().int().positive().describe("Sheet ID"),
       operations: z
-        .array(
-          z.discriminatedUnion("type", [
-            z
-              .object({
-                type: z.literal("cell"),
-                row: z.coerce.number().positive().describe("行号，从 1 开始"),
-                col: z.coerce.number().positive().describe("列号，从 1 开始"),
-                value: writeCellValueSchema.describe("写入的值"),
-                valueType: writeCellValueTypeSchema.optional().describe("日期写入时传 date"),
-                formula: writeFormulaSchema.optional(),
-              })
-              .refine((value) => value.formula != null || value.value != null, {
-                message: "Cell write requires a value or formula",
-              })
-              .refine((value) => value.valueType !== "date" || typeof value.value === "string", {
-                message: "日期值必须是字符串",
-              })
-              .refine((value) => value.valueType !== "date" || value.formula == null, {
-                message: "日期写入不能同时写公式",
-              }),
-            z
-              .object({
-                type: z.literal("range"),
-                startRow: z.coerce.number().positive().describe("起始行号，从 1 开始"),
-                startCol: z.coerce.number().positive().describe("起始列号，从 1 开始"),
-                endRow: z.coerce.number().positive().describe("结束行号，从 1 开始"),
-                endCol: z.coerce.number().positive().describe("结束列号，从 1 开始"),
-                value: writeCellValueSchema.describe("写入的值"),
-                valueType: writeCellValueTypeSchema.optional().describe("日期写入时传 date"),
-                formula: writeFormulaSchema.optional(),
-              })
-              .refine((value) => value.endRow >= value.startRow && value.endCol >= value.startCol, {
-                message: "Invalid sheet range",
-              })
-              .refine((value) => value.formula != null || value.value != null, {
-                message: "Range write requires a value or formula",
-              })
-              .refine((value) => value.valueType !== "date" || typeof value.value === "string", {
-                message: "日期值必须是字符串",
-              })
-              .refine((value) => value.valueType !== "date" || value.formula == null, {
-                message: "日期写入不能同时写公式",
-              }),
-          ]),
-        )
+        .array(writeOperationSchema)
         .min(1)
         .superRefine((operations, ctx) => {
+          const ranges = [];
           let cellCount = 0;
           for (const operation of operations) {
-            cellCount +=
-              operation.type === "cell"
-                ? 1
-                : (operation.endRow - operation.startRow + 1) *
-                  (operation.endCol - operation.startCol + 1);
+            try {
+              const range = parseWriteRange(operation.range);
+              ranges.push(range);
+              cellCount += writeRangeCellCount(range);
+            } catch {
+              continue;
+            }
             if (cellCount > MAX_WRITE_CELLS_PER_CALL) {
               ctx.addIssue({
                 code: z.ZodIssueCode.custom,
-                message: "单次 writeCells 最多写入 10000 个单元格",
+                message: "A writeCells call may contain at most 10000 cells",
               });
               return;
             }
           }
+          try {
+            assertWriteRangesDoNotOverlap(ranges);
+          } catch (error) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: error instanceof Error ? error.message : "Write ranges must not overlap",
+            });
+          }
         })
-        .describe("写入操作列表，支持离散单元格和连续范围"),
+        .describe("Write operations, each using an A1 range"),
     }),
   },
   clearCells: {

@@ -29,7 +29,10 @@ describe("patchWorkbookWithDelta", () => {
     const result = patchWorkbookWithDelta(
       workbook(),
       10,
-      { type: "write", cells: [{ row: 1, col: 1, value: "" }] },
+      {
+        type: "write",
+        operations: [{ type: "range", startRow: 1, startCol: 1, endRow: 1, endCol: 1, value: "" }],
+      },
       { baseRevision: 4, revision: 5 },
     );
 
@@ -41,7 +44,12 @@ describe("patchWorkbookWithDelta", () => {
     const result = patchWorkbookWithDelta(
       workbook(),
       10,
-      { type: "write", cells: [{ row: 1, col: 1, value: "new" }] },
+      {
+        type: "write",
+        operations: [
+          { type: "range", startRow: 1, startCol: 1, endRow: 1, endCol: 1, value: "new" },
+        ],
+      },
       { baseRevision: 3, revision: 4 },
     );
 

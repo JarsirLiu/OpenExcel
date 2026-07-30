@@ -103,18 +103,20 @@ export function buildToolPart(
               patches.length > 0
                 ? {
                     type: "write",
-                    cells: patches.flatMap((patch) =>
-                      patch.values.map((value, index) => ({
-                        row: patch.row,
-                        col: patch.startCol + index,
-                        value: value.value,
-                        ...(value.formula ? { formula: value.formula } : {}),
-                      })),
-                    ),
+                    operations: patches.map((patch) => ({
+                      type: "range",
+                      startRow: patch.row,
+                      startCol: patch.startCol,
+                      endRow: patch.row,
+                      endCol: patch.startCol + patch.values.length - 1,
+                      values: [patch.values.map((value) => value.value)],
+                    })),
                   }
                 : undefined,
             changeSummary:
-              changedCellCount > 0 ? { changedCellCount, rangeOperationCount: 0 } : undefined,
+              changedCellCount > 0
+                ? { changedCellCount, changedRanges: [], operationCount: patches.length }
+                : undefined,
           }
         : undefined,
   };

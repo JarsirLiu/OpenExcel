@@ -1,6 +1,8 @@
 import { sheetChangeDeltaToZeroBased } from "../chat/sheetCoordinates.js";
+import { formatWriteRange } from "../chat/writeRange.js";
 import type { FortuneCell } from "../excel/celldataUtils.js";
 import { fortuneDateCellValue, normalizeFortuneFormula } from "../excel/fortuneCellValue.js";
+import { tokenizeFormula } from "../formula/formulaReferenceTokenizer.js";
 import type { SheetMutation } from "./sheetMutation.js";
 import { cloneSheetSnapshot, type SheetSnapshot } from "./sheetSnapshot.js";
 
@@ -32,7 +34,7 @@ function applyWrite(
   row: number,
   col: number,
   value: string | number | boolean,
-  valueType?: "date",
+  valueType?: "date" | "string",
   formula?: string,
 ): void {
   const key = cellKey(row, col);
@@ -41,7 +43,7 @@ function applyWrite(
   const normalizedFormula = normalizeFortuneFormula(formula);
   if (valueType === "date") {
     if (typeof value !== "string" || normalizedFormula) {
-      throw new Error("日期写入必须使用字符串值且不能同时写公式");
+      throw new Error("Date writes require a string value and cannot include a formula");
     }
     cells.set(key, { ...current, v: fortuneDateCellValue(value, current.v) });
     return;
@@ -62,6 +64,62 @@ function applyWrite(
     nextValue.m = String(value);
   }
   cells.set(key, { ...current, v: nextValue as unknown as FortuneCell["v"] });
+}
+
+function applyWriteRange(
+  cells: CellMap,
+  range: {
+    startRow: number;
+    startCol: number;
+    endRow: number;
+    endCol: number;
+    value?: string | number | boolean;
+    values?: Array<Array<string | number | boolean>>;
+    valueType?: "date" | "string";
+    formula?: string;
+  },
+): void {
+  if (range.values) {
+    for (let row = range.startRow; row <= range.endRow; row++) {
+      for (let col = range.startCol; col <= range.endCol; col++) {
+        const value = range.values[row - range.startRow]?.[col - range.startCol];
+        if (value === undefined) throw new Error("Write matrix dimensions do not match the range");
+        applyWrite(cells, row, col, value, range.valueType);
+      }
+    }
+    return;
+  }
+  const value = range.value ?? "";
+  forEachRange(range, (row, col) =>
+    applyWrite(
+      cells,
+      row,
+      col,
+      value,
+      range.valueType,
+      range.formula
+        ? shiftFormula(range.formula, row - range.startRow, col - range.startCol)
+        : undefined,
+    ),
+  );
+}
+
+function shiftFormula(formula: string, rowDelta: number, colDelta: number): string {
+  return tokenizeFormula(formula)
+    .map((token) => {
+      if (token.kind === "text") return token.value;
+      const reference = token.value;
+      const row = reference.absoluteRow ? reference.row : reference.row + rowDelta;
+      const column = reference.absoluteColumn ? reference.column : reference.column + colDelta;
+      if (row < 1 || column < 1)
+        throw new Error("A shifted formula reference is outside the sheet");
+      let name = "";
+      for (let current = column; current > 0; current = Math.floor((current - 1) / 26)) {
+        name = String.fromCharCode(65 + ((current - 1) % 26)) + name;
+      }
+      return `${reference.absoluteColumn ? "$" : ""}${name}${reference.absoluteRow ? "$" : ""}${row}`;
+    })
+    .join("");
 }
 
 function applyClear(cells: CellMap, row: number, col: number): void {
@@ -161,17 +219,30 @@ export function applySheetMutation(
 ): {
   snapshot: SheetSnapshot;
   mutation: SheetMutation;
-  changeSummary: { changedCellCount: number; rangeOperationCount: number };
+  changeSummary: { changedCellCount: number; changedRanges: string[]; operationCount: number };
 } {
   const next = cloneSheetSnapshot(snapshot);
   const cells = mapCells(next.celldata);
   const before = new Map([...cells].map(([key, cell]) => [key, contentSignature(cell)]));
   const config = parseConfig(next.config);
   const internal = sheetChangeDeltaToZeroBased(mutation);
+  const writeOperations = internal.type === "write" ? internal.operations : null;
 
   if (internal.type === "write") {
-    for (const cell of internal.cells)
-      applyWrite(cells, cell.row, cell.col, cell.value, cell.valueType, cell.formula);
+    for (const operation of writeOperations ?? []) {
+      if (operation.type === "cell") {
+        applyWrite(
+          cells,
+          operation.row,
+          operation.col,
+          operation.value,
+          operation.valueType,
+          operation.formula,
+        );
+      } else {
+        applyWriteRange(cells, operation);
+      }
+    }
     for (const range of internal.merges ?? []) {
       applyMerge(cells, range);
       addMergeConfig(config, range);
@@ -207,12 +278,57 @@ export function applySheetMutation(
     [...cells].filter(([key, cell]) => before.get(key) !== contentSignature(cell)).length +
     [...before.keys()].filter((key) => !cells.has(key)).length;
 
+  const changedCoordinates = [...cells.keys()]
+    .filter((key) => before.get(key) !== contentSignature(cells.get(key)))
+    .concat([...before.keys()].filter((key) => !cells.has(key)))
+    .map((key) => key.split(",").map(Number) as [number, number]);
+  const changedRanges = compactChangedRanges(changedCoordinates);
+
   return {
     snapshot: next,
     mutation,
     changeSummary: {
       changedCellCount,
-      rangeOperationCount: internal.type === "write" ? 0 : internal.operations.length,
+      changedRanges,
+      operationCount: internal.operations.length,
     },
   };
+}
+
+function compactChangedRanges(coordinates: Array<[number, number]>): string[] {
+  const byRow = new Map<number, number[]>();
+  for (const [row, col] of coordinates) byRow.set(row, [...(byRow.get(row) ?? []), col]);
+  return [...byRow.entries()]
+    .sort(([left], [right]) => left - right)
+    .flatMap(([row, columns]) => {
+      const sorted = [...new Set(columns)].sort((left, right) => left - right);
+      const ranges: string[] = [];
+      let start = sorted[0];
+      let previous = start;
+      for (const column of sorted.slice(1)) {
+        if (column !== previous + 1) {
+          ranges.push(
+            formatWriteRange({
+              startRow: row + 1,
+              startCol: start + 1,
+              endRow: row + 1,
+              endCol: previous + 1,
+            }),
+          );
+          start = column;
+        }
+        previous = column;
+      }
+      if (start !== undefined) {
+        ranges.push(
+          formatWriteRange({
+            startRow: row + 1,
+            startCol: start + 1,
+            endRow: row + 1,
+            endCol: previous + 1,
+          }),
+        );
+      }
+      return ranges;
+    });
 }

@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18n";
 import { normalizePreviewData, SheetPreview } from "./SheetPreview";
 import styles from "./ToolCallCard.module.css";
 
@@ -67,22 +68,22 @@ function getToolSummary(toolName: string, output: unknown, input: unknown): stri
   const sheetLabel =
     getSheetLabel(output) ??
     (isRecord(safeInput) && typeof safeInput.sheetNo === "number"
-      ? `Sheet #${safeInput.sheetNo}`
-      : "Sheet");
+      ? t("sheet_number", { number: safeInput.sheetNo })
+      : t("sheet_default"));
 
   switch (toolName) {
     case "readSheetData":
-      return `读取 ${sheetLabel}`;
+      return t("tool_read_sheet", { sheet: sheetLabel });
     case "readSheetObjects":
-      return `读取对象 ${sheetLabel}`;
+      return t("tool_read_sheet_objects", { sheet: sheetLabel });
     case "writeCells":
-      return `写入 ${sheetLabel}`;
+      return t("tool_write_sheet", { sheet: sheetLabel });
     case "clearCells":
-      return `清空 ${sheetLabel}`;
+      return t("tool_clear_sheet", { sheet: sheetLabel });
     case "mergeCells":
-      return `合并 ${sheetLabel}`;
+      return t("tool_merge_sheet", { sheet: sheetLabel });
     case "unmergeCells":
-      return `取消合并 ${sheetLabel}`;
+      return t("tool_unmerge_sheet", { sheet: sheetLabel });
     default:
       return sheetLabel;
   }
@@ -91,64 +92,20 @@ function getToolSummary(toolName: string, output: unknown, input: unknown): stri
 function getSheetActionLabel(toolName: string): string {
   switch (toolName) {
     case "readSheetData":
-      return "读取了 Sheet";
+      return t("sheet_action_read");
     case "readSheetObjects":
-      return "读取了 Sheet 对象";
+      return t("sheet_action_read_objects");
     case "writeCells":
-      return "修改了 Sheet";
+      return t("sheet_action_write");
     case "clearCells":
-      return "清空了 Sheet";
+      return t("sheet_action_clear");
     case "mergeCells":
-      return "合并了 Sheet";
+      return t("sheet_action_merge");
     case "unmergeCells":
-      return "取消合并了 Sheet";
+      return t("sheet_action_unmerge");
     default:
-      return "处理了 Sheet";
+      return t("sheet_action_generic");
   }
-}
-
-function computeChangedCells(delta: unknown): Set<string> | undefined {
-  if (!delta || typeof delta !== "object") return undefined;
-
-  const d = delta as Record<string, unknown>;
-  const cells: string[] = [];
-
-  if (d.type === "write" && Array.isArray(d.cells)) {
-    for (const c of d.cells) {
-      if (
-        c &&
-        typeof c === "object" &&
-        typeof (c as any).row === "number" &&
-        typeof (c as any).col === "number"
-      ) {
-        cells.push(`${(c as any).row},${(c as any).col}`);
-      }
-    }
-  } else if (
-    (d.type === "clear" || d.type === "merge" || d.type === "unmerge") &&
-    Array.isArray(d.operations)
-  ) {
-    for (const op of d.operations) {
-      if (!op || typeof op !== "object") continue;
-      const o = op as Record<string, unknown>;
-      if (o.type === "cell" && typeof o.row === "number" && typeof o.col === "number") {
-        cells.push(`${o.row},${o.col}`);
-      } else if (
-        typeof o.startRow === "number" &&
-        typeof o.startCol === "number" &&
-        typeof o.endRow === "number" &&
-        typeof o.endCol === "number"
-      ) {
-        for (let r = o.startRow; r <= o.endRow; r++) {
-          for (let c = o.startCol; c <= o.endCol; c++) {
-            cells.push(`${r},${c}`);
-          }
-        }
-      }
-    }
-  }
-
-  return cells.length > 0 ? new Set(cells) : undefined;
 }
 
 export function ToolCallCard({ part }: { part: any }) {
@@ -163,7 +120,12 @@ export function ToolCallCard({ part }: { part: any }) {
   const preview = normalizePreviewData(output?.preview);
   const isReadOnlyTool = READ_ONLY_TOOLS.has(toolName);
   const sheetInfo = output?.sheetInfo ?? output?.sheet ?? null;
-  const changedCells = computeChangedCells(output?.delta);
+  const changedRanges =
+    isRecord(output?.changeSummary) && Array.isArray(output.changeSummary.changedRanges)
+      ? output.changeSummary.changedRanges.filter(
+          (range: unknown): range is string => typeof range === "string",
+        )
+      : undefined;
   const stateClass = isComplete
     ? isError
       ? styles.stateError
@@ -189,14 +151,14 @@ export function ToolCallCard({ part }: { part: any }) {
         <span className={styles.name}>{toolName}</span>
         <span className={styles.summary}>{summary}</span>
         <span className={`${styles.state} ${stateClass}`}>
-          {isComplete ? (isError ? "失败" : "已完成") : "运行中..."}
+          {isComplete ? (isError ? t("tool_failed") : t("tool_completed")) : t("tool_running")}
         </span>
       </div>
       {isComplete && !isError && !isReadOnlyTool && preview && preview.rows.length > 0 && (
         <div className={styles.preview}>
           <SheetPreview
             preview={preview}
-            changedCells={changedCells}
+            changedRanges={changedRanges}
             label={output?.previewLabel}
           />
         </div>

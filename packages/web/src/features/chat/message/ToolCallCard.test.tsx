@@ -52,7 +52,12 @@ describe("ToolCallCard", () => {
               rows: [{ row: 1, values: ["Updated"] }],
               merges: [],
             },
-            delta: { type: "write", cells: [{ row: 1, col: 1 }] },
+            delta: {
+              type: "write",
+              operations: [
+                { type: "range", startRow: 1, startCol: 1, endRow: 1, endCol: 1, value: "Updated" },
+              ],
+            },
           },
         }}
       />,

@@ -12,15 +12,20 @@ describe("SheetChangeSummary", () => {
             state: "output-available",
             output: {
               sheetInfo: { sheetId: 1, sheetNo: 1, sheetName: "Sheet1" },
-              changeSummary: { changedCellCount: 2, rangeOperationCount: 0 },
-              delta: { type: "write", cells: [] },
+              changeSummary: { changedCellCount: 2, changedRanges: ["A1:B1"], operationCount: 1 },
+              delta: {
+                type: "write",
+                operations: [
+                  { type: "range", startRow: 1, startCol: 1, endRow: 1, endCol: 2, value: "x" },
+                ],
+              },
             },
           },
         ]}
       />,
     );
 
-    expect(screen.getByText("2 个单元格")).toBeTruthy();
+    expect(screen.getByText(/2 个单元格/)).toBeTruthy();
   });
 
   it("renders range operations separately from cell changes", () => {
@@ -32,7 +37,7 @@ describe("SheetChangeSummary", () => {
             state: "output-available",
             output: {
               sheetInfo: { sheetId: 1, sheetNo: 1, sheetName: "Sheet1" },
-              changeSummary: { changedCellCount: 0, rangeOperationCount: 1 },
+              changeSummary: { changedCellCount: 0, changedRanges: [], operationCount: 1 },
               delta: {
                 type: "merge",
                 operations: [{ type: "range", startRow: 1, startCol: 1, endRow: 3, endCol: 4 }],
@@ -43,7 +48,7 @@ describe("SheetChangeSummary", () => {
       />,
     );
 
-    expect(screen.getByText("1 个区域操作")).toBeTruthy();
+    expect(screen.getByText("1 个操作")).toBeTruthy();
   });
 
   it("does not render a sheet when the server reports no actual changes", () => {
@@ -55,7 +60,7 @@ describe("SheetChangeSummary", () => {
             state: "output-available",
             output: {
               sheetInfo: { sheetId: 2, sheetNo: 1, sheetName: "Sheet2" },
-              changeSummary: { changedCellCount: 0, rangeOperationCount: 0 },
+              changeSummary: { changedCellCount: 0, changedRanges: [], operationCount: 0 },
               delta: {
                 type: "clear",
                 operations: [{ type: "range", startRow: 1, startCol: 1, endRow: 3, endCol: 3 }],

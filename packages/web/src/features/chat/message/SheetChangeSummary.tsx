@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { t } from "@/lib/i18n";
 import styles from "./SheetChangeSummary.module.css";
 import { SheetPreview } from "./SheetPreview";
 
@@ -11,9 +12,9 @@ type SheetChangeEntry = {
   sheetName: string;
   sheetNo?: number;
   lastPreview: any;
-  changedCells: Set<string>;
+  changedRanges: string[];
   changedCellCount: number;
-  rangeOperationCount: number;
+  operationCount: number;
 };
 
 function collectSheetChanges(parts: any[]): SheetChangeEntry[] {
@@ -36,87 +37,40 @@ function collectSheetChanges(parts: any[]): SheetChangeEntry[] {
       map.set(sheetId, {
         sheetId,
         sheetName:
-          typeof output.sheetInfo.sheetName === "string" ? output.sheetInfo.sheetName : "Sheet",
+          typeof output.sheetInfo.sheetName === "string"
+            ? output.sheetInfo.sheetName
+            : t("sheet_default"),
         sheetNo: output.sheetInfo.sheetNo,
         lastPreview: null,
-        changedCells: new Set(),
+        changedRanges: [],
         changedCellCount: 0,
-        rangeOperationCount: 0,
+        operationCount: 0,
       });
     }
 
     const entry = map.get(sheetId)!;
-    const delta = output.delta;
     const changeSummary = output.changeSummary;
-    if (
-      isRecord(changeSummary) &&
-      typeof changeSummary.changedCellCount === "number" &&
-      typeof changeSummary.rangeOperationCount === "number"
-    ) {
-      entry.changedCellCount += changeSummary.changedCellCount;
-      entry.rangeOperationCount += changeSummary.rangeOperationCount;
-    }
-
-    if (delta && typeof delta === "object") {
-      const d = delta as Record<string, unknown>;
-
-      if (d.type === "write" && Array.isArray(d.cells)) {
-        for (const c of d.cells) {
-          if (
-            c &&
-            typeof c === "object" &&
-            typeof (c as any).row === "number" &&
-            typeof (c as any).col === "number"
-          ) {
-            entry.changedCells.add(`${(c as any).row},${(c as any).col}`);
-          }
-        }
-      } else if (d.type === "clear" && Array.isArray(d.operations)) {
-        for (const op of d.operations) {
-          if (!op || typeof op !== "object") continue;
-          const o = op as Record<string, unknown>;
-          if (o.type === "cell" && typeof o.row === "number" && typeof o.col === "number") {
-            entry.changedCells.add(`${o.row},${o.col}`);
-          } else if (
-            typeof o.startRow === "number" &&
-            typeof o.startCol === "number" &&
-            typeof o.endRow === "number" &&
-            typeof o.endCol === "number"
-          ) {
-            for (let r = o.startRow; r <= o.endRow; r++) {
-              for (let c = o.startCol; c <= o.endCol; c++) {
-                entry.changedCells.add(`${r},${c}`);
-              }
-            }
-          }
-        }
-      } else if ((d.type === "merge" || d.type === "unmerge") && Array.isArray(d.operations)) {
-        for (const op of d.operations) {
-          if (!op || typeof op !== "object") continue;
-          const o = op as Record<string, unknown>;
-          if (
-            typeof o.startRow === "number" &&
-            typeof o.startCol === "number" &&
-            typeof o.endRow === "number" &&
-            typeof o.endCol === "number"
-          ) {
-            for (let r = o.startRow; r <= o.endRow; r++) {
-              for (let c = o.startCol; c <= o.endCol; c++) {
-                entry.changedCells.add(`${r},${c}`);
-              }
-            }
-          }
-        }
+    if (isRecord(changeSummary)) {
+      if (typeof changeSummary.changedCellCount === "number") {
+        entry.changedCellCount += changeSummary.changedCellCount;
+      }
+      if (typeof changeSummary.operationCount === "number") {
+        entry.operationCount += changeSummary.operationCount;
+      }
+      if (Array.isArray(changeSummary.changedRanges)) {
+        entry.changedRanges.push(
+          ...changeSummary.changedRanges.filter(
+            (range): range is string => typeof range === "string",
+          ),
+        );
       }
     }
 
-    if (output.preview) {
-      entry.lastPreview = output.preview;
-    }
+    if (output.preview) entry.lastPreview = output.preview;
   }
 
   return [...map.values()].filter(
-    (entry) => entry.changedCellCount > 0 || entry.rangeOperationCount > 0,
+    (entry) => entry.changedCellCount > 0 || entry.operationCount > 0,
   );
 }
 
@@ -128,30 +82,30 @@ export function SheetChangeSummary({
   onNavigateSheet?: (sheetId: number) => void;
 }) {
   const [expandedSheets, setExpandedSheets] = useState<Set<number>>(new Set());
-
   const sheets = collectSheetChanges(parts);
   if (sheets.length === 0) return null;
 
   const toggleSheet = (sheetId: number) => {
     const next = new Set(expandedSheets);
-    if (next.has(sheetId)) {
-      next.delete(sheetId);
-    } else {
-      next.add(sheetId);
-    }
+    if (next.has(sheetId)) next.delete(sheetId);
+    else next.add(sheetId);
     setExpandedSheets(next);
   };
 
   const formatChangeSummary = (sheet: SheetChangeEntry) => {
-    const parts: string[] = [];
-    if (sheet.changedCellCount > 0) parts.push(`${sheet.changedCellCount} 个单元格`);
-    if (sheet.rangeOperationCount > 0) parts.push(`${sheet.rangeOperationCount} 个区域操作`);
-    return parts.length > 0 ? parts.join("，") : "无实际内容变化";
+    const summary: string[] = [];
+    if (sheet.changedCellCount > 0) {
+      summary.push(t("sheet_changed_cells", { count: sheet.changedCellCount }));
+    }
+    if (sheet.operationCount > 0) {
+      summary.push(t("sheet_operation_count", { count: sheet.operationCount }));
+    }
+    return summary.length > 0 ? summary.join(t("list_separator")) : t("sheet_no_content_change");
   };
 
   return (
     <div className={styles.summary}>
-      <div className={styles.heading}>修改了 {sheets.length} 个工作表</div>
+      <div className={styles.heading}>{t("sheet_changes_heading", { count: sheets.length })}</div>
       {sheets.map((sheet) => (
         <div key={sheet.sheetId} className={styles.sheet}>
           <div className={styles.sheetRow}>
@@ -170,7 +124,10 @@ export function SheetChangeSummary({
               type="button"
               className={styles.toggle}
               onClick={() => toggleSheet(sheet.sheetId)}
-              aria-label={`${expandedSheets.has(sheet.sheetId) ? "收起" : "展开"} ${sheet.sheetName} 变更预览`}
+              aria-label={t("sheet_change_toggle", {
+                action: expandedSheets.has(sheet.sheetId) ? t("collapse") : t("expand"),
+                sheet: sheet.sheetName,
+              })}
               aria-expanded={expandedSheets.has(sheet.sheetId)}
             >
               <span className={styles.chevron} aria-hidden="true" />
@@ -178,7 +135,7 @@ export function SheetChangeSummary({
           </div>
           {expandedSheets.has(sheet.sheetId) && sheet.lastPreview && (
             <div className={styles.preview}>
-              <SheetPreview preview={sheet.lastPreview} changedCells={sheet.changedCells} />
+              <SheetPreview preview={sheet.lastPreview} changedRanges={sheet.changedRanges} />
             </div>
           )}
         </div>

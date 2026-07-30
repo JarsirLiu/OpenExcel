@@ -22,7 +22,9 @@ type RevisionedResult = { revision: number };
 
 function throwIfAborted(signal: AbortSignal | undefined) {
   if (!signal?.aborted) return;
-  throw signal.reason instanceof Error ? signal.reason : new Error("工具执行已中断");
+  throw signal.reason instanceof Error
+    ? signal.reason
+    : new Error("Sheet tool execution was aborted");
 }
 
 export async function runSheetMutation<T extends RevisionedResult>(
@@ -37,7 +39,7 @@ export async function runSheetMutation<T extends RevisionedResult>(
       where: { id: sheetId, workbook: { workspaceId: context.workspaceId } },
       include: { workbook: true },
     });
-    if (!sheet) throw new ToolNotFoundError(`Sheet ${sheetId} 不存在`);
+    if (!sheet) throw new ToolNotFoundError(`Sheet ${sheetId} was not found`);
 
     throwIfAborted(abortSignal);
     const result = await mutation(sheet, tx);

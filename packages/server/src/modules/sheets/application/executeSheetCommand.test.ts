@@ -22,7 +22,12 @@ const command = {
   mutationId: "mutation-1",
   sheetId: 7,
   baseRevision: 2,
-  mutation: { type: "write" as const, cells: [{ row: 1, col: 1, value: "next" }] },
+  mutation: {
+    type: "write" as const,
+    operations: [
+      { type: "range" as const, startRow: 1, startCol: 1, endRow: 1, endCol: 1, value: "next" },
+    ],
+  },
 };
 
 describe("executeSheetCommand", () => {
@@ -112,7 +117,7 @@ describe("executeSheetCommand", () => {
       baseRevision: 2,
       revision: 3,
       mutation: command.mutation,
-      changeSummary: { changedCellCount: 1, rangeOperationCount: 0 },
+      changeSummary: { changedCellCount: 1, changedRanges: ["A1"], operationCount: 1 },
     });
     mocks.findReceipt.mockResolvedValue({
       commandHash: sheetCommandFingerprint(command),
@@ -135,7 +140,7 @@ describe("executeSheetCommand", () => {
         baseRevision: 2,
         revision: 3,
         mutation: command.mutation,
-        changeSummary: { changedCellCount: 1, rangeOperationCount: 0 },
+        changeSummary: { changedCellCount: 1, changedRanges: ["A1"], operationCount: 1 },
       }),
     });
     mocks.findSheet
@@ -176,14 +181,19 @@ describe("executeSheetCommand", () => {
         baseRevision: command.baseRevision,
         revision: 3,
         mutation: command.mutation,
-        changeSummary: { changedCellCount: 1, rangeOperationCount: 0 },
+        changeSummary: { changedCellCount: 1, changedRanges: ["A1"], operationCount: 1 },
       }),
     });
 
     await expect(
       executeSheetCommand(3, {
         ...command,
-        mutation: { type: "write", cells: [{ row: 1, col: 1, value: "different" }] },
+        mutation: {
+          type: "write",
+          operations: [
+            { type: "range", startRow: 1, startCol: 1, endRow: 1, endCol: 1, value: "different" },
+          ],
+        },
       }),
     ).rejects.toThrow("已用于其他命令");
     expect(mocks.commitSheetCommand).not.toHaveBeenCalled();

@@ -101,6 +101,13 @@ export {
   toolColumnToA1Ref,
   toolRangeToA1Ref,
 } from "./chat/sheetGeometry.js";
+export {
+  assertWriteRangesDoNotOverlap,
+  formatWriteRange,
+  parseWriteRange,
+  writeRangeCellCount,
+  writeRangesOverlap,
+} from "./chat/writeRange.js";
 export type { FortuneCell, FortuneCellValue } from "./excel/celldataUtils.js";
 export {
   celldataToGrid,

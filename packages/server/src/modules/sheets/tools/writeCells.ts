@@ -1,8 +1,7 @@
 import { ToolInputValidationError } from "@openexcel/agent";
 import {
   type ExcelToolInput,
-  MAX_WRITE_CELLS_PER_CALL,
-  type SheetChangeCell,
+  parseWriteRange,
   type SheetMutation,
   storageIndex,
 } from "@openexcel/core";
@@ -15,61 +14,15 @@ import { toSheetToolPatchResult } from "./sheetToolResult.js";
 
 type WriteOperation = ExcelToolInput<"writeCells">["operations"][number];
 
-function expandOperations(
-  operations: WriteOperation[],
-  abortSignal?: AbortSignal,
-): SheetChangeCell[] {
-  const cells: SheetChangeCell[] = [];
-  for (const operation of operations) {
-    if (abortSignal?.aborted) {
-      throw abortSignal.reason instanceof Error ? abortSignal.reason : new Error("工具执行已中断");
-    }
-    if (operation.type === "cell") {
-      if (cells.length >= MAX_WRITE_CELLS_PER_CALL) {
-        throw new ToolInputValidationError("单次 writeCells 最多写入 10000 个单元格");
-      }
-      const cell: SheetChangeCell = {
-        row: operation.row,
-        col: operation.col,
-        value: operation.value,
-        valueType: operation.valueType,
-      };
-      if (operation.formula !== undefined) cell.formula = operation.formula;
-      cells.push(cell);
-      continue;
-    }
-    const rangeSize =
-      (operation.endRow - operation.startRow + 1) * (operation.endCol - operation.startCol + 1);
-    if (cells.length + rangeSize > MAX_WRITE_CELLS_PER_CALL) {
-      throw new ToolInputValidationError("单次 writeCells 最多写入 10000 个单元格");
-    }
-    for (let row = operation.startRow; row <= operation.endRow; row++) {
-      for (let col = operation.startCol; col <= operation.endCol; col++) {
-        if (abortSignal?.aborted) {
-          throw abortSignal.reason instanceof Error
-            ? abortSignal.reason
-            : new Error("工具执行已中断");
-        }
-        const cell: SheetChangeCell = {
-          row,
-          col,
-          value: operation.value,
-          valueType: operation.valueType,
-        };
-        if (operation.formula !== undefined) cell.formula = operation.formula;
-        cells.push(cell);
-      }
-    }
-  }
-  return cells;
-}
-
-function affectedRange(cells: SheetChangeCell) {
+function toMutationOperation(operation: WriteOperation) {
+  const range = parseWriteRange(operation.range);
   return {
-    startRow: storageIndex(cells.row - 1),
-    endRow: storageIndex(cells.row - 1),
-    startCol: storageIndex(cells.col - 1),
-    endCol: storageIndex(cells.col - 1),
+    type: "range" as const,
+    ...range,
+    value: operation.value,
+    values: operation.values,
+    valueType: operation.valueType,
+    formula: operation.formula,
   };
 }
 
@@ -78,12 +31,23 @@ export const writeCells = defineServerTool("writeCells", {
   resultBudget: { maxTokens: 4_000, compact: (value) => value },
   execute: async (input, options) => {
     const { sheetId, operations } = input;
+    const mutationOperations = operations.map(toMutationOperation);
+    const ranges = mutationOperations.map(({ startRow, startCol, endRow, endCol }) => ({
+      startRow,
+      startCol,
+      endRow,
+      endCol,
+    }));
     return runSheetMutation(
       { ...options.context, db: options.db },
       sheetId,
       async (sheet, tx) => {
-        const cells = expandOperations(operations, options.abortSignal);
-        const mutation: SheetMutation = { type: "write", cells };
+        if (options.abortSignal?.aborted) {
+          throw options.abortSignal.reason instanceof Error
+            ? options.abortSignal.reason
+            : new ToolInputValidationError("Sheet tool execution was aborted");
+        }
+        const mutation: SheetMutation = { type: "write", operations: mutationOperations };
         const result = await executeSheetCommandInTransaction(tx, options.context.workspaceId, {
           kind: "mutation",
           mutationId: createSheetToolMutationId(
@@ -95,7 +59,6 @@ export const writeCells = defineServerTool("writeCells", {
           baseRevision: sheet.revision,
           mutation,
         });
-        const ranges = cells.map(affectedRange);
         const minRow = Math.min(...ranges.map((range) => range.startRow));
         const maxRow = Math.max(...ranges.map((range) => range.endRow));
         const minCol = Math.min(...ranges.map((range) => range.startCol));
@@ -110,9 +73,9 @@ export const writeCells = defineServerTool("writeCells", {
             snapshot.celldata,
             sheet.name,
             sheetId,
-            storageIndex(minRow),
-            storageIndex(maxRow),
-            { startCol: storageIndex(minCol), endCol: storageIndex(maxCol) },
+            storageIndex(minRow - 1),
+            storageIndex(maxRow - 1),
+            { startCol: storageIndex(minCol - 1), endCol: storageIndex(maxCol - 1) },
           ),
           sheetInfo: { sheetId: sheet.id, sheetNo: sheet.sheetNo, sheetName: sheet.name },
         };

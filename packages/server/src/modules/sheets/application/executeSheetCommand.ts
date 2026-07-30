@@ -70,7 +70,8 @@ function applyCommand(current: SheetSnapshot, command: SheetCommand) {
         mutation: null,
         changeSummary: {
           changedCellCount: command.snapshot.celldata.length,
-          rangeOperationCount: 0,
+          changedRanges: [],
+          operationCount: 0,
         },
       };
 }

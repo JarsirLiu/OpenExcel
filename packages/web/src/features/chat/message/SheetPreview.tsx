@@ -1,4 +1,5 @@
-import { toolColumnToA1Ref, toolIndex, toolRangeToA1Ref } from "@openexcel/core";
+import { parseWriteRange, toolColumnToA1Ref, toolIndex, toolRangeToA1Ref } from "@openexcel/core";
+import { t } from "@/lib/i18n";
 
 interface PreviewMerge {
   startRow: number;
@@ -116,17 +117,26 @@ function buildMergeMap(merges: PreviewMerge[]): Map<string, { rs: number; cs: nu
 
 export function SheetPreview({
   preview: rawPreview,
-  changedCells,
-  label = "变更区域",
+  changedRanges,
+  label,
 }: {
   preview: unknown;
-  changedCells?: ReadonlySet<string>;
+  changedRanges?: readonly string[];
   label?: string;
 }) {
   const preview = normalizePreviewData(rawPreview);
   if (!preview) return null;
 
   const mergeMap = buildMergeMap(preview.merges);
+  const parsedChangedRanges = (changedRanges ?? []).map(parseWriteRange);
+  const isChanged = (row: number, col: number) =>
+    parsedChangedRanges.some(
+      (range) =>
+        row >= range.startRow &&
+        row <= range.endRow &&
+        col >= range.startCol &&
+        col <= range.endCol,
+    );
   const skipped = new Set<string>();
   const colBase = preview.range.startCol;
   const columnCount = Math.max(
@@ -146,7 +156,7 @@ export function SheetPreview({
       <div
         style={{ fontSize: 12, fontWeight: 600, color: "var(--muted-foreground)", marginBottom: 4 }}
       >
-        {preview.sheetName} — {label} ({rangeLabel})
+        {preview.sheetName} — {label ?? t("sheet_change_preview")} ({rangeLabel})
       </div>
       <div style={{ overflowX: "auto", maxHeight: 300, overflowY: "auto" }}>
         <table
@@ -160,7 +170,7 @@ export function SheetPreview({
           <thead>
             <tr>
               <th
-                aria-label="行列标题"
+                aria-label={t("sheet_preview_headers")}
                 style={{
                   border: "1px solid var(--border)",
                   padding: "4px 8px",
@@ -203,9 +213,9 @@ export function SheetPreview({
                 </th>
                 {columns.map((col, ci) => {
                   const val = row.values[ci] ?? "";
-                  const key = `${row.row},${col}`;
-                  if (skipped.has(key)) return null;
-                  const merge = mergeMap.get(key);
+                  const mergeKey = `${row.row},${col}`;
+                  if (skipped.has(mergeKey)) return null;
+                  const merge = mergeMap.get(mergeKey);
                   if (merge) {
                     for (let r = row.row; r < row.row + merge.rs; r++) {
                       for (let c = col; c < col + merge.cs; c++) {
@@ -223,7 +233,7 @@ export function SheetPreview({
                         padding: "4px 8px",
                         whiteSpace: "nowrap",
                         minWidth: 60,
-                        background: changedCells?.has(key)
+                        background: isChanged(row.row, col)
                           ? "#d4edda"
                           : row.row === preview.range.startRow
                             ? "var(--muted)"
