@@ -22,7 +22,13 @@ describe("collectSheetPatchUpdates", () => {
             input: { sheetId: 11 },
             output: {
               sheetInfo: { sheetId: 11, sheetNo: 2, sheetName: "Budget" },
-              changeSummary: { changedCellCount: 1, changedRanges: ["B1"], operationCount: 1 },
+              changeSummary: {
+                changedCellCount: 1,
+                changedRanges: ["B1"],
+                omittedRangeCount: 0,
+                truncated: false,
+                operationCount: 1,
+              },
               delta: {
                 type: "write",
                 operations: [
@@ -43,7 +49,13 @@ describe("collectSheetPatchUpdates", () => {
             input: { sheetId: 12 },
             output: {
               sheetInfo: { sheetId: 12, sheetNo: 3, sheetName: "Plan" },
-              changeSummary: { changedCellCount: 0, changedRanges: [], operationCount: 0 },
+              changeSummary: {
+                changedCellCount: 0,
+                changedRanges: [],
+                omittedRangeCount: 0,
+                truncated: false,
+                operationCount: 0,
+              },
               delta: null,
             },
           },
@@ -75,7 +87,13 @@ describe("collectSheetPatchUpdates", () => {
             input: { sheetId: 13 },
             output: {
               sheetInfo: { sheetId: 13, sheetNo: 4, sheetName: "Invalid" },
-              changeSummary: { changedCellCount: 0, changedRanges: [], operationCount: 0 },
+              changeSummary: {
+                changedCellCount: 0,
+                changedRanges: [],
+                omittedRangeCount: 0,
+                truncated: false,
+                operationCount: 0,
+              },
               delta: {
                 type: "write",
                 operations: [
@@ -112,7 +130,13 @@ describe("collectSheetPatchUpdates", () => {
             input: { sheetId: 14 },
             output: {
               sheetInfo: { sheetId: 14, sheetNo: 5, sheetName: "Clear" },
-              changeSummary: { changedCellCount: 4, changedRanges: ["A1:C3"], operationCount: 2 },
+              changeSummary: {
+                changedCellCount: 4,
+                changedRanges: ["A1:C3"],
+                omittedRangeCount: 0,
+                truncated: false,
+                operationCount: 2,
+              },
               delta: {
                 type: "clear",
                 operations: [
@@ -281,7 +305,13 @@ describe("collectWorkbookMutationToolCallIds", () => {
             input: { sheetId: 31 },
             output: {
               sheetInfo: { sheetId: 31, sheetNo: 1, sheetName: "Sheet1" },
-              changeSummary: { changedCellCount: 1, changedRanges: ["A1"], operationCount: 1 },
+              changeSummary: {
+                changedCellCount: 1,
+                changedRanges: ["A1"],
+                omittedRangeCount: 0,
+                truncated: false,
+                operationCount: 1,
+              },
               delta: {
                 type: "clear",
                 operations: [{ type: "cell", row: 1, col: 1 }],
@@ -350,7 +380,13 @@ describe("collectWorkbookRefreshToolCallIds", () => {
             input: { sheetId: 31 },
             output: {
               sheetInfo: { sheetId: 31, sheetNo: 1, sheetName: "Sheet1" },
-              changeSummary: { changedCellCount: 1, changedRanges: ["A1"], operationCount: 1 },
+              changeSummary: {
+                changedCellCount: 1,
+                changedRanges: ["A1"],
+                omittedRangeCount: 0,
+                truncated: false,
+                operationCount: 1,
+              },
               delta: {
                 type: "write",
                 operations: [
@@ -387,7 +423,13 @@ describe("collectWorkbookRefreshToolCallIds", () => {
             input: { sheetId: 31 },
             output: {
               sheetInfo: { sheetId: 31, sheetNo: 1, sheetName: "Sheet1" },
-              changeSummary: { changedCellCount: 1, changedRanges: ["A1"], operationCount: 1 },
+              changeSummary: {
+                changedCellCount: 1,
+                changedRanges: ["A1"],
+                omittedRangeCount: 0,
+                truncated: false,
+                operationCount: 1,
+              },
               delta: {
                 type: "write",
                 operations: [
@@ -426,7 +468,13 @@ describe("useSheetPatchSync", () => {
             input: { sheetId: 31 },
             output: {
               sheetInfo: { sheetId: 31, sheetNo: 1, sheetName: "Sheet1" },
-              changeSummary: { changedCellCount: 1, changedRanges: ["A1"], operationCount: 1 },
+              changeSummary: {
+                changedCellCount: 1,
+                changedRanges: ["A1"],
+                omittedRangeCount: 0,
+                truncated: false,
+                operationCount: 1,
+              },
               delta: {
                 type: "write",
                 operations: [
@@ -450,7 +498,13 @@ describe("useSheetPatchSync", () => {
             input: { sheetId: 31 },
             output: {
               sheetInfo: { sheetId: 31, sheetNo: 1, sheetName: "Sheet1" },
-              changeSummary: { changedCellCount: 1, changedRanges: ["B2"], operationCount: 1 },
+              changeSummary: {
+                changedCellCount: 1,
+                changedRanges: ["B2"],
+                omittedRangeCount: 0,
+                truncated: false,
+                operationCount: 1,
+              },
               delta: {
                 type: "write",
                 operations: [
@@ -495,7 +549,13 @@ describe("useSheetPatchSync", () => {
             input: { sheetId: 31 },
             output: {
               sheetInfo: { sheetId: 31, sheetNo: 1, sheetName: "Sheet1" },
-              changeSummary: { changedCellCount: 1, changedRanges: ["A1"], operationCount: 1 },
+              changeSummary: {
+                changedCellCount: 1,
+                changedRanges: ["A1"],
+                omittedRangeCount: 0,
+                truncated: false,
+                operationCount: 1,
+              },
               delta: {
                 type: "write",
                 operations: [
@@ -519,7 +579,13 @@ describe("useSheetPatchSync", () => {
             input: { sheetId: 31 },
             output: {
               sheetInfo: { sheetId: 31, sheetNo: 1, sheetName: "Sheet1" },
-              changeSummary: { changedCellCount: 1, changedRanges: ["B2"], operationCount: 1 },
+              changeSummary: {
+                changedCellCount: 1,
+                changedRanges: ["B2"],
+                omittedRangeCount: 0,
+                truncated: false,
+                operationCount: 1,
+              },
               delta: {
                 type: "write",
                 operations: [
@@ -560,7 +626,13 @@ describe("useSheetPatchSync", () => {
             input: { sheetId: 31 },
             output: {
               sheetInfo: { sheetId: 31, sheetNo: 1, sheetName: "Sheet1" },
-              changeSummary: { changedCellCount: 1, changedRanges: ["A1"], operationCount: 1 },
+              changeSummary: {
+                changedCellCount: 1,
+                changedRanges: ["A1"],
+                omittedRangeCount: 0,
+                truncated: false,
+                operationCount: 1,
+              },
               delta: {
                 type: "write",
                 operations: [
@@ -589,7 +661,13 @@ describe("useSheetPatchSync", () => {
           input: { sheetId: 31 },
           output: {
             sheetInfo: { sheetId: 31, sheetNo: 1, sheetName: "Sheet1" },
-            changeSummary: { changedCellCount: 1, changedRanges: ["A1"], operationCount: 1 },
+            changeSummary: {
+              changedCellCount: 1,
+              changedRanges: ["A1"],
+              omittedRangeCount: 0,
+              truncated: false,
+              operationCount: 1,
+            },
             delta: {
               type: "write",
               operations: [

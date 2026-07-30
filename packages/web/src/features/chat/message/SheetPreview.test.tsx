@@ -12,6 +12,7 @@ describe("SheetPreview", () => {
         { row: 4, values: ["B", "2"] },
       ],
       merges: [],
+      truncated: false,
       range: { startRow: 3, endRow: 4, startCol: 1, endCol: 2 },
     });
 
@@ -27,6 +28,7 @@ describe("SheetPreview", () => {
       sheetName: "Budget",
       rows: [{ values: ["A", 1] }, { 0: "B", 1: 2 }, "plain"],
       merges: [],
+      truncated: false,
       range: { startRow: 1, endRow: 3, startCol: 1, endCol: 2 },
     });
 
@@ -41,11 +43,25 @@ describe("SheetPreview", () => {
     expect(() => render(<SheetPreview preview={{ rows: [{ value: "bad" }] }} />)).not.toThrow();
   });
 
+  it("rejects preview rows that exceed the bounded column count", () => {
+    expect(
+      normalizePreviewData({
+        sheetId: 1,
+        sheetName: "Budget",
+        rows: [{ row: 1, values: Array.from({ length: 33 }, () => "x") }],
+        merges: [],
+        truncated: true,
+        range: { startRow: 1, endRow: 1, startCol: 1, endCol: 1 },
+      }),
+    ).toBeNull();
+  });
+
   it("renders merge spans keyed by the explicit row number", () => {
     // 服务端给出 row=2 的合并，跨 2 行 2 列；前端不应依赖数组下标推断。
     const preview = normalizePreviewData({
       sheetId: 1,
       sheetName: "Sheet1",
+      truncated: false,
       rows: [
         { row: 1, values: ["header", ""] },
         { row: 2, values: ["merged", ""] },

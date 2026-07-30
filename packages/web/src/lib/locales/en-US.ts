@@ -112,6 +112,7 @@ export const enUS = {
   sheet_no_content_change: "No content changed",
   sheet_number: "Sheet #{number}",
   sheet_operation_count: "{count} operations",
+  sheet_omitted_ranges: "and {count} more ranges",
   sheet_preview_headers: "Row and column headers",
   tool_clear_sheet: "Clear {sheet}",
   tool_completed: "Completed",

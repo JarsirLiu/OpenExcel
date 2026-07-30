@@ -177,9 +177,13 @@ export const sheetChangeDeltaSchema = z.union([
   }),
 ]);
 
+export const MAX_CHANGED_RANGES = 20;
+
 export const sheetChangeSummarySchema = z.object({
   changedCellCount: z.number().int().nonnegative(),
-  changedRanges: z.array(z.string().min(1)),
+  changedRanges: z.array(z.string().min(1)).max(MAX_CHANGED_RANGES),
+  omittedRangeCount: z.number().int().nonnegative(),
+  truncated: z.boolean(),
   operationCount: z.number().int().nonnegative(),
 });
 

@@ -1,4 +1,10 @@
-import { parseWriteRange, toolColumnToA1Ref, toolIndex, toolRangeToA1Ref } from "@openexcel/core";
+import {
+  MAX_CHANGED_RANGES,
+  parseWriteRange,
+  toolColumnToA1Ref,
+  toolIndex,
+  toolRangeToA1Ref,
+} from "@openexcel/core";
 import { t } from "@/lib/i18n";
 
 interface PreviewMerge {
@@ -14,12 +20,16 @@ interface PreviewRow {
   values: string[];
 }
 
+const MAX_PREVIEW_ROWS = 50;
+const MAX_PREVIEW_COLUMNS = 32;
+
 export interface PreviewData {
   sheetId: number;
   sheetName: string;
   range: { startRow: number; endRow: number; startCol: number; endCol: number };
   rows: PreviewRow[];
   merges: PreviewMerge[];
+  truncated: boolean;
 }
 
 type PreviewRange = PreviewData["range"];
@@ -51,6 +61,7 @@ function isPreviewRow(value: unknown, range: PreviewRange): value is PreviewRow 
   return (
     value.row >= range.startRow &&
     value.row <= range.endRow &&
+    value.values.length <= MAX_PREVIEW_COLUMNS &&
     value.values.every((cell) => typeof cell === "string")
   );
 }
@@ -87,7 +98,11 @@ export function normalizePreviewData(value: unknown): PreviewData | null {
     !Number.isInteger(value.sheetId) ||
     !isPreviewRange(range) ||
     !Array.isArray(value.rows) ||
-    !Array.isArray(value.merges)
+    !Array.isArray(value.merges) ||
+    typeof value.truncated !== "boolean" ||
+    value.rows.length > MAX_PREVIEW_ROWS ||
+    range.endRow - range.startRow + 1 > MAX_PREVIEW_ROWS ||
+    range.endCol - range.startCol + 1 > MAX_PREVIEW_COLUMNS
   ) {
     return null;
   }
@@ -101,6 +116,7 @@ export function normalizePreviewData(value: unknown): PreviewData | null {
     range,
     rows: value.rows,
     merges: value.merges,
+    truncated: value.truncated,
   };
 }
 
@@ -128,7 +144,15 @@ export function SheetPreview({
   if (!preview) return null;
 
   const mergeMap = buildMergeMap(preview.merges);
-  const parsedChangedRanges = (changedRanges ?? []).map(parseWriteRange);
+  const parsedChangedRanges = (changedRanges ?? [])
+    .slice(0, MAX_CHANGED_RANGES)
+    .flatMap((range) => {
+      try {
+        return [parseWriteRange(range)];
+      } catch {
+        return [];
+      }
+    });
   const isChanged = (row: number, col: number) =>
     parsedChangedRanges.some(
       (range) =>

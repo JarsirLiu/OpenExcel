@@ -55,8 +55,9 @@ describe("executeSheetCommand", () => {
   it("applies a mutation and commits one conditional snapshot update", async () => {
     const result = await executeSheetCommand(3, command);
 
-    expect(result.revision).toBe(3);
-    expect(result.snapshot.celldata).toEqual([{ r: 0, c: 0, v: { v: "next", m: "next" } }]);
+    expect(result.outcome).toBe("committed");
+    expect(result.result.revision).toBe(3);
+    expect(result.result.snapshot?.celldata).toEqual([{ r: 0, c: 0, v: { v: "next", m: "next" } }]);
     expect(mocks.commitSheetCommand).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
@@ -68,6 +69,8 @@ describe("executeSheetCommand", () => {
         uploadedData: JSON.stringify([{ r: 0, c: 0, v: { v: "next", m: "next" } }]),
       }),
     );
+    const commitInput = mocks.commitSheetCommand.mock.calls[0]?.[1];
+    expect(JSON.parse(commitInput.result)).not.toHaveProperty("snapshot");
   });
 
   it("canonicalizes a legacy merge before unmerging and clears stale metadata", async () => {
@@ -92,13 +95,52 @@ describe("executeSheetCommand", () => {
       },
     });
 
-    expect(result.snapshot.celldata).toEqual([
+    expect(result.outcome).toBe("committed");
+    expect(result.result.snapshot?.celldata).toEqual([
       { r: 0, c: 0, v: { v: "A", m: "A", fc: "#000000" } },
     ]);
     expect(mocks.commitSheetCommand).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ merges: "[]" }),
     );
+  });
+
+  it("reports actual cell differences for a snapshot replacement", async () => {
+    mocks.findSheet.mockResolvedValueOnce({
+      id: 7,
+      sheetNo: 1,
+      name: "Sheet1",
+      revision: 2,
+      uploadedData: JSON.stringify([
+        { r: 0, c: 0, v: { v: "old", m: "old" } },
+        { r: 1, c: 1, v: { v: "same", m: "same" } },
+      ]),
+      config: null,
+      workbook: { workspaceId: 3 },
+    });
+
+    const result = await executeSheetCommand(3, {
+      kind: "replaceSnapshot",
+      mutationId: "replace-1",
+      sheetId: 7,
+      baseRevision: 2,
+      snapshot: {
+        celldata: [
+          { r: 0, c: 0, v: { v: "new", m: "new" } },
+          { r: 1, c: 1, v: { v: "same", m: "same" } },
+          { r: 2, c: 2, v: { v: "added", m: "added" } },
+        ],
+        config: null,
+      },
+    });
+
+    expect(result.result.changeSummary).toEqual({
+      changedCellCount: 2,
+      changedRanges: ["A1", "C3"],
+      omittedRangeCount: 0,
+      truncated: false,
+      operationCount: 0,
+    });
   });
 
   it("replays a receipt without writing the Sheet again", async () => {
@@ -117,7 +159,13 @@ describe("executeSheetCommand", () => {
       baseRevision: 2,
       revision: 3,
       mutation: command.mutation,
-      changeSummary: { changedCellCount: 1, changedRanges: ["A1"], operationCount: 1 },
+      changeSummary: {
+        changedCellCount: 1,
+        changedRanges: ["A1"],
+        omittedRangeCount: 0,
+        truncated: false,
+        operationCount: 1,
+      },
     });
     mocks.findReceipt.mockResolvedValue({
       commandHash: sheetCommandFingerprint(command),
@@ -126,8 +174,10 @@ describe("executeSheetCommand", () => {
 
     const result = await executeSheetCommand(3, command);
 
-    expect(result.revision).toBe(3);
-    expect(result.mutation).toEqual(command.mutation);
+    expect(result.outcome).toBe("replayed");
+    expect(result.result.revision).toBe(3);
+    expect(result.result.mutation).toEqual(command.mutation);
+    expect(result.result.snapshot).toBeNull();
     expect(mocks.commitSheetCommand).not.toHaveBeenCalled();
   });
 
@@ -140,7 +190,13 @@ describe("executeSheetCommand", () => {
         baseRevision: 2,
         revision: 3,
         mutation: command.mutation,
-        changeSummary: { changedCellCount: 1, changedRanges: ["A1"], operationCount: 1 },
+        changeSummary: {
+          changedCellCount: 1,
+          changedRanges: ["A1"],
+          omittedRangeCount: 0,
+          truncated: false,
+          operationCount: 1,
+        },
       }),
     });
     mocks.findSheet
@@ -166,9 +222,12 @@ describe("executeSheetCommand", () => {
     const firstResult = await executeSheetCommand(3, command);
     const result = await executeSheetCommand(3, { ...command, baseRevision: 3 });
 
-    expect(firstResult.revision).toBe(3);
-    expect(result.revision).toBe(4);
-    expect(result.baseRevision).toBe(2);
+    expect(firstResult.outcome).toBe("committed");
+    expect(result.outcome).toBe("replayed");
+    expect(firstResult.result.revision).toBe(3);
+    expect(result.result.revision).toBe(3);
+    expect(result.result.baseRevision).toBe(2);
+    expect(result.result.snapshot).toBeNull();
     expect(mocks.commitSheetCommand).toHaveBeenCalledTimes(1);
   });
 
@@ -181,7 +240,13 @@ describe("executeSheetCommand", () => {
         baseRevision: command.baseRevision,
         revision: 3,
         mutation: command.mutation,
-        changeSummary: { changedCellCount: 1, changedRanges: ["A1"], operationCount: 1 },
+        changeSummary: {
+          changedCellCount: 1,
+          changedRanges: ["A1"],
+          omittedRangeCount: 0,
+          truncated: false,
+          operationCount: 1,
+        },
       }),
     });
 

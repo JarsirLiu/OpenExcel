@@ -32,10 +32,25 @@ receipts. The Web owns editor state and save scheduling.
 ## Concurrency and idempotency
 
 1. Validate the command schema and confirm that the Sheet belongs to the workspace.
-2. If the `mutationId` already exists and the command hash matches, return the original receipt result.
+2. If the `mutationId` already exists and the command hash matches, return the original receipt result, including its original `baseRevision`, `revision`, mutation, and summary. Receipts do not store a post-mutation snapshot; a replay therefore has no snapshot preview. The current Sheet is not substituted into a replayed result.
 3. If the same `mutationId` has a different payload, return an idempotency conflict.
 4. If the current revision differs from `baseRevision`, return a revision conflict.
 5. On success, increment the revision once and save the mutation receipt.
+
+For `write` mutations, operations within one command are applied in array order;
+when ranges overlap, later operations overwrite earlier operations. Separate
+commands are serialized by the Server mutation path. Different workspaces use
+independent queues.
+
+Change summaries are bounded projections: the cell count is complete, while
+`changedRanges` contains at most 20 compressed ranges and carries
+`omittedRangeCount` and `truncated` when more ranges exist. Preview data is
+also bounded to 50 rows by 32 columns.
+
+When a `writeCells` result exceeds the model-result budget, the Server returns
+the bounded summary and revision fields with `delta: null` and without a
+preview. The Web treats this as an authoritative refresh signal and reloads
+the current workbook; it does not reconstruct the omitted delta.
 
 The Sheet repository only performs database reads and writes. It does not
 rebuild an Excel calculation engine or derive filter, sort, or formula

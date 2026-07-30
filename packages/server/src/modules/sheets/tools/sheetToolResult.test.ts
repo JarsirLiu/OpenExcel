@@ -17,14 +17,26 @@ describe("toSheetToolPatchResult", () => {
         baseRevision: 2,
         revision: 3,
         mutation,
-        changeSummary: { changedCellCount: 1, changedRanges: ["A1"], operationCount: 1 },
+        changeSummary: {
+          changedCellCount: 1,
+          changedRanges: ["A1"],
+          omittedRangeCount: 0,
+          truncated: false,
+          operationCount: 1,
+        },
         snapshot: { celldata: [], config: null },
       }),
     ).toEqual({
       delta: mutation,
       baseRevision: 2,
       revision: 3,
-      changeSummary: { changedCellCount: 1, changedRanges: ["A1"], operationCount: 1 },
+      changeSummary: {
+        changedCellCount: 1,
+        changedRanges: ["A1"],
+        omittedRangeCount: 0,
+        truncated: false,
+        operationCount: 1,
+      },
     });
   });
 });

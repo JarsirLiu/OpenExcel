@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { sheetChangeDeltaSchema } from "../chat/sheetChange.js";
+import { sheetChangeDeltaSchema, sheetChangeSummarySchema } from "../chat/sheetChange.js";
 
-const sheetSnapshotSchema = z.object({
+export const sheetSnapshotSchema = z.object({
   celldata: z.array(
     z
       .object({
@@ -32,3 +32,15 @@ export const sheetCommandSchema = z.discriminatedUnion("kind", [
     snapshot: sheetSnapshotSchema,
   }),
 ]);
+
+export const sheetCommandResultSchema = z.object({
+  mutationId: z.string().trim().min(1),
+  sheetId: z.number().int().positive(),
+  baseRevision: z.number().int().nonnegative(),
+  revision: z.number().int().nonnegative(),
+  mutation: sheetMutationSchema.nullable(),
+  changeSummary: sheetChangeSummarySchema,
+  snapshot: sheetSnapshotSchema.nullable(),
+});
+
+export const sheetCommandReceiptSchema = sheetCommandResultSchema.omit({ snapshot: true });

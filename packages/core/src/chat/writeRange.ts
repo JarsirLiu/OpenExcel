@@ -53,31 +53,3 @@ export function formatWriteRange(range: WriteRange): string {
 export function writeRangeCellCount(range: WriteRange): number {
   return (range.endRow - range.startRow + 1) * (range.endCol - range.startCol + 1);
 }
-
-export function writeRangesOverlap(left: WriteRange, right: WriteRange): boolean {
-  return (
-    left.startRow <= right.endRow &&
-    right.startRow <= left.endRow &&
-    left.startCol <= right.endCol &&
-    right.startCol <= left.endCol
-  );
-}
-
-export function assertWriteRangesDoNotOverlap(ranges: readonly WriteRange[]): void {
-  const occupied = new Map<string, number>();
-  for (let index = 0; index < ranges.length; index += 1) {
-    const range = ranges[index];
-    for (let row = range.startRow; row <= range.endRow; row += 1) {
-      for (let col = range.startCol; col <= range.endCol; col += 1) {
-        const key = `${row},${col}`;
-        const previous = occupied.get(key);
-        if (previous !== undefined) {
-          throw new Error(
-            `Overlapping write ranges are not allowed: ${formatWriteRange(ranges[previous])} and ${formatWriteRange(range)}`,
-          );
-        }
-        occupied.set(key, index);
-      }
-    }
-  }
-}

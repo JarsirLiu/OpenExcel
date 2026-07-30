@@ -60,6 +60,7 @@ export type {
   SheetChangeVersion,
 } from "./chat/sheetChange.js";
 export {
+  MAX_CHANGED_RANGES,
   sheetChangeCellSchema,
   sheetChangeClearCellSchema,
   sheetChangeClearOperationSchema,
@@ -102,11 +103,9 @@ export {
   toolRangeToA1Ref,
 } from "./chat/sheetGeometry.js";
 export {
-  assertWriteRangesDoNotOverlap,
   formatWriteRange,
   parseWriteRange,
   writeRangeCellCount,
-  writeRangesOverlap,
 } from "./chat/writeRange.js";
 export type { FortuneCell, FortuneCellValue } from "./excel/celldataUtils.js";
 export {
@@ -189,14 +188,24 @@ export {
   XlsxSafetyLimitError,
   type XlsxSafetyLimits,
 } from "./importer/xlsxSafetyGuard.js";
-export { applySheetMutation } from "./sheet-sync/applySheetMutation.js";
+export {
+  applySheetMutation,
+  summarizeSheetSnapshotChange,
+} from "./sheet-sync/applySheetMutation.js";
 export type {
   SheetCommand,
   SheetCommandBase,
+  SheetCommandReceipt,
   SheetCommandResult,
 } from "./sheet-sync/sheetCommand.js";
 export type { SheetMutation } from "./sheet-sync/sheetMutation.js";
-export { sheetCommandSchema, sheetMutationSchema } from "./sheet-sync/sheetMutationSchema.js";
+export {
+  sheetCommandReceiptSchema,
+  sheetCommandResultSchema,
+  sheetCommandSchema,
+  sheetMutationSchema,
+  sheetSnapshotSchema,
+} from "./sheet-sync/sheetMutationSchema.js";
 export type { SheetSnapshot } from "./sheet-sync/sheetSnapshot.js";
 export { cloneSheetSnapshot } from "./sheet-sync/sheetSnapshot.js";
 export type {

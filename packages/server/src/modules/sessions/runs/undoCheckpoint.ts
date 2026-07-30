@@ -123,6 +123,30 @@ export async function withUndoTrackedSheetMutation<T>(
   return withUndoTrackedMutation(workspaceId, sheetIds, mutation, originRunId);
 }
 
+export type UndoTrackedExecution<T> = {
+  result: T;
+  outcome: "committed" | "replayed";
+};
+
+export async function withUndoTrackedExecutionAfterSuccess<T>(
+  workspaceId: number,
+  sheetIds: number[],
+  mutation: (tx: Prisma.TransactionClient) => Promise<UndoTrackedExecution<T>>,
+  originRunId?: number,
+  existingTx?: Prisma.TransactionClient,
+) {
+  const execute = async (tx: Prisma.TransactionClient) => {
+    const execution = await mutation(tx);
+    if (execution.outcome === "committed") {
+      await invalidateUndoCheckpointsForSheetsInTransaction(tx, workspaceId, sheetIds, originRunId);
+    }
+    return execution.result;
+  };
+
+  if (existingTx) return execute(existingTx);
+  return withWorkspaceUndoLock(workspaceId, () => prisma.$transaction(execute));
+}
+
 export async function withUndoTrackedSheetMutationAfterSuccess<T>(
   workspaceId: number,
   sheetIds: number[],
@@ -130,23 +154,13 @@ export async function withUndoTrackedSheetMutationAfterSuccess<T>(
   originRunId?: number,
   existingTx?: Prisma.TransactionClient,
 ) {
-  if (existingTx) {
-    const result = await mutation(existingTx);
-    await invalidateUndoCheckpointsForSheetsInTransaction(
-      existingTx,
-      workspaceId,
-      sheetIds,
-      originRunId,
-    );
-    return result;
-  }
-  return withWorkspaceUndoLock(workspaceId, async () => {
-    return prisma.$transaction(async (tx) => {
-      const result = await mutation(tx);
-      await invalidateUndoCheckpointsForSheetsInTransaction(tx, workspaceId, sheetIds, originRunId);
-      return result;
-    });
-  });
+  return withUndoTrackedExecutionAfterSuccess(
+    workspaceId,
+    sheetIds,
+    async (tx) => ({ result: await mutation(tx), outcome: "committed" }),
+    originRunId,
+    existingTx,
+  );
 }
 
 export async function completeRunAndUpdateUndoCheckpoint(

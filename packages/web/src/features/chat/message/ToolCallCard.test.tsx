@@ -23,6 +23,7 @@ describe("ToolCallCard", () => {
                 { row: 2, values: ["January", "100"] },
               ],
               merges: [],
+              truncated: false,
             },
           },
         }}
@@ -51,6 +52,7 @@ describe("ToolCallCard", () => {
               range: { startRow: 1, endRow: 1, startCol: 1, endCol: 1 },
               rows: [{ row: 1, values: ["Updated"] }],
               merges: [],
+              truncated: false,
             },
             delta: {
               type: "write",

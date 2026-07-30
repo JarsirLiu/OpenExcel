@@ -1,3 +1,4 @@
+export type { SheetCommandExecution } from "./executeSheetCommand.js";
 export {
   executeSheetCommand,
   executeSheetCommandInTransaction,

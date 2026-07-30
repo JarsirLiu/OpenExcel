@@ -6,7 +6,13 @@ describe("sheetChangePatchOutputSchema", () => {
     const result = sheetChangePatchOutputSchema.safeParse({
       success: true,
       updatedCells: 1,
-      changeSummary: { changedCellCount: 1, changedRanges: ["B1"], operationCount: 1 },
+      changeSummary: {
+        changedCellCount: 1,
+        changedRanges: ["B1"],
+        omittedRangeCount: 0,
+        truncated: false,
+        operationCount: 1,
+      },
       delta: {
         type: "write",
         operations: [
@@ -24,7 +30,13 @@ describe("sheetChangePatchOutputSchema", () => {
     const result = sheetChangePatchOutputSchema.safeParse({
       success: true,
       updatedCells: 1,
-      changeSummary: { changedCellCount: 1, changedRanges: ["B1"], operationCount: 1 },
+      changeSummary: {
+        changedCellCount: 1,
+        changedRanges: ["B1"],
+        omittedRangeCount: 0,
+        truncated: false,
+        operationCount: 1,
+      },
       delta: {
         type: "write",
         operations: [
@@ -50,12 +62,18 @@ describe("sheetChangePatchOutputSchema", () => {
     const result = sheetChangePatchOutputSchema.safeParse({
       success: true,
       updatedCells: 4,
-      changeSummary: { changedCellCount: 4, changedRanges: ["A2:B3"], operationCount: 2 },
+      changeSummary: {
+        changedCellCount: 4,
+        changedRanges: ["A2:B3"],
+        omittedRangeCount: 0,
+        truncated: false,
+        operationCount: 2,
+      },
       delta: {
         type: "write",
         operations: [
-          { type: "range", startRow: 2, startCol: 1, endRow: 3, endCol: 2, value: "value" },
-          { type: "cell", row: 3, col: 2, value: "override" },
+          { type: "range", startRow: 2, startCol: 1, endRow: 2, endCol: 2, value: "value" },
+          { type: "range", startRow: 3, startCol: 1, endRow: 3, endCol: 2, value: "override" },
         ],
       },
       sheetInfo: { sheetId: 1, sheetName: "Sheet1" },
@@ -68,7 +86,13 @@ describe("sheetChangePatchOutputSchema", () => {
     const result = sheetChangePatchOutputSchema.safeParse({
       success: true,
       updatedCells: 0,
-      changeSummary: { changedCellCount: 0, changedRanges: [], operationCount: 0 },
+      changeSummary: {
+        changedCellCount: 0,
+        changedRanges: [],
+        omittedRangeCount: 0,
+        truncated: false,
+        operationCount: 0,
+      },
       delta: {
         type: "write",
         operations: [{ type: "range", startRow: 1, startCol: 1, endRow: 1, endCol: 1, value: "x" }],
@@ -82,7 +106,13 @@ describe("sheetChangePatchOutputSchema", () => {
   it("accepts a valid clear patch output", () => {
     const result = sheetChangePatchOutputSchema.safeParse({
       success: true,
-      changeSummary: { changedCellCount: 0, changedRanges: [], operationCount: 1 },
+      changeSummary: {
+        changedCellCount: 0,
+        changedRanges: [],
+        omittedRangeCount: 0,
+        truncated: false,
+        operationCount: 1,
+      },
       delta: {
         type: "clear",
         operations: [
@@ -99,7 +129,13 @@ describe("sheetChangePatchOutputSchema", () => {
   it("rejects invalid ranges", () => {
     const result = sheetChangePatchOutputSchema.safeParse({
       success: true,
-      changeSummary: { changedCellCount: 0, changedRanges: [], operationCount: 1 },
+      changeSummary: {
+        changedCellCount: 0,
+        changedRanges: [],
+        omittedRangeCount: 0,
+        truncated: false,
+        operationCount: 1,
+      },
       delta: {
         type: "merge",
         operations: [{ type: "range", startRow: 2, startCol: 2, endRow: 1, endCol: 3 }],

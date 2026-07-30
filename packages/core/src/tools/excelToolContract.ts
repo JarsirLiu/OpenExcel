@@ -1,11 +1,7 @@
 import { z } from "zod";
 import { chartSpecSchema } from "../chart/chartModel.js";
 import { sheetChangePatchOutputSchema } from "../chat/sheetChange.js";
-import {
-  assertWriteRangesDoNotOverlap,
-  parseWriteRange,
-  writeRangeCellCount,
-} from "../chat/writeRange.js";
+import { parseWriteRange, writeRangeCellCount } from "../chat/writeRange.js";
 
 const writeCellValueSchema = z.union([z.string(), z.number(), z.boolean()]);
 const writeCellValueTypeSchema = z.enum(["date", "string"]);
@@ -690,7 +686,7 @@ export const excelToolSpecs = {
   },
   writeCells: {
     description:
-      "Write cell contents in non-overlapping A1 ranges. Each operation must use exactly one mode: value fills the range, values supplies an exact matrix, or formula fills the range using relative Excel references. Use valueType:'date' or valueType:'string' when date or text semantics must be preserved. Dates must be timezone-free strings. This tool does not modify styles, filters, charts, or other Excel objects; use clearCells to remove content.",
+      "Write cell contents in A1 ranges in array order; when ranges overlap, later operations overwrite earlier operations. Each operation must use exactly one mode: value fills the range, values supplies an exact matrix, or formula fills the range using relative Excel references. Use valueType:'date' or valueType:'string' when date or text semantics must be preserved. Dates must be timezone-free strings. This tool does not modify styles, filters, charts, or other Excel objects; use clearCells to remove content.",
     needsRunContext: true,
     outputSchema: sheetMutationOutputSchema,
     inputSchema: z.object({
@@ -699,12 +695,10 @@ export const excelToolSpecs = {
         .array(writeOperationSchema)
         .min(1)
         .superRefine((operations, ctx) => {
-          const ranges = [];
           let cellCount = 0;
           for (const operation of operations) {
             try {
               const range = parseWriteRange(operation.range);
-              ranges.push(range);
               cellCount += writeRangeCellCount(range);
             } catch {
               continue;
@@ -716,14 +710,6 @@ export const excelToolSpecs = {
               });
               return;
             }
-          }
-          try {
-            assertWriteRangesDoNotOverlap(ranges);
-          } catch (error) {
-            ctx.addIssue({
-              code: z.ZodIssueCode.custom,
-              message: error instanceof Error ? error.message : "Write ranges must not overlap",
-            });
           }
         })
         .describe("Write operations, each using an A1 range"),

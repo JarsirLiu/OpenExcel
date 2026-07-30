@@ -149,7 +149,7 @@ describe("Excel tool contract", () => {
     expect(invalidDateFormula.success).toBe(false);
   });
 
-  it("rejects overlapping ranges in one writeCells call", () => {
+  it("accepts overlapping ranges and applies them in array order", () => {
     const result = excelToolSpecs.writeCells.inputSchema.safeParse({
       sheetId: 1,
       operations: [
@@ -158,6 +158,6 @@ describe("Excel tool contract", () => {
       ],
     });
 
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
   });
 });

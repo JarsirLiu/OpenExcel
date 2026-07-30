@@ -56,6 +56,7 @@ vi.mock("./repository.js", () => ({
 import {
   completeRunAndUpdateUndoCheckpoint,
   invalidateUndoCheckpointsForSheets,
+  withUndoTrackedExecutionAfterSuccess,
   withUndoTrackedSheetMutation,
   withUndoTrackedSheetMutationAfterSuccess,
 } from "./undoCheckpoint.js";
@@ -212,6 +213,19 @@ describe("undo checkpoint", () => {
     expect(mutation.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.findRunsWithSnapshotsForSheetsInTransaction.mock.invocationCallOrder[0],
     );
+  });
+
+  it("does not invalidate the checkpoint when a Sheet command is replayed", async () => {
+    const mutation = vi.fn().mockResolvedValueOnce({
+      result: { revision: 3 },
+      outcome: "replayed",
+    });
+
+    await expect(withUndoTrackedExecutionAfterSuccess(3, [7], mutation)).resolves.toEqual({
+      revision: 3,
+    });
+
+    expect(mocks.findRunsWithSnapshotsForSheetsInTransaction).not.toHaveBeenCalled();
   });
 
   it("does not arm an invalidated run after it settles", async () => {

@@ -75,7 +75,10 @@ describe("runSheetMutation", () => {
   });
 
   it("stores legacy merges in the canonical undo snapshot", async () => {
-    const mutation = vi.fn().mockResolvedValueOnce({ revision: 5, ok: true });
+    const mutation = vi.fn().mockResolvedValueOnce({
+      result: { revision: 5, ok: true },
+      outcome: "committed",
+    });
 
     await runSheetMutation({ runId: 11, workspaceId: 3 }, 7, mutation);
 
@@ -103,7 +106,10 @@ describe("runSheetMutation", () => {
   });
 
   it("invalidates older checkpoints in the same transaction", async () => {
-    const mutation = vi.fn().mockResolvedValueOnce({ revision: 5 });
+    const mutation = vi.fn().mockResolvedValueOnce({
+      result: { revision: 5 },
+      outcome: "committed",
+    });
 
     await runSheetMutation({ runId: 11, workspaceId: 3 }, 7, mutation);
 
@@ -113,5 +119,19 @@ describe("runSheetMutation", () => {
       [7],
       11,
     );
+  });
+
+  it("does not create undo state when a mutation replays its original receipt", async () => {
+    const replayed = { revision: 3, ok: true };
+    const mutation = vi.fn().mockResolvedValueOnce({
+      result: replayed,
+      outcome: "replayed",
+    });
+
+    const result = await runSheetMutation({ runId: 11, workspaceId: 3 }, 7, mutation);
+
+    expect(result).toBe(replayed);
+    expect(mocks.recordRestorableRunSheetSnapshot).not.toHaveBeenCalled();
+    expect(mocks.invalidateUndoCheckpointsForSheetsInTransaction).not.toHaveBeenCalled();
   });
 });

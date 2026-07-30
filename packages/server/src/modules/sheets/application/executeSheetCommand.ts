@@ -2,9 +2,12 @@ import {
   applySheetMutation,
   cloneSheetSnapshot,
   type SheetCommand,
+  type SheetCommandReceipt,
   type SheetCommandResult,
   type SheetSnapshot,
+  sheetCommandReceiptSchema,
   sheetCommandSchema,
+  summarizeSheetSnapshotChange,
 } from "@openexcel/core";
 import { prisma } from "../../../infra/database/db.js";
 import type { Prisma } from "../../../infra/database/prismaTypes.js";
@@ -20,9 +23,14 @@ import {
 import { commitSheetCommandInTransaction } from "../infrastructure/sheetMutationReceiptRepository.js";
 import { sheetCommandFingerprint } from "./sheetCommandFingerprint.js";
 
-type StoredCommandResult = Omit<SheetCommandResult, "snapshot">;
+type StoredCommandResult = SheetCommandReceipt;
 
 type SheetTransaction = Prisma.TransactionClient;
+
+export type SheetCommandExecution = {
+  result: SheetCommandResult;
+  outcome: "committed" | "replayed";
+};
 
 function snapshotFromSheet(
   sheet: Awaited<ReturnType<SheetTransaction["sheet"]["findFirst"]>>,
@@ -31,27 +39,23 @@ function snapshotFromSheet(
   return sheetRecordToSnapshot(sheet);
 }
 
-function storedResult(
-  result: StoredCommandResult,
-  snapshot: SheetSnapshot,
-  revision = result.revision,
-): SheetCommandResult {
-  return { ...result, revision, snapshot: cloneSheetSnapshot(snapshot) };
+function resultFromReceipt(receipt: StoredCommandResult): SheetCommandExecution {
+  return {
+    result: { ...receipt, snapshot: null },
+    outcome: "replayed",
+  };
 }
 
 function parseStoredResult(value: string): StoredCommandResult {
-  const parsed: unknown = JSON.parse(value);
-  if (!parsed || typeof parsed !== "object" || !("revision" in parsed)) {
-    throw new Error("Invalid sheet mutation receipt");
-  }
-  return parsed as StoredCommandResult;
+  return sheetCommandReceiptSchema.parse(JSON.parse(value));
 }
 
 function commandResult(
   command: SheetCommand,
   revision: number,
+  snapshot: SheetSnapshot,
   changeSummary: SheetCommandResult["changeSummary"],
-): StoredCommandResult {
+): SheetCommandResult {
   return {
     mutationId: command.mutationId,
     sheetId: command.sheetId,
@@ -59,7 +63,13 @@ function commandResult(
     revision,
     mutation: command.kind === "mutation" ? command.mutation : null,
     changeSummary,
+    snapshot,
   };
+}
+
+function receiptFromResult(result: SheetCommandResult): StoredCommandResult {
+  const { snapshot: _snapshot, ...receipt } = result;
+  return receipt;
 }
 
 function applyCommand(current: SheetSnapshot, command: SheetCommand) {
@@ -68,11 +78,7 @@ function applyCommand(current: SheetSnapshot, command: SheetCommand) {
     : {
         snapshot: cloneSheetSnapshot(command.snapshot),
         mutation: null,
-        changeSummary: {
-          changedCellCount: command.snapshot.celldata.length,
-          changedRanges: [],
-          operationCount: 0,
-        },
+        changeSummary: summarizeSheetSnapshotChange(current, command.snapshot, 0),
       };
 }
 
@@ -80,7 +86,7 @@ export async function executeSheetCommandInTransaction(
   tx: SheetTransaction,
   workspaceId: number,
   input: SheetCommand,
-): Promise<SheetCommandResult> {
+): Promise<SheetCommandExecution> {
   const command = sheetCommandSchema.parse(input) as SheetCommand;
   const commandHash = sheetCommandFingerprint(command);
   const sheet = await tx.sheet.findFirst({
@@ -94,10 +100,14 @@ export async function executeSheetCommandInTransaction(
   });
   if (receipt) {
     const result = parseStoredResult(receipt.result);
-    if (result.sheetId !== command.sheetId || receipt.commandHash !== commandHash) {
+    if (
+      result.mutationId !== command.mutationId ||
+      result.sheetId !== command.sheetId ||
+      receipt.commandHash !== commandHash
+    ) {
       throw new SheetMutationIdConflictError(command.mutationId);
     }
-    return storedResult(result, snapshotFromSheet(sheet), sheet.revision);
+    return resultFromReceipt(result);
   }
 
   if (sheet.revision !== command.baseRevision) {
@@ -106,7 +116,7 @@ export async function executeSheetCommandInTransaction(
 
   const applied = applyCommand(snapshotFromSheet(sheet), command);
   const revision = command.baseRevision + 1;
-  const result = commandResult(command, revision, applied.changeSummary);
+  const result = commandResult(command, revision, applied.snapshot, applied.changeSummary);
   const persistedSnapshot = serializeSheetSnapshot(applied.snapshot);
   const commit = await commitSheetCommandInTransaction(tx, {
     sheetId: command.sheetId,
@@ -117,7 +127,7 @@ export async function executeSheetCommandInTransaction(
     config: persistedSnapshot.config,
     mutationId: command.mutationId,
     commandHash,
-    result: JSON.stringify(result),
+    result: JSON.stringify(receiptFromResult(result)),
   });
 
   if (commit.kind === "missing") throw new SheetNotFoundError(command.sheetId);
@@ -125,27 +135,18 @@ export async function executeSheetCommandInTransaction(
     if (commit.commandHash !== commandHash) {
       throw new SheetMutationIdConflictError(command.mutationId);
     }
-    const currentSheet = await tx.sheet.findFirst({
-      where: { id: command.sheetId, workbook: { workspaceId } },
-      include: { workbook: true },
-    });
-    if (!currentSheet) throw new SheetNotFoundError(command.sheetId);
-    return storedResult(
-      parseStoredResult(commit.result),
-      snapshotFromSheet(currentSheet),
-      currentSheet.revision,
-    );
+    return resultFromReceipt(parseStoredResult(commit.result));
   }
   if (commit.kind === "conflict") {
     throw new SheetRevisionConflictError(command.sheetId);
   }
 
-  return storedResult(result, applied.snapshot);
+  return { result, outcome: "committed" };
 }
 
 export async function executeSheetCommand(
   workspaceId: number,
   input: SheetCommand,
-): Promise<SheetCommandResult> {
+): Promise<SheetCommandExecution> {
   return prisma.$transaction((tx) => executeSheetCommandInTransaction(tx, workspaceId, input));
 }

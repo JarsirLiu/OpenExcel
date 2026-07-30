@@ -1,3 +1,4 @@
+import { MAX_CHANGED_RANGES, sheetChangeSummarySchema } from "@openexcel/core";
 import { t } from "@/lib/i18n";
 import { normalizePreviewData, SheetPreview } from "./SheetPreview";
 import styles from "./ToolCallCard.module.css";
@@ -120,12 +121,10 @@ export function ToolCallCard({ part }: { part: any }) {
   const preview = normalizePreviewData(output?.preview);
   const isReadOnlyTool = READ_ONLY_TOOLS.has(toolName);
   const sheetInfo = output?.sheetInfo ?? output?.sheet ?? null;
-  const changedRanges =
-    isRecord(output?.changeSummary) && Array.isArray(output.changeSummary.changedRanges)
-      ? output.changeSummary.changedRanges.filter(
-          (range: unknown): range is string => typeof range === "string",
-        )
-      : undefined;
+  const parsedChangeSummary = sheetChangeSummarySchema.safeParse(output?.changeSummary);
+  const changedRanges = parsedChangeSummary.success
+    ? parsedChangeSummary.data.changedRanges.slice(0, MAX_CHANGED_RANGES)
+    : undefined;
   const stateClass = isComplete
     ? isError
       ? styles.stateError

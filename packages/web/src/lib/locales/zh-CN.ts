@@ -112,6 +112,7 @@ export const zhCN: Record<TranslationKey, string> = {
   sheet_no_content_change: "无实际内容变化",
   sheet_number: "Sheet #{number}",
   sheet_operation_count: "{count} 个操作",
+  sheet_omitted_ranges: "另有 {count} 个范围",
   sheet_preview_headers: "行列标题",
   tool_clear_sheet: "清空 {sheet}",
   tool_completed: "已完成",

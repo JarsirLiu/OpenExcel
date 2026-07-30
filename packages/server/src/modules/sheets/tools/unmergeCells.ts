@@ -21,7 +21,7 @@ export const unmergeCells = defineServerTool("unmergeCells", {
       input.sheetId,
       async (sheet, tx) => {
         const mutation: SheetMutation = { type: "unmerge", operations: input.operations };
-        const result = await executeSheetCommandInTransaction(tx, options.context.workspaceId, {
+        const execution = await executeSheetCommandInTransaction(tx, options.context.workspaceId, {
           kind: "mutation",
           mutationId: createSheetToolMutationId(
             options.context.runId,
@@ -32,8 +32,8 @@ export const unmergeCells = defineServerTool("unmergeCells", {
           baseRevision: sheet.revision,
           mutation,
         });
+        const result = execution.result;
         const ranges = input.operations.map(sheetChangeRangeToZeroBased);
-        const { snapshot } = result;
         const commandResult = toSheetToolPatchResult(result);
         const output = {
           success: true as const,
@@ -46,20 +46,24 @@ export const unmergeCells = defineServerTool("unmergeCells", {
             }),
           ),
           ...commandResult,
-          preview: buildSheetChangePreview(
-            snapshot.celldata,
-            sheet.name,
-            input.sheetId,
-            storageIndex(Math.min(...ranges.map((range) => range.startRow))),
-            storageIndex(Math.max(...ranges.map((range) => range.endRow))),
-            {
-              startCol: storageIndex(Math.min(...ranges.map((range) => range.startCol))),
-              endCol: storageIndex(Math.max(...ranges.map((range) => range.endCol))),
-            },
-          ),
+          ...(result.snapshot
+            ? {
+                preview: buildSheetChangePreview(
+                  result.snapshot.celldata,
+                  sheet.name,
+                  input.sheetId,
+                  storageIndex(Math.min(...ranges.map((range) => range.startRow))),
+                  storageIndex(Math.max(...ranges.map((range) => range.endRow))),
+                  {
+                    startCol: storageIndex(Math.min(...ranges.map((range) => range.startCol))),
+                    endCol: storageIndex(Math.max(...ranges.map((range) => range.endCol))),
+                  },
+                ),
+              }
+            : {}),
           sheetInfo: { sheetId: sheet.id, sheetNo: sheet.sheetNo, sheetName: sheet.name },
         };
-        return output;
+        return { result: output, outcome: execution.outcome };
       },
       options.abortSignal,
     );

@@ -33,6 +33,10 @@ tool-call ledger row in a short transaction, execute without a database
 transaction, and persist completion or failure in a separate short write.
 Mutation tools keep the claim, concrete database mutation, and ledger completion
 in one transaction so a committed mutation always has a completed receipt.
+Mutation tool executions for the same workspace pass through the process-local
+workspace mutation queue, so concurrent `writeCells` calls cannot execute at
+the same time. Queues are independent across workspaces; this is a write-path
+ordering guarantee, not a cross-workspace or multi-session coordination model.
 SQLite write transactions are serialized by a process-local server gate; this
 supports the local single-process deployment model but does not coordinate
 multiple server processes. PostgreSQL is required for multi-instance operation.

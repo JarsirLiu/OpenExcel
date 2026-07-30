@@ -1,3 +1,4 @@
+import type { SheetChangeSummary } from "../chat/sheetChange.js";
 import type { SheetMutation } from "./sheetMutation.js";
 import type { SheetSnapshot } from "./sheetSnapshot.js";
 
@@ -17,10 +18,8 @@ export type SheetCommandResult = {
   baseRevision: number;
   revision: number;
   mutation: SheetMutation | null;
-  changeSummary: {
-    changedCellCount: number;
-    changedRanges: string[];
-    operationCount: number;
-  };
-  snapshot: SheetSnapshot;
+  changeSummary: SheetChangeSummary;
+  snapshot: SheetSnapshot | null;
 };
+
+export type SheetCommandReceipt = Omit<SheetCommandResult, "snapshot">;

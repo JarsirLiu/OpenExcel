@@ -8,7 +8,10 @@ import {
 } from "../../../shared/utils/sheetSnapshot.js";
 import { withWorkspaceUndoLock } from "../../sessions/infrastructure/workspaceUndoLock.js";
 import * as runRepo from "../../sessions/runs/repository.js";
-import { invalidateUndoCheckpointsForSheetsInTransaction } from "../../sessions/runs/undoCheckpoint.js";
+import {
+  invalidateUndoCheckpointsForSheetsInTransaction,
+  type UndoTrackedExecution,
+} from "../../sessions/runs/undoCheckpoint.js";
 import type * as sheetRepo from "../infrastructure/sheetRepository.js";
 
 type RunToolContext = {
@@ -30,7 +33,10 @@ function throwIfAborted(signal: AbortSignal | undefined) {
 export async function runSheetMutation<T extends RevisionedResult>(
   context: RunToolContext,
   sheetId: number,
-  mutation: (sheet: SheetForWorkspace, tx: Prisma.TransactionClient) => Promise<T>,
+  mutation: (
+    sheet: SheetForWorkspace,
+    tx: Prisma.TransactionClient,
+  ) => Promise<UndoTrackedExecution<T>>,
   abortSignal?: AbortSignal,
 ) {
   const execute = async (tx: Prisma.TransactionClient) => {
@@ -42,8 +48,10 @@ export async function runSheetMutation<T extends RevisionedResult>(
     if (!sheet) throw new ToolNotFoundError(`Sheet ${sheetId} was not found`);
 
     throwIfAborted(abortSignal);
-    const result = await mutation(sheet, tx);
+    const execution = await mutation(sheet, tx);
     throwIfAborted(abortSignal);
+    if (execution.outcome === "replayed") return execution.result;
+    const result = execution.result;
     const snapshot = serializeSheetSnapshot(sheetRecordToSnapshot(sheet));
 
     throwIfAborted(abortSignal);

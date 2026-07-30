@@ -55,6 +55,7 @@ function buildPreview(
       values: values.map((item: DemoCell) => String(item.value)),
     })),
     merges: [],
+    truncated: false,
   };
 }
 
@@ -115,7 +116,13 @@ export function buildToolPart(
                 : undefined,
             changeSummary:
               changedCellCount > 0
-                ? { changedCellCount, changedRanges: [], operationCount: patches.length }
+                ? {
+                    changedCellCount,
+                    changedRanges: [],
+                    omittedRangeCount: 0,
+                    truncated: false,
+                    operationCount: patches.length,
+                  }
                 : undefined,
           }
         : undefined,

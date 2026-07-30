@@ -8,14 +8,33 @@ const snapshot: SheetSnapshot = {
 };
 
 describe("applySheetMutation", () => {
-  it("applies range writes without changing their ordered operation semantics", () => {
+  it("applies overlapping write operations in order", () => {
+    const result = applySheetMutation(
+      { celldata: [], config: null },
+      {
+        type: "write",
+        operations: [
+          { type: "range", startRow: 1, startCol: 1, endRow: 2, endCol: 2, value: "first" },
+          { type: "cell", row: 2, col: 2, value: "last" },
+        ],
+      },
+    );
+
+    expect(result.snapshot.celldata).toContainEqual({
+      r: 1,
+      c: 1,
+      v: { v: "last", m: "last" },
+    });
+  });
+
+  it("applies non-overlapping range writes as one mutation", () => {
     const result = applySheetMutation(
       { celldata: [], config: null },
       {
         type: "write",
         operations: [
           { type: "range", startRow: 1, startCol: 1, endRow: 2, endCol: 2, value: "range" },
-          { type: "cell", row: 2, col: 2, value: "cell" },
+          { type: "range", startRow: 3, startCol: 1, endRow: 3, endCol: 2, value: "cell" },
         ],
       },
     );
@@ -24,11 +43,15 @@ describe("applySheetMutation", () => {
       { r: 0, c: 0, v: { v: "range", m: "range" } },
       { r: 0, c: 1, v: { v: "range", m: "range" } },
       { r: 1, c: 0, v: { v: "range", m: "range" } },
-      { r: 1, c: 1, v: { v: "cell", m: "cell" } },
+      { r: 1, c: 1, v: { v: "range", m: "range" } },
+      { r: 2, c: 0, v: { v: "cell", m: "cell" } },
+      { r: 2, c: 1, v: { v: "cell", m: "cell" } },
     ]);
     expect(result.changeSummary).toEqual({
-      changedCellCount: 4,
-      changedRanges: ["A1:B1", "A2:B2"],
+      changedCellCount: 6,
+      changedRanges: ["A1:B3"],
+      omittedRangeCount: 0,
+      truncated: false,
       operationCount: 2,
     });
   });
@@ -133,9 +156,47 @@ describe("applySheetMutation", () => {
     expect(result.snapshot.celldata.map((cell) => cell.v.v)).toEqual(["A", 1, "B", 2]);
     expect(result.changeSummary).toEqual({
       changedCellCount: 4,
-      changedRanges: ["A1:B1", "A2:B2"],
+      changedRanges: ["A1:B2"],
+      omittedRangeCount: 0,
+      truncated: false,
       operationCount: 1,
     });
+  });
+
+  it("bounds changed ranges while preserving the complete changed-cell count", () => {
+    const result = applySheetMutation(
+      { celldata: [], config: null },
+      {
+        type: "write",
+        operations: Array.from({ length: 21 }, (_, index) => ({
+          type: "cell" as const,
+          row: index * 2 + 1,
+          col: 1,
+          value: "changed",
+        })),
+      },
+    );
+
+    expect(result.changeSummary.changedCellCount).toBe(21);
+    expect(result.changeSummary.changedRanges).toHaveLength(20);
+    expect(result.changeSummary.omittedRangeCount).toBe(1);
+    expect(result.changeSummary.truncated).toBe(true);
+  });
+
+  it("merges adjacent horizontal and vertical ranges", () => {
+    const result = applySheetMutation(
+      { celldata: [], config: null },
+      {
+        type: "write",
+        operations: [
+          { type: "range", startRow: 1, startCol: 1, endRow: 1, endCol: 4, value: "row 1" },
+          { type: "range", startRow: 2, startCol: 1, endRow: 2, endCol: 4, value: "row 2" },
+          { type: "range", startRow: 3, startCol: 1, endRow: 5, endCol: 1, value: "column" },
+        ],
+      },
+    );
+
+    expect(result.changeSummary.changedRanges).toEqual(["A1:D2", "A3:A5"]);
   });
 
   it("fills relative formula references across a range", () => {
@@ -188,6 +249,11 @@ describe("applySheetMutation", () => {
     const formattedResult = applySheetMutation(mergeSnapshot, {
       type: "merge",
       operations: [{ type: "range", startRow: 1, startCol: 1, endRow: 1, endCol: 2 }],
+    });
+
+    expect(formattedResult.changeSummary).toMatchObject({
+      changedCellCount: 1,
+      changedRanges: ["B1"],
     });
 
     expect(formattedResult.snapshot.celldata).toEqual([

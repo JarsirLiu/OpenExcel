@@ -1,3 +1,4 @@
+import { sheetChangeSummarySchema } from "@openexcel/core";
 import { useState } from "react";
 import { t } from "@/lib/i18n";
 import styles from "./SheetChangeSummary.module.css";
@@ -15,7 +16,11 @@ type SheetChangeEntry = {
   changedRanges: string[];
   changedCellCount: number;
   operationCount: number;
+  omittedRangeCount: number;
+  truncated: boolean;
 };
+
+const MAX_DISPLAY_RANGES = 20;
 
 function collectSheetChanges(parts: any[]): SheetChangeEntry[] {
   const map = new Map<number, SheetChangeEntry>();
@@ -45,28 +50,27 @@ function collectSheetChanges(parts: any[]): SheetChangeEntry[] {
         changedRanges: [],
         changedCellCount: 0,
         operationCount: 0,
+        omittedRangeCount: 0,
+        truncated: false,
       });
     }
 
     const entry = map.get(sheetId)!;
-    const changeSummary = output.changeSummary;
-    if (isRecord(changeSummary)) {
-      if (typeof changeSummary.changedCellCount === "number") {
-        entry.changedCellCount += changeSummary.changedCellCount;
-      }
-      if (typeof changeSummary.operationCount === "number") {
-        entry.operationCount += changeSummary.operationCount;
-      }
-      if (Array.isArray(changeSummary.changedRanges)) {
-        entry.changedRanges.push(
-          ...changeSummary.changedRanges.filter(
-            (range): range is string => typeof range === "string",
-          ),
-        );
-      }
+    const parsedSummary = sheetChangeSummarySchema.safeParse(output.changeSummary);
+    if (!parsedSummary.success) continue;
+    const changeSummary = parsedSummary.data;
+    entry.changedCellCount += changeSummary.changedCellCount;
+    entry.operationCount += changeSummary.operationCount;
+    entry.omittedRangeCount += changeSummary.omittedRangeCount;
+    entry.truncated ||= changeSummary.truncated;
+    const remaining = Math.max(0, MAX_DISPLAY_RANGES - entry.changedRanges.length);
+    entry.changedRanges.push(...changeSummary.changedRanges.slice(0, remaining));
+    if (changeSummary.changedRanges.length > remaining) {
+      entry.omittedRangeCount += changeSummary.changedRanges.length - remaining;
+      entry.truncated = true;
     }
 
-    if (output.preview) entry.lastPreview = output.preview;
+    entry.lastPreview = output.preview ?? null;
   }
 
   return [...map.values()].filter(
@@ -99,6 +103,9 @@ export function SheetChangeSummary({
     }
     if (sheet.operationCount > 0) {
       summary.push(t("sheet_operation_count", { count: sheet.operationCount }));
+    }
+    if (sheet.omittedRangeCount > 0 || sheet.truncated) {
+      summary.push(t("sheet_omitted_ranges", { count: sheet.omittedRangeCount }));
     }
     return summary.length > 0 ? summary.join(t("list_separator")) : t("sheet_no_content_change");
   };

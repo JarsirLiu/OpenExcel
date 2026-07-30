@@ -1,3 +1,4 @@
+import { MAX_CHANGED_RANGES, type SheetChangeSummary } from "../chat/sheetChange.js";
 import { sheetChangeDeltaToZeroBased } from "../chat/sheetCoordinates.js";
 import { formatWriteRange } from "../chat/writeRange.js";
 import type { FortuneCell } from "../excel/celldataUtils.js";
@@ -29,6 +30,20 @@ function mapCells(celldata: FortuneCell[]): CellMap {
   return new Map(celldata.map((cell) => [cellKey(cell.r, cell.c), { ...cell, v: { ...cell.v } }]));
 }
 
+type CellCoordinate = { row: number; col: number };
+
+function captureBefore(
+  cells: CellMap,
+  touched: Map<string, { coordinate: CellCoordinate; before: string }>,
+  row: number,
+  col: number,
+): void {
+  const key = cellKey(row, col);
+  if (!touched.has(key)) {
+    touched.set(key, { coordinate: { row, col }, before: contentSignature(cells.get(key)) });
+  }
+}
+
 function applyWrite(
   cells: CellMap,
   row: number,
@@ -36,8 +51,10 @@ function applyWrite(
   value: string | number | boolean,
   valueType?: "date" | "string",
   formula?: string,
+  capture?: (row: number, col: number) => void,
 ): void {
   const key = cellKey(row, col);
+  capture?.(row, col);
   const current = cells.get(key) ?? ({ r: row, c: col, v: {} } as FortuneCell);
   const nextValue: Record<string, unknown> = { ...current.v };
   const normalizedFormula = normalizeFortuneFormula(formula);
@@ -78,13 +95,14 @@ function applyWriteRange(
     valueType?: "date" | "string";
     formula?: string;
   },
+  capture?: (row: number, col: number) => void,
 ): void {
   if (range.values) {
     for (let row = range.startRow; row <= range.endRow; row++) {
       for (let col = range.startCol; col <= range.endCol; col++) {
         const value = range.values[row - range.startRow]?.[col - range.startCol];
         if (value === undefined) throw new Error("Write matrix dimensions do not match the range");
-        applyWrite(cells, row, col, value, range.valueType);
+        applyWrite(cells, row, col, value, range.valueType, undefined, capture);
       }
     }
     return;
@@ -100,6 +118,7 @@ function applyWriteRange(
       range.formula
         ? shiftFormula(range.formula, row - range.startRow, col - range.startCol)
         : undefined,
+      capture,
     ),
   );
 }
@@ -122,10 +141,16 @@ function shiftFormula(formula: string, rowDelta: number, colDelta: number): stri
     .join("");
 }
 
-function applyClear(cells: CellMap, row: number, col: number): void {
+function applyClear(
+  cells: CellMap,
+  row: number,
+  col: number,
+  capture?: (row: number, col: number) => void,
+): void {
   const key = cellKey(row, col);
   const current = cells.get(key);
   if (!current) return;
+  capture?.(row, col);
   const next = removeContent(current);
   if (next) cells.set(key, next);
   else cells.delete(key);
@@ -143,6 +168,7 @@ function forEachRange(
 function applyMerge(
   cells: CellMap,
   range: { startRow: number; startCol: number; endRow: number; endCol: number },
+  capture?: (row: number, col: number) => void,
 ): void {
   const merge = {
     r: range.startRow,
@@ -151,6 +177,7 @@ function applyMerge(
     cs: range.endCol - range.startCol + 1,
   };
   forEachRange(range, (row, col) => {
+    capture?.(row, col);
     const key = cellKey(row, col);
     const current = cells.get(key) ?? ({ r: row, c: col, v: {} } as FortuneCell);
     const preserved =
@@ -219,13 +246,14 @@ export function applySheetMutation(
 ): {
   snapshot: SheetSnapshot;
   mutation: SheetMutation;
-  changeSummary: { changedCellCount: number; changedRanges: string[]; operationCount: number };
+  changeSummary: SheetChangeSummary;
 } {
+  const internal = sheetChangeDeltaToZeroBased(mutation);
   const next = cloneSheetSnapshot(snapshot);
   const cells = mapCells(next.celldata);
-  const before = new Map([...cells].map(([key, cell]) => [key, contentSignature(cell)]));
+  const touched = new Map<string, { coordinate: CellCoordinate; before: string }>();
+  const capture = (row: number, col: number) => captureBefore(cells, touched, row, col);
   const config = parseConfig(next.config);
-  const internal = sheetChangeDeltaToZeroBased(mutation);
   const writeOperations = internal.type === "write" ? internal.operations : null;
 
   if (internal.type === "write") {
@@ -238,23 +266,24 @@ export function applySheetMutation(
           operation.value,
           operation.valueType,
           operation.formula,
+          capture,
         );
       } else {
-        applyWriteRange(cells, operation);
+        applyWriteRange(cells, operation, capture);
       }
     }
     for (const range of internal.merges ?? []) {
-      applyMerge(cells, range);
+      applyMerge(cells, range, capture);
       addMergeConfig(config, range);
     }
   } else if (internal.type === "clear") {
     for (const operation of internal.operations) {
-      if (operation.type === "cell") applyClear(cells, operation.row, operation.col);
-      else forEachRange(operation, (row, col) => applyClear(cells, row, col));
+      if (operation.type === "cell") applyClear(cells, operation.row, operation.col, capture);
+      else forEachRange(operation, (row, col) => applyClear(cells, row, col, capture));
     }
   } else if (internal.type === "merge") {
     for (const range of internal.operations) {
-      applyMerge(cells, range);
+      applyMerge(cells, range, capture);
       addMergeConfig(config, range);
     }
   } else {
@@ -274,31 +303,64 @@ export function applySheetMutation(
   const updated = [...cells.values()].sort((left, right) => left.r - right.r || left.c - right.c);
   next.celldata = updated;
   next.config = Object.keys(config).length > 0 ? config : null;
-  const changedCellCount =
-    [...cells].filter(([key, cell]) => before.get(key) !== contentSignature(cell)).length +
-    [...before.keys()].filter((key) => !cells.has(key)).length;
-
-  const changedCoordinates = [...cells.keys()]
-    .filter((key) => before.get(key) !== contentSignature(cells.get(key)))
-    .concat([...before.keys()].filter((key) => !cells.has(key)))
-    .map((key) => key.split(",").map(Number) as [number, number]);
-  const changedRanges = compactChangedRanges(changedCoordinates);
+  const changedCoordinates = [...touched.values()]
+    .filter(
+      ({ coordinate, before }) =>
+        before !== contentSignature(cells.get(cellKey(coordinate.row, coordinate.col))),
+    )
+    .map(({ coordinate }) => [coordinate.row, coordinate.col] as [number, number]);
+  const summary = createChangeSummary(changedCoordinates, internal.operations.length);
 
   return {
     snapshot: next,
     mutation,
-    changeSummary: {
-      changedCellCount,
-      changedRanges,
-      operationCount: internal.operations.length,
-    },
+    changeSummary: summary,
+  };
+}
+
+export function summarizeSheetSnapshotChange(
+  before: SheetSnapshot,
+  after: SheetSnapshot,
+  operationCount: number,
+): SheetChangeSummary {
+  const beforeCells = mapCells(before.celldata);
+  const afterCells = mapCells(after.celldata);
+  const keys = new Set([...beforeCells.keys(), ...afterCells.keys()]);
+  const changedCoordinates: Array<[number, number]> = [];
+
+  for (const key of keys) {
+    if (contentSignature(beforeCells.get(key)) !== contentSignature(afterCells.get(key))) {
+      const [row, col] = key.split(",").map(Number);
+      changedCoordinates.push([row, col]);
+    }
+  }
+
+  return createChangeSummary(changedCoordinates, operationCount);
+}
+
+function createChangeSummary(
+  changedCoordinates: Array<[number, number]>,
+  operationCount: number,
+): SheetChangeSummary {
+  const compactedRanges = compactChangedRanges(changedCoordinates);
+  const changedRanges = compactedRanges.slice(0, MAX_CHANGED_RANGES);
+  return {
+    changedCellCount: changedCoordinates.length,
+    changedRanges,
+    omittedRangeCount: compactedRanges.length - changedRanges.length,
+    truncated: compactedRanges.length > changedRanges.length,
+    operationCount,
   };
 }
 
 function compactChangedRanges(coordinates: Array<[number, number]>): string[] {
   const byRow = new Map<number, number[]>();
-  for (const [row, col] of coordinates) byRow.set(row, [...(byRow.get(row) ?? []), col]);
-  return [...byRow.entries()]
+  for (const [row, col] of coordinates) {
+    const columns = byRow.get(row);
+    if (columns) columns.push(col);
+    else byRow.set(row, [col]);
+  }
+  const rowRanges = [...byRow.entries()]
     .sort(([left], [right]) => left - right)
     .flatMap(([row, columns]) => {
       const sorted = [...new Set(columns)].sort((left, right) => left - right);
@@ -331,4 +393,65 @@ function compactChangedRanges(coordinates: Array<[number, number]>): string[] {
       }
       return ranges;
     });
+
+  const byColumnRange = new Map<string, { startCol: number; endCol: number; rows: number[] }>();
+  for (const range of rowRanges) {
+    const parsed = range.match(/^([A-Z]+)(\d+)(?::([A-Z]+)(\d+))?$/);
+    if (!parsed) continue;
+    const startCol = columnNumber(parsed[1]);
+    const endCol = columnNumber(parsed[3] ?? parsed[1]);
+    const row = Number(parsed[2]) - 1;
+    const key = `${startCol},${endCol}`;
+    const entry = byColumnRange.get(key) ?? { startCol, endCol, rows: [] };
+    entry.rows.push(row);
+    byColumnRange.set(key, entry);
+  }
+
+  const merged: string[] = [];
+  for (const entry of byColumnRange.values()) {
+    const rows = [...entry.rows].sort((left, right) => left - right);
+    let startRow = rows[0];
+    let previousRow = startRow;
+    for (const row of rows.slice(1)) {
+      if (row !== previousRow + 1) {
+        merged.push(
+          formatWriteRange({
+            startRow: startRow + 1,
+            startCol: entry.startCol,
+            endRow: previousRow + 1,
+            endCol: entry.endCol,
+          }),
+        );
+        startRow = row;
+      }
+      previousRow = row;
+    }
+    if (startRow !== undefined) {
+      merged.push(
+        formatWriteRange({
+          startRow: startRow + 1,
+          startCol: entry.startCol,
+          endRow: previousRow + 1,
+          endCol: entry.endCol,
+        }),
+      );
+    }
+  }
+
+  return merged.sort((left, right) => {
+    const leftMatch = left.match(/^([A-Z]+)(\d+)/);
+    const rightMatch = right.match(/^([A-Z]+)(\d+)/);
+    return (
+      Number(leftMatch?.[2]) - Number(rightMatch?.[2]) ||
+      columnNumber(leftMatch?.[1] ?? "A") - columnNumber(rightMatch?.[1] ?? "A")
+    );
+  });
+}
+
+function columnNumber(value: string): number {
+  let result = 0;
+  for (const character of value) {
+    result = result * 26 + character.charCodeAt(0) - 64;
+  }
+  return result;
 }
