@@ -46,7 +46,10 @@ export function buildSheetChangePreview(
   maxRow0: StorageIndex,
   columnRange?: SheetPreviewColumnRange,
 ): SheetChangePreview {
-  const maxSheetCol0 = Math.max(...celldata.map((cell) => cell.c), 0);
+  let maxSheetCol0 = 0;
+  for (const cell of celldata) {
+    if (cell.c > maxSheetCol0) maxSheetCol0 = cell.c;
+  }
   const requestedStartCol0 = columnRange?.startCol ?? storageIndex(0);
   const requestedEndCol0 = columnRange?.endCol ?? storageIndex(maxSheetCol0);
   const startCol0 = Math.max(0, requestedStartCol0);

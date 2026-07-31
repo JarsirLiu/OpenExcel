@@ -7,7 +7,8 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "bench": "vitest bench benchmarks"
   },
   "dependencies": {
     "@corbe30/fortune-excel": "2.3.3",

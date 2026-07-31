@@ -11,6 +11,7 @@
     "start": "tsx src/index.ts",
     "test": "vitest run",
     "test:watch": "vitest",
+    "bench": "node --expose-gc --import tsx benchmarks/sheetPerformance.ts",
     "db:generate": "tsx scripts/prisma-database.ts generate",
     "db:migrate": "tsx scripts/prisma-database.ts migrate",
     "db:prepare": "pnpm db:generate && pnpm db:migrate"
