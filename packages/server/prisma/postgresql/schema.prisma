@@ -87,11 +87,10 @@ model Sheet {
   name         String
   order        Int
   columns      String                  @db.Text
-  merges       String                  @db.Text
-  uploadedData String?                 @db.Text
   config       String?                 @db.Text
   revision     Int       @default(0)
   workbook     Workbook                @relation(fields: [workbookId], references: [id], onDelete: Cascade)
+  chunks       SheetChunk[]
   sessions     Session[]
   runSnapshots AgentRunSheetSnapshot[]
   charts       Chart[]
@@ -101,6 +100,21 @@ model Sheet {
 
   @@unique([workbookId, sheetNo])
   @@index([workbookId, order])
+}
+
+model SheetChunk {
+  id              Int      @id @default(autoincrement())
+  sheetId         Int
+  chunkRow        Int
+  chunkCol        Int
+  payload         String   @db.Text
+  contentRevision Int      @default(0)
+  sheet           Sheet    @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([sheetId, chunkRow, chunkCol])
+  @@index([sheetId, chunkRow, chunkCol])
 }
 
 model SheetMutationReceipt {

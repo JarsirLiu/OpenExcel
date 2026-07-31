@@ -4,7 +4,7 @@ import * as repo from "../infrastructure/workbookRepository.js";
 import { deleteSheet } from "./deleteSheet.js";
 
 vi.mock("../infrastructure/workbookRepository.js", () => ({
-  findWorkbookWithSheets: vi.fn(),
+  findWorkbookMetadata: vi.fn(),
   deleteSheetAndReindex: vi.fn(),
 }));
 
@@ -29,14 +29,14 @@ describe("deleteSheet", () => {
   });
 
   it("returns null when the workbook is missing", async () => {
-    mockedRepo.findWorkbookWithSheets.mockResolvedValue(null as any);
+    mockedRepo.findWorkbookMetadata.mockResolvedValue(null as any);
 
     await expect(deleteSheet(1, 1, 10)).resolves.toBeNull();
     expect(mockedRepo.deleteSheetAndReindex).not.toHaveBeenCalled();
   });
 
   it("blocks deleting the last remaining sheet", async () => {
-    mockedRepo.findWorkbookWithSheets.mockResolvedValue({
+    mockedRepo.findWorkbookMetadata.mockResolvedValue({
       id: 1,
       sheets: [{ id: 10, order: 0 }],
     } as any);
@@ -49,7 +49,7 @@ describe("deleteSheet", () => {
   });
 
   it("deletes and reindexes remaining sheets", async () => {
-    mockedRepo.findWorkbookWithSheets.mockResolvedValue({
+    mockedRepo.findWorkbookMetadata.mockResolvedValue({
       id: 1,
       sheets: [
         { id: 10, sheetNo: 1, order: 0 },
@@ -70,7 +70,7 @@ describe("deleteSheet", () => {
   });
 
   it("blocks deleting a sheet referenced by a chart", async () => {
-    mockedRepo.findWorkbookWithSheets.mockResolvedValue({
+    mockedRepo.findWorkbookMetadata.mockResolvedValue({
       id: 1,
       sheets: [
         { id: 10, sheetNo: 1, order: 0 },
@@ -87,7 +87,7 @@ describe("deleteSheet", () => {
   });
 
   it("rechecks the last-sheet invariant after waiting for another deletion", async () => {
-    mockedRepo.findWorkbookWithSheets
+    mockedRepo.findWorkbookMetadata
       .mockResolvedValueOnce({
         id: 1,
         sheets: [

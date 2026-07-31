@@ -1,6 +1,7 @@
 import {
   applySheetMutation,
   cloneSheetSnapshot,
+  normalizeFortuneCellData,
   type SheetCommand,
   type SheetCommandReceipt,
   type SheetCommandResult,
@@ -12,9 +13,11 @@ import {
 import { prisma } from "../../../infra/database/db.js";
 import type { Prisma } from "../../../infra/database/prismaTypes.js";
 import {
-  serializeSheetSnapshot,
-  sheetRecordToSnapshot,
-} from "../../../shared/utils/sheetSnapshot.js";
+  mutationChunkRanges,
+  type SheetChunkRange,
+  serializeSheetChunks,
+  snapshotFromSheetChunks,
+} from "../../../shared/utils/sheetChunks.js";
 import {
   SheetMutationIdConflictError,
   SheetNotFoundError,
@@ -32,11 +35,83 @@ export type SheetCommandExecution = {
   outcome: "committed" | "replayed";
 };
 
-function snapshotFromSheet(
-  sheet: Awaited<ReturnType<SheetTransaction["sheet"]["findFirst"]>>,
-): SheetSnapshot {
-  if (!sheet) throw new Error("Sheet not found");
-  return sheetRecordToSnapshot(sheet);
+function parseConfig(value: string | null): Record<string, unknown> | null {
+  if (!value) return null;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function chunkWhere(sheetId: number, ranges: readonly SheetChunkRange[]) {
+  if (ranges.length === 1) {
+    const [range] = ranges;
+    return {
+      sheetId,
+      chunkRow: { gte: range.chunkRow, lte: range.endChunkRow },
+      chunkCol: { gte: range.chunkCol, lte: range.endChunkCol },
+    };
+  }
+  return {
+    sheetId,
+    OR: ranges.map(({ chunkRow, chunkCol, endChunkRow, endChunkCol }) => ({
+      chunkRow: { gte: chunkRow, lte: endChunkRow },
+      chunkCol: { gte: chunkCol, lte: endChunkCol },
+    })),
+  };
+}
+
+async function findMutationChunks(
+  tx: SheetTransaction,
+  sheetId: number,
+  ranges: readonly SheetChunkRange[],
+) {
+  const chunks: Array<{ chunkRow: number; chunkCol: number; payload: string }> = [];
+  const batchSize = 64;
+  for (let index = 0; index < ranges.length; index += batchSize) {
+    const batch = ranges.slice(index, index + batchSize);
+    chunks.push(...(await tx.sheetChunk.findMany({ where: chunkWhere(sheetId, batch) })));
+  }
+  return chunks;
+}
+
+function chunkUpdatesForSnapshot(
+  snapshot: SheetSnapshot,
+  ranges: readonly SheetChunkRange[],
+  existingChunks: readonly { chunkRow: number; chunkCol: number }[],
+  onlyExisting: boolean,
+) {
+  const serialized = serializeSheetChunks(snapshot.celldata);
+  const serializedByKey = new Map(
+    serialized.map((chunk) => [`${chunk.chunkRow},${chunk.chunkCol}`, chunk.payload]),
+  );
+  const updatesByKey = new Map<
+    string,
+    { chunkRow: number; chunkCol: number; payload: string | null }
+  >();
+  const coordinates = onlyExisting
+    ? existingChunks
+    : ranges.flatMap((range) => {
+        const result: Array<{ chunkRow: number; chunkCol: number }> = [];
+        for (let chunkRow = range.chunkRow; chunkRow <= range.endChunkRow; chunkRow += 1) {
+          for (let chunkCol = range.chunkCol; chunkCol <= range.endChunkCol; chunkCol += 1) {
+            result.push({ chunkRow, chunkCol });
+          }
+        }
+        return result;
+      });
+  for (const { chunkRow, chunkCol } of coordinates) {
+    updatesByKey.set(`${chunkRow},${chunkCol}`, {
+      chunkRow,
+      chunkCol,
+      payload: serializedByKey.get(`${chunkRow},${chunkCol}`) ?? null,
+    });
+  }
+  return [...updatesByKey.values()];
 }
 
 function resultFromReceipt(receipt: StoredCommandResult): SheetCommandExecution {
@@ -114,17 +189,42 @@ export async function executeSheetCommandInTransaction(
     throw new SheetRevisionConflictError(command.sheetId);
   }
 
-  const applied = applyCommand(snapshotFromSheet(sheet), command);
+  let applied: ReturnType<typeof applyCommand>;
+  let chunks: Array<{ chunkRow: number; chunkCol: number; payload: string | null }>;
+  let replaceAllChunks = false;
+
+  if (command.kind === "mutation") {
+    const ranges = mutationChunkRanges(command.mutation);
+    const storedChunks =
+      ranges.length > 0 ? await findMutationChunks(tx, command.sheetId, ranges) : [];
+    const current = snapshotFromSheetChunks(storedChunks, parseConfig(sheet.config), false);
+    applied = applyCommand(current, command);
+    applied.snapshot.celldata = normalizeFortuneCellData(applied.snapshot.celldata);
+    chunks = chunkUpdatesForSnapshot(
+      applied.snapshot,
+      ranges,
+      storedChunks,
+      command.mutation.type === "clear" || command.mutation.type === "unmerge",
+    );
+  } else {
+    const storedChunks = await tx.sheetChunk.findMany({ where: { sheetId: command.sheetId } });
+    const current = snapshotFromSheetChunks(storedChunks, parseConfig(sheet.config));
+    applied = applyCommand(current, command);
+    chunks = serializeSheetChunks(applied.snapshot.celldata).map((chunk) => ({
+      ...chunk,
+      payload: chunk.payload,
+    }));
+    replaceAllChunks = true;
+  }
   const revision = command.baseRevision + 1;
   const result = commandResult(command, revision, applied.snapshot, applied.changeSummary);
-  const persistedSnapshot = serializeSheetSnapshot(applied.snapshot);
   const commit = await commitSheetCommandInTransaction(tx, {
     sheetId: command.sheetId,
     workspaceId,
     baseRevision: command.baseRevision,
-    merges: persistedSnapshot.merges,
-    uploadedData: persistedSnapshot.uploadedData,
-    config: persistedSnapshot.config,
+    config: applied.snapshot.config ? JSON.stringify(applied.snapshot.config) : null,
+    chunks,
+    replaceAllChunks,
     mutationId: command.mutationId,
     commandHash,
     result: JSON.stringify(receiptFromResult(result)),

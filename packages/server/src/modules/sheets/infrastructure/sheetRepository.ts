@@ -3,7 +3,7 @@ import { prisma } from "../../../infra/database/db.js";
 export async function findSheetForWorkspace(id: number, workspaceId: number) {
   const sheet = await prisma.sheet.findFirst({
     where: { id },
-    include: { workbook: true },
+    include: { workbook: true, chunks: true },
   });
   if (!sheet) return null;
   if (sheet.workbook.workspaceId !== workspaceId) return null;

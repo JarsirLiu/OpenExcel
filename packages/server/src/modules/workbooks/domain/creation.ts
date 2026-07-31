@@ -2,15 +2,13 @@ import { ToolNotFoundError } from "@openexcel/agent";
 
 export type SheetInitializationPayload = {
   columns: string;
-  merges: string;
-  uploadedData: string;
+  celldata: string;
   config?: string;
 };
 
 export type SourceSheetPayload = {
   columns: string;
-  merges: string;
-  uploadedData: string | null;
+  celldata: string | null;
   config: string | null;
 };
 
@@ -39,8 +37,7 @@ export function normalizeSheetName(name: string | undefined, fallbackIndex: numb
 export function buildBlankSheetInitialization(): SheetInitializationPayload {
   return {
     columns: JSON.stringify([]),
-    merges: JSON.stringify([]),
-    uploadedData: JSON.stringify([]),
+    celldata: JSON.stringify([]),
   };
 }
 
@@ -49,8 +46,7 @@ export function buildSourceSheetInitialization(
 ): SheetInitializationPayload {
   const payload: SheetInitializationPayload = {
     columns: sourceSheet.columns,
-    merges: sourceSheet.merges,
-    uploadedData: sourceSheet.uploadedData ?? JSON.stringify([]),
+    celldata: sourceSheet.celldata ?? JSON.stringify([]),
   };
 
   if (sourceSheet.config != null) {

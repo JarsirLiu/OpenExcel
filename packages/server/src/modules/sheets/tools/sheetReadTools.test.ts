@@ -2,6 +2,21 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockFindFirst = vi.fn();
 
+function canonicalizeSheetFixture(value: Record<string, unknown>) {
+  if (!value) return value;
+  if (typeof value.uploadedData !== "string") return value;
+  return {
+    ...value,
+    chunks: [{ payload: JSON.stringify({ celldata: JSON.parse(value.uploadedData) }) }],
+  };
+}
+
+const originalMockResolvedValue = mockFindFirst.mockResolvedValue.bind(mockFindFirst);
+mockFindFirst.mockResolvedValue = ((value: Record<string, unknown>) =>
+  originalMockResolvedValue(
+    canonicalizeSheetFixture(value),
+  )) as typeof mockFindFirst.mockResolvedValue;
+
 vi.mock("../../../infra/database/db.js", () => ({
   prisma: { sheet: { findFirst: mockFindFirst } },
 }));

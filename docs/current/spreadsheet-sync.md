@@ -42,6 +42,19 @@ when ranges overlap, later operations overwrite earlier operations. Separate
 commands are serialized by the Server mutation path. Different workspaces use
 independent queues.
 
+Mutation inputs are not rejected based on a fixed cell or chunk count. Normal
+spreadsheet actions such as clearing a large area or pasting a large range must
+remain valid. Overlapping operations keep their ordered overwrite semantics and
+are not scanned for overlap just to calculate a limit. Resource protection
+belongs in the chunk execution path and transport-level request handling, not
+in a user-visible spreadsheet size cap.
+
+The Server maps mutation areas to chunk rectangles and queries continuous areas
+with chunk row/column bounds. Disjoint areas are queried in bounded batches to
+avoid constructing a SQL predicate for every cell. Clear and unmerge commands
+only rewrite chunks that already exist; write commands create the chunks needed
+by the written area.
+
 Change summaries are bounded projections: the cell count is complete, while
 `changedRanges` contains at most 20 compressed ranges and carries
 `omittedRangeCount` and `truncated` when more ranges exist. Preview data is
@@ -61,13 +74,16 @@ dependencies from a mutation.
 - Persistence and FortuneSheet use zero-based `r/c` coordinates.
 - AI tools and chat previews use one-based row/column numbers and A1 references.
 - `packages/core/src/chat/sheetCoordinates.ts` and `packages/core/src/chat/sheetGeometry.ts` are the conversion boundary.
-- `uploadedData` is the Sheet snapshot source. `dateValues` is a derived projection for `readSheetData`, not a second persisted truth.
+- `SheetChunk` is the only persisted Sheet content source. API `uploadedData` and `merges` fields are derived views assembled from chunks; `dateValues` is a derived projection for `readSheetData`.
 - Chart data references and placement belong to `ChartSpec` and must not be implicitly changed by ordinary Sheet content writes.
 
 ## Web synchronization behavior
 
 - The Web workbook document is the browser's authoritative state for the current workbook.
 - Sheet saves are debounced per Sheet; the current scheduler defaults to 500 ms.
+- Normal Web edits are submitted as sparse `patch` mutations containing only
+  changed cells and changed sheet config. The Web does not submit a complete
+  Sheet snapshot for an ordinary edit.
 - A revision change cancels pending saves that are no longer applicable.
 - Workbook and Sheet requests use request generations and `AbortController` to ignore stale responses.
 - Workbook switching keeps the old document visible until the new document is ready; on failure, the old document remains usable and retryable.

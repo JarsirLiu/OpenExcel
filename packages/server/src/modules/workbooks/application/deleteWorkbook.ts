@@ -2,7 +2,7 @@ import { withUndoTrackedSheetMutation } from "../../sessions/runs/undoCheckpoint
 import * as repo from "../infrastructure/workbookRepository.js";
 
 export async function deleteWorkbook(workspaceId: number, id: number) {
-  const wb = await repo.findWorkbookWithSheets(id, workspaceId);
+  const wb = await repo.findWorkbookMetadata(id, workspaceId);
   if (!wb) return { error: "Workbook not found", statusCode: 404 as const };
 
   await withUndoTrackedSheetMutation(

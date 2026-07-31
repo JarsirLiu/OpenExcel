@@ -32,9 +32,21 @@ const sheet = {
   name: "Sheet1",
   sheetNo: 0,
   revision: 4,
-  uploadedData: JSON.stringify([{ r: 0, c: 0, v: { v: "A", m: "A" } }]),
+  chunks: [
+    {
+      payload: JSON.stringify({
+        celldata: [
+          {
+            r: 0,
+            c: 0,
+            v: { v: "A", m: "A", mc: { r: 0, c: 0, rs: 1, cs: 2 } },
+          },
+          { r: 0, c: 1, v: { mc: { r: 0, c: 0, rs: 1, cs: 2 } } },
+        ],
+      }),
+    },
+  ],
   config: null,
-  merges: JSON.stringify([{ row: [0, 0], col: [0, 1] }]),
   workbook: { workspaceId: 3 },
 };
 
@@ -74,7 +86,7 @@ describe("runSheetMutation", () => {
     expect(mocks.transaction).toHaveBeenCalledTimes(1);
   });
 
-  it("stores legacy merges in the canonical undo snapshot", async () => {
+  it("stores the canonical chunk snapshot in undo state", async () => {
     const mutation = vi.fn().mockResolvedValueOnce({
       result: { revision: 5, ok: true },
       outcome: "committed",
@@ -101,7 +113,11 @@ describe("runSheetMutation", () => {
           mc: { r: 0, c: 0, rs: 1, cs: 2 },
         },
       },
-      { r: 0, c: 1, v: { mc: { r: 0, c: 0, rs: 1, cs: 2 } } },
+      {
+        r: 0,
+        c: 1,
+        v: { v: null, m: "", fc: "#000000", mc: { r: 0, c: 0, rs: 1, cs: 2 } },
+      },
     ]);
   });
 

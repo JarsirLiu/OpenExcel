@@ -1,6 +1,11 @@
 import { prisma } from "../../../infra/database/db.js";
 import type { Prisma } from "../../../infra/database/prismaTypes.js";
 import { generateWorkbookPublicId } from "../../../shared/utils/publicId.js";
+import { serializeSheetChunks } from "../../../shared/utils/sheetChunks.js";
+import {
+  serializeSheetSnapshot,
+  sheetRecordToSnapshot,
+} from "../../../shared/utils/sheetSnapshot.js";
 import {
   buildBlankSheetInitialization,
   buildSourceSheetInitialization,
@@ -22,6 +27,17 @@ export async function findWorkbooksWithSheets(workspaceId: number) {
   });
 }
 
+export async function findWorkbookMetadata(
+  id: number,
+  workspaceId: number,
+  db: Prisma.TransactionClient = prisma,
+) {
+  return db.workbook.findFirst({
+    where: { id, workspaceId },
+    include: { sheets: { orderBy: { order: "asc" } } },
+  });
+}
+
 export async function findWorkbookWithSheets(
   id: number,
   workspaceId: number,
@@ -30,7 +46,7 @@ export async function findWorkbookWithSheets(
   const workbook = await db.workbook.findFirst({
     where: { id, workspaceId },
     include: {
-      sheets: { orderBy: { order: "asc" } },
+      sheets: { orderBy: { order: "asc" }, include: { chunks: true } },
       charts: { orderBy: [{ order: "asc" }, { id: "asc" }] },
     },
   });
@@ -105,7 +121,7 @@ export async function createWorkbookWithInitialSheet(
         ? null
         : await tx.sheet.findUnique({
             where: { id: input.sourceSheetId },
-            include: { workbook: true },
+            include: { workbook: true, chunks: true },
           });
 
     if (
@@ -115,8 +131,14 @@ export async function createWorkbookWithInitialSheet(
       throw new WorkbookCreationError("源 Sheet 不存在", "SOURCE_SHEET_NOT_FOUND", 404);
     }
 
-    const payload = sourceSheet
-      ? buildSourceSheetInitialization(sourceSheet)
+    const sourcePayload = sourceSheet
+      ? {
+          columns: sourceSheet.columns,
+          ...serializeSheetSnapshot(sheetRecordToSnapshot(sourceSheet)),
+        }
+      : null;
+    const payload = sourcePayload
+      ? buildSourceSheetInitialization(sourcePayload)
       : buildBlankSheetInitialization();
     const initialSheet = await tx.sheet.create({
       data: {
@@ -125,11 +147,16 @@ export async function createWorkbookWithInitialSheet(
         name: input.initialSheetName,
         order: 0,
         columns: payload.columns,
-        merges: payload.merges,
-        uploadedData: payload.uploadedData,
         config: payload.config ?? null,
       },
     });
+    const initialCells = JSON.parse(payload.celldata) as Parameters<typeof serializeSheetChunks>[0];
+    const chunks = serializeSheetChunks(initialCells);
+    if (chunks.length > 0) {
+      await tx.sheetChunk.createMany({
+        data: chunks.map((chunk) => ({ ...chunk, sheetId: initialSheet.id })),
+      });
+    }
 
     return {
       id: workbook.id,
@@ -156,18 +183,25 @@ export async function createSheet(
     name: string;
     order: number;
     columns: string;
-    merges: string;
-    uploadedData: string;
+    celldata: string;
     config?: string;
   },
   db: Prisma.TransactionClient = prisma,
 ) {
-  return db.sheet.create({
+  const sheet = await db.sheet.create({
     data: {
       ...data,
       config: data.config ?? null,
     },
   });
+  const cells = JSON.parse(data.celldata) as Parameters<typeof serializeSheetChunks>[0];
+  const chunks = serializeSheetChunks(cells);
+  if (chunks.length > 0) {
+    await db.sheetChunk.createMany({
+      data: chunks.map((chunk) => ({ ...chunk, sheetId: sheet.id })),
+    });
+  }
+  return sheet;
 }
 
 export async function deleteSheetAndReindex(

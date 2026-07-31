@@ -1,5 +1,9 @@
 import type { Prisma } from "../../../infra/database/prismaTypes.js";
 import {
+  serializeSheetSnapshot,
+  sheetRecordToSnapshot,
+} from "../../../shared/utils/sheetSnapshot.js";
+import {
   buildBlankSheetInitialization,
   buildSourceSheetInitialization,
   normalizeSheetName,
@@ -27,8 +31,14 @@ export async function createSheet(
   const nextOrder = workbook.sheets.length;
   const nextSheetNo = workbook.sheets.reduce((max, sheet) => Math.max(max, sheet.sheetNo), 0) + 1;
   const nextName = normalizeSheetName(name, nextSheetNo);
-  const payload = sourceSheet
-    ? buildSourceSheetInitialization(sourceSheet)
+  const sourcePayload = sourceSheet
+    ? {
+        columns: sourceSheet.columns,
+        ...serializeSheetSnapshot(sheetRecordToSnapshot(sourceSheet)),
+      }
+    : null;
+  const payload = sourcePayload
+    ? buildSourceSheetInitialization(sourcePayload)
     : buildBlankSheetInitialization();
 
   const sheet = await repo.createSheet(
@@ -38,8 +48,7 @@ export async function createSheet(
       name: nextName,
       order: nextOrder,
       columns: payload.columns,
-      merges: payload.merges,
-      uploadedData: payload.uploadedData,
+      celldata: payload.celldata,
       config: payload.config,
     },
     db,

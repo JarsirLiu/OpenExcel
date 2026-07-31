@@ -14,7 +14,8 @@
 | `Workspace` | User resource boundary | Owns `Workbook`, `UploadAsset`, and `Session` |
 | `UploadAsset` | Original upload metadata and lifecycle | May be referenced by a `Workbook`; file content lives in storage |
 | `Workbook` | Workbook container | Belongs to `Workspace`; owns `Sheet` and `Chart` |
-| `Sheet` | Editable spreadsheet surface | Belongs to `Workbook`; has a revision and mutation receipts |
+| `Sheet` | Editable spreadsheet surface and revision boundary | Belongs to `Workbook`; content is stored in `SheetChunk` rows |
+| `SheetChunk` | Sparse 256×256 Sheet content chunk | Belongs to `Sheet`; unique by Sheet and chunk coordinates |
 | `SheetMutationReceipt` | Idempotency receipt for a Sheet command | Belongs to `Sheet`; unique by `mutationId` |
 | `Chart` | Persisted chart definition | Belongs to a `Workbook` and its host `Sheet` |
 | `ChartMutationReceipt` | Idempotency receipt for a chart mutation | Unique by `mutationId` |

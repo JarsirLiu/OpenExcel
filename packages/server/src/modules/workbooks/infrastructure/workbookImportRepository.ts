@@ -1,6 +1,7 @@
 import type { ImportedChartInput, ImportedWorkbookWarning } from "@openexcel/core";
 import { prisma } from "../../../infra/database/db.js";
 import { generateWorkbookPublicId } from "../../../shared/utils/publicId.js";
+import { serializeSheetChunks } from "../../../shared/utils/sheetChunks.js";
 import type { AssetRecord } from "../../assets/domain/asset.js";
 import type { AssetImportActivator } from "../../assets/domain/assetRepository.js";
 import { createImportedChartsInTransaction } from "../../charts/infrastructure/chartRepository.js";
@@ -65,11 +66,17 @@ export async function createImportedWorkbooks(
             name: parsedWorkbook.sheetNames[index],
             order: index,
             columns: JSON.stringify([]),
-            merges: JSON.stringify(parsed.merges),
-            uploadedData: JSON.stringify(parsed.celldata),
             config: JSON.stringify(parsed.config ?? {}),
           },
         });
+        const chunks = serializeSheetChunks(
+          parsed.celldata as Parameters<typeof serializeSheetChunks>[0],
+        );
+        if (chunks.length > 0) {
+          await tx.sheetChunk.createMany({
+            data: chunks.map((chunk) => ({ ...chunk, sheetId: createdSheet.id })),
+          });
+        }
         const sheetKey = parsedWorkbook.sheetKeys[index];
         if (!sheetKey) throw new Error("导入 Sheet key 缺失");
         sheetIdByKey.set(sheetKey, createdSheet.id);

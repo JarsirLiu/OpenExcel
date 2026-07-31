@@ -53,6 +53,7 @@ export type {
   SheetChangeClearOperation,
   SheetChangeClearRange,
   SheetChangeDelta,
+  SheetChangePatch,
   SheetChangePatchOutput,
   SheetChangeRange,
   SheetChangeRangeOperation,

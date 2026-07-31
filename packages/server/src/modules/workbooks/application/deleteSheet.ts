@@ -4,7 +4,7 @@ import { LastSheetDeletionBlockedError, SheetDeletionBlockedError } from "../dom
 import * as repo from "../infrastructure/workbookRepository.js";
 
 export async function deleteSheet(workspaceId: number, workbookId: number, sheetId: number) {
-  const workbook = await repo.findWorkbookWithSheets(workbookId, workspaceId);
+  const workbook = await repo.findWorkbookMetadata(workbookId, workspaceId);
   if (!workbook) return null;
 
   const sheet = workbook.sheets.find((item) => item.id === sheetId);
@@ -20,7 +20,7 @@ export async function deleteSheet(workspaceId: number, workbookId: number, sheet
     await withUndoTrackedMutation(
       workspaceId,
       async () => {
-        const latestWorkbook = await repo.findWorkbookWithSheets(workbookId, workspaceId);
+        const latestWorkbook = await repo.findWorkbookMetadata(workbookId, workspaceId);
         if (!latestWorkbook || latestWorkbook.sheets.length <= 1) {
           throw new LastSheetDeletionBlockedError();
         }

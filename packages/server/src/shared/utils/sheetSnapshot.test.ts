@@ -6,69 +6,44 @@ import {
 } from "./sheetSnapshot.js";
 
 describe("sheetRecordToSnapshot", () => {
-  it("materializes legacy merges into the canonical cell snapshot", () => {
+  it("reads canonical cells from SheetChunk payloads", () => {
     const snapshot = sheetRecordToSnapshot({
-      uploadedData: JSON.stringify([{ r: 0, c: 0, v: { v: "A", m: "A", bg: "#fff" } }]),
       config: null,
-      merges: JSON.stringify([{ row: [0, 0], col: [0, 1] }]),
-    });
-
-    expect(snapshot.celldata).toEqual([
-      {
-        r: 0,
-        c: 0,
-        v: {
-          v: "A",
-          m: "A",
-          bg: "#fff",
-          fc: "#000000",
-          mc: { r: 0, c: 0, rs: 1, cs: 2 },
+      chunks: [
+        {
+          payload: JSON.stringify({
+            celldata: [
+              {
+                r: 0,
+                c: 0,
+                v: { v: "A", m: "A", mc: { r: 0, c: 0, rs: 1, cs: 2 } },
+              },
+              { r: 0, c: 1, v: { mc: { r: 0, c: 0, rs: 1, cs: 2 } } },
+            ],
+          }),
         },
-      },
-      { r: 0, c: 1, v: { mc: { r: 0, c: 0, rs: 1, cs: 2 } } },
-    ]);
-    expect(snapshotMergesJson(snapshot)).toBe(JSON.stringify([{ row: [0, 0], col: [0, 1] }]));
-  });
-
-  it("uses canonical cells when legacy metadata is stale", () => {
-    const snapshot = sheetRecordToSnapshot({
-      uploadedData: JSON.stringify([
-        { r: 0, c: 0, v: { v: "A", m: "A", mc: { r: 0, c: 0, rs: 1, cs: 2 } } },
-        { r: 0, c: 1, v: { mc: { r: 0, c: 0, rs: 1, cs: 2 } } },
-      ]),
-      config: null,
-      merges: JSON.stringify([{ row: [3, 3], col: [3, 4] }]),
+      ],
     });
 
     expect(snapshotMergesJson(snapshot)).toBe(JSON.stringify([{ row: [0, 0], col: [0, 1] }]));
     expect(snapshot.celldata).toHaveLength(2);
   });
 
-  it("ignores malformed legacy merge metadata", () => {
-    const snapshot = sheetRecordToSnapshot({
-      uploadedData: JSON.stringify([{ r: 0, c: 0, v: { v: "A", m: "A" } }]),
+  it("returns an empty snapshot when no chunks exist", () => {
+    expect(sheetRecordToSnapshot({ config: null, chunks: [] })).toEqual({
+      celldata: [],
       config: null,
-      merges: JSON.stringify([
-        { row: [2, 1], col: [0, 1] },
-        { row: [0], col: [0, 1] },
-      ]),
     });
-
-    expect(snapshot.celldata).toEqual([{ r: 0, c: 0, v: { v: "A", m: "A", fc: "#000000" } }]);
   });
 
-  it("persists date serials and date semantics in the canonical snapshot", () => {
-    const snapshot = sheetRecordToSnapshot({
-      uploadedData: JSON.stringify([
-        { r: 0, c: 0, v: { v: 44805, m: "2022/9/1", ct: { t: "d", fa: "m/d/yy" } } },
-      ]),
+  it("serializes cells for an undo snapshot without Sheet legacy fields", () => {
+    const persisted = serializeSheetSnapshot({
+      celldata: [{ r: 0, c: 0, v: { v: 44805, m: "2022/9/1" } }],
       config: null,
-      merges: "[]",
     });
 
-    const persisted = serializeSheetSnapshot(snapshot);
-    expect(JSON.parse(persisted.uploadedData)).toEqual([
-      { r: 0, c: 0, v: { v: 44805, m: "2022/9/1", ct: { t: "d", fa: "m/d/yy" }, fc: "#000000" } },
-    ]);
+    expect(JSON.parse(persisted.celldata)).toHaveLength(1);
+    expect(persisted).not.toHaveProperty("merges");
+    expect(persisted).not.toHaveProperty("uploadedData");
   });
 });

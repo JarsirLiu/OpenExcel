@@ -43,7 +43,7 @@ export async function runSheetMutation<T extends RevisionedResult>(
     throwIfAborted(abortSignal);
     const sheet = await tx.sheet.findFirst({
       where: { id: sheetId, workbook: { workspaceId: context.workspaceId } },
-      include: { workbook: true },
+      include: { workbook: true, chunks: true },
     });
     if (!sheet) throw new ToolNotFoundError(`Sheet ${sheetId} was not found`);
 
@@ -58,7 +58,7 @@ export async function runSheetMutation<T extends RevisionedResult>(
     await runRepo.recordRestorableRunSheetSnapshot(tx, {
       runId: context.runId,
       sheetId,
-      uploadedData: snapshot.uploadedData,
+      uploadedData: snapshot.celldata,
       config: snapshot.config,
       beforeRevision: sheet.revision,
       afterRevision: result.revision,

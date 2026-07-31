@@ -18,9 +18,9 @@ export async function commitSheetCommandInTransaction(
     sheetId: number;
     workspaceId: number;
     baseRevision: number;
-    merges: string;
-    uploadedData: string;
     config: string | null;
+    chunks: Array<{ chunkRow: number; chunkCol: number; payload: string | null }>;
+    replaceAllChunks: boolean;
     mutationId: string;
     commandHash: string;
     result: string;
@@ -46,14 +46,49 @@ export async function commitSheetCommandInTransaction(
   const updated = await tx.sheet.updateMany({
     where: { id: sheet.id, revision: input.baseRevision },
     data: {
-      merges: input.merges,
-      uploadedData: input.uploadedData,
       config: input.config,
       revision: { increment: 1 },
     },
   });
   if (updated.count === 0) {
     return { kind: "conflict" };
+  }
+
+  if (input.replaceAllChunks) {
+    await tx.sheetChunk.deleteMany({ where: { sheetId: input.sheetId } });
+  }
+
+  for (const chunk of input.chunks) {
+    if (chunk.payload === null) {
+      await tx.sheetChunk.deleteMany({
+        where: {
+          sheetId: input.sheetId,
+          chunkRow: chunk.chunkRow,
+          chunkCol: chunk.chunkCol,
+        },
+      });
+      continue;
+    }
+    await tx.sheetChunk.upsert({
+      where: {
+        sheetId_chunkRow_chunkCol: {
+          sheetId: input.sheetId,
+          chunkRow: chunk.chunkRow,
+          chunkCol: chunk.chunkCol,
+        },
+      },
+      create: {
+        sheetId: input.sheetId,
+        chunkRow: chunk.chunkRow,
+        chunkCol: chunk.chunkCol,
+        payload: chunk.payload,
+        contentRevision: input.baseRevision + 1,
+      },
+      update: {
+        payload: chunk.payload,
+        contentRevision: input.baseRevision + 1,
+      },
+    });
   }
 
   await tx.sheetMutationReceipt.create({
@@ -73,9 +108,9 @@ export async function commitSheetCommand(input: {
   sheetId: number;
   workspaceId: number;
   baseRevision: number;
-  merges: string;
-  uploadedData: string;
   config: string | null;
+  chunks: Array<{ chunkRow: number; chunkCol: number; payload: string | null }>;
+  replaceAllChunks: boolean;
   mutationId: string;
   commandHash: string;
   result: string;

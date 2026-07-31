@@ -3,7 +3,7 @@ import * as repo from "../infrastructure/workbookRepository.js";
 import { deleteWorkbook } from "./deleteWorkbook.js";
 
 vi.mock("../infrastructure/workbookRepository.js", () => ({
-  findWorkbookWithSheets: vi.fn(),
+  findWorkbookMetadata: vi.fn(),
   deleteWorkbook: vi.fn(),
 }));
 
@@ -23,7 +23,7 @@ describe("deleteWorkbook", () => {
   });
 
   it("allows deleting the last workbook in a workspace", async () => {
-    mockedRepo.findWorkbookWithSheets.mockResolvedValue({
+    mockedRepo.findWorkbookMetadata.mockResolvedValue({
       id: 7,
       sheets: [{ id: 11 }],
     } as any);
@@ -34,7 +34,7 @@ describe("deleteWorkbook", () => {
   });
 
   it("returns not found without mutating another workspace", async () => {
-    mockedRepo.findWorkbookWithSheets.mockResolvedValue(null);
+    mockedRepo.findWorkbookMetadata.mockResolvedValue(null);
 
     await expect(deleteWorkbook(3, 7)).resolves.toEqual({
       error: "Workbook not found",

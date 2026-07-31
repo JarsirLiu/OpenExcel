@@ -39,7 +39,7 @@ export async function normalizeChartSpecForWorkspace(
   const sheets = db
     ? await db.sheet.findMany({
         where: { id: { in: sheetIds }, workbook: { workspaceId } },
-        select: { id: true, uploadedData: true, config: true, merges: true },
+        include: { chunks: true },
       })
     : await Promise.all(sheetIds.map((sheetId) => findSheetForWorkspace(sheetId, workspaceId)));
 
@@ -70,7 +70,7 @@ export async function inspectChartDataForWorkspace(
   const sheets = db
     ? await db.sheet.findMany({
         where: { id: { in: sheetIds }, workbook: { workspaceId } },
-        select: { id: true, uploadedData: true, config: true, merges: true },
+        include: { chunks: true },
       })
     : await Promise.all(sheetIds.map((sheetId) => findSheetForWorkspace(sheetId, workspaceId)));
   const existingSheets = sheets.filter(

@@ -8,6 +8,32 @@ const snapshot: SheetSnapshot = {
 };
 
 describe("applySheetMutation", () => {
+  it("applies a sparse patch without changing untouched cells", () => {
+    const result = applySheetMutation(
+      {
+        celldata: [
+          { r: 0, c: 0, v: { v: "old", m: "old" } },
+          { r: 0, c: 1, v: { v: "keep", m: "keep" } },
+        ],
+        config: null,
+      },
+      {
+        type: "patch",
+        cells: [
+          { row: 1, col: 1, cell: { v: "new", m: "new", f: "=1+1" } },
+          { row: 1, col: 2, cell: null },
+        ],
+        config: { showGridLines: false },
+      },
+    );
+
+    expect(result.snapshot.celldata).toEqual([
+      { r: 0, c: 0, v: { v: "new", m: "new", f: "=1+1" } },
+    ]);
+    expect(result.snapshot.config).toEqual({ showGridLines: false });
+    expect(result.changeSummary).toMatchObject({ changedCellCount: 2, operationCount: 2 });
+  });
+
   it("applies overlapping write operations in order", () => {
     const result = applySheetMutation(
       { celldata: [], config: null },
@@ -75,6 +101,27 @@ describe("applySheetMutation", () => {
     });
 
     expect(result.snapshot.celldata).toEqual([{ r: 0, c: 0, v: { bg: "#fff" } }]);
+  });
+
+  it("clears a large sparse range without iterating empty coordinates", () => {
+    const result = applySheetMutation(
+      {
+        celldata: [
+          { r: 999_999, c: 0, v: { v: "last", m: "last" } },
+          { r: 1_000_001, c: 1, v: { v: "", m: "", bg: "#fff" } },
+        ],
+        config: null,
+      },
+      {
+        type: "clear",
+        operations: [{ type: "range", startRow: 1, startCol: 1, endRow: 1_000_000, endCol: 1 }],
+      },
+    );
+
+    expect(result.snapshot.celldata).toEqual([
+      { r: 1_000_001, c: 1, v: { v: "", m: "", bg: "#fff" } },
+    ]);
+    expect(result.changeSummary.changedCellCount).toBe(1);
   });
 
   it("stores date writes as Excel serials with explicit date semantics", () => {

@@ -122,6 +122,15 @@ export type ZeroBasedSheetChangeDelta =
   | {
       type: "unmerge";
       operations: ZeroBasedSheetChangeRange[];
+    }
+  | {
+      type: "patch";
+      cells: Array<{
+        row: StorageIndex;
+        col: StorageIndex;
+        cell: Record<string, unknown> | null;
+      }>;
+      config?: Record<string, unknown> | null;
     };
 
 /**
@@ -238,6 +247,18 @@ export function sheetChangeDeltaToZeroBased(delta: SheetChangeDelta): ZeroBasedS
     };
   }
 
+  if (delta.type === "patch") {
+    return {
+      type: "patch",
+      cells: delta.cells.map((cell) => ({
+        row: toolIndexToStorage(toolIndex(cell.row)),
+        col: toolIndexToStorage(toolIndex(cell.col)),
+        cell: cell.cell,
+      })),
+      config: delta.config,
+    };
+  }
+
   throw new Error("Unsupported sheet change delta");
 }
 
@@ -326,6 +347,18 @@ export function zeroBasedSheetChangeDeltaToSheetChangeDelta(
         type: "range",
         ...zeroBasedSheetChangeRangeToSheetChangeRange(operation),
       })),
+    };
+  }
+
+  if (delta.type === "patch") {
+    return {
+      type: "patch",
+      cells: delta.cells.map((cell) => ({
+        row: storageIndexToTool(cell.row),
+        col: storageIndexToTool(cell.col),
+        cell: cell.cell,
+      })),
+      config: delta.config,
     };
   }
 

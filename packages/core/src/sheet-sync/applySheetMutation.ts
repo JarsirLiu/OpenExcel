@@ -108,6 +108,7 @@ function applyWriteRange(
     return;
   }
   const value = range.value ?? "";
+  const formulaTokens = range.formula ? tokenizeFormula(range.formula) : undefined;
   forEachRange(range, (row, col) =>
     applyWrite(
       cells,
@@ -115,16 +116,20 @@ function applyWriteRange(
       col,
       value,
       range.valueType,
-      range.formula
-        ? shiftFormula(range.formula, row - range.startRow, col - range.startCol)
+      formulaTokens
+        ? shiftTokenizedFormula(formulaTokens, row - range.startRow, col - range.startCol)
         : undefined,
       capture,
     ),
   );
 }
 
-function shiftFormula(formula: string, rowDelta: number, colDelta: number): string {
-  return tokenizeFormula(formula)
+function shiftTokenizedFormula(
+  tokens: ReturnType<typeof tokenizeFormula>,
+  rowDelta: number,
+  colDelta: number,
+): string {
+  return tokens
     .map((token) => {
       if (token.kind === "text") return token.value;
       const reference = token.value;
@@ -154,6 +159,23 @@ function applyClear(
   const next = removeContent(current);
   if (next) cells.set(key, next);
   else cells.delete(key);
+}
+
+function applyClearRange(
+  cells: CellMap,
+  range: { startRow: number; startCol: number; endRow: number; endCol: number },
+  capture?: (row: number, col: number) => void,
+): void {
+  for (const cell of cells.values()) {
+    if (
+      cell.r >= range.startRow &&
+      cell.r <= range.endRow &&
+      cell.c >= range.startCol &&
+      cell.c <= range.endCol
+    ) {
+      applyClear(cells, cell.r, cell.c, capture);
+    }
+  }
 }
 
 function forEachRange(
@@ -253,7 +275,7 @@ export function applySheetMutation(
   const cells = mapCells(next.celldata);
   const touched = new Map<string, { coordinate: CellCoordinate; before: string }>();
   const capture = (row: number, col: number) => captureBefore(cells, touched, row, col);
-  const config = parseConfig(next.config);
+  let config = parseConfig(next.config);
   const writeOperations = internal.type === "write" ? internal.operations : null;
 
   if (internal.type === "write") {
@@ -279,14 +301,14 @@ export function applySheetMutation(
   } else if (internal.type === "clear") {
     for (const operation of internal.operations) {
       if (operation.type === "cell") applyClear(cells, operation.row, operation.col, capture);
-      else forEachRange(operation, (row, col) => applyClear(cells, row, col, capture));
+      else applyClearRange(cells, operation, capture);
     }
   } else if (internal.type === "merge") {
     for (const range of internal.operations) {
       applyMerge(cells, range, capture);
       addMergeConfig(config, range);
     }
-  } else {
+  } else if (internal.type === "unmerge") {
     for (const range of internal.operations) {
       forEachRange(range, (row, col) => {
         const key = cellKey(row, col);
@@ -297,6 +319,23 @@ export function applySheetMutation(
         else cells.set(key, { ...current, v: rest });
       });
       removeMergeConfig(config, range);
+    }
+  } else {
+    for (const patch of internal.cells) {
+      capture(patch.row, patch.col);
+      const key = cellKey(patch.row, patch.col);
+      if (patch.cell === null) {
+        cells.delete(key);
+        continue;
+      }
+      cells.set(key, {
+        r: patch.row,
+        c: patch.col,
+        v: patch.cell as unknown as FortuneCell["v"],
+      });
+    }
+    if (internal.config !== undefined) {
+      config = internal.config ? structuredClone(internal.config) : {};
     }
   }
 
@@ -309,7 +348,9 @@ export function applySheetMutation(
         before !== contentSignature(cells.get(cellKey(coordinate.row, coordinate.col))),
     )
     .map(({ coordinate }) => [coordinate.row, coordinate.col] as [number, number]);
-  const summary = createChangeSummary(changedCoordinates, internal.operations.length);
+  const operationCount =
+    internal.type === "patch" ? internal.cells.length : internal.operations.length;
+  const summary = createChangeSummary(changedCoordinates, operationCount);
 
   return {
     snapshot: next,

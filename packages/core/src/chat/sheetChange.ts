@@ -92,6 +92,22 @@ const sheetChangeRangePayloadSchema = z.object({
   endCol: z.number().int().positive(),
 });
 
+const sheetChangePatchCellSchema = z.object({
+  row: z.number().int().positive(),
+  col: z.number().int().positive(),
+  cell: z.record(z.string(), z.unknown()).nullable(),
+});
+
+const sheetChangePatchSchema = z
+  .object({
+    type: z.literal("patch"),
+    cells: z.array(sheetChangePatchCellSchema),
+    config: z.record(z.string(), z.unknown()).nullable().optional(),
+  })
+  .refine((patch) => patch.cells.length > 0 || patch.config !== undefined, {
+    message: "A patch must change cells or sheet config",
+  });
+
 export const sheetChangeRangeSchema = sheetChangeRangePayloadSchema.refine(
   (range) => range.endRow >= range.startRow && range.endCol >= range.startCol,
   {
@@ -175,6 +191,7 @@ export const sheetChangeDeltaSchema = z.union([
     type: z.literal("unmerge"),
     operations: z.array(sheetChangeRangeOperationSchema).min(1),
   }),
+  sheetChangePatchSchema,
 ]);
 
 export const MAX_CHANGED_RANGES = 20;
@@ -214,6 +231,7 @@ export type SheetChangeClearRange = z.infer<typeof sheetChangeClearRangeSchema>;
 export type SheetChangeRangeOperation = z.infer<typeof sheetChangeRangeOperationSchema>;
 export type SheetChangeClearOperation = z.infer<typeof sheetChangeClearOperationSchema>;
 export type SheetChangeDelta = z.infer<typeof sheetChangeDeltaSchema>;
+export type SheetChangePatch = z.infer<typeof sheetChangePatchSchema>;
 export type SheetChangeSummary = z.infer<typeof sheetChangeSummarySchema>;
 export type SheetChangeVersion = z.infer<typeof sheetChangeVersionSchema>;
 export type SheetChangePatchOutput = z.infer<typeof sheetChangePatchOutputSchema>;

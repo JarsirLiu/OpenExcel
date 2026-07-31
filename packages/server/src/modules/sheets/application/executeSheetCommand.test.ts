@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   transaction: vi.fn(),
   findSheet: vi.fn(),
   findReceipt: vi.fn(),
+  findChunks: vi.fn(),
   commitSheetCommand: vi.fn(),
 }));
 
@@ -43,9 +44,11 @@ describe("executeSheetCommand", () => {
       workbook: { workspaceId: 3 },
     });
     mocks.findReceipt.mockResolvedValue(null);
+    mocks.findChunks.mockResolvedValue([]);
     mocks.transaction.mockImplementation((callback: (tx: unknown) => unknown) =>
       callback({
         sheet: { findFirst: mocks.findSheet },
+        sheetChunk: { findMany: mocks.findChunks },
         sheetMutationReceipt: { findUnique: mocks.findReceipt },
       }),
     );
@@ -57,7 +60,9 @@ describe("executeSheetCommand", () => {
 
     expect(result.outcome).toBe("committed");
     expect(result.result.revision).toBe(3);
-    expect(result.result.snapshot?.celldata).toEqual([{ r: 0, c: 0, v: { v: "next", m: "next" } }]);
+    expect(result.result.snapshot?.celldata).toEqual([
+      { r: 0, c: 0, v: { v: "next", m: "next", fc: "#000000" } },
+    ]);
     expect(mocks.commitSheetCommand).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
@@ -65,25 +70,62 @@ describe("executeSheetCommand", () => {
         workspaceId: 3,
         baseRevision: 2,
         mutationId: "mutation-1",
-        merges: "[]",
-        uploadedData: JSON.stringify([{ r: 0, c: 0, v: { v: "next", m: "next" } }]),
+        config: null,
+        chunks: [
+          {
+            chunkRow: 0,
+            chunkCol: 0,
+            payload: JSON.stringify({
+              celldata: [{ r: 0, c: 0, v: { v: "next", m: "next", fc: "#000000" } }],
+            }),
+          },
+        ],
       }),
     );
     const commitInput = mocks.commitSheetCommand.mock.calls[0]?.[1];
     expect(JSON.parse(commitInput.result)).not.toHaveProperty("snapshot");
   });
 
-  it("canonicalizes a legacy merge before unmerging and clears stale metadata", async () => {
+  it("queries a continuous mutation range by chunk row and column bounds", async () => {
+    await executeSheetCommand(3, {
+      ...command,
+      mutation: {
+        type: "clear",
+        operations: [{ type: "range", startRow: 1, startCol: 1, endRow: 100_000, endCol: 100_000 }],
+      },
+    });
+
+    expect(mocks.findChunks).toHaveBeenCalledWith({
+      where: {
+        sheetId: 7,
+        chunkRow: { gte: 0, lte: 390 },
+        chunkCol: { gte: 0, lte: 390 },
+      },
+    });
+  });
+
+  it("unmerges canonical chunk data and clears merge metadata", async () => {
     mocks.findSheet.mockResolvedValueOnce({
       id: 7,
       sheetNo: 1,
       name: "Sheet1",
       revision: 2,
-      uploadedData: JSON.stringify([{ r: 0, c: 0, v: { v: "A", m: "A" } }]),
+      uploadedData: "[]",
       config: null,
-      merges: JSON.stringify([{ row: [0, 0], col: [0, 1] }]),
       workbook: { workspaceId: 3 },
     });
+    mocks.findChunks.mockResolvedValueOnce([
+      {
+        chunkRow: 0,
+        chunkCol: 0,
+        payload: JSON.stringify({
+          celldata: [
+            { r: 0, c: 0, v: { v: "A", m: "A", mc: { r: 0, c: 0, rs: 1, cs: 2 } } },
+            { r: 0, c: 1, v: { mc: { r: 0, c: 0, rs: 1, cs: 2 } } },
+          ],
+        }),
+      },
+    ]);
     const result = await executeSheetCommand(3, {
       kind: "mutation",
       mutationId: "unmerge-legacy-1",
@@ -101,7 +143,18 @@ describe("executeSheetCommand", () => {
     ]);
     expect(mocks.commitSheetCommand).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ merges: "[]" }),
+      expect.objectContaining({
+        config: null,
+        chunks: [
+          {
+            chunkRow: 0,
+            chunkCol: 0,
+            payload: JSON.stringify({
+              celldata: [{ r: 0, c: 0, v: { v: "A", m: "A", fc: "#000000" } }],
+            }),
+          },
+        ],
+      }),
     );
   });
 
@@ -118,6 +171,18 @@ describe("executeSheetCommand", () => {
       config: null,
       workbook: { workspaceId: 3 },
     });
+    mocks.findChunks.mockResolvedValueOnce([
+      {
+        chunkRow: 0,
+        chunkCol: 0,
+        payload: JSON.stringify({
+          celldata: [
+            { r: 0, c: 0, v: { v: "old", m: "old" } },
+            { r: 1, c: 1, v: { v: "same", m: "same" } },
+          ],
+        }),
+      },
+    ]);
 
     const result = await executeSheetCommand(3, {
       kind: "replaceSnapshot",
