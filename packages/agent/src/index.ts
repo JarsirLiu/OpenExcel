@@ -9,6 +9,7 @@ export {
 export { buildSystemPrompt, DEFAULT_PROMPT } from "./prompt/systemPrompt.js";
 export {
   type ContextBudgetPlan,
+  type ContextBudgetPlanOptions,
   createContextBudgetPlan,
   shouldCompact,
 } from "./runtime/context/compaction/budgetPlanner.js";
@@ -126,8 +127,10 @@ export {
   DEFAULT_CONTEXT_WINDOW_TOKENS,
   DEFAULT_MAX_USER_INPUT_TOKENS,
   DEFAULT_OUTPUT_RESERVE_TOKENS,
+  estimateFixedContextTokens,
   estimateModelContextTokens,
   estimateTokens,
+  MIN_CONTEXT_WINDOW_TOKENS,
   toEstimableToolDefinitions,
   trimMessagesToContextWindow,
 } from "./session/contextWindow.js";

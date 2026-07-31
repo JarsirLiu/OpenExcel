@@ -1,4 +1,4 @@
-import { DEFAULT_MAX_USER_INPUT_TOKENS } from "@openexcel/agent";
+import { DEFAULT_MAX_USER_INPUT_TOKENS, MIN_CONTEXT_WINDOW_TOKENS } from "@openexcel/agent";
 import { config as loadDotenv } from "dotenv";
 import { environmentFile } from "./infra/runtimePaths.js";
 
@@ -71,7 +71,10 @@ export function createModelConfig(env: NodeJS.ProcessEnv): ModelConfig {
       MAX_MODEL_MAX_RETRIES,
     ),
     timeoutMs: readNonNegativeInt(env, "MODEL_TIMEOUT_MS", 120_000),
-    contextWindowTokens: readPositiveInt(env, "MODEL_CONTEXT_WINDOW_TOKENS", 180_000),
+    contextWindowTokens: Math.max(
+      MIN_CONTEXT_WINDOW_TOKENS,
+      readPositiveInt(env, "MODEL_CONTEXT_WINDOW_TOKENS", 180_000),
+    ),
     outputReserveTokens: readPositiveInt(env, "MODEL_OUTPUT_RESERVE_TOKENS", 16_000),
     maxUserInputTokens: readPositiveInt(
       env,

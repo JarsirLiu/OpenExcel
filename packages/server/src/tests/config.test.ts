@@ -52,6 +52,17 @@ describe("environment model config", () => {
     ).toBe(3);
   });
 
+  it("uses the minimum context window for smaller configured values", () => {
+    expect(
+      createModelConfig({
+        MODEL_BASE_URL: "https://test.api.com/v1",
+        MODEL_API_KEY: "sk-test123",
+        MODEL_NAME: "gpt-4o-mini",
+        MODEL_CONTEXT_WINDOW_TOKENS: "32000",
+      }).contextWindowTokens,
+    ).toBe(64_000);
+  });
+
   it("throws when a required variable is missing", () => {
     expect(() =>
       createModelConfig({

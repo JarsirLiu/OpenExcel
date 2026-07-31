@@ -1,5 +1,8 @@
 import type { LanguageModel } from "ai";
-import { estimateModelContextTokens } from "../../session/contextWindow.js";
+import {
+  estimateFixedContextTokens,
+  estimateModelContextTokens,
+} from "../../session/contextWindow.js";
 import type { ModelStepBudgetEvent } from "../../session/tokenBudget.js";
 import { appendResponseMessages } from "../../session/transcript.js";
 import type { AgentToolDefinition, AgentTranscriptMessage } from "../contracts.js";
@@ -125,10 +128,15 @@ export class ContextCompactionCoordinator {
     const activeTools = input.activeTools;
     if (!this.lastStep && !force) return undefined;
 
-    const plan = createContextBudgetPlan(this.options.contextWindowTokens, this.policy);
     const actualTools = this.options.tools
       .filter((tool) => activeTools === undefined || activeTools.includes(tool.name))
       .map(({ name, description, inputSchema }) => ({ name, description, inputSchema }));
+    const plan = createContextBudgetPlan(this.options.contextWindowTokens, this.policy, {
+      fixedContextTokens: estimateFixedContextTokens({
+        systemPrompt: input.instructions,
+        toolDefinitions: actualTools,
+      }),
+    });
     const estimatedContextTokens = estimateModelContextTokens({
       messages: input.messages,
       systemPrompt: input.instructions,

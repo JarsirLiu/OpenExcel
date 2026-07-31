@@ -1,4 +1,7 @@
-import { toEstimableToolDefinitions } from "../../../session/contextWindow.js";
+import {
+  estimateFixedContextTokens,
+  toEstimableToolDefinitions,
+} from "../../../session/contextWindow.js";
 import { defaultTokenEstimator, type TokenEstimator } from "../../../session/tokenBudget.js";
 import { createContextSummaryMessage } from "../modelContextAssembler.js";
 import {
@@ -96,15 +99,20 @@ export class ContextCompactionEngine {
       );
     }
 
-    const plan = createContextBudgetPlan(
-      input.contextWindowTokens,
-      this.policy,
-      this.options.summaryFixedContextTokens ??
+    const baseSystemPrompt = input.modelContext?.systemPrompt;
+
+    const plan = createContextBudgetPlan(input.contextWindowTokens, this.policy, {
+      fixedContextTokens: estimateFixedContextTokens({
+        systemPrompt: baseSystemPrompt,
+        toolDefinitions: input.modelContext?.toolDefinitions,
+      }),
+      summaryFixedContextTokens:
+        this.options.summaryFixedContextTokens ??
         this.options.summaryGenerator.estimateFixedContextTokens?.({
           previousSummary,
           coveredTranscriptCursor: coveredEntry.cursor,
         }),
-    );
+    });
     const summary = await this.generateSummary(
       input,
       previousSummary,
@@ -112,7 +120,6 @@ export class ContextCompactionEngine {
       plan.summaryInputBudget,
     );
 
-    const baseSystemPrompt = input.modelContext?.systemPrompt;
     const contextTokens = this.estimator.estimate({
       messages: [createContextSummaryMessage(summary), ...selection.recentMessages],
       systemPrompt: baseSystemPrompt,

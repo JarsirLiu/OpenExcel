@@ -2,24 +2,36 @@ import type { ContextCompactionPolicy } from "./types.js";
 
 export interface ContextBudgetPlan {
   regularInputBudget: number;
+  conversationInputBudget: number;
   summaryInputBudget: number;
+  fixedContextTokens: number;
   compactBefore: number;
+}
+
+export interface ContextBudgetPlanOptions {
+  fixedContextTokens?: number;
+  summaryFixedContextTokens?: number;
 }
 
 export function createContextBudgetPlan(
   contextWindowTokens: number,
   policy: ContextCompactionPolicy,
-  summaryFixedContextTokens = 0,
+  options: ContextBudgetPlanOptions = {},
 ): ContextBudgetPlan {
   const contextWindow = positiveInteger(contextWindowTokens, "contextWindowTokens");
+  const fixedContextTokens = nonNegativeInteger(
+    options.fixedContextTokens ?? 0,
+    "fixedContextTokens",
+  );
   const summaryFixedTokens = nonNegativeInteger(
-    summaryFixedContextTokens,
+    options.summaryFixedContextTokens ?? 0,
     "summaryFixedContextTokens",
   );
   const regularInputBudget = Math.max(
     1,
     contextWindow - policy.outputReserveTokens - policy.safetyMarginTokens,
   );
+  const conversationInputBudget = Math.max(1, regularInputBudget - fixedContextTokens);
   const summaryInputBudget = Math.max(
     1,
     contextWindow - policy.summaryMaxTokens - policy.safetyMarginTokens - summaryFixedTokens,
@@ -27,10 +39,15 @@ export function createContextBudgetPlan(
 
   return {
     regularInputBudget,
+    conversationInputBudget,
     summaryInputBudget,
+    fixedContextTokens,
     compactBefore: Math.max(
-      1,
-      Math.min(Math.floor(regularInputBudget * policy.triggerRatio), regularInputBudget),
+      fixedContextTokens,
+      Math.min(
+        fixedContextTokens + Math.floor(conversationInputBudget * policy.triggerRatio),
+        regularInputBudget,
+      ),
     ),
   };
 }

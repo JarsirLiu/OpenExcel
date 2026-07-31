@@ -12,7 +12,7 @@ export interface ContextCompactionPolicy {
 }
 
 export const DEFAULT_CONTEXT_COMPACTION_POLICY: ContextCompactionPolicy = {
-  triggerRatio: 0.85,
+  triggerRatio: 0.9,
   safetyMarginTokens: 1_024,
   outputReserveTokens: 16_000,
   summaryMaxTokens: 8_192,

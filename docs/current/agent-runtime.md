@@ -209,7 +209,12 @@ retention policy.
 The Agent currently provides token estimation and observation, window trimming,
 summary generation, transcript safety boundaries, a checkpoint store,
 compaction success/failure events, and context checkpoints for recovery. The
-default compaction strategy is defined in
+regular input budget is `context window - output reserve - safety margin`.
+The conversation budget then subtracts the dynamic fixed context (system prompt
+and active tool definitions), and the compaction threshold is
+`fixed context + conversation budget * trigger ratio`. The default trigger ratio
+is 90%. Configured context windows below 64K use a 64K minimum for runtime
+budget calculations. The default compaction strategy is defined in
 `packages/agent/src/runtime/context/compaction/types.ts`.
 
 ## Run states

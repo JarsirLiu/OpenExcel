@@ -1,4 +1,5 @@
 export const DEFAULT_CONTEXT_WINDOW_TOKENS = 180_000;
+export const MIN_CONTEXT_WINDOW_TOKENS = 64_000;
 export const DEFAULT_OUTPUT_RESERVE_TOKENS = 16_000;
 export const DEFAULT_MAX_USER_INPUT_TOKENS = 16_000;
 
@@ -82,6 +83,20 @@ export function estimateModelContextTokens(input: ModelContextTokenInput): numbe
       pendingToolResults: input.pendingToolResults,
     }),
   );
+}
+
+/** Estimates the fixed portion of a model request outside conversation messages. */
+export function estimateFixedContextTokens(input: {
+  systemPrompt?: unknown;
+  toolDefinitions?: unknown;
+}): number {
+  const systemPromptTokens =
+    input.systemPrompt === undefined ? 0 : estimateTokens(input.systemPrompt);
+  const toolDefinitionTokens =
+    input.toolDefinitions === undefined
+      ? 0
+      : estimateTokens(toEstimableToolDefinitions(input.toolDefinitions));
+  return systemPromptTokens + toolDefinitionTokens;
 }
 
 function truncateText(text: string, maxTokens: number): string {
