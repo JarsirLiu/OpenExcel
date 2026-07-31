@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mutationChunkRanges } from "./sheetChunks.js";
+import { mutationChunkRanges, parseSheetChunkPayload } from "./sheetChunks.js";
 
 describe("mutationChunkRanges", () => {
   it("represents a large continuous range as one chunk rectangle", () => {
@@ -23,5 +23,12 @@ describe("mutationChunkRanges", () => {
         ],
       }),
     ).toEqual([{ chunkRow: 0, chunkCol: 0, endChunkRow: 1, endChunkCol: 1 }]);
+  });
+});
+
+describe("parseSheetChunkPayload", () => {
+  it("fails instead of treating a malformed chunk as empty", () => {
+    expect(() => parseSheetChunkPayload("not-json")).toThrow();
+    expect(() => parseSheetChunkPayload(JSON.stringify({}))).toThrow("celldata must be an array");
   });
 });

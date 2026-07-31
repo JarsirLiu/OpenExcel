@@ -20,7 +20,9 @@ function safeParse<T>(value: string, fallback: T): T {
   }
 }
 
-export function deserializeSheet(sheet: Prisma.SheetGetPayload<{}>): SheetJson {
+export function deserializeSheet(
+  sheet: Prisma.SheetGetPayload<{ include: { chunks: true } }>,
+): SheetJson {
   const snapshot = sheetRecordToSnapshot(sheet);
   return {
     id: sheet.id,

@@ -54,12 +54,11 @@ export function serializeSheetChunks(celldata: readonly FortuneCell[]): Array<{
 }
 
 export function parseSheetChunkPayload(payload: string): FortuneCell[] {
-  try {
-    const parsed = JSON.parse(payload) as Partial<SheetChunkPayload>;
-    return Array.isArray(parsed.celldata) ? (parsed.celldata as FortuneCell[]) : [];
-  } catch {
-    return [];
+  const parsed = JSON.parse(payload) as Partial<SheetChunkPayload>;
+  if (!Array.isArray(parsed.celldata)) {
+    throw new Error("Invalid SheetChunk payload: celldata must be an array");
   }
+  return parsed.celldata as FortuneCell[];
 }
 
 export function snapshotFromSheetChunks(

@@ -29,11 +29,17 @@ describe("sheetRecordToSnapshot", () => {
     expect(snapshot.celldata).toHaveLength(2);
   });
 
-  it("returns an empty snapshot when no chunks exist", () => {
+  it("returns an empty snapshot when the sheet has no chunks", () => {
     expect(sheetRecordToSnapshot({ config: null, chunks: [] })).toEqual({
       celldata: [],
       config: null,
     });
+  });
+
+  it("fails when Sheet config JSON is invalid", () => {
+    expect(() => sheetRecordToSnapshot({ config: "[]", chunks: [] })).toThrow(
+      "Invalid Sheet config",
+    );
   });
 
   it("serializes cells for an undo snapshot without Sheet legacy fields", () => {

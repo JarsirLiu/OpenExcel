@@ -74,7 +74,7 @@ dependencies from a mutation.
 - Persistence and FortuneSheet use zero-based `r/c` coordinates.
 - AI tools and chat previews use one-based row/column numbers and A1 references.
 - `packages/core/src/chat/sheetCoordinates.ts` and `packages/core/src/chat/sheetGeometry.ts` are the conversion boundary.
-- `SheetChunk` is the only persisted Sheet content source. API `uploadedData` and `merges` fields are derived views assembled from chunks; `dateValues` is a derived projection for `readSheetData`.
+- `SheetChunk` is the only persisted Sheet content source. API `uploadedData` and `merges` fields are derived views assembled from chunks; `dateValues` is a derived projection for `readSheetData`. Content reads require the chunk relation explicitly; missing or malformed chunk/config payloads fail instead of being treated as an empty Sheet.
 - Chart data references and placement belong to `ChartSpec` and must not be implicitly changed by ordinary Sheet content writes.
 
 ## Web synchronization behavior

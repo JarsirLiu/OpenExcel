@@ -3,23 +3,20 @@ import type { Prisma } from "../../infra/database/prismaTypes.js";
 import { snapshotFromSheetChunks } from "./sheetChunks.js";
 
 type PersistedSheet = Pick<Prisma.SheetGetPayload<{}>, "config"> & {
-  chunks?: readonly { payload: string }[];
+  chunks: readonly { payload: string }[];
 };
 
 function parseConfig(value: string | null): Record<string, unknown> | null {
   if (!value) return null;
-  try {
-    const parsed: unknown = JSON.parse(value);
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-      ? (parsed as Record<string, unknown>)
-      : null;
-  } catch {
-    return null;
+  const parsed: unknown = JSON.parse(value);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Invalid Sheet config: expected an object");
   }
+  return parsed as Record<string, unknown>;
 }
 
 export function sheetRecordToSnapshot(sheet: PersistedSheet): SheetSnapshot {
-  return snapshotFromSheetChunks(sheet.chunks ?? [], parseConfig(sheet.config));
+  return snapshotFromSheetChunks(sheet.chunks, parseConfig(sheet.config));
 }
 
 export function snapshotMergesJson(snapshot: SheetSnapshot): string {
