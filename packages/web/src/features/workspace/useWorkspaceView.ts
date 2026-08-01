@@ -58,12 +58,14 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
 
   useEffect(() => {
     const targetWorkbookId = transition?.targetWorkbookId;
-    if (
-      workspaceId == null ||
-      transition?.status !== "loading" ||
-      targetWorkbookId == null ||
-      currentWorkbook?.id === targetWorkbookId
-    ) {
+    if (workspaceId == null || transition?.status !== "loading" || targetWorkbookId == null) {
+      return;
+    }
+
+    // The document store is updated before the async loader resolves. Treat
+    // that observable document identity as the successful transition signal.
+    if (currentWorkbook?.id === targetWorkbookId) {
+      commitWorkbook(targetWorkbookId);
       return;
     }
 

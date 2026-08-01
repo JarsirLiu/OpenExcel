@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   commitWorkbook: vi.fn(),
   failWorkbookTransition: vi.fn(),
   clearActiveWorkbook: vi.fn(),
+  transition: null as { targetWorkbookId: number; status: "loading" | "failed" } | null,
 }));
 
 vi.mock("@/api/workbooks", () => ({
@@ -49,7 +50,7 @@ vi.mock("@/features/workspace/useWorkbookCatalog", () => ({
     failWorkbookTransition: mocks.failWorkbookTransition,
     clearActiveWorkbook: mocks.clearActiveWorkbook,
     activeWorkbookId: 1,
-    transition: null,
+    transition: mocks.transition,
     retryTransition: vi.fn(),
     switchWorkbook: vi.fn(),
   }),
@@ -71,7 +72,7 @@ vi.mock("./useWorkbookDocument", () => ({
     updateCharts: vi.fn(),
     updateSheetRevision: vi.fn(),
     updateWorkbookMetadata: vi.fn(),
-    loadWorkbook: vi.fn().mockResolvedValue(null),
+    loadWorkbook: mocks.loadWorkbook,
     reloadCurrentWorkbook: vi.fn().mockResolvedValue(null),
     loadSheet: async (sheetId: number) => {
       const loaded = await mocks.fetchSheet(1, sheetId, { signal: new AbortController().signal });
@@ -98,6 +99,9 @@ describe("useWorkspaceView", () => {
     mocks.toast.mockReset();
     mocks.replaceCurrentWorkbook.mockReset();
     mocks.updateCurrentWorkbook.mockReset();
+    mocks.loadWorkbook.mockReset();
+    mocks.commitWorkbook.mockReset();
+    mocks.transition = null;
   });
 
   it("loads the new active sheet when its index stays the same", async () => {
@@ -133,5 +137,39 @@ describe("useWorkspaceView", () => {
     rerender();
 
     await waitFor(() => expect(mocks.fetchSheet).toHaveBeenCalledWith(1, 2, expect.anything()));
+  });
+
+  it("completes the workbook transition after the document is replaced", async () => {
+    currentWorkbook = {
+      id: 1,
+      publicId: "workbook-1",
+      name: "Workbook 1",
+      sheets: [],
+      charts: [],
+    };
+    const loadedWorkbook: WorkbookFull = {
+      id: 2,
+      publicId: "workbook-2",
+      name: "Workbook 2",
+      sheets: [],
+      charts: [],
+    };
+    mocks.transition = { targetWorkbookId: 2, status: "loading" };
+
+    let resolveLoad!: (workbook: WorkbookFull) => void;
+    mocks.loadWorkbook.mockReturnValue(
+      new Promise<WorkbookFull>((resolve) => {
+        resolveLoad = resolve;
+      }),
+    );
+
+    const { rerender } = renderHook(() => useWorkspaceView(1));
+    await waitFor(() => expect(mocks.loadWorkbook).toHaveBeenCalledWith(2, expect.anything()));
+
+    currentWorkbook = loadedWorkbook;
+    rerender();
+
+    await waitFor(() => expect(mocks.commitWorkbook).toHaveBeenCalledWith(2));
+    resolveLoad(loadedWorkbook);
   });
 });
