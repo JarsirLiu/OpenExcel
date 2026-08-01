@@ -169,6 +169,66 @@ describe("createAgentToolSet", () => {
     expect(execute).toHaveBeenCalledTimes(11);
   });
 
+  it("admits only one mutation tool per model step while allowing read tools to use the normal gate", async () => {
+    let release!: () => void;
+    const blocker = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const execute = vi.fn().mockImplementation(async ({ toolName }: { toolName: string }) => {
+      if (toolName === "writeCells") await blocker;
+      return { toolName };
+    });
+    const onToolFinish = vi.fn();
+    const tools = createAgentToolSet(
+      [
+        {
+          name: "writeCells",
+          description: "Write cells",
+          inputSchema: z.object({}),
+          executionMode: "mutation",
+        },
+        {
+          name: "readSheetData",
+          description: "Read a sheet",
+          inputSchema: z.object({}),
+          executionMode: "read",
+        },
+        {
+          name: "createChart",
+          description: "Create a chart",
+          inputSchema: z.object({}),
+          executionMode: "mutation",
+        },
+      ],
+      { execute },
+      undefined,
+      { onToolFinish },
+    );
+
+    const firstWrite = (tools.writeCells as any).execute({}, { toolCallId: "write-1" });
+    await Promise.resolve();
+    const secondWrite = await (tools.createChart as any).execute({}, { toolCallId: "write-2" });
+    const read = await (tools.readSheetData as any).execute({}, { toolCallId: "read-1" });
+
+    expect(secondWrite).toMatchObject({
+      isError: true,
+      error: {
+        kind: "rate_limit",
+        details: { maxMutationToolsPerStep: 1 },
+      },
+    });
+    expect(read).toEqual({ toolName: "readSheetData" });
+    expect(execute).toHaveBeenCalledTimes(2);
+
+    release();
+    await firstWrite;
+    (tools as any).resetToolCallBatch();
+
+    await expect(
+      (tools.createChart as any).execute({}, { toolCallId: "write-3" }),
+    ).resolves.toEqual({ toolName: "createChart" });
+  });
+
   it("rethrows unexpected executor errors instead of hiding them from diagnostics", async () => {
     const execute = vi.fn().mockRejectedValue(new Error("programmer bug"));
     const onToolFinish = vi.fn();

@@ -12,6 +12,18 @@ describe("buildRunToolset", () => {
     expect(toolsContext.readSheetData).toEqual({ workspaceId: 3 });
     expect(toolsContext.createChart).toEqual({ runId: 19, workspaceId: 3 });
     expect(toolsContext.writeCells).toEqual({ runId: 19, workspaceId: 3 });
+    expect(
+      buildRunToolset(3, 19).toolDefinitions.find((tool) => tool.name === "readSheetData")
+        ?.executionMode,
+    ).toBe("read");
+    expect(
+      buildRunToolset(3, 19).toolDefinitions.find((tool) => tool.name === "createChart")
+        ?.executionMode,
+    ).toBe("mutation");
+    expect(
+      buildRunToolset(3, 19).toolDefinitions.find((tool) => tool.name === "writeCells")
+        ?.executionMode,
+    ).toBe("mutation");
   });
 
   it("normalizes concrete tool output before the idempotent executor persists it", async () => {

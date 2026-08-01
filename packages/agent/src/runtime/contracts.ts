@@ -16,10 +16,14 @@ import type {
 
 export type AgentTranscriptMessage = Record<string, unknown>;
 
+export type AgentToolExecutionMode = "read" | "mutation";
+
 export interface AgentToolDefinition {
   name: string;
   description: string;
   inputSchema: z.ZodTypeAny;
+  /** Mutation tools are admitted at most once in a model step. */
+  executionMode?: AgentToolExecutionMode;
 }
 
 export interface ToolExecutionRequest {

@@ -10,6 +10,7 @@ describe("system prompt", () => {
     );
     expect(DEFAULT_PROMPT).toContain("工具报错、结果被截断或核验不通过时，不要无限重复调用工具");
     expect(DEFAULT_PROMPT).toContain("每个模型步骤最多并行调用 10 个工具");
+    expect(DEFAULT_PROMPT).toContain("每个模型步骤最多调用一个会修改工作簿、Sheet 或图表的工具");
   });
 
   it("delegates tool-specific rules to the tool catalog", () => {

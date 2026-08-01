@@ -56,6 +56,13 @@ model-visible `rate_limit` ToolError and do not enter the executor. They still
 produce the normal tool lifecycle and tool-call/tool-result pairing, so the
 model can retry them after the batch finishes.
 
+Tool definitions may declare `executionMode: "mutation"`. At most one mutation
+tool is admitted in a model step. Additional mutation calls receive a
+model-visible concurrency error before entering the executor, so they cannot
+start a database transaction or change workbook state. Read tools retain the
+normal per-step parallelism limit. The batch gates reset only after the model
+step has reconciled all tool results.
+
 Large tools must page or otherwise reduce their own domain result;
 `readSheetData` provides overview, compact range, exact range, and find
 operations. Range reads use a fixed row-major page cell budget and return a

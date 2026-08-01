@@ -73,10 +73,11 @@ export function buildRunToolset(workspaceId: number, runId: number) {
 
   const toolsContext = buildToolContexts(workspaceId, runId);
   const toolDefinitions = Object.values(serverToolRegistry).map(
-    ({ name, description, inputSchema }) => ({
+    ({ name, description, inputSchema, persistenceMode }) => ({
       name,
       description,
       inputSchema,
+      executionMode: persistenceMode,
     }),
   );
 

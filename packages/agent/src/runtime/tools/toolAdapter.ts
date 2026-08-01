@@ -56,6 +56,7 @@ export function createAgentToolSet(
   hooks: ToolAdapterHooks = {},
 ): AgentToolSet {
   const concurrencyGate = createToolConcurrencyGate(MAX_PARALLEL_TOOL_CALLS);
+  const mutationConcurrencyGate = createToolConcurrencyGate(1);
   const tools = Object.fromEntries(
     definitions.map((definition) => [
       definition.name,
@@ -86,6 +87,28 @@ export function createAgentToolSet(
               `Too many parallel tool calls. At most ${MAX_PARALLEL_TOOL_CALLS} tool calls may execute at once. Retry this call after the current batch finishes.`,
               {
                 maxParallelToolCalls: MAX_PARALLEL_TOOL_CALLS,
+                toolName: definition.name,
+                toolCallId,
+              },
+            );
+            await hooks.onToolFinish?.({
+              toolName: definition.name,
+              toolCallId,
+              input,
+              error,
+              source: "adapter",
+            });
+            return toolErrorResult(error);
+          }
+
+          const isMutation = definition.executionMode === "mutation";
+          const releaseMutation = isMutation ? mutationConcurrencyGate.tryAcquire() : undefined;
+          if (isMutation && !releaseMutation) {
+            releaseConcurrency();
+            const error = new ToolConcurrencyError(
+              "Only one mutation tool may execute in a model step. Retry this mutation in the next step.",
+              {
+                maxMutationToolsPerStep: 1,
                 toolName: definition.name,
                 toolCallId,
               },
@@ -155,6 +178,7 @@ export function createAgentToolSet(
               return toolErrorResult(error);
             }
           } finally {
+            releaseMutation?.();
             releaseConcurrency();
           }
         },
@@ -163,7 +187,10 @@ export function createAgentToolSet(
   );
 
   Object.defineProperty(tools, "resetToolCallBatch", {
-    value: () => concurrencyGate.resetBatch(),
+    value: () => {
+      concurrencyGate.resetBatch();
+      mutationConcurrencyGate.resetBatch();
+    },
     enumerable: false,
   });
   return tools as AgentToolSet;
