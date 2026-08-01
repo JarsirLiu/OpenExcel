@@ -1,4 +1,3 @@
-import { Workbook } from "@fortune-sheet/react";
 import { useMemo, useRef } from "react";
 import "@fortune-sheet/react/dist/index.css";
 import type { WorkbookFull } from "@/api/workbooks";
@@ -8,8 +7,10 @@ import { ChartOverlay } from "@/features/workbook/charts/ChartOverlay";
 import type { ChartMutation } from "@/features/workbook/charts/chartMutation";
 import { useChartInsertion } from "@/features/workbook/charts/useChartInsertion";
 import { normalizeSheetIndex } from "@/features/workspace/sheetIndex";
+import type { WorkbookDocumentStore } from "@/features/workspace/WorkbookDocumentStore";
 import { type DemoGridFocus, useDemoGridFocus } from "./demoGridFocus";
 import styles from "./ExcelGrid.module.css";
+import { FortuneSheetHost } from "./FortuneSheetHost";
 import { useFortuneSheetFilterMenu } from "./fortuneSheetFilterMenu";
 import { useFortuneSheetTooltip } from "./fortuneSheetTooltip";
 import { useExcelGridWorkspace } from "./useExcelGridWorkspace";
@@ -62,6 +63,7 @@ const CELL_CONTEXT_MENU = [
 interface Props {
   workspaceId: number | null;
   workbook: WorkbookFull | null;
+  documentStore: WorkbookDocumentStore;
   workbookRevision: number;
   currentSheetIndex: number;
   onSheetIndexChange?: (sheetIndex: number) => void;
@@ -82,6 +84,7 @@ interface Props {
 export function ExcelGrid({
   workspaceId,
   workbook,
+  documentStore,
   workbookRevision,
   currentSheetIndex,
   onSheetIndexChange,
@@ -108,7 +111,6 @@ export function ExcelGrid({
   const {
     saveStatus,
     workbookRef,
-    liveWorkbook,
     sheetData,
     sessionKey,
     layoutBySheetId,
@@ -131,6 +133,7 @@ export function ExcelGrid({
     onWorkbookMutation,
     onSheetRevisionChanged,
     onSheetContentChanged,
+    documentStore,
     sheetLoaded,
   });
   useFortuneSheetFilterMenu(gridRootRef, workbook !== null);
@@ -148,7 +151,7 @@ export function ExcelGrid({
     sessionKey,
   });
 
-  const renderWorkbook = liveWorkbook ?? workbook;
+  const renderWorkbook = workbook;
   const { dialog, handleSelectionChange, toolbarItems } = useChartInsertion({
     workspaceId,
     workbook: renderWorkbook,
@@ -199,9 +202,9 @@ export function ExcelGrid({
       className={`${styles.container} ${isDemoFocusActive ? styles.demoFocusActive : ""}`}
     >
       <div className={styles.inner}>
-        <Workbook
-          key={`${workbook.id}:${sessionKey}`}
-          ref={workbookRef}
+        <FortuneSheetHost
+          sessionKey={`${workbook.id}:${sessionKey}`}
+          workbookRef={workbookRef}
           data={sheetData as any}
           onChange={handleChange}
           onOp={handleOp}
@@ -227,7 +230,7 @@ export function ExcelGrid({
               containerRef={gridRootRef}
               layerRef={chartLayerRef}
               workspaceId={workspaceId}
-              workbook={renderWorkbook!}
+              documentStore={documentStore}
               sheetId={String(currentSheet.id)}
               layout={currentSheetLayout}
               onChartMutation={onChartMutation}

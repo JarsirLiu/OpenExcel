@@ -1,8 +1,8 @@
-import type { FortuneCell } from "@openexcel/core";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { fetchSheet, fetchWorkbookForEditor, type WorkbookFull } from "@/api/workbooks";
 import type { SheetEditorChange } from "@/features/sync/sheetEditorChange";
 import { mergeWorkbookSnapshot } from "@/features/sync/workbookRevision";
+import { WorkbookDocumentStore } from "./WorkbookDocumentStore";
 
 function loadedSheetIds(workbook: WorkbookFull | null): number[] | undefined {
   if (!workbook) return undefined;
@@ -21,86 +21,36 @@ function isAbortError(error: unknown): boolean {
   );
 }
 
-type SheetPatch = Extract<SheetEditorChange, { kind: "patch" }>["mutation"];
-
-type SheetCellCache = {
-  source: readonly FortuneCell[];
-  indexes: Map<string, number>;
-};
-
-function cellKey(row: number, col: number): string {
-  return `${row},${col}`;
-}
-
-function createCellCache(celldata: readonly FortuneCell[]): SheetCellCache {
-  return {
-    source: celldata,
-    indexes: new Map(celldata.map((cell, index) => [cellKey(cell.r, cell.c), index])),
-  };
-}
-
-function applySheetPatch(
-  cache: SheetCellCache,
-  patch: SheetPatch,
-): { celldata: FortuneCell[]; cache: SheetCellCache } {
-  const nextCelldata: (FortuneCell | null)[] = [...cache.source];
-  let indexes = cache.indexes;
-  let requiresCompaction = false;
-
-  const ensureWritableIndexes = () => {
-    if (indexes === cache.indexes) indexes = new Map(indexes);
-  };
-
-  for (const change of patch.cells) {
-    const row = change.row - 1;
-    const col = change.col - 1;
-    const key = cellKey(row, col);
-    const index = indexes.get(key);
-    if (change.cell === null) {
-      if (index !== undefined) {
-        nextCelldata[index] = null;
-        ensureWritableIndexes();
-        indexes.delete(key);
-        requiresCompaction = true;
-      }
-      continue;
-    }
-
-    const nextCell = {
-      r: row,
-      c: col,
-      v: { ...change.cell } as unknown as FortuneCell["v"],
-    };
-    if (index === undefined) {
-      ensureWritableIndexes();
-      indexes.set(key, nextCelldata.length);
-      nextCelldata.push(nextCell);
-      requiresCompaction = true;
-    } else {
-      nextCelldata[index] = nextCell;
-    }
-  }
-
-  if (requiresCompaction) {
-    const compacted = nextCelldata.filter((cell): cell is FortuneCell => cell !== null);
-    compacted.sort((left, right) => left.r - right.r || left.c - right.c);
-    return { celldata: compacted, cache: createCellCache(compacted) };
-  }
-
-  const celldata = nextCelldata as FortuneCell[];
-  return { celldata, cache: { source: celldata, indexes } };
-}
-
 export function useWorkbookDocument(
   workspaceId: number | null,
   initialWorkbook: WorkbookFull | null | undefined,
 ) {
-  const [currentWorkbook, setCurrentWorkbook] = useState<WorkbookFull | null>(
-    initialWorkbook ?? null,
+  const documentStoreRef = useRef<WorkbookDocumentStore | null>(null);
+  if (!documentStoreRef.current) {
+    documentStoreRef.current = new WorkbookDocumentStore(initialWorkbook ?? null);
+  }
+  const documentStore = documentStoreRef.current;
+  const subscribeToWorkbookChanges = useCallback(
+    (listener: () => void) =>
+      documentStore.subscribeToChanges((change) => {
+        if (
+          change.kind === "workbook" ||
+          change.structural ||
+          change.configChanged ||
+          change.cells.length === 0
+        ) {
+          listener();
+        }
+      }),
+    [documentStore],
+  );
+  const currentWorkbook = useSyncExternalStore(
+    subscribeToWorkbookChanges,
+    documentStore.getSnapshot,
+    documentStore.getSnapshot,
   );
   const [workbookRevision, setWorkbookRevision] = useState(0);
-  const currentWorkbookRef = useRef(currentWorkbook);
-  const sheetCellCacheRef = useRef<Map<number, SheetCellCache>>(new Map());
+  const currentWorkbookRef = useRef(documentStore.getSnapshot());
   const workbookRequestGenerationRef = useRef(0);
   const workbookRequestControllerRef = useRef<AbortController | null>(null);
   const sheetRequestGenerationRef = useRef(0);
@@ -150,97 +100,71 @@ export function useWorkbookDocument(
   }, []);
 
   useEffect(() => {
-    currentWorkbookRef.current = currentWorkbook;
-  }, [currentWorkbook]);
-
-  useEffect(() => {
     invalidateRequests();
     const next = initialWorkbook ?? null;
-    currentWorkbookRef.current = next;
-    setCurrentWorkbook(next);
+    const replaced = documentStore.replace(next);
+    currentWorkbookRef.current = replaced;
     setWorkbookRevision((revision) => revision + 1);
 
     return () => {
       invalidateRequests();
     };
-  }, [initialWorkbook?.id, invalidateRequests, workspaceId]);
+  }, [documentStore, initialWorkbook?.id, invalidateRequests, workspaceId]);
 
-  const replaceCurrentWorkbook = useCallback((next: WorkbookFull | null) => {
-    sheetCellCacheRef.current.clear();
-    currentWorkbookRef.current = next;
-    setCurrentWorkbook(next);
-    setWorkbookRevision((revision) => revision + 1);
-  }, []);
+  const replaceCurrentWorkbook = useCallback(
+    (next: WorkbookFull | null) => {
+      const replaced = documentStore.replace(next);
+      currentWorkbookRef.current = replaced;
+      setWorkbookRevision((revision) => revision + 1);
+    },
+    [documentStore],
+  );
 
   const updateCurrentWorkbook = useCallback(
     (updater: WorkbookUpdater) => {
       const current = currentWorkbookRef.current;
       if (!current) return null;
-      const next = updater(current);
-      replaceCurrentWorkbook(next);
+      const next = documentStore.update(updater);
+      currentWorkbookRef.current = next;
+      setWorkbookRevision((revision) => revision + 1);
       return next;
     },
-    [replaceCurrentWorkbook],
+    [documentStore],
   );
 
-  const updateCharts = useCallback((charts: WorkbookFull["charts"]) => {
-    const current = currentWorkbookRef.current;
-    if (!current) return;
-    const next = { ...current, charts };
-    currentWorkbookRef.current = next;
-    setCurrentWorkbook(next);
-  }, []);
+  const updateCharts = useCallback(
+    (charts: WorkbookFull["charts"]) => {
+      const next = documentStore.updateCharts(charts);
+      currentWorkbookRef.current = next;
+    },
+    [documentStore],
+  );
 
-  const updateSheetRevision = useCallback((sheetId: number, revision: number) => {
-    const current = currentWorkbookRef.current;
-    const sheet = current?.sheets.find((item) => item.id === sheetId);
-    if (!current || !sheet || revision <= sheet.revision) return;
-    const next = {
-      ...current,
-      sheets: current.sheets.map((item) => (item.id === sheetId ? { ...item, revision } : item)),
-    };
-    currentWorkbookRef.current = next;
-    setCurrentWorkbook(next);
-  }, []);
+  const updateSheetRevision = useCallback(
+    (sheetId: number, revision: number) => {
+      const next = documentStore.updateSheetRevision(sheetId, revision);
+      currentWorkbookRef.current = next;
+    },
+    [documentStore],
+  );
 
-  const updateSheetContent = useCallback((change: SheetEditorChange): WorkbookFull | null => {
-    const current = currentWorkbookRef.current;
-    const currentSheet = current?.sheets.find((sheet) => sheet.id === change.sheetId);
-    if (!current || !currentSheet) return null;
-    const sheetId = change.sheetId;
-    const currentCelldata = (currentSheet.uploadedData ?? []) as FortuneCell[];
-    const cached = sheetCellCacheRef.current.get(sheetId);
-    const cache = cached?.source === currentCelldata ? cached : createCellCache(currentCelldata);
-    const patchResult = change.kind === "patch" ? applySheetPatch(cache, change.mutation) : null;
-    const nextCelldata =
-      change.kind === "patch"
-        ? (patchResult?.celldata ?? currentCelldata)
-        : change.snapshot.celldata;
-    const nextConfig =
-      change.kind === "patch"
-        ? change.mutation.config === undefined
-          ? currentSheet.config
-          : change.mutation.config
-        : change.snapshot.config;
-    sheetCellCacheRef.current.set(sheetId, patchResult?.cache ?? createCellCache(nextCelldata));
-    const next = {
-      ...current,
-      sheets: current.sheets.map((sheet) =>
-        sheet.id === sheetId ? { ...sheet, uploadedData: nextCelldata, config: nextConfig } : sheet,
-      ),
-    };
-    currentWorkbookRef.current = next;
-    return next;
-  }, []);
+  const updateSheetContent = useCallback(
+    (change: SheetEditorChange): WorkbookFull | null => {
+      const next = documentStore.updateSheetContent(change);
+      currentWorkbookRef.current = next;
+      return next;
+    },
+    [documentStore],
+  );
 
-  const updateWorkbookMetadata = useCallback((updater: WorkbookUpdater) => {
-    const current = currentWorkbookRef.current;
-    if (!current) return null;
-    const next = updater(current);
-    currentWorkbookRef.current = next;
-    setCurrentWorkbook(next);
-    return next;
-  }, []);
+  const updateWorkbookMetadata = useCallback(
+    (updater: WorkbookUpdater) => {
+      const next = documentStore.update(updater);
+      currentWorkbookRef.current = next;
+      return next;
+    },
+    [documentStore],
+  );
 
   const loadWorkbook = useCallback(
     async (workbookId: number, options?: { loadChartDependencies?: boolean }) => {
@@ -336,5 +260,6 @@ export function useWorkbookDocument(
     loadWorkbook,
     reloadCurrentWorkbook,
     loadSheet,
+    documentStore,
   };
 }

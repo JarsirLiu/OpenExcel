@@ -52,6 +52,7 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
     loadWorkbook,
     reloadCurrentWorkbook,
     loadSheet,
+    documentStore,
   } = useWorkbookDocument(workspaceId, initial?.currentWorkbook);
   const [referenceCacheRevision, setReferenceCacheRevision] = useState(0);
 
@@ -431,6 +432,7 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
     workbooks,
     workbookIdx,
     currentWorkbook,
+    documentStore,
     workbookRevision,
     loading,
     transition,

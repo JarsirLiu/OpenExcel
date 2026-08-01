@@ -4,11 +4,13 @@ import type { WorkbookStructureUpdate } from "@/features/sync/types";
 import type { ChartMutation } from "@/features/workbook/charts/chartMutation";
 import type { DemoGridFocus } from "@/features/workbook/editor/demoGridFocus";
 import { ExcelGrid } from "@/features/workbook/editor/ExcelGrid";
+import type { WorkbookDocumentStore } from "@/features/workspace/WorkbookDocumentStore";
 import styles from "./ExcelWorkspace.module.css";
 
 interface Props {
   workspaceId: number | null;
   workbook: WorkbookFull | null;
+  documentStore: WorkbookDocumentStore;
   workbookRevision: number;
   currentSheetIndex: number;
   onSheetIndexChange: (sheetIndex: number) => void;
@@ -29,6 +31,7 @@ interface Props {
 export function ExcelWorkspace({
   workspaceId,
   workbook,
+  documentStore,
   workbookRevision,
   currentSheetIndex,
   onSheetIndexChange,
@@ -51,6 +54,7 @@ export function ExcelWorkspace({
         <ExcelGrid
           workspaceId={workspaceId}
           workbook={workbook}
+          documentStore={documentStore}
           workbookRevision={workbookRevision}
           currentSheetIndex={currentSheetIndex}
           onSheetIndexChange={onSheetIndexChange}

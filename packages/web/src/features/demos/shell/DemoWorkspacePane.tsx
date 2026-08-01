@@ -4,6 +4,7 @@ import type { Workspace } from "@/api/workspaces";
 import workbenchStyles from "@/app/Workbench.module.css";
 import { SheetActivationProvider } from "@/features/workbook/editor/SheetActivationContext";
 import { useWorkspaceSidebarLayout } from "@/features/workspace/useWorkspaceSidebarLayout";
+import { WorkbookDocumentStore } from "@/features/workspace/WorkbookDocumentStore";
 import { WorkspaceSidebar } from "@/features/workspace/WorkspaceSidebar";
 import { WorkspaceView } from "@/features/workspace/WorkspaceView";
 import { t } from "@/lib/i18n";
@@ -52,6 +53,10 @@ export const DemoWorkspacePane = memo(function DemoWorkspacePane({
     const workbook = workbooks[currentWorkbookIndex];
     return workbook ? toWorkbook(workbook, currentWorkbookIndex) : null;
   }, [currentWorkbookIndex, workbooks]);
+  const documentStore = useMemo(
+    () => new WorkbookDocumentStore(currentWorkbook),
+    [currentWorkbook, workbookRevision],
+  );
   const currentMeta = workbookMetas[currentWorkbookIndex];
   const handleWorkbookSwitch = useCallback(
     (index: number) => {
@@ -119,6 +124,7 @@ export const DemoWorkspacePane = memo(function DemoWorkspacePane({
           workbooks={workbookMetas}
           workbookIdx={currentWorkbookIndex}
           currentWorkbook={currentWorkbook}
+          documentStore={documentStore}
           workbookRevision={workbookRevision}
           loading={false}
           transition={null}

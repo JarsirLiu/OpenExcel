@@ -47,6 +47,7 @@ type SheetState = {
   inFlight: Promise<void> | null;
   retryAttempt: number;
   conflictAttempt: number;
+  retryAfterInFlight: boolean;
 };
 
 type PendingCell = {
@@ -122,6 +123,7 @@ export class SheetSaveCoordinator {
       inFlight: null,
       retryAttempt: 0,
       conflictAttempt: 0,
+      retryAfterInFlight: false,
     });
   }
 
@@ -175,7 +177,12 @@ export class SheetSaveCoordinator {
 
   retry(sheetId: number, task: SheetSaveTask, options?: SheetSaveOptions): void {
     const state = this.states.get(sheetId);
-    if (!state || state.inFlight || state.timer !== null) return;
+    if (!state) return;
+    if (state.inFlight) {
+      state.retryAfterInFlight = true;
+      return;
+    }
+    if (state.timer !== null) return;
     if (state.retryAttempt >= MAX_RETRY_ATTEMPTS) return;
     const delay = RETRY_DELAYS_MS[state.retryAttempt] ?? RETRY_DELAYS_MS.at(-1)!;
     state.retryAttempt += 1;
@@ -217,6 +224,7 @@ export class SheetSaveCoordinator {
     state.latestConfig = merged.config;
     state.pendingCells.clear();
     state.pendingConfig = null;
+    state.retryAfterInFlight = false;
     state.latestVersion += 1;
     state.conflictAttempt += 1;
     return cloneSnapshot(merged);
@@ -328,6 +336,7 @@ export class SheetSaveCoordinator {
         current.persistedRevision = result.revision;
         current.retryAttempt = 0;
         current.conflictAttempt = 0;
+        current.retryAfterInFlight = false;
         options?.onSuccess?.(result);
         if (current.latestVersion !== version) {
           this.armTimer(sheetId, current, task, options, options?.debounceMs ?? 500);
@@ -349,7 +358,10 @@ export class SheetSaveCoordinator {
         const current = this.states.get(sheetId);
         if (current === state && current.inFlight === inFlight) {
           current.inFlight = null;
-          if (retryRequested) this.retry(sheetId, task, options);
+          if (retryRequested || current.retryAfterInFlight) {
+            current.retryAfterInFlight = false;
+            this.retry(sheetId, task, options);
+          }
         }
       });
     state.inFlight = inFlight;

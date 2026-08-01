@@ -9,6 +9,7 @@ import { preloadChartRenderer } from "../workbook/charts/ChartRendererBoundary";
 import { ExcelWorkspace } from "../workbook/ui/ExcelWorkspace";
 import { WorkbookHeader } from "../workbook/ui/WorkbookHeader";
 import type { WorkbookTransition } from "./useWorkbookCatalog";
+import type { WorkbookDocumentStore } from "./WorkbookDocumentStore";
 import { WorkspaceEmptyState } from "./WorkspaceEmptyState";
 import styles from "./WorkspaceView.module.css";
 
@@ -23,6 +24,7 @@ type Props = {
   workbooks: WorkbookMeta[];
   workbookIdx: number;
   currentWorkbook: WorkbookFull | null;
+  documentStore: WorkbookDocumentStore;
   workbookRevision: number;
   loading: boolean;
   transition: WorkbookTransition | null;
@@ -54,6 +56,7 @@ export function WorkspaceView({
   workbooks,
   workbookIdx,
   currentWorkbook,
+  documentStore,
   workbookRevision,
   loading,
   transition,
@@ -129,6 +132,7 @@ export function WorkspaceView({
         <ExcelWorkspace
           workspaceId={workspaceId}
           workbook={currentWorkbook}
+          documentStore={documentStore}
           workbookRevision={workbookRevision}
           currentSheetIndex={currentSheetIndex}
           onSheetIndexChange={setCurrentSheetIndex}

@@ -1,5 +1,5 @@
-import { useMemo } from "react";
-import type { WorkbookFull } from "@/api/workbooks";
+import { useCallback, useMemo, useSyncExternalStore } from "react";
+import type { WorkbookDocumentStore } from "@/features/workspace/WorkbookDocumentStore";
 import type { SheetGridLayout } from "../layout/fortuneSheetLayout";
 import { normalizeSheetId } from "../sheetIdentity";
 import { ChartDataLayer } from "./ChartDataLayer";
@@ -13,7 +13,7 @@ type Props = {
   containerRef: React.RefObject<HTMLDivElement | null>;
   layerRef: React.RefObject<HTMLDivElement | null>;
   workspaceId: number | null;
-  workbook: WorkbookFull;
+  documentStore: WorkbookDocumentStore;
   sheetId: string;
   layout: SheetGridLayout;
   onChartMutation?: (mutation: ChartMutation) => Promise<void> | void;
@@ -27,7 +27,7 @@ export function ChartOverlay({
   containerRef,
   layerRef,
   workspaceId,
-  workbook,
+  documentStore,
   sheetId,
   layout,
   onChartMutation,
@@ -35,9 +35,21 @@ export function ChartOverlay({
   onSheetLoad,
 }: Props) {
   const activeSheetId = normalizeSheetId(sheetId);
+  const subscribeToOverlayChanges = useCallback(
+    (listener: () => void) =>
+      documentStore.subscribeToChanges((change) => {
+        if (change.kind === "workbook" || change.structural) listener();
+      }),
+    [documentStore],
+  );
+  const workbook = useSyncExternalStore(
+    subscribeToOverlayChanges,
+    documentStore.getSnapshot,
+    documentStore.getSnapshot,
+  );
   const charts = useMemo(
-    () => chartsForSheet(workbook.charts, activeSheetId),
-    [activeSheetId, workbook.charts],
+    () => (workbook ? chartsForSheet(workbook.charts, activeSheetId) : []),
+    [activeSheetId, workbook],
   );
   const viewport = useChartViewport({ containerRef, layerRef, sheetId: activeSheetId });
   const {
@@ -56,7 +68,7 @@ export function ChartOverlay({
     onChartMutation,
   });
 
-  if (charts.length === 0) return null;
+  if (!workbook || charts.length === 0) return null;
 
   return (
     <div className={styles.layer}>
@@ -83,7 +95,7 @@ export function ChartOverlay({
           >
             <ChartDataLayer
               chart={chart}
-              workbook={workbook}
+              documentStore={documentStore}
               sheetLoaded={sheetLoaded}
               onSheetLoad={onSheetLoad}
             />

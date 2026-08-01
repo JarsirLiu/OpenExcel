@@ -292,6 +292,7 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
           workbooks={workbook.workbooks}
           workbookIdx={workbook.workbookIdx}
           currentWorkbook={workbook.currentWorkbook}
+          documentStore={workbook.documentStore}
           workbookRevision={workbook.workbookRevision}
           loading={loading}
           transition={workbook.transition}
