@@ -1,38 +1,28 @@
 import type { WorkbookInstance } from "@fortune-sheet/react";
-import {
-  extractSheetConfig,
-  type FortuneCell,
-  matrixToCelldata,
-  normalizeFortuneCellValue,
-  type SheetChangeDelta,
-  type SheetCommand,
-  type SheetConfig,
-} from "@openexcel/core";
+import { extractSheetConfig } from "@openexcel/core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { WorkbookFull } from "@/api/workbooks";
-import {
-  createSheet,
-  deleteSheet,
-  deleteWorkbook,
-  executeSheetCommand,
-  fetchSheet,
-  SheetRevisionConflictError,
-  updateSheetName,
-} from "@/api/workbooks";
+import { createSheet, deleteSheet, deleteWorkbook, updateSheetName } from "@/api/workbooks";
 import type { SheetSnapshotForSave } from "@/features/sync/sheetChunkSnapshot";
-import { SheetSaveCoordinator } from "@/features/sync/sheetSaveCoordinator";
+import type {
+  SheetContentChangeHandler,
+  SheetEditorChange,
+} from "@/features/sync/sheetEditorChange";
 import type { WorkbookStructureUpdate } from "@/features/sync/types";
+import { useSheetSaveController } from "@/features/sync/useSheetSaveController";
 import { normalizeSheetIndex } from "@/features/workspace/sheetIndex";
 import { confirm, toast } from "@/shared/lib";
 import { adaptFortuneSheetLayout, type SheetGridLayout } from "../layout/fortuneSheetLayout";
 import { findSheetIndexById } from "../sheetIdentity";
 import { toFortuneSheetData } from "./fortuneSheet";
+import { adaptFortuneSheetChange } from "./fortuneSheetChangeAdapter";
 import {
   collectFortuneSheetOpHints,
   type FortuneSheetOp,
   type FortuneSheetOpHint,
 } from "./fortuneSheetOps";
 import { useSheetActivation } from "./SheetActivationContext";
+import { createSheetEditorSnapshot, type SheetEditorSnapshot } from "./sheetMutationFromDiff";
 import { useWorkbookEditorSession } from "./useWorkbookEditorSession";
 
 type UseExcelGridWorkspaceProps = {
@@ -46,37 +36,9 @@ type UseExcelGridWorkspaceProps = {
   onWorkbookRefresh?: () => Promise<void> | void;
   onWorkbookMutation?: () => Promise<void> | void;
   onSheetRevisionChanged?: (sheetId: number, revision: number) => void;
-  onSheetContentChanged?: (
-    sheetId: number,
-    celldata: FortuneCell[],
-    config: SheetConfig | null,
-    mutation?: SheetChangeDelta,
-  ) => void;
+  onSheetContentChanged?: SheetContentChangeHandler;
   sheetLoaded: boolean;
 };
-
-function createMutationId(): string {
-  return (
-    globalThis.crypto?.randomUUID?.() ?? `web-${Date.now()}-${Math.random().toString(36).slice(2)}`
-  );
-}
-
-function patchFromHint(
-  celldata: readonly FortuneCell[],
-  hint: FortuneSheetOpHint,
-): SheetChangeDelta | undefined {
-  const cellsByKey = new Map(celldata.map((cell) => [`${cell.r},${cell.c}`, cell]));
-  const cells = [...hint.cellKeys].map((key) => {
-    const [row, col] = key.split(",").map(Number);
-    const cell = cellsByKey.get(key);
-    return {
-      row: row + 1,
-      col: col + 1,
-      cell: cell?.v ? { ...(cell.v as unknown as Record<string, unknown>) } : null,
-    };
-  });
-  return cells.length > 0 ? { type: "patch", cells } : undefined;
-}
 
 export function useExcelGridWorkspace({
   workspaceId,
@@ -92,29 +54,51 @@ export function useExcelGridWorkspace({
   onSheetContentChanged,
   sheetLoaded,
 }: UseExcelGridWorkspaceProps) {
-  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
-  const saveStatusResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const saveCoordinatorRef = useRef<SheetSaveCoordinator | null>(null);
   const deletingSheetRef = useRef(false);
-  if (!saveCoordinatorRef.current) saveCoordinatorRef.current = new SheetSaveCoordinator();
   const workbookRef = useRef<WorkbookInstance>(null);
+  const liveWorkbookRef = useRef(workbook);
+  const [contentVersion, setContentVersion] = useState(0);
   const { sheetData, sessionKey } = useWorkbookEditorSession(workbook, workbookRevision);
   const { registerActivateSheet } = useSheetActivation();
+  const applyDocumentChange = useCallback(
+    (change: SheetEditorChange) => {
+      const next = onSheetContentChanged?.(change);
+      if (next) {
+        liveWorkbookRef.current = next;
+        setContentVersion((version) => version + 1);
+      }
+      return next;
+    },
+    [onSheetContentChanged],
+  );
+  const {
+    saveStatus,
+    reset: resetSave,
+    schedule: scheduleSave,
+  } = useSheetSaveController({
+    workspaceId,
+    sheetLoaded,
+    onRevisionChanged: onSheetRevisionChanged,
+    onRebasedChange: applyDocumentChange,
+  });
   const layoutSessionKey = `${workbook?.id ?? "none"}:${sessionKey}`;
   const activeSheetIndex = normalizeSheetIndex(currentSheetIndex, workbook?.sheets.length ?? 0);
   const workbookStateRef = useRef(workbook);
   const activeSheetIndexRef = useRef(activeSheetIndex);
   const sheetLoadedRef = useRef(sheetLoaded);
   const pendingOpHintsRef = useRef<Map<number, FortuneSheetOpHint>>(new Map());
+  const editorSnapshotsRef = useRef<Map<number, SheetEditorSnapshot>>(new Map());
   const editorSessionRef = useRef(sessionKey);
-  const initialChangeSessionRef = useRef<string | number | null>(null);
-  workbookStateRef.current = workbook;
+  useEffect(() => {
+    liveWorkbookRef.current = workbook;
+  }, [workbook]);
+  workbookStateRef.current = liveWorkbookRef.current ?? workbook;
   activeSheetIndexRef.current = activeSheetIndex;
   sheetLoadedRef.current = sheetLoaded;
   if (editorSessionRef.current !== sessionKey) {
     editorSessionRef.current = sessionKey;
-    initialChangeSessionRef.current = null;
     pendingOpHintsRef.current.clear();
+    editorSnapshotsRef.current.clear();
   }
   const initialLayouts = useMemo(
     () =>
@@ -132,19 +116,19 @@ export function useExcelGridWorkspace({
   useEffect(() => {
     if (!workbook) return;
 
+    const editorSnapshots = new Map<number, SheetEditorSnapshot>();
     workbook.sheets.forEach((sheet) => {
       const fd = toFortuneSheetData(sheet);
-      saveCoordinatorRef.current?.reset(
-        sheet.id,
-        {
-          celldata: fd.celldata,
-          config: extractSheetConfig(fd),
-        },
-        sheet.revision,
-      );
+      const snapshot = {
+        celldata: fd.celldata,
+        config: extractSheetConfig(fd),
+      } satisfies SheetSnapshotForSave;
+      editorSnapshots.set(sheet.id, createSheetEditorSnapshot(snapshot.celldata, snapshot.config));
+      resetSave(sheet.id, snapshot, sheet.revision);
     });
+    editorSnapshotsRef.current = editorSnapshots;
     pendingOpHintsRef.current.clear();
-  }, [workbook?.id, workbookRevision]);
+  }, [resetSave, workbook?.id, workbookRevision]);
 
   useEffect(() => {
     setLayoutState({ sessionKey: layoutSessionKey, bySheetId: initialLayouts });
@@ -164,132 +148,6 @@ export function useExcelGridWorkspace({
     workbookRef.current.activateSheet({ index });
   }, [currentSheetIndex, sessionKey]);
 
-  useEffect(() => {
-    return () => {
-      saveCoordinatorRef.current?.dispose();
-      if (saveStatusResetRef.current) {
-        clearTimeout(saveStatusResetRef.current);
-      }
-    };
-  }, []);
-
-  const syncSheetToServer = useCallback(
-    async (
-      sheetId: number,
-      request: {
-        kind: "mutation" | "replaceChunks";
-        baseRevision: number;
-        mutation?: SheetChangeDelta;
-        config?: SheetConfig | null;
-        chunks?: Array<{ chunkRow: number; chunkCol: number; payload: string | null }>;
-      },
-    ) => {
-      if (workspaceId == null) {
-        return { revision: request.baseRevision };
-      }
-
-      const mutationId = createMutationId();
-      setSaveStatus("saving");
-      try {
-        const command: SheetCommand =
-          request.kind === "mutation"
-            ? {
-                kind: "mutation",
-                mutationId,
-                sheetId,
-                baseRevision: request.baseRevision,
-                mutation: request.mutation as SheetChangeDelta,
-              }
-            : {
-                kind: "replaceChunks",
-                mutationId,
-                sheetId,
-                baseRevision: request.baseRevision,
-                config: request.config as Record<string, unknown> | null,
-                chunks: request.chunks ?? [],
-              };
-        const result = await executeSheetCommand(workspaceId, command);
-        setSaveStatus("saved");
-        onSheetRevisionChanged?.(sheetId, result.revision);
-        if (saveStatusResetRef.current) clearTimeout(saveStatusResetRef.current);
-        saveStatusResetRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
-        return result;
-      } catch (error) {
-        setSaveStatus("idle");
-        console.error("保存失败:", error);
-        throw error;
-      }
-    },
-    [onSheetRevisionChanged, workspaceId],
-  );
-
-  const scheduleSave = useCallback(
-    (celldata: any[], config: any, mutation?: SheetChangeDelta) => {
-      if (!sheetLoadedRef.current) {
-        return;
-      }
-      const currentWorkbook = workbookStateRef.current;
-      const currentSheetIndex = activeSheetIndexRef.current;
-      if (!currentWorkbook?.sheets[currentSheetIndex]) {
-        return;
-      }
-      const sheet = currentWorkbook.sheets[currentSheetIndex];
-      if (!sheet) {
-        return;
-      }
-      if (!Array.isArray(celldata)) {
-        return;
-      }
-
-      const normalizedConfig =
-        config && typeof config === "object" && !Array.isArray(config) ? config : null;
-      const snapshot: SheetSnapshotForSave = {
-        celldata: celldata as FortuneCell[],
-        config: normalizedConfig,
-      };
-      const onSuccess = (result: { revision: number }) => {
-        setSaveStatus("saved");
-        onSheetRevisionChanged?.(sheet.id, result.revision);
-        if (saveStatusResetRef.current) clearTimeout(saveStatusResetRef.current);
-        saveStatusResetRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
-      };
-      let onError: (error: unknown) => void;
-      onError = (error) => {
-        if (!(error instanceof SheetRevisionConflictError) || workspaceId == null) {
-          setSaveStatus("idle");
-          console.error("保存失败:", error);
-          return;
-        }
-        void fetchSheet(workspaceId, sheet.id)
-          .then((remote) => {
-            const rebased = saveCoordinatorRef.current?.rebase(
-              sheet.id,
-              { celldata: (remote.uploadedData ?? []) as FortuneCell[], config: remote.config },
-              remote.revision,
-            );
-            if (!rebased) return;
-            saveCoordinatorRef.current?.schedule(
-              sheet.id,
-              rebased,
-              (request) => syncSheetToServer(sheet.id, request),
-              { onSuccess, onError },
-            );
-          })
-          .catch((refreshError) => {
-            setSaveStatus("idle");
-            console.error("保存冲突合并失败:", refreshError);
-          });
-      };
-      saveCoordinatorRef.current?.schedule(
-        sheet.id,
-        snapshot,
-        (request) => syncSheetToServer(sheet.id, request),
-        { mutation, onSuccess, onError },
-      );
-    },
-    [onSheetRevisionChanged, syncSheetToServer],
-  );
-
   const handleChange = useCallback(
     (data: any[]) => {
       const currentWorkbook = workbookStateRef.current;
@@ -300,8 +158,6 @@ export function useExcelGridWorkspace({
       if (!sheet) return;
       const hint = pendingOpHintsRef.current.get(sheet.id);
       pendingOpHintsRef.current.delete(sheet.id);
-      const isInitialEditorChange = initialChangeSessionRef.current !== sessionKey;
-      if (isInitialEditorChange) initialChangeSessionRef.current = sessionKey;
 
       if (!hint || hint.requiresSnapshot) {
         setLayoutState((current) => {
@@ -332,20 +188,23 @@ export function useExcelGridWorkspace({
       if (!Array.isArray(cellMatrix)) {
         return;
       }
-      const celldata = matrixToCelldata(cellMatrix).map((cell) => ({
-        ...cell,
-        v: normalizeFortuneCellValue(cell.v),
-      }));
       const config = extractSheetConfig(fortuneSheet);
-      const mutation = hint && !hint.requiresSnapshot ? patchFromHint(celldata, hint) : undefined;
-      if (mutation) {
-        onSheetContentChanged?.(sheet.id, celldata, config, mutation);
-      } else if (hint?.requiresSnapshot || !isInitialEditorChange) {
-        onSheetContentChanged?.(sheet.id, celldata, config);
+      const previousSnapshot = editorSnapshotsRef.current.get(sheet.id);
+      if (!previousSnapshot) return;
+      const { snapshot: currentEditorSnapshot, change } = adaptFortuneSheetChange({
+        sheetId: sheet.id,
+        data: cellMatrix,
+        config,
+        previous: previousSnapshot,
+        hint,
+      });
+      editorSnapshotsRef.current.set(sheet.id, currentEditorSnapshot);
+      if (change) {
+        applyDocumentChange(change);
+        scheduleSave(change);
       }
-      scheduleSave(celldata, config, mutation);
     },
-    [initialLayouts, layoutSessionKey, onSheetContentChanged, scheduleSave, sessionKey],
+    [applyDocumentChange, initialLayouts, layoutSessionKey, scheduleSave],
   );
 
   const handleOp = useCallback((ops: readonly FortuneSheetOp[]) => {
@@ -361,8 +220,8 @@ export function useExcelGridWorkspace({
         pendingOpHintsRef.current.set(sheetId, hint);
         continue;
       }
-      for (const cellKey of hint.cellKeys) current.cellKeys.add(cellKey);
       current.requiresSnapshot ||= hint.requiresSnapshot;
+      for (const cellKey of hint.changedCellKeys) current.changedCellKeys.add(cellKey);
     }
   }, []);
 
@@ -485,6 +344,8 @@ export function useExcelGridWorkspace({
   return {
     saveStatus,
     workbookRef,
+    liveWorkbook: liveWorkbookRef.current,
+    contentVersion,
     sheetData,
     sessionKey,
     layoutBySheetId,

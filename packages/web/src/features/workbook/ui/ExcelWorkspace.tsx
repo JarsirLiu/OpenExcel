@@ -1,5 +1,5 @@
-import type { FortuneCell, SheetChangeDelta, SheetConfig } from "@openexcel/core";
 import type { WorkbookFull } from "@/api/workbooks";
+import type { SheetContentChangeHandler } from "@/features/sync/sheetEditorChange";
 import type { WorkbookStructureUpdate } from "@/features/sync/types";
 import type { ChartMutation } from "@/features/workbook/charts/chartMutation";
 import type { DemoGridFocus } from "@/features/workbook/editor/demoGridFocus";
@@ -22,12 +22,7 @@ interface Props {
   onChartMutation?: (mutation: ChartMutation) => Promise<void> | void;
   onWorkbookMutation?: () => Promise<void> | void;
   onSheetRevisionChanged?: (sheetId: number, revision: number) => void;
-  onSheetContentChanged?: (
-    sheetId: number,
-    celldata: FortuneCell[],
-    config: SheetConfig | null,
-    mutation?: SheetChangeDelta,
-  ) => void;
+  onSheetContentChanged?: SheetContentChangeHandler;
   demoGridFocus?: DemoGridFocus;
 }
 

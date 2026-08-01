@@ -10,6 +10,16 @@ import {
 } from "./sheetChunkSnapshot";
 
 export type SheetSaveResult = { revision: number };
+export type SheetSaveErrorAction = "handled" | "retry" | "stop";
+export type SheetSaveInput =
+  | {
+      kind: "patch";
+      mutation: Extract<SheetChangeDelta, { type: "patch" }>;
+    }
+  | {
+      kind: "snapshot";
+      snapshot: SheetSnapshotForSave;
+    };
 export type SheetSaveRequest =
   | {
       kind: "mutation";
@@ -26,7 +36,8 @@ export type SheetSaveTask = (request: SheetSaveRequest) => Promise<SheetSaveResu
 
 type SheetState = {
   latestVersion: number;
-  latestSnapshot: SheetSnapshotForSave;
+  latestCells: Map<string, FortuneCell>;
+  latestConfig: SheetConfig | null;
   persistedRevision: number;
   persistedChunks: Map<string, string>;
   persistedConfig: string;
@@ -34,6 +45,8 @@ type SheetState = {
   pendingConfig: { config: SheetConfig | null; version: number } | null;
   timer: ReturnType<typeof setTimeout> | null;
   inFlight: Promise<void> | null;
+  retryAttempt: number;
+  conflictAttempt: number;
 };
 
 type PendingCell = {
@@ -43,11 +56,51 @@ type PendingCell = {
   version: number;
 };
 
+type SheetSaveOptions = {
+  debounceMs?: number;
+  conflictRetry?: boolean;
+  onSuccess?: (result: SheetSaveResult) => void;
+  onError?: (error: unknown) => SheetSaveErrorAction | undefined;
+};
+
+const MAX_RETRY_ATTEMPTS = 5;
+const MAX_CONFLICT_ATTEMPTS = 3;
+const RETRY_DELAYS_MS = [1000, 2000, 4000, 8000, 16000] as const;
+
 function cloneSnapshot(snapshot: SheetSnapshotForSave): SheetSnapshotForSave {
   return {
     celldata: snapshot.celldata.map((cell) => ({ ...cell, v: { ...cell.v } })),
     config: snapshot.config ? structuredClone(snapshot.config) : null,
   };
+}
+
+function cellsFromCelldata(celldata: readonly FortuneCell[]): Map<string, FortuneCell> {
+  return new Map(celldata.map((cell) => [`${cell.r},${cell.c}`, { ...cell, v: { ...cell.v } }]));
+}
+
+function snapshotFromCells(
+  cells: ReadonlyMap<string, FortuneCell>,
+  config: SheetConfig | null,
+): SheetSnapshotForSave {
+  return {
+    celldata: [...cells.values()]
+      .map((cell) => ({ ...cell, v: { ...cell.v } }))
+      .sort((left, right) => left.r - right.r || left.c - right.c),
+    config: config ? structuredClone(config) : null,
+  };
+}
+
+function sameCell(left: FortuneCell | undefined, right: FortuneCell | undefined): boolean {
+  return JSON.stringify(left?.v ?? null) === JSON.stringify(right?.v ?? null);
+}
+
+function cellsFromChunks(chunks: ReadonlyMap<string, string>): Map<string, FortuneCell> {
+  const cells = new Map<string, FortuneCell>();
+  for (const payload of chunks.values()) {
+    const parsed = JSON.parse(payload) as { celldata?: FortuneCell[] };
+    for (const cell of parsed.celldata ?? []) cells.set(`${cell.r},${cell.c}`, cell);
+  }
+  return cells;
 }
 
 /** Debounces and serializes browser Sheet saves without making the editor await HTTP. */
@@ -58,7 +111,8 @@ export class SheetSaveCoordinator {
     this.cancel(sheetId);
     this.states.set(sheetId, {
       latestVersion: 0,
-      latestSnapshot: cloneSnapshot(snapshot),
+      latestCells: cellsFromCelldata(snapshot.celldata),
+      latestConfig: snapshot.config ? structuredClone(snapshot.config) : null,
       persistedRevision: revision,
       persistedChunks: serializeSheetChunkSnapshot(snapshot.celldata),
       persistedConfig: serializeSheetConfig(snapshot.config),
@@ -66,26 +120,39 @@ export class SheetSaveCoordinator {
       pendingConfig: null,
       timer: null,
       inFlight: null,
+      retryAttempt: 0,
+      conflictAttempt: 0,
     });
   }
 
   schedule(
     sheetId: number,
-    snapshot: SheetSnapshotForSave,
+    input: SheetSaveInput,
     task: SheetSaveTask,
-    options?: {
-      debounceMs?: number;
-      mutation?: SheetChangeDelta;
-      onSuccess?: (result: SheetSaveResult) => void;
-      onError?: (error: unknown) => void;
-    },
+    options?: SheetSaveOptions,
   ): void {
     const state = this.states.get(sheetId);
     if (!state) return;
     state.latestVersion += 1;
-    state.latestSnapshot = snapshot;
-    if (options?.mutation) {
-      for (const cell of options.mutation.type === "patch" ? options.mutation.cells : []) {
+    state.retryAttempt = 0;
+    if (!options?.conflictRetry) state.conflictAttempt = 0;
+    if (input.kind === "patch") {
+      for (const cell of input.mutation.cells) {
+        const key = `${cell.row - 1},${cell.col - 1}`;
+        if (cell.cell === null) {
+          state.latestCells.delete(key);
+        } else {
+          state.latestCells.set(key, {
+            r: cell.row - 1,
+            c: cell.col - 1,
+            v: { ...(cell.cell as unknown as FortuneCell["v"]) },
+          });
+        }
+      }
+      if (input.mutation.config !== undefined) {
+        state.latestConfig = input.mutation.config as SheetConfig | null;
+      }
+      for (const cell of input.mutation.cells) {
         state.pendingCells.set(`${cell.row},${cell.col}`, {
           row: cell.row,
           col: cell.col,
@@ -93,23 +160,26 @@ export class SheetSaveCoordinator {
           version: state.latestVersion,
         });
       }
-      if (options.mutation.type === "patch" && options.mutation.config !== undefined) {
-        state.pendingConfig = { config: snapshot.config, version: state.latestVersion };
+      if (input.mutation.config !== undefined) {
+        state.pendingConfig = { config: state.latestConfig, version: state.latestVersion };
       }
     } else {
+      state.latestCells = cellsFromCelldata(input.snapshot.celldata);
+      state.latestConfig = input.snapshot.config ? structuredClone(input.snapshot.config) : null;
       state.pendingCells.clear();
       state.pendingConfig = null;
     }
     this.cancelTimer(state);
-    state.timer = setTimeout(() => {
-      state.timer = null;
-      void this.flush(sheetId, task, options);
-    }, options?.debounceMs ?? 500);
+    if (!state.inFlight) this.armTimer(sheetId, state, task, options, options?.debounceMs ?? 500);
   }
 
-  setRevision(sheetId: number, revision: number): void {
+  retry(sheetId: number, task: SheetSaveTask, options?: SheetSaveOptions): void {
     const state = this.states.get(sheetId);
-    if (state && revision > state.persistedRevision) state.persistedRevision = revision;
+    if (!state || state.inFlight || state.timer !== null) return;
+    if (state.retryAttempt >= MAX_RETRY_ATTEMPTS) return;
+    const delay = RETRY_DELAYS_MS[state.retryAttempt] ?? RETRY_DELAYS_MS.at(-1)!;
+    state.retryAttempt += 1;
+    this.armTimer(sheetId, state, task, options, delay);
   }
 
   rebase(
@@ -119,35 +189,36 @@ export class SheetSaveCoordinator {
   ): SheetSnapshotForSave | null {
     const state = this.states.get(sheetId);
     if (!state) return null;
-    const localChunks = serializeSheetChunkSnapshot(state.latestSnapshot.celldata);
-    const localChanges = changedSheetChunks(state.persistedChunks, localChunks);
+    if (state.conflictAttempt >= MAX_CONFLICT_ATTEMPTS) return null;
+
+    const baseCells = cellsFromChunks(state.persistedChunks);
+    const localCells = state.latestCells;
     const remoteCells = new Map(remote.celldata.map((cell) => [`${cell.r},${cell.c}`, cell]));
-    for (const change of localChanges) {
-      for (const [key, cell] of remoteCells) {
-        const row = Math.floor(cell.r / 256);
-        const col = Math.floor(cell.c / 256);
-        if (row === change.chunkRow && col === change.chunkCol) remoteCells.delete(key);
-      }
-      if (change.payload) {
-        const parsed = JSON.parse(change.payload) as { celldata?: FortuneCell[] };
-        for (const cell of parsed.celldata ?? []) remoteCells.set(`${cell.r},${cell.c}`, cell);
-      }
+    const keys = new Set([...baseCells.keys(), ...localCells.keys()]);
+    for (const key of keys) {
+      const baseCell = baseCells.get(key);
+      const localCell = localCells.get(key);
+      if (sameCell(baseCell, localCell)) continue;
+      if (localCell) remoteCells.set(key, localCell);
+      else remoteCells.delete(key);
     }
-    const localConfigChanged =
-      serializeSheetConfig(state.latestSnapshot.config) !== state.persistedConfig;
+
+    const localConfigChanged = serializeSheetConfig(state.latestConfig) !== state.persistedConfig;
     const merged = {
       celldata: [...remoteCells.values()].sort(
         (left, right) => left.r - right.r || left.c - right.c,
       ),
-      config: localConfigChanged ? state.latestSnapshot.config : remote.config,
+      config: localConfigChanged ? state.latestConfig : remote.config,
     };
     state.persistedRevision = revision;
     state.persistedChunks = serializeSheetChunkSnapshot(remote.celldata);
     state.persistedConfig = serializeSheetConfig(remote.config);
-    state.latestSnapshot = merged;
+    state.latestCells = cellsFromCelldata(merged.celldata);
+    state.latestConfig = merged.config;
     state.pendingCells.clear();
     state.pendingConfig = null;
     state.latestVersion += 1;
+    state.conflictAttempt += 1;
     return cloneSnapshot(merged);
   }
 
@@ -159,12 +230,7 @@ export class SheetSaveCoordinator {
   private async flush(
     sheetId: number,
     task: SheetSaveTask,
-    options?: {
-      debounceMs?: number;
-      mutation?: SheetChangeDelta;
-      onSuccess?: (result: SheetSaveResult) => void;
-      onError?: (error: unknown) => void;
-    },
+    options?: SheetSaveOptions,
   ): Promise<void> {
     const state = this.states.get(sheetId);
     if (!state || state.inFlight) return;
@@ -172,7 +238,7 @@ export class SheetSaveCoordinator {
     const version = state.latestVersion;
     const sentCells = new Map(state.pendingCells);
     const sentConfig = state.pendingConfig;
-    const sentConfigValue = sentConfig ? state.latestSnapshot.config : null;
+    const sentConfigValue = sentConfig ? state.latestConfig : null;
     let request: SheetSaveRequest;
     let snapshot: SheetSnapshotForSave | null = null;
 
@@ -188,7 +254,7 @@ export class SheetSaveCoordinator {
         },
       };
     } else {
-      snapshot = cloneSnapshot(state.latestSnapshot);
+      snapshot = snapshotFromCells(state.latestCells, state.latestConfig);
       const chunks = changedSheetChunks(
         state.persistedChunks,
         serializeSheetChunkSnapshot(snapshot.celldata),
@@ -203,6 +269,7 @@ export class SheetSaveCoordinator {
       };
     }
 
+    let retryRequested = false;
     const inFlight = task(request)
       .then((result) => {
         const current = this.states.get(sheetId);
@@ -259,20 +326,31 @@ export class SheetSaveCoordinator {
           }
         }
         current.persistedRevision = result.revision;
+        current.retryAttempt = 0;
+        current.conflictAttempt = 0;
         options?.onSuccess?.(result);
         if (current.latestVersion !== version) {
-          current.timer = setTimeout(() => {
-            current.timer = null;
-            void this.flush(sheetId, task, options);
-          }, options?.debounceMs ?? 500);
+          this.armTimer(sheetId, current, task, options, options?.debounceMs ?? 500);
         }
       })
       .catch((error) => {
-        options?.onError?.(error);
+        let action: SheetSaveErrorAction | undefined;
+        try {
+          action = options?.onError?.(error);
+        } catch (callbackError) {
+          console.error("Sheet save error callback failed", callbackError);
+          action = "retry";
+        }
+        if (action !== "handled" && action !== "stop") {
+          retryRequested = true;
+        }
       })
       .finally(() => {
         const current = this.states.get(sheetId);
-        if (current === state && current.inFlight === inFlight) current.inFlight = null;
+        if (current === state && current.inFlight === inFlight) {
+          current.inFlight = null;
+          if (retryRequested) this.retry(sheetId, task, options);
+        }
       });
     state.inFlight = inFlight;
   }
@@ -282,6 +360,20 @@ export class SheetSaveCoordinator {
       clearTimeout(state.timer);
       state.timer = null;
     }
+  }
+
+  private armTimer(
+    sheetId: number,
+    state: SheetState,
+    task: SheetSaveTask,
+    options: SheetSaveOptions | undefined,
+    delayMs: number,
+  ): void {
+    this.cancelTimer(state);
+    state.timer = setTimeout(() => {
+      state.timer = null;
+      void this.flush(sheetId, task, options);
+    }, delayMs);
   }
 
   private cancel(sheetId: number): void {

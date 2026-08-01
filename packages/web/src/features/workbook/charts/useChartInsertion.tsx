@@ -17,6 +17,20 @@ type Props = {
   mutationPort?: ChartMutationPort;
 };
 
+function sameSelection(
+  left: ReturnType<typeof normalizeChartSelection>,
+  right: ReturnType<typeof normalizeChartSelection>,
+): boolean {
+  if (left === right) return true;
+  if (!left || !right) return false;
+  return (
+    left.startRow === right.startRow &&
+    left.endRow === right.endRow &&
+    left.startCol === right.startCol &&
+    left.endCol === right.endCol
+  );
+}
+
 export function useChartInsertion({
   workspaceId,
   workbook,
@@ -38,8 +52,9 @@ export function useChartInsertion({
   }, [currentSheet?.id]);
 
   const applySelection = useCallback((sheetId: string, nextSelection: FortuneSelection) => {
-    setSelectionSheetId(sheetId);
-    setSelection(normalizeChartSelection(nextSelection));
+    const normalized = normalizeChartSelection(nextSelection);
+    setSelectionSheetId((current) => (current === sheetId ? current : sheetId));
+    setSelection((current) => (sameSelection(current, normalized) ? current : normalized));
   }, []);
 
   const handleSelectionChange = useCallback(

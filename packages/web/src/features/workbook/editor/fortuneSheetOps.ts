@@ -1,5 +1,3 @@
-import { SHEET_CHUNK_COLUMNS, SHEET_CHUNK_ROWS } from "@/features/sync/sheetChunkSnapshot";
-
 export type FortuneSheetOp = {
   op: "replace" | "remove" | "add" | "insertRowCol" | "deleteRowCol" | "addSheet" | "deleteSheet";
   id?: string;
@@ -8,8 +6,8 @@ export type FortuneSheetOp = {
 };
 
 export type FortuneSheetOpHint = {
-  cellKeys: Set<string>;
   requiresSnapshot: boolean;
+  changedCellKeys: Set<string>;
 };
 
 function isCellCoordinate(value: unknown): value is number {
@@ -26,14 +24,17 @@ export function collectFortuneSheetOpHints(
     const sheetId = op.id == null ? activeSheetId : Number(op.id);
     if (!Number.isInteger(sheetId)) continue;
 
-    const hint = hints.get(sheetId) ?? { cellKeys: new Set<string>(), requiresSnapshot: false };
+    const hint = hints.get(sheetId) ?? {
+      requiresSnapshot: false,
+      changedCellKeys: new Set<string>(),
+    };
     const [root, row, col] = op.path;
 
     if (root === "calcChain") continue;
-    if (root === "data" && isCellCoordinate(row) && isCellCoordinate(col)) {
-      hint.cellKeys.add(`${row},${col}`);
-    } else {
+    if (root !== "data" || !isCellCoordinate(row) || !isCellCoordinate(col)) {
       hint.requiresSnapshot = true;
+    } else {
+      hint.changedCellKeys.add(`${row},${col}`);
     }
 
     if (
@@ -49,8 +50,4 @@ export function collectFortuneSheetOpHints(
   }
 
   return hints;
-}
-
-export function chunkKeyForCell(row: number, col: number): string {
-  return `${Math.floor(row / SHEET_CHUNK_ROWS)},${Math.floor(col / SHEET_CHUNK_COLUMNS)}`;
 }

@@ -1,8 +1,8 @@
 import { Workbook } from "@fortune-sheet/react";
-import type { FortuneCell, SheetChangeDelta, SheetConfig } from "@openexcel/core";
 import { useMemo, useRef } from "react";
 import "@fortune-sheet/react/dist/index.css";
 import type { WorkbookFull } from "@/api/workbooks";
+import type { SheetContentChangeHandler } from "@/features/sync/sheetEditorChange";
 import type { WorkbookStructureUpdate } from "@/features/sync/types";
 import { ChartOverlay } from "@/features/workbook/charts/ChartOverlay";
 import type { ChartMutation } from "@/features/workbook/charts/chartMutation";
@@ -75,12 +75,7 @@ interface Props {
   onChartMutation?: (mutation: ChartMutation) => Promise<void> | void;
   onWorkbookMutation?: () => Promise<void> | void;
   onSheetRevisionChanged?: (sheetId: number, revision: number) => void;
-  onSheetContentChanged?: (
-    sheetId: number,
-    celldata: FortuneCell[],
-    config: SheetConfig | null,
-    mutation?: SheetChangeDelta,
-  ) => void;
+  onSheetContentChanged?: SheetContentChangeHandler;
   demoGridFocus?: DemoGridFocus;
 }
 
@@ -113,6 +108,7 @@ export function ExcelGrid({
   const {
     saveStatus,
     workbookRef,
+    liveWorkbook,
     sheetData,
     sessionKey,
     layoutBySheetId,
@@ -152,9 +148,10 @@ export function ExcelGrid({
     sessionKey,
   });
 
+  const renderWorkbook = liveWorkbook ?? workbook;
   const { dialog, handleSelectionChange, toolbarItems } = useChartInsertion({
     workspaceId,
-    workbook,
+    workbook: renderWorkbook,
     workbookRef,
     currentSheetIndex,
     onChartMutation,
@@ -230,7 +227,7 @@ export function ExcelGrid({
               containerRef={gridRootRef}
               layerRef={chartLayerRef}
               workspaceId={workspaceId}
-              workbook={workbook}
+              workbook={renderWorkbook!}
               sheetId={String(currentSheet.id)}
               layout={currentSheetLayout}
               onChartMutation={onChartMutation}

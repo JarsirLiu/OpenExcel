@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { collectFortuneSheetOpHints } from "./fortuneSheetOps";
 
 describe("collectFortuneSheetOpHints", () => {
-  it("collects all changed cells, including formula-dependent cells", () => {
+  it("does not require a snapshot for direct cell operations", () => {
     const hints = collectFortuneSheetOpHints(
       [
         { op: "replace", id: "60", path: ["data", 0, 0, "v"], value: 9 },
@@ -17,8 +17,8 @@ describe("collectFortuneSheetOpHints", () => {
     );
 
     expect(hints.get(60)).toEqual({
-      cellKeys: new Set(["0,0", "0,1"]),
       requiresSnapshot: false,
+      changedCellKeys: new Set(["0,0", "0,1"]),
     });
   });
 

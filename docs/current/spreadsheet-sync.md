@@ -85,13 +85,21 @@ dependencies from a mutation.
 
 - The Web workbook document is the browser's authoritative state for the current workbook.
 - Sheet saves are debounced per Sheet; the current scheduler defaults to 500 ms.
-- Normal Web edits are submitted as `mutation` commands containing only the
-  changed cells reported by FortuneSheet's `onOp`, including formula-dependent
-  cells whose cached values changed. The browser retains the complete current
-  Sheet so FortuneSheet and charts always read one document, while the Server
-  applies those cell patches transactionally to the affected persisted chunks.
-  Bulk or structural operations use `replaceChunks` with only changed 256×256
-  chunks and the current Sheet config.
+- Normal Web edits are submitted as `mutation` commands containing the cell
+  changes found by comparing the post-calculation `onChange` snapshot with the
+  previous editor snapshot. `onOp` supplies changed-cell coordinates and
+  identifies structural or non-cell operations; it is not authoritative for
+  values because FortuneSheet may omit formula-dependent cells from the
+  operation list. The adapter therefore observes the direct cells plus the
+  existing formula cells, so recalculated formula caches are included without
+  scanning or materializing the complete Sheet for ordinary edits. Each
+  changed cell carries its complete FortuneCell value, including formula,
+  cached value, display value, and formatting. Sheet-level configuration changes
+  are included in the same patch when possible. The browser retains the
+  complete current Sheet so FortuneSheet and charts always read one document,
+  while the Server applies those cell patches transactionally to the affected
+  persisted chunks. Bulk or structural operations use `replaceChunks` with
+  only changed 256×256 chunks and the current Sheet config.
 - FortuneSheet is the interactive calculation authority in the browser. Its
   recalculated formula cells, including cached `v`/`m` values and the `f`
   expression, are copied into the browser workbook document before the sparse
@@ -101,8 +109,13 @@ dependencies from a mutation.
   it does not recalculate formulas. After a successful save, the Sheet
   revision advances and a reload reads the persisted formula cache back into
   the browser document.
-- `replaceChunks` rebases local changed chunks after a revision conflict; the
-  server's untouched chunks remain the conflict-free base.
+- Revision conflicts rebase local cell changes against the remote snapshot at
+  cell granularity, preserving remote changes to untouched cells. Structural
+  or large replacement operations remain chunk-based and are retried from the
+  rebased snapshot rather than blindly replacing an entire remote chunk.
+- Failed saves retain their pending batch and retry with bounded exponential
+  backoff. A save callback may explicitly mark a revision conflict as handled
+  while it fetches and rebases the remote Sheet.
 - A revision change cancels pending saves that are no longer applicable.
 - Workbook and Sheet requests use request generations and `AbortController` to ignore stale responses.
 - Workbook switching keeps the old document visible until the new document is ready; on failure, the old document remains usable and retryable.

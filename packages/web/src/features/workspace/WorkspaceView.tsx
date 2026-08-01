@@ -1,6 +1,6 @@
-import type { FortuneCell, SheetChangeDelta, SheetConfig } from "@openexcel/core";
 import { useEffect, useRef } from "react";
 import type { WorkbookFull } from "@/api/workbooks";
+import type { SheetContentChangeHandler } from "@/features/sync/sheetEditorChange";
 import type { WorkbookStructureUpdate } from "@/features/sync/types";
 import type { ChartMutation } from "@/features/workbook/charts/chartMutation";
 import type { DemoGridFocus } from "@/features/workbook/editor/demoGridFocus";
@@ -44,12 +44,7 @@ type Props = {
   onWorkbookMutation?: () => Promise<void> | void;
   onChartMutation?: (mutation: ChartMutation) => Promise<void> | void;
   onSheetRevisionChanged?: (sheetId: number, revision: number) => void;
-  onSheetContentChanged?: (
-    sheetId: number,
-    celldata: FortuneCell[],
-    config: SheetConfig | null,
-    mutation?: SheetChangeDelta,
-  ) => void;
+  onSheetContentChanged?: SheetContentChangeHandler;
   presentationMode?: boolean;
   demoGridFocus?: DemoGridFocus;
 };
