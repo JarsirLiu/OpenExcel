@@ -86,6 +86,47 @@ describe("executeSheetCommand", () => {
     expect(JSON.parse(commitInput.result)).not.toHaveProperty("snapshot");
   });
 
+  it("replaces only submitted chunks and preserves formula cache values", async () => {
+    const result = await executeSheetCommand(3, {
+      kind: "replaceChunks",
+      mutationId: "chunks-1",
+      sheetId: 7,
+      baseRevision: 2,
+      config: null,
+      chunks: [
+        {
+          chunkRow: 0,
+          chunkCol: 0,
+          payload: JSON.stringify({
+            celldata: [
+              { r: 0, c: 0, v: { v: 9, m: "9" } },
+              { r: 0, c: 1, v: { v: 9, m: "9", f: "SUM(A1:A1)" } },
+            ],
+          }),
+        },
+      ],
+    });
+
+    expect(result.result.changeSummary.changedCellCount).toBe(2);
+    expect(mocks.commitSheetCommand).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        chunks: [
+          {
+            chunkRow: 0,
+            chunkCol: 0,
+            payload: JSON.stringify({
+              celldata: [
+                { r: 0, c: 0, v: { v: 9, m: "9" } },
+                { r: 0, c: 1, v: { v: 9, m: "9", f: "=SUM(A1:A1)" } },
+              ],
+            }),
+          },
+        ],
+      }),
+    );
+  });
+
   it("queries a continuous mutation range by chunk row and column bounds", async () => {
     await executeSheetCommand(3, {
       ...command,

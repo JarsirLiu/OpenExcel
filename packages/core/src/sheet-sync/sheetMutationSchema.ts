@@ -31,6 +31,20 @@ export const sheetCommandSchema = z.discriminatedUnion("kind", [
     baseRevision: z.number().int().nonnegative(),
     snapshot: sheetSnapshotSchema,
   }),
+  z.object({
+    kind: z.literal("replaceChunks"),
+    mutationId: z.string().trim().min(1),
+    sheetId: z.number().int().positive(),
+    baseRevision: z.number().int().nonnegative(),
+    config: z.record(z.string(), z.unknown()).nullable(),
+    chunks: z.array(
+      z.object({
+        chunkRow: z.number().int().nonnegative(),
+        chunkCol: z.number().int().nonnegative(),
+        payload: z.string().nullable(),
+      }),
+    ),
+  }),
 ]);
 
 export const sheetCommandResultSchema = z.object({

@@ -257,7 +257,11 @@ describe("applySheetMutation", () => {
       },
     );
 
-    expect(result.snapshot.celldata.map((cell) => cell.v.f)).toEqual(["B2*C2", "B3*C3", "B4*C4"]);
+    expect(result.snapshot.celldata.map((cell) => cell.v.f)).toEqual([
+      "=B2*C2",
+      "=B3*C3",
+      "=B4*C4",
+    ]);
   });
 
   it("applies merge state to both cells and config", () => {

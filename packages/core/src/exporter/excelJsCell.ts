@@ -94,6 +94,11 @@ export function applyFortuneCell(
   value: FortuneCellValue,
 ) {
   const formula = normalizeFortuneFormula(value.f);
-  cell.value = formula ? { formula, result: toFormulaResult(value) } : toScalarValue(value);
+  // ExcelJS accepts formula expressions without the UI-leading '='; the XLSX
+  // writer stores the expression in the standard <f> element and Excel shows
+  // it with '=' when the workbook is opened.
+  cell.value = formula
+    ? { formula: formula.replace(/^=/, ""), result: toFormulaResult(value) }
+    : toScalarValue(value);
   Object.assign(cell.style, toStyle(value));
 }

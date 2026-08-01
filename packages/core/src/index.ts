@@ -108,6 +108,7 @@ export {
   parseWriteRange,
   writeRangeCellCount,
 } from "./chat/writeRange.js";
+export { buildFortuneCalcChain, type FortuneCalcChainItem } from "./excel/calcChain.js";
 export type { FortuneCell, FortuneCellValue } from "./excel/celldataUtils.js";
 export {
   celldataToGrid,
@@ -194,6 +195,7 @@ export {
   summarizeSheetSnapshotChange,
 } from "./sheet-sync/applySheetMutation.js";
 export type {
+  SheetChunkReplacement,
   SheetCommand,
   SheetCommandBase,
   SheetCommandReceipt,

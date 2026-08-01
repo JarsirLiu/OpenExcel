@@ -1,3 +1,4 @@
+import type { FortuneCell, SheetConfig } from "@openexcel/core";
 import { useEffect, useRef } from "react";
 import type { WorkbookFull } from "@/api/workbooks";
 import type { WorkbookStructureUpdate } from "@/features/sync/types";
@@ -43,6 +44,11 @@ type Props = {
   onWorkbookMutation?: () => Promise<void> | void;
   onChartMutation?: (mutation: ChartMutation) => Promise<void> | void;
   onSheetRevisionChanged?: (sheetId: number, revision: number) => void;
+  onSheetContentChanged?: (
+    sheetId: number,
+    celldata: FortuneCell[],
+    config: SheetConfig | null,
+  ) => void;
   presentationMode?: boolean;
   demoGridFocus?: DemoGridFocus;
 };
@@ -73,6 +79,7 @@ export function WorkspaceView({
   onWorkbookMutation,
   onChartMutation,
   onSheetRevisionChanged,
+  onSheetContentChanged,
   presentationMode = false,
   demoGridFocus,
 }: Props) {
@@ -139,6 +146,7 @@ export function WorkspaceView({
           onWorkbookMutation={onWorkbookMutation}
           onChartMutation={onChartMutation}
           onSheetRevisionChanged={onSheetRevisionChanged}
+          onSheetContentChanged={onSheetContentChanged}
           demoGridFocus={demoGridFocus}
         />
         {transition?.status === "loading" && (

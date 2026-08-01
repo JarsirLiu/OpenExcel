@@ -47,6 +47,7 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
     replaceCurrentWorkbook,
     updateCharts,
     updateSheetRevision,
+    updateSheetContent,
     updateWorkbookMetadata,
     loadWorkbook,
     reloadCurrentWorkbook,
@@ -87,6 +88,14 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
   ]);
 
   const sheets = useSheetNavigation(workspaceId, currentWorkbook, loadSheet);
+  const {
+    currentSheetIndex,
+    setCurrentSheetIndex,
+    sheetLoading,
+    sheetLoadError,
+    retryCurrentSheet,
+    loadSheetById,
+  } = sheets;
 
   const invalidateReferenceCache = useCallback(() => {
     setReferenceCacheRevision((revision) => revision + 1);
@@ -177,11 +186,11 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
     const nextId = safeList[workbookIdx]?.id ?? safeList[0]?.id;
     if (nextId != null) {
       requestWorkbookById(nextId);
-      sheets.setCurrentSheetIndex(0);
+      setCurrentSheetIndex(0);
     } else {
       replaceCurrentWorkbook(null);
       clearActiveWorkbook();
-      sheets.setCurrentSheetIndex(0);
+      setCurrentSheetIndex(0);
     }
   }, [
     clearActiveWorkbook,
@@ -191,7 +200,7 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
     reloadCurrentWorkbook,
     replaceCurrentWorkbook,
     requestWorkbookById,
-    sheets,
+    setCurrentSheetIndex,
     workbookIdx,
     workspaceId,
   ]);
@@ -205,7 +214,7 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
         const safeList = await refreshCatalog();
         if (safeList?.some((workbook) => workbook.id === update.workbookId)) {
           requestWorkbookById(update.workbookId);
-          sheets.setCurrentSheetIndex(0);
+          setCurrentSheetIndex(0);
         }
         return;
       }
@@ -216,13 +225,13 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
         sheetIds: loadedSheetIds(workbook),
       });
       if (!nextWorkbook || nextWorkbook.sheets.length === 0) {
-        sheets.setCurrentSheetIndex(0);
+        setCurrentSheetIndex(0);
         return;
       }
 
       if (update.kind === "sheet-deleted") {
         const nextIndex = nextWorkbook.sheets.findIndex((sheet) => sheet.id === update.sheetId);
-        sheets.setCurrentSheetIndex(
+        setCurrentSheetIndex(
           nextIndex >= 0
             ? nextIndex
             : getSheetIndexAfterDeletion(update.order, nextWorkbook.sheets.length),
@@ -231,7 +240,7 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
       }
 
       const nextIndex = nextWorkbook.sheets.findIndex((sheet) => sheet.id === update.sheetId);
-      sheets.setCurrentSheetIndex(
+      setCurrentSheetIndex(
         nextIndex >= 0 ? nextIndex : normalizeSheetIndex(update.order, nextWorkbook.sheets.length),
       );
     },
@@ -241,7 +250,7 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
       refreshCatalog,
       reloadCurrentWorkbook,
       requestWorkbookById,
-      sheets,
+      setCurrentSheetIndex,
       workspaceId,
     ],
   );
@@ -270,7 +279,7 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
         const lastResult = imported.results[imported.results.length - 1];
         if (lastResult) {
           requestWorkbookById(lastResult.id);
-          sheets.setCurrentSheetIndex(0);
+          setCurrentSheetIndex(0);
         }
         if (imported.error) {
           const progress =
@@ -318,7 +327,13 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
         return false;
       }
     },
-    [importWorkbooksInCatalog, invalidateReferenceCache, requestWorkbookById, sheets, workspaceId],
+    [
+      importWorkbooksInCatalog,
+      invalidateReferenceCache,
+      requestWorkbookById,
+      setCurrentSheetIndex,
+      workspaceId,
+    ],
   );
 
   const handleWorkbookDelete = useCallback(
@@ -332,7 +347,7 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
           const next = mutation.workbooks[0];
           if (next) {
             requestWorkbookById(next.id);
-            sheets.setCurrentSheetIndex(0);
+            setCurrentSheetIndex(0);
           } else {
             replaceCurrentWorkbook(null);
             clearActiveWorkbook();
@@ -354,7 +369,7 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
       invalidateReferenceCache,
       replaceCurrentWorkbook,
       requestWorkbookById,
-      sheets,
+      setCurrentSheetIndex,
       workspaceId,
     ],
   );
@@ -367,7 +382,7 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
         if (!mutation) return;
         invalidateReferenceCache();
         requestWorkbookById(mutation.result.id);
-        sheets.setCurrentSheetIndex(0);
+        setCurrentSheetIndex(0);
         toast({ message: t("workbook_created"), variant: "success" });
       } catch (error) {
         toast({
@@ -376,7 +391,13 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
         });
       }
     },
-    [createWorkbookInCatalog, invalidateReferenceCache, requestWorkbookById, sheets, workspaceId],
+    [
+      createWorkbookInCatalog,
+      invalidateReferenceCache,
+      requestWorkbookById,
+      setCurrentSheetIndex,
+      workspaceId,
+    ],
   );
 
   const handleWorkbookRename = useCallback(
@@ -414,14 +435,15 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
     loading,
     transition,
     retryWorkbookTransition: retryTransition,
-    currentSheetIndex: sheets.currentSheetIndex,
-    setCurrentSheetIndex: sheets.setCurrentSheetIndex,
-    sheetLoading: sheets.sheetLoading,
-    sheetLoadError: sheets.sheetLoadError,
-    retryCurrentSheet: sheets.retryCurrentSheet,
-    loadSheetById: sheets.loadSheetById,
+    currentSheetIndex,
+    setCurrentSheetIndex,
+    sheetLoading,
+    sheetLoadError,
+    retryCurrentSheet,
+    loadSheetById,
     handleSheetChanged,
     handleSheetRevisionChanged,
+    handleSheetContentChanged: updateSheetContent,
     handleWorkbookStructureChanged,
     handleWorkbookRefresh: refreshCurrentWorkbook,
     handleChartsRefresh: refreshCurrentCharts,

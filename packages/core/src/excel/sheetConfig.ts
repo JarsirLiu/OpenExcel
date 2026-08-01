@@ -1,3 +1,4 @@
+import type { FortuneCalcChainItem } from "./calcChain.js";
 import type { FortuneCell } from "./celldataUtils.js";
 
 export type { FortuneCell };
@@ -31,7 +32,6 @@ export interface SheetConfig {
   images?: any[];
   dataVerification?: any;
   hyperlink?: Record<string, any>;
-  calcChain?: any[];
   luckysheet_conditionformat_save?: any[];
   luckysheet_alternateformat_save?: any[];
   chart?: any[];
@@ -66,13 +66,13 @@ export interface FortuneSheetData {
   images?: any[];
   dataVerification?: any;
   hyperlink?: Record<string, any>;
-  calcChain?: any[];
   luckysheet_conditionformat_save?: any[];
   luckysheet_alternateformat_save?: any[];
   chart?: any[];
   isPivotTable?: boolean;
   pivotTable?: any;
   hide?: number;
+  calcChain?: FortuneCalcChainItem[];
 }
 
 const CONFIG_KEYS: (keyof SheetConfig)[] = [
@@ -95,7 +95,6 @@ const CONFIG_KEYS: (keyof SheetConfig)[] = [
   "images",
   "dataVerification",
   "hyperlink",
-  "calcChain",
   "luckysheet_conditionformat_save",
   "luckysheet_alternateformat_save",
   "chart",

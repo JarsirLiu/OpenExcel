@@ -33,6 +33,12 @@ Web API client -> Server resource access -> application service
   -> Web workbook document / FortuneSheet adapter
 ```
 
+For an active workbook, the Web workbook document is the single current-data
+source for the editor and charts. FortuneSheet is an integration adapter and
+the browser calculation authority; ordinary edits update the document without
+recreating the FortuneSheet instance. Persistence is coordinated separately
+by the per-Sheet save coordinator.
+
 The Server passes uploaded Excel files to Core for import and stores the raw
 file as an `UploadAsset`. Structured workbook and Sheet data is persisted in
 the database. The Server calls Core to generate XLSX exports.

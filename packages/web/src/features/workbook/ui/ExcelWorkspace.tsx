@@ -1,3 +1,4 @@
+import type { FortuneCell, SheetConfig } from "@openexcel/core";
 import type { WorkbookFull } from "@/api/workbooks";
 import type { WorkbookStructureUpdate } from "@/features/sync/types";
 import type { ChartMutation } from "@/features/workbook/charts/chartMutation";
@@ -21,6 +22,11 @@ interface Props {
   onChartMutation?: (mutation: ChartMutation) => Promise<void> | void;
   onWorkbookMutation?: () => Promise<void> | void;
   onSheetRevisionChanged?: (sheetId: number, revision: number) => void;
+  onSheetContentChanged?: (
+    sheetId: number,
+    celldata: FortuneCell[],
+    config: SheetConfig | null,
+  ) => void;
   demoGridFocus?: DemoGridFocus;
 }
 
@@ -40,6 +46,7 @@ export function ExcelWorkspace({
   onChartMutation,
   onWorkbookMutation,
   onSheetRevisionChanged,
+  onSheetContentChanged,
   demoGridFocus,
 }: Props) {
   return (
@@ -61,6 +68,7 @@ export function ExcelWorkspace({
           onChartMutation={onChartMutation}
           onWorkbookMutation={onWorkbookMutation}
           onSheetRevisionChanged={onSheetRevisionChanged}
+          onSheetContentChanged={onSheetContentChanged}
           demoGridFocus={demoGridFocus}
         />
       </div>

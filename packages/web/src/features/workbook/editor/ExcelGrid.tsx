@@ -1,4 +1,5 @@
 import { Workbook } from "@fortune-sheet/react";
+import type { FortuneCell, SheetConfig } from "@openexcel/core";
 import { useMemo, useRef } from "react";
 import "@fortune-sheet/react/dist/index.css";
 import type { WorkbookFull } from "@/api/workbooks";
@@ -74,6 +75,11 @@ interface Props {
   onChartMutation?: (mutation: ChartMutation) => Promise<void> | void;
   onWorkbookMutation?: () => Promise<void> | void;
   onSheetRevisionChanged?: (sheetId: number, revision: number) => void;
+  onSheetContentChanged?: (
+    sheetId: number,
+    celldata: FortuneCell[],
+    config: SheetConfig | null,
+  ) => void;
   demoGridFocus?: DemoGridFocus;
 }
 
@@ -93,6 +99,7 @@ export function ExcelGrid({
   onChartMutation,
   onWorkbookMutation,
   onSheetRevisionChanged,
+  onSheetContentChanged,
   demoGridFocus,
 }: Props) {
   const gridRootRef = useRef<HTMLDivElement>(null);
@@ -125,6 +132,7 @@ export function ExcelGrid({
     onWorkbookRefresh,
     onWorkbookMutation,
     onSheetRevisionChanged,
+    onSheetContentChanged,
     sheetLoaded,
   });
   useFortuneSheetFilterMenu(gridRootRef, workbook !== null);

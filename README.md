@@ -1,28 +1,72 @@
 # OpenExcel
 
-OpenExcel 是一个基于 React、Fastify、Prisma 和 AI SDK 的多工作表 Excel 工作台，支持工作区、工作簿、表格编辑和 AI 对话式操作。
+<p align="center">
+  <img src="docs/assets/openexcel-logo.svg" alt="OpenExcel logo" width="112" />
+</p>
 
-## 环境要求
+<p align="center"><strong>AI-native spreadsheet workbench for importing, editing, charting, and formula-driven workflows.</strong></p>
 
-- Node.js 22+
-- pnpm 10.20.0
-- Docker Engine 及 Docker Compose（使用 Docker 部署时）
+<p align="center"><a href="README.zh-CN.md">中文</a> · <a href="https://github.com/JarsirLiu/OpenExcel">GitHub</a> · <a href="https://github.com/JarsirLiu/OpenExcel/issues">Issues</a></p>
 
-## 配置环境变量
+<p align="center">
+  <a href="https://github.com/JarsirLiu/OpenExcel/actions/workflows/ci.yml"><img src="https://github.com/JarsirLiu/OpenExcel/actions/workflows/ci.yml/badge.svg" alt="CI status" /></a>
+  <img src="https://img.shields.io/badge/version-0.1.0-5b8def.svg" alt="Version 0.1.0" />
+  <a href="https://github.com/JarsirLiu/OpenExcel/stargazers"><img src="https://img.shields.io/github/stars/JarsirLiu/OpenExcel?style=flat" alt="GitHub stars" /></a>
+  <img src="https://img.shields.io/badge/contributions-welcome-2ea44f.svg" alt="Contributions welcome" />
+  <img src="https://img.shields.io/badge/license-not%20published-lightgrey.svg" alt="License not published" />
+</p>
 
-复制示例文件：
+<!-- After recording the real product tour, uncomment this block:
+<p align="center">
+  <img src="docs/assets/openexcel-demo.gif" alt="OpenExcel product tour" width="900" />
+</p>
+-->
 
-```bash
-cp .env.example .env
+OpenExcel keeps the spreadsheet grid people already know and adds an AI workspace beside it. Import a workbook, describe the change in natural language, review the result, and export the workbook when it is ready.
+
+> Early-stage project: the current repository is actively evolving. The capabilities below are based on the current code and replay demos, not a future product plan.
+
+## What it does today
+
+| Workflow | Current capability |
+| --- | --- |
+| Workspaces | Create and manage workspaces, workbooks, and sessions |
+| Excel files | Import supported XLSX/XLS/CSV content and export XLSX workbooks |
+| Spreadsheet editing | Read, write, clear, and inspect cell ranges with formula-aware operations |
+| Charts | Create, list, update, delete, and render persisted charts |
+| AI interaction | Ask for workbook changes through a natural-language chat loop |
+| Safe review | Show tool progress, bounded previews, structured failures, and undo checkpoints |
+| Product demos | Browse read-only replay scenarios from the built-in Examples catalog |
+
+Example request:
+
+```text
+Create a monthly sales chart from the Sales sheet and add a margin formula for each row.
 ```
 
-Windows PowerShell：
+The AI can translate that intent into spreadsheet and chart operations. You still own the final review before exporting or sharing the workbook.
+
+## Why OpenExcel
+
+| Manual spreadsheet workflow | OpenExcel workflow |
+| --- | --- |
+| Search for the right sheet and range | Ask for the outcome in plain language |
+| Hand-write repeated formulas | Generate a relative formula pattern across a range |
+| Build a chart through several dialogs | Describe the chart and its source range |
+| Recheck every changed cell manually | Review bounded change previews and tool results |
+| Keep the workbook and explanation separate | Keep the workbook and AI conversation in one workspace |
+
+## Quick start: local development
+
+Requirements: Node.js 22+, pnpm 10.20.0, and an OpenAI-compatible model API endpoint.
 
 ```powershell
-Copy-Item .env.example .env
+pnpm install
+cp .env.example .env
+pnpm dev
 ```
 
-编辑 `.env`：
+Set these values in `.env` before using chat or AI title generation:
 
 ```env
 MODEL_BASE_URL=https://your-model-endpoint.example/v1
@@ -30,105 +74,107 @@ MODEL_API_KEY=your-api-key
 MODEL_NAME=your-model-name
 ```
 
-模型配置是必需的。服务端启动后第一次执行对话或生成标题时，会校验这三个变量。
+Open:
 
-数据库默认使用 SQLite：
+- Web app: `http://localhost:5173`
+- API: `http://localhost:4000`
+- Health check: `http://localhost:4000/api/health`
+- Built-in examples: `http://localhost:5173/demos`
 
-```env
-DATABASE_PROVIDER=sqlite
-```
+## Local production-like run
 
-SQLite 的数据库文件默认位于项目根目录的 `.data/openexcel.db`。Docker Compose 会将同名数据库保存在 `/app/.data/openexcel.db`，并通过 volume 持久化。
+There are two different meanings of “local production” in this repository:
 
-如果切换到 PostgreSQL，再配置对应的连接串：
+1. `pnpm dev` runs Vite and the Fastify server separately with a development proxy.
+2. Docker Compose runs the built Web app and the Fastify server together, with SQLite and persistent storage.
 
-```env
-DATABASE_PROVIDER=postgresql
-DATABASE_URL=postgresql://user:password@db-host:5432/openexcel
-```
+The recommended production-like local run is:
 
-## 本地启动
-
-安装依赖：
-
-```bash
-pnpm install
-```
-
-首次安装或更新 Prisma schema 后，准备 Prisma Client 和数据库：
-
-```bash
-pnpm db:prepare
-```
-
-启动 Web 和 Server：
-
-```bash
-pnpm dev
-```
-
-默认地址：
-
-- Web：`http://localhost:5173`
-- API：`http://localhost:4000`
-- 健康检查：`http://localhost:4000/api/health`
-
-Vite 会把 `/api` 请求代理到 `http://127.0.0.1:4000`。`pnpm dev` 会先执行数据库迁移，然后启动 Web 和 Server；不会重复生成 Prisma Client。首次安装或 schema 变更后，先执行 `pnpm db:prepare` 生成客户端并完成迁移。
-
-## 常用命令
-
-```bash
-pnpm build          # 构建 Web 前端
-pnpm typecheck      # 全仓 TypeScript 检查
-pnpm test           # 全部测试
-pnpm test:server    # Server 测试
-pnpm test:web       # Web 测试
-pnpm db:prepare     # 生成 Prisma Client 并执行数据库迁移
-pnpm db:generate    # 只生成 Prisma Client
-pnpm db:migrate     # 执行数据库迁移
-```
-
-## Docker 部署
-
-完整的镜像发布和服务器部署流程见 [Docker deployment guide](docs/current/docker-deployment.md)。
-
-复制 `.env.example` 并填写模型配置：
-
-```bash
+```powershell
 cp .env.example .env
-vim .env
-```
-
-构建镜像：
-
-```bash
-docker build -t openexcel:local .
-```
-
-启动容器：
-
-```bash
-docker compose up -d
-```
-
-镜像构建阶段会生成 Prisma Client，容器启动阶段会自动执行数据库迁移；不需要在服务器上手动运行迁移命令。容器内的数据路径固定为
-`/app/.data/openexcel.db` 和 `/app/.data/storage`，两者都由 `openexcel-data` volume 持久化，不依赖容器启动时的工作目录。
-
-查看状态和日志：
-
-```bash
+docker compose up -d --build
 docker compose ps
-docker compose logs -f server
 ```
 
-健康检查：
+Then open `http://127.0.0.1:4000`. The container serves the built frontend from Fastify, runs database migrations at startup, and persists SQLite data and uploaded files in the `openexcel-data` volume.
+
+For a non-Docker smoke test:
 
 ```bash
-curl http://127.0.0.1:4000/api/health
+pnpm prod
 ```
 
-SQLite 数据保存在 Docker volume `openexcel-data` 中。删除容器不会删除该 volume；不要执行 `docker compose down -v`，除非确认要删除数据库。
+`pnpm preview` is only a Vite frontend preview. It is not a complete production run because it does not start the API server or database.
 
-## Git 提交检查
+See [docs/current/docker-deployment.md](docs/current/docker-deployment.md) for image publishing, PostgreSQL notes, backups, and server deployment.
 
-提交时 Husky 会执行 lint-staged、类型检查和 commitlint。Git 客户端或 IDE 启动提交时，需要让它继承 Node.js 和 pnpm 的 PATH；项目 hook 不依赖固定的 Node.js 安装目录。也可以先执行 `corepack enable` 启用项目使用的 pnpm。
+## Common commands
+
+```bash
+pnpm dev          # Start Web + Server in development mode
+pnpm prod         # Build Web, prepare the database, and start the server
+pnpm build        # Build the Web app
+pnpm typecheck    # Typecheck all packages
+pnpm test         # Run the test suites
+pnpm test:web     # Run Web tests
+pnpm test:server  # Run Server tests
+pnpm test:core    # Run Core tests
+pnpm db:prepare   # Generate Prisma Client and apply migrations
+```
+
+## Architecture
+
+```text
+Web (React/Vite)
+       │ HTTP + NDJSON event stream
+       ▼
+Server (Fastify + Prisma) ───► SQLite / PostgreSQL
+       │ concrete workbook, sheet, and chart tools
+       ▼
+Agent runtime (model loop, events, retries, context)
+       │
+       ▼
+Core (Excel import/export, sheet mutations, chart contracts)
+```
+
+The monorepo packages are intentionally separated:
+
+- `packages/web` owns the browser UI, editor, charts, chat, and user interaction.
+- `packages/server` owns HTTP, authorization, persistence, sessions, and concrete tool execution.
+- `packages/agent` owns the model loop, context, events, retries, and tool adaptation.
+- `packages/core` owns spreadsheet primitives, Excel conversion, chart models, and tool contracts.
+
+## Recording the README demo
+
+Add your real 10–15 second recording at `docs/assets/openexcel-demo.gif`, then uncomment the image block near the top of this file.
+
+Recommended story:
+
+1. Import an Excel workbook.
+2. Ask: “Create a monthly chart and fill the margin formula for each row.”
+3. Show the changed chart, formula preview, and export action.
+
+Keep the cursor visible, use a realistic workbook, and finish on the result rather than on the prompt. This is the most important asset for converting README visitors into users.
+
+## Roadmap
+
+This is a proposed public roadmap, not a description of already-implemented behavior:
+
+- [x] Workspaces, workbooks, sheets, import/export, charts, and AI chat loop
+- [x] Read-only replay examples for product discovery
+- [x] Docker-based local production profile
+- [ ] Replace the placeholder with a real end-to-end capture
+- [ ] Add a repository license and publish a first stable release
+- [ ] Add measured workflow benchmarks instead of illustrative time savings
+- [ ] Document production hardening, backups, observability, and deployment profiles
+- [ ] Improve multi-instance deployment guidance for PostgreSQL
+
+## Contributing
+
+Issues and pull requests are welcome. Before changing code, read [docs/README.md](docs/README.md), the relevant `docs/current/` and `docs/rules/` files, and the nearest package `AGENTS.md`.
+
+Use Conventional Commits, keep tests next to the behavior they protect, and run `pnpm check` plus the affected test suite before opening a pull request.
+
+## License
+
+No license file has been published yet. Until a license is added, do not assume that the repository grants permission to redistribute or use the code commercially.

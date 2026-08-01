@@ -180,7 +180,7 @@ export function normalizeFortuneFormula(formula?: unknown): string | undefined {
   if (typeof formula !== "string") return undefined;
   const trimmed = formula.trim();
   if (!trimmed) return undefined;
-  return trimmed.replace(/^=/, "");
+  return `=${trimmed.replace(/^=/, "")}`;
 }
 
 function cellTypeOf(value: FortuneCellValue): string | undefined {

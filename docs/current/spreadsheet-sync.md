@@ -24,6 +24,7 @@ algorithms.
 
 - `mutation`: applies a local `SheetMutation`.
 - `replaceSnapshot`: replaces a complete sparse `SheetSnapshot`.
+- `replaceChunks`: replaces only the submitted SheetChunk payloads and config.
 
 Both carry `mutationId`, `sheetId`, and `baseRevision`. Core owns pure
 transformation. The Server owns workspace scope, transactions, revisions, and
@@ -76,14 +77,29 @@ dependencies from a mutation.
 - `packages/core/src/chat/sheetCoordinates.ts` and `packages/core/src/chat/sheetGeometry.ts` are the conversion boundary.
 - `SheetChunk` is the only persisted Sheet content source. API `uploadedData` and `merges` fields are derived views assembled from chunks; `dateValues` is a derived projection for `readSheetData`. Content reads require the chunk relation explicitly; missing or malformed chunk/config payloads fail instead of being treated as an empty Sheet.
 - Chart data references and placement belong to `ChartSpec` and must not be implicitly changed by ordinary Sheet content writes.
+- Internal FortuneCell formulas always use a leading `=`. `calcChain` is a
+  runtime-derived editor cache rebuilt from the actual Sheet id and current
+  formula cells; persisted legacy chain entries are not authoritative.
 
 ## Web synchronization behavior
 
 - The Web workbook document is the browser's authoritative state for the current workbook.
 - Sheet saves are debounced per Sheet; the current scheduler defaults to 500 ms.
-- Normal Web edits are submitted as sparse `patch` mutations containing only
-  changed cells and changed sheet config. The Web does not submit a complete
-  Sheet snapshot for an ordinary edit.
+- Normal Web edits are submitted as `replaceChunks` commands containing only
+  changed 256×256 chunks and the current Sheet config. The browser retains the
+  complete current Sheet so FortuneSheet and charts always read one document,
+  while the transport and database update only changed chunks.
+- FortuneSheet is the interactive calculation authority in the browser. Its
+  recalculated formula cells, including cached `v`/`m` values and the `f`
+  expression, are copied into the browser workbook document before the sparse
+  mutation is scheduled. Charts read that current document data and therefore
+  update without waiting for the Server.
+- The Server persists the browser-submitted recalculated cells transactionally;
+  it does not recalculate formulas. After a successful save, the Sheet
+  revision advances and a reload reads the persisted formula cache back into
+  the browser document.
+- `replaceChunks` rebases local changed chunks after a revision conflict; the
+  server's untouched chunks remain the conflict-free base.
 - A revision change cancels pending saves that are no longer applicable.
 - Workbook and Sheet requests use request generations and `AbortController` to ignore stale responses.
 - Workbook switching keeps the old document visible until the new document is ready; on failure, the old document remains usable and retryable.
@@ -94,5 +110,6 @@ dependencies from a mutation.
 - Core mutation: `packages/core/src/sheet-sync/applySheetMutation.ts`
 - Server application: `packages/server/src/modules/sheets/application/executeSheetCommand.ts`
 - Server receipt: `packages/server/src/modules/sheets/infrastructure/sheetMutationReceiptRepository.ts`
-- Web queue: `packages/web/src/features/sync/sheetSaveQueue.ts`
-- Web scheduler: `packages/web/src/features/sync/sheetSaveScheduler.ts`
+- Web document/chunk serializer: `packages/web/src/features/sync/sheetChunkSnapshot.ts`
+- Web save coordinator: `packages/web/src/features/sync/sheetSaveCoordinator.ts`
+- Historical formula repair: `pnpm --filter @openexcel/server db:repair-formulas`

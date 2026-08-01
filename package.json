@@ -8,6 +8,8 @@
   "scripts": {
     "dev": "pnpm db:prepare && concurrently --raw --kill-others-on-fail \"pnpm --filter @openexcel/server dev\" \"wait-on http://127.0.0.1:4000/api/health && pnpm --filter @openexcel/web dev\"",
     "build": "pnpm --filter @openexcel/web build",
+    "start": "pnpm --filter @openexcel/server db:prepare && pnpm --filter @openexcel/server start",
+    "prod": "pnpm build && pnpm start",
     "preview": "pnpm --filter @openexcel/web preview",
     "test": "pnpm --recursive --workspace-concurrency=1 --filter @openexcel/agent --filter @openexcel/core --filter @openexcel/server --filter @openexcel/web test",
     "test:core": "pnpm --filter @openexcel/core test",

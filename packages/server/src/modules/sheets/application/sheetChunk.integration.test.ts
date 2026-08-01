@@ -217,12 +217,44 @@ describe("SheetChunk persistence (SQLite)", () => {
     await expect(database.prisma.sheetChunk.count({ where: { sheetId } })).resolves.toBe(2);
   });
 
+  it("replaces one chunk while preserving recalculated formula cache values", async () => {
+    const result = await executeSheetCommand(workspaceId, {
+      kind: "replaceChunks",
+      mutationId: "chunk-replace-changed-1",
+      sheetId,
+      baseRevision: 7,
+      config: null,
+      chunks: [
+        {
+          chunkRow: 0,
+          chunkCol: 0,
+          payload: JSON.stringify({
+            celldata: [
+              { r: 0, c: 0, v: { v: 9, m: "9" } },
+              { r: 0, c: 1, v: { v: 9, m: "9", f: "=SUM(A1:A1)" } },
+            ],
+          }),
+        },
+      ],
+    });
+
+    expect(result.result.revision).toBe(8);
+    const chunk = await database.prisma.sheetChunk.findUnique({
+      where: { sheetId_chunkRow_chunkCol: { sheetId, chunkRow: 0, chunkCol: 0 } },
+    });
+    expect(JSON.parse(chunk!.payload).celldata[1].v).toMatchObject({
+      v: 9,
+      m: "9",
+      f: "=SUM(A1:A1)",
+    });
+  });
+
   it("clears a huge sparse range without walking empty coordinates", async () => {
     const result = await executeSheetCommand(workspaceId, {
       kind: "mutation",
       mutationId: "chunk-clear-large-1",
       sheetId,
-      baseRevision: 7,
+      baseRevision: 8,
       mutation: {
         type: "clear",
         operations: [
@@ -231,7 +263,7 @@ describe("SheetChunk persistence (SQLite)", () => {
       },
     });
 
-    expect(result.result.revision).toBe(8);
+    expect(result.result.revision).toBe(9);
     const remainingChunks = await database.prisma.sheetChunk.findMany({ where: { sheetId } });
     expect(remainingChunks).toHaveLength(1);
     expect(JSON.parse(remainingChunks[0]!.payload).celldata).toEqual([

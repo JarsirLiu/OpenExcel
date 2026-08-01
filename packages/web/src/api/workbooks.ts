@@ -300,9 +300,16 @@ export async function executeSheetCommand(
     },
     body: encoded.body,
   });
-  if (res.status === 409) throw new Error("Sheet 已被其他操作修改，请刷新后重试");
+  if (res.status === 409) throw new SheetRevisionConflictError(command.sheetId);
   if (!res.ok) throw new Error("保存失败");
   return res.json();
+}
+
+export class SheetRevisionConflictError extends Error {
+  constructor(readonly sheetId: number) {
+    super("Sheet 已被其他操作修改");
+    this.name = "SheetRevisionConflictError";
+  }
 }
 
 export async function updateSheetName(

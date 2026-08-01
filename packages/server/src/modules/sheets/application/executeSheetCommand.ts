@@ -2,6 +2,7 @@ import {
   applySheetMutation,
   cloneSheetSnapshot,
   normalizeFortuneCellData,
+  normalizeFortuneCellValue,
   type SheetCommand,
   type SheetCommandReceipt,
   type SheetCommandResult,
@@ -14,6 +15,7 @@ import { prisma } from "../../../infra/database/db.js";
 import type { Prisma } from "../../../infra/database/prismaTypes.js";
 import {
   mutationChunkRanges,
+  parseSheetChunkPayload,
   type SheetChunkRange,
   serializeSheetChunks,
   snapshotFromSheetChunks,
@@ -114,6 +116,69 @@ function chunkUpdatesForSnapshot(
   return [...updatesByKey.values()];
 }
 
+function chunkCoordinate(row: number, col: number) {
+  return { chunkRow: Math.floor(row / 256), chunkCol: Math.floor(col / 256) };
+}
+
+function normalizeChunkCells(celldata: ReturnType<typeof parseSheetChunkPayload>) {
+  return celldata.map((cell) => ({
+    ...cell,
+    v: normalizeFortuneCellValue(cell.v),
+  }));
+}
+
+function replaceChunksInSnapshot(
+  current: SheetSnapshot,
+  command: Extract<SheetCommand, { kind: "replaceChunks" }>,
+): {
+  snapshot: SheetSnapshot;
+  chunks: Array<{ chunkRow: number; chunkCol: number; payload: string | null }>;
+} {
+  const cells = new Map(current.celldata.map((cell) => [`${cell.r},${cell.c}`, cell]));
+  const chunks: Array<{ chunkRow: number; chunkCol: number; payload: string | null }> = [];
+
+  for (const replacement of command.chunks) {
+    for (const [key, cell] of cells) {
+      const coordinate = chunkCoordinate(cell.r, cell.c);
+      if (
+        coordinate.chunkRow === replacement.chunkRow &&
+        coordinate.chunkCol === replacement.chunkCol
+      ) {
+        cells.delete(key);
+      }
+    }
+
+    if (replacement.payload === null) {
+      chunks.push(replacement);
+      continue;
+    }
+
+    const normalized = normalizeChunkCells(parseSheetChunkPayload(replacement.payload));
+    for (const cell of normalized) {
+      const coordinate = chunkCoordinate(cell.r, cell.c);
+      if (
+        coordinate.chunkRow !== replacement.chunkRow ||
+        coordinate.chunkCol !== replacement.chunkCol
+      ) {
+        throw new Error("Sheet chunk payload contains a cell outside its coordinate");
+      }
+      cells.set(`${cell.r},${cell.c}`, cell);
+    }
+    chunks.push({
+      ...replacement,
+      payload: JSON.stringify({ celldata: normalized }),
+    });
+  }
+
+  return {
+    snapshot: {
+      celldata: [...cells.values()].sort((left, right) => left.r - right.r || left.c - right.c),
+      config: command.config,
+    },
+    chunks,
+  };
+}
+
 function resultFromReceipt(receipt: StoredCommandResult): SheetCommandExecution {
   return {
     result: { ...receipt, snapshot: null },
@@ -147,7 +212,10 @@ function receiptFromResult(result: SheetCommandResult): StoredCommandResult {
   return receipt;
 }
 
-function applyCommand(current: SheetSnapshot, command: SheetCommand) {
+function applyCommand(
+  current: SheetSnapshot,
+  command: Extract<SheetCommand, { kind: "mutation" | "replaceSnapshot" }>,
+) {
   return command.kind === "mutation"
     ? applySheetMutation(current, command.mutation)
     : {
@@ -206,7 +274,7 @@ export async function executeSheetCommandInTransaction(
       storedChunks,
       command.mutation.type === "clear" || command.mutation.type === "unmerge",
     );
-  } else {
+  } else if (command.kind === "replaceSnapshot") {
     const storedChunks = await tx.sheetChunk.findMany({ where: { sheetId: command.sheetId } });
     const current = snapshotFromSheetChunks(storedChunks, parseConfig(sheet.config));
     applied = applyCommand(current, command);
@@ -215,6 +283,16 @@ export async function executeSheetCommandInTransaction(
       payload: chunk.payload,
     }));
     replaceAllChunks = true;
+  } else {
+    const storedChunks = await tx.sheetChunk.findMany({ where: { sheetId: command.sheetId } });
+    const current = snapshotFromSheetChunks(storedChunks, parseConfig(sheet.config));
+    const replaced = replaceChunksInSnapshot(current, command);
+    applied = {
+      snapshot: replaced.snapshot,
+      mutation: null,
+      changeSummary: summarizeSheetSnapshotChange(current, replaced.snapshot, 0),
+    };
+    chunks = replaced.chunks;
   }
   const revision = command.baseRevision + 1;
   const result = commandResult(command, revision, applied.snapshot, applied.changeSummary);

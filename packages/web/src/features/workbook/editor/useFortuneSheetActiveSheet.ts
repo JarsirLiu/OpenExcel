@@ -35,6 +35,8 @@ export function useFortuneSheetActiveSheet({
   currentSheetIndex,
   onSheetIndexChange,
 }: Props) {
+  const sheetIdentityKey = workbook?.sheets.map((sheet) => `${sheet.id}:${sheet.name}`).join("|");
+
   useEffect(() => {
     const root = containerRef.current;
     if (!root || !workbook || !onSheetIndexChange) return;
@@ -65,5 +67,5 @@ export function useFortuneSheetActiveSheet({
       observer.disconnect();
       root.removeEventListener("click", syncActiveSheet, true);
     };
-  }, [containerRef, currentSheetIndex, onSheetIndexChange, workbook]);
+  }, [containerRef, currentSheetIndex, onSheetIndexChange, sheetIdentityKey]);
 }

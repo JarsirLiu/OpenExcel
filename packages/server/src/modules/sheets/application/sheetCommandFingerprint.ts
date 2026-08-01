@@ -26,12 +26,20 @@ export function sheetCommandFingerprint(command: SheetCommand): string {
           sheetId: command.sheetId,
           mutation: command.mutation,
         }
-      : {
-          kind: command.kind,
-          mutationId: command.mutationId,
-          sheetId: command.sheetId,
-          snapshot: command.snapshot,
-        };
+      : command.kind === "replaceSnapshot"
+        ? {
+            kind: command.kind,
+            mutationId: command.mutationId,
+            sheetId: command.sheetId,
+            snapshot: command.snapshot,
+          }
+        : {
+            kind: command.kind,
+            mutationId: command.mutationId,
+            sheetId: command.sheetId,
+            config: command.config,
+            chunks: command.chunks,
+          };
 
   return createHash("sha256").update(canonicalJson(identity), "utf8").digest("hex");
 }

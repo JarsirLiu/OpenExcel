@@ -1,5 +1,6 @@
 import type { FortuneCell, FortuneSheetData, SheetConfig } from "@openexcel/core";
 import {
+  buildFortuneCalcChain,
   extractMergesFromCelldata,
   isCelldata,
   normalizeFortuneCellData,
@@ -40,6 +41,8 @@ export function toFortuneSheetData(sheet: {
   if (sheet.config && typeof sheet.config === "object") {
     restoreSheetConfig(result, sheet.config as SheetConfig);
   }
+
+  result.calcChain = buildFortuneCalcChain(celldata, result.id);
 
   return result;
 }

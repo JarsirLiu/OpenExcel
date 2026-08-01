@@ -303,7 +303,7 @@ describe("parseSpreadsheetFile", () => {
     expect(cells.get(0)).toMatchObject({ v: 1234.5, m: "$1,234.50" });
     expect(cells.get(1)).toMatchObject({ v: 0.125, m: "12.5%" });
     expect(cells.get(2)).toMatchObject({ v: 1234567.89, m: "1,234,567.89" });
-    expect(cells.get(3)).toMatchObject({ v: 2, m: "2.00", f: "1+1" });
+    expect(cells.get(3)).toMatchObject({ v: 2, m: "2.00", f: "=1+1" });
     expect(cells.get(4)).toMatchObject({ v: true, m: "TRUE", ct: { t: "b" } });
     expect(cells.get(5)).toMatchObject({ v: false, m: "FALSE", ct: { t: "b" } });
     expect(cells.get(6)).toMatchObject({ v: "#DIV/0!", m: "#DIV/0!", ct: { t: "e" } });

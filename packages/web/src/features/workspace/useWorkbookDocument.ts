@@ -1,3 +1,4 @@
+import type { FortuneCell, SheetConfig } from "@openexcel/core";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchSheet, fetchWorkbookForEditor, type WorkbookFull } from "@/api/workbooks";
 import { mergeWorkbookSnapshot } from "@/features/sync/workbookRevision";
@@ -128,6 +129,29 @@ export function useWorkbookDocument(
     currentWorkbookRef.current = next;
   }, []);
 
+  const updateSheetContent = useCallback(
+    (sheetId: number, celldata: FortuneCell[], config: SheetConfig | null) => {
+      const current = currentWorkbookRef.current;
+      const currentSheet = current?.sheets.find((sheet) => sheet.id === sheetId);
+      if (!current || !currentSheet) return;
+      if (
+        JSON.stringify(currentSheet.uploadedData) === JSON.stringify(celldata) &&
+        JSON.stringify(currentSheet.config) === JSON.stringify(config)
+      ) {
+        return;
+      }
+      const next = {
+        ...current,
+        sheets: current.sheets.map((sheet) =>
+          sheet.id === sheetId ? { ...sheet, uploadedData: celldata, config } : sheet,
+        ),
+      };
+      currentWorkbookRef.current = next;
+      setCurrentWorkbook(next);
+    },
+    [],
+  );
+
   const updateWorkbookMetadata = useCallback((updater: WorkbookUpdater) => {
     const current = currentWorkbookRef.current;
     if (!current) return null;
@@ -226,6 +250,7 @@ export function useWorkbookDocument(
     updateCurrentWorkbook,
     updateCharts,
     updateSheetRevision,
+    updateSheetContent,
     updateWorkbookMetadata,
     loadWorkbook,
     reloadCurrentWorkbook,
