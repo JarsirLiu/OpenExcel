@@ -1,4 +1,4 @@
-import type { FortuneCell, SheetConfig } from "@openexcel/core";
+import type { FortuneCell, SheetChangeDelta, SheetConfig } from "@openexcel/core";
 import { useEffect, useRef } from "react";
 import type { WorkbookFull } from "@/api/workbooks";
 import type { WorkbookStructureUpdate } from "@/features/sync/types";
@@ -48,6 +48,7 @@ type Props = {
     sheetId: number,
     celldata: FortuneCell[],
     config: SheetConfig | null,
+    mutation?: SheetChangeDelta,
   ) => void;
   presentationMode?: boolean;
   demoGridFocus?: DemoGridFocus;

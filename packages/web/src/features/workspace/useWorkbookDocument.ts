@@ -1,4 +1,4 @@
-import type { FortuneCell, SheetConfig } from "@openexcel/core";
+import type { FortuneCell, SheetChangeDelta, SheetConfig } from "@openexcel/core";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchSheet, fetchWorkbookForEditor, type WorkbookFull } from "@/api/workbooks";
 import { mergeWorkbookSnapshot } from "@/features/sync/workbookRevision";
@@ -18,6 +18,27 @@ function isAbortError(error: unknown): boolean {
     candidate.name === "AbortError" ||
     (typeof candidate.message === "string" && candidate.message.toLowerCase().includes("aborted"))
   );
+}
+
+type SheetPatch = Extract<SheetChangeDelta, { type: "patch" }>;
+
+function applySheetPatch(celldata: readonly FortuneCell[], patch: SheetPatch): FortuneCell[] {
+  const cells = new Map(celldata.map((cell) => [`${cell.r},${cell.c}`, cell]));
+  for (const change of patch.cells) {
+    const row = change.row - 1;
+    const col = change.col - 1;
+    const key = `${row},${col}`;
+    if (change.cell === null) {
+      cells.delete(key);
+      continue;
+    }
+    cells.set(key, {
+      r: row,
+      c: col,
+      v: { ...change.cell } as unknown as FortuneCell["v"],
+    });
+  }
+  return [...cells.values()].sort((left, right) => left.r - right.r || left.c - right.c);
 }
 
 export function useWorkbookDocument(
@@ -130,20 +151,27 @@ export function useWorkbookDocument(
   }, []);
 
   const updateSheetContent = useCallback(
-    (sheetId: number, celldata: FortuneCell[], config: SheetConfig | null) => {
+    (
+      sheetId: number,
+      celldata: FortuneCell[],
+      config: SheetConfig | null,
+      mutation?: SheetChangeDelta,
+    ) => {
       const current = currentWorkbookRef.current;
       const currentSheet = current?.sheets.find((sheet) => sheet.id === sheetId);
       if (!current || !currentSheet) return;
-      if (
-        JSON.stringify(currentSheet.uploadedData) === JSON.stringify(celldata) &&
-        JSON.stringify(currentSheet.config) === JSON.stringify(config)
-      ) {
-        return;
-      }
+      const nextCelldata =
+        mutation?.type === "patch"
+          ? applySheetPatch((currentSheet.uploadedData ?? []) as FortuneCell[], mutation)
+          : celldata;
+      const nextConfig =
+        mutation?.type === "patch" && mutation.config === undefined ? currentSheet.config : config;
       const next = {
         ...current,
         sheets: current.sheets.map((sheet) =>
-          sheet.id === sheetId ? { ...sheet, uploadedData: celldata, config } : sheet,
+          sheet.id === sheetId
+            ? { ...sheet, uploadedData: nextCelldata, config: nextConfig }
+            : sheet,
         ),
       };
       currentWorkbookRef.current = next;

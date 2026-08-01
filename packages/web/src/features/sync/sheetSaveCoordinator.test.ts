@@ -65,4 +65,64 @@ describe("SheetSaveCoordinator", () => {
       vi.useRealTimers();
     }
   });
+
+  it("sends sparse cell patches across multiple chunks", async () => {
+    vi.useFakeTimers();
+    try {
+      const coordinator = new SheetSaveCoordinator();
+      coordinator.reset(
+        60,
+        {
+          celldata: [
+            { r: 0, c: 0, v: { v: 90, m: "90" } },
+            { r: 300, c: 300, v: { v: 10, m: "10" } },
+          ],
+          config: null,
+        },
+        4,
+      );
+      const save = vi.fn().mockResolvedValue({ revision: 5 });
+
+      coordinator.schedule(
+        60,
+        {
+          celldata: [
+            { r: 0, c: 0, v: { v: 9, m: "9" } },
+            { r: 0, c: 1, v: { v: 9, m: "9", f: "=SUM(A1:A1)" } },
+            { r: 300, c: 300, v: { v: 11, m: "11" } },
+          ],
+          config: null,
+        },
+        save,
+        {
+          mutation: {
+            type: "patch",
+            cells: [
+              { row: 1, col: 1, cell: { v: 9, m: "9" } },
+              { row: 1, col: 2, cell: { v: 9, m: "9", f: "=SUM(A1:A1)" } },
+              { row: 301, col: 301, cell: { v: 11, m: "11" } },
+            ],
+          },
+        },
+      );
+      await vi.advanceTimersByTimeAsync(500);
+
+      expect(save).toHaveBeenCalledOnce();
+      expect(save.mock.calls[0]?.[0]).toEqual({
+        kind: "mutation",
+        baseRevision: 4,
+        mutation: {
+          type: "patch",
+          cells: [
+            { row: 1, col: 1, cell: { v: 9, m: "9" } },
+            { row: 1, col: 2, cell: { v: 9, m: "9", f: "=SUM(A1:A1)" } },
+            { row: 301, col: 301, cell: { v: 11, m: "11" } },
+          ],
+        },
+      });
+      coordinator.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

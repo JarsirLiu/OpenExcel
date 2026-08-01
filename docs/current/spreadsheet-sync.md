@@ -85,10 +85,13 @@ dependencies from a mutation.
 
 - The Web workbook document is the browser's authoritative state for the current workbook.
 - Sheet saves are debounced per Sheet; the current scheduler defaults to 500 ms.
-- Normal Web edits are submitted as `replaceChunks` commands containing only
-  changed 256×256 chunks and the current Sheet config. The browser retains the
-  complete current Sheet so FortuneSheet and charts always read one document,
-  while the transport and database update only changed chunks.
+- Normal Web edits are submitted as `mutation` commands containing only the
+  changed cells reported by FortuneSheet's `onOp`, including formula-dependent
+  cells whose cached values changed. The browser retains the complete current
+  Sheet so FortuneSheet and charts always read one document, while the Server
+  applies those cell patches transactionally to the affected persisted chunks.
+  Bulk or structural operations use `replaceChunks` with only changed 256×256
+  chunks and the current Sheet config.
 - FortuneSheet is the interactive calculation authority in the browser. Its
   recalculated formula cells, including cached `v`/`m` values and the `f`
   expression, are copied into the browser workbook document before the sparse

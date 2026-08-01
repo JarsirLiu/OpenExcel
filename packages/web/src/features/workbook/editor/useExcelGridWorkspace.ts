@@ -4,6 +4,7 @@ import {
   type FortuneCell,
   matrixToCelldata,
   normalizeFortuneCellValue,
+  type SheetChangeDelta,
   type SheetCommand,
   type SheetConfig,
 } from "@openexcel/core";
@@ -26,6 +27,11 @@ import { confirm, toast } from "@/shared/lib";
 import { adaptFortuneSheetLayout, type SheetGridLayout } from "../layout/fortuneSheetLayout";
 import { findSheetIndexById } from "../sheetIdentity";
 import { toFortuneSheetData } from "./fortuneSheet";
+import {
+  collectFortuneSheetOpHints,
+  type FortuneSheetOp,
+  type FortuneSheetOpHint,
+} from "./fortuneSheetOps";
 import { useSheetActivation } from "./SheetActivationContext";
 import { useWorkbookEditorSession } from "./useWorkbookEditorSession";
 
@@ -44,6 +50,7 @@ type UseExcelGridWorkspaceProps = {
     sheetId: number,
     celldata: FortuneCell[],
     config: SheetConfig | null,
+    mutation?: SheetChangeDelta,
   ) => void;
   sheetLoaded: boolean;
 };
@@ -52,6 +59,23 @@ function createMutationId(): string {
   return (
     globalThis.crypto?.randomUUID?.() ?? `web-${Date.now()}-${Math.random().toString(36).slice(2)}`
   );
+}
+
+function patchFromHint(
+  celldata: readonly FortuneCell[],
+  hint: FortuneSheetOpHint,
+): SheetChangeDelta | undefined {
+  const cellsByKey = new Map(celldata.map((cell) => [`${cell.r},${cell.c}`, cell]));
+  const cells = [...hint.cellKeys].map((key) => {
+    const [row, col] = key.split(",").map(Number);
+    const cell = cellsByKey.get(key);
+    return {
+      row: row + 1,
+      col: col + 1,
+      cell: cell?.v ? { ...(cell.v as unknown as Record<string, unknown>) } : null,
+    };
+  });
+  return cells.length > 0 ? { type: "patch", cells } : undefined;
 }
 
 export function useExcelGridWorkspace({
@@ -77,6 +101,21 @@ export function useExcelGridWorkspace({
   const { sheetData, sessionKey } = useWorkbookEditorSession(workbook, workbookRevision);
   const { registerActivateSheet } = useSheetActivation();
   const layoutSessionKey = `${workbook?.id ?? "none"}:${sessionKey}`;
+  const activeSheetIndex = normalizeSheetIndex(currentSheetIndex, workbook?.sheets.length ?? 0);
+  const workbookStateRef = useRef(workbook);
+  const activeSheetIndexRef = useRef(activeSheetIndex);
+  const sheetLoadedRef = useRef(sheetLoaded);
+  const pendingOpHintsRef = useRef<Map<number, FortuneSheetOpHint>>(new Map());
+  const editorSessionRef = useRef(sessionKey);
+  const initialChangeSessionRef = useRef<string | number | null>(null);
+  workbookStateRef.current = workbook;
+  activeSheetIndexRef.current = activeSheetIndex;
+  sheetLoadedRef.current = sheetLoaded;
+  if (editorSessionRef.current !== sessionKey) {
+    editorSessionRef.current = sessionKey;
+    initialChangeSessionRef.current = null;
+    pendingOpHintsRef.current.clear();
+  }
   const initialLayouts = useMemo(
     () =>
       Object.fromEntries(
@@ -90,8 +129,6 @@ export function useExcelGridWorkspace({
   }>({ sessionKey: layoutSessionKey, bySheetId: initialLayouts });
   const layoutBySheetId =
     layoutState.sessionKey === layoutSessionKey ? layoutState.bySheetId : initialLayouts;
-  const activeSheetIndex = normalizeSheetIndex(currentSheetIndex, workbook?.sheets.length ?? 0);
-
   useEffect(() => {
     if (!workbook) return;
 
@@ -106,6 +143,7 @@ export function useExcelGridWorkspace({
         sheet.revision,
       );
     });
+    pendingOpHintsRef.current.clear();
   }, [workbook?.id, workbookRevision]);
 
   useEffect(() => {
@@ -139,9 +177,11 @@ export function useExcelGridWorkspace({
     async (
       sheetId: number,
       request: {
+        kind: "mutation" | "replaceChunks";
         baseRevision: number;
-        config: SheetConfig | null;
-        chunks: Array<{ chunkRow: number; chunkCol: number; payload: string | null }>;
+        mutation?: SheetChangeDelta;
+        config?: SheetConfig | null;
+        chunks?: Array<{ chunkRow: number; chunkCol: number; payload: string | null }>;
       },
     ) => {
       if (workspaceId == null) {
@@ -151,14 +191,23 @@ export function useExcelGridWorkspace({
       const mutationId = createMutationId();
       setSaveStatus("saving");
       try {
-        const command: SheetCommand = {
-          kind: "replaceChunks",
-          mutationId,
-          sheetId,
-          baseRevision: request.baseRevision,
-          config: request.config as Record<string, unknown> | null,
-          chunks: request.chunks,
-        };
+        const command: SheetCommand =
+          request.kind === "mutation"
+            ? {
+                kind: "mutation",
+                mutationId,
+                sheetId,
+                baseRevision: request.baseRevision,
+                mutation: request.mutation as SheetChangeDelta,
+              }
+            : {
+                kind: "replaceChunks",
+                mutationId,
+                sheetId,
+                baseRevision: request.baseRevision,
+                config: request.config as Record<string, unknown> | null,
+                chunks: request.chunks ?? [],
+              };
         const result = await executeSheetCommand(workspaceId, command);
         setSaveStatus("saved");
         onSheetRevisionChanged?.(sheetId, result.revision);
@@ -175,14 +224,16 @@ export function useExcelGridWorkspace({
   );
 
   const scheduleSave = useCallback(
-    (celldata: any[], config: any) => {
-      if (!sheetLoaded) {
+    (celldata: any[], config: any, mutation?: SheetChangeDelta) => {
+      if (!sheetLoadedRef.current) {
         return;
       }
-      if (!workbook?.sheets[activeSheetIndex]) {
+      const currentWorkbook = workbookStateRef.current;
+      const currentSheetIndex = activeSheetIndexRef.current;
+      if (!currentWorkbook?.sheets[currentSheetIndex]) {
         return;
       }
-      const sheet = workbook.sheets[activeSheetIndex];
+      const sheet = currentWorkbook.sheets[currentSheetIndex];
       if (!sheet) {
         return;
       }
@@ -233,36 +284,45 @@ export function useExcelGridWorkspace({
         sheet.id,
         snapshot,
         (request) => syncSheetToServer(sheet.id, request),
-        { onSuccess, onError },
+        { mutation, onSuccess, onError },
       );
     },
-    [activeSheetIndex, onSheetRevisionChanged, sheetLoaded, syncSheetToServer, workbook],
+    [onSheetRevisionChanged, syncSheetToServer],
   );
 
   const handleChange = useCallback(
     (data: any[]) => {
-      if (!sheetLoaded || !workbook || !Array.isArray(data)) return;
+      const currentWorkbook = workbookStateRef.current;
+      const currentSheetIndex = activeSheetIndexRef.current;
+      if (!sheetLoadedRef.current || !currentWorkbook || !Array.isArray(data)) return;
 
-      setLayoutState((current) => {
-        const bySheetId =
-          current.sessionKey === layoutSessionKey
-            ? { ...current.bySheetId }
-            : { ...initialLayouts };
-        let changed = current.sessionKey !== layoutSessionKey;
-        for (const fortuneSheet of data) {
-          if (fortuneSheet?.id == null) continue;
-          const key = String(fortuneSheet.id);
-          const nextLayout = adaptFortuneSheetLayout(fortuneSheet);
-          if (JSON.stringify(bySheetId[key]) !== JSON.stringify(nextLayout)) {
-            bySheetId[key] = nextLayout;
-            changed = true;
-          }
-        }
-        return changed ? { sessionKey: layoutSessionKey, bySheetId } : current;
-      });
-
-      const sheet = workbook.sheets[activeSheetIndex];
+      const sheet = currentWorkbook.sheets[currentSheetIndex];
       if (!sheet) return;
+      const hint = pendingOpHintsRef.current.get(sheet.id);
+      pendingOpHintsRef.current.delete(sheet.id);
+      const isInitialEditorChange = initialChangeSessionRef.current !== sessionKey;
+      if (isInitialEditorChange) initialChangeSessionRef.current = sessionKey;
+
+      if (!hint || hint.requiresSnapshot) {
+        setLayoutState((current) => {
+          const bySheetId =
+            current.sessionKey === layoutSessionKey
+              ? { ...current.bySheetId }
+              : { ...initialLayouts };
+          let changed = current.sessionKey !== layoutSessionKey;
+          for (const fortuneSheet of data) {
+            if (fortuneSheet?.id == null) continue;
+            const key = String(fortuneSheet.id);
+            const nextLayout = adaptFortuneSheetLayout(fortuneSheet);
+            if (JSON.stringify(bySheetId[key]) !== JSON.stringify(nextLayout)) {
+              bySheetId[key] = nextLayout;
+              changed = true;
+            }
+          }
+          return changed ? { sessionKey: layoutSessionKey, bySheetId } : current;
+        });
+      }
+
       const fortuneSheet = data.find((s: any) => String(s.id) === String(sheet.id));
       if (!fortuneSheet) {
         return;
@@ -277,29 +337,45 @@ export function useExcelGridWorkspace({
         v: normalizeFortuneCellValue(cell.v),
       }));
       const config = extractSheetConfig(fortuneSheet);
-      onSheetContentChanged?.(sheet.id, celldata, config);
-      scheduleSave(celldata, config);
+      const mutation = hint && !hint.requiresSnapshot ? patchFromHint(celldata, hint) : undefined;
+      if (mutation) {
+        onSheetContentChanged?.(sheet.id, celldata, config, mutation);
+      } else if (hint?.requiresSnapshot || !isInitialEditorChange) {
+        onSheetContentChanged?.(sheet.id, celldata, config);
+      }
+      scheduleSave(celldata, config, mutation);
     },
-    [
-      activeSheetIndex,
-      initialLayouts,
-      layoutSessionKey,
-      onSheetContentChanged,
-      scheduleSave,
-      sheetLoaded,
-      workbook,
-    ],
+    [initialLayouts, layoutSessionKey, onSheetContentChanged, scheduleSave, sessionKey],
   );
+
+  const handleOp = useCallback((ops: readonly FortuneSheetOp[]) => {
+    const currentWorkbook = workbookStateRef.current;
+    const currentSheetIndex = activeSheetIndexRef.current;
+    if (!currentWorkbook) return;
+    const activeSheet = currentWorkbook.sheets[currentSheetIndex];
+    if (!activeSheet) return;
+    const hints = collectFortuneSheetOpHints(ops, activeSheet.id);
+    for (const [sheetId, hint] of hints) {
+      const current = pendingOpHintsRef.current.get(sheetId);
+      if (!current) {
+        pendingOpHintsRef.current.set(sheetId, hint);
+        continue;
+      }
+      for (const cellKey of hint.cellKeys) current.cellKeys.add(cellKey);
+      current.requiresSnapshot ||= hint.requiresSnapshot;
+    }
+  }, []);
 
   const handleActivateSheet = useCallback(
     (sheetId: string | number) => {
-      if (!workbook) return;
-      const nextIndex = findSheetIndexById(workbook.sheets, sheetId);
+      const currentWorkbook = workbookStateRef.current;
+      if (!currentWorkbook) return;
+      const nextIndex = findSheetIndexById(currentWorkbook.sheets, sheetId);
       if (nextIndex >= 0) {
         onSheetIndexChange?.(nextIndex);
       }
     },
-    [onSheetIndexChange, workbook],
+    [onSheetIndexChange],
   );
 
   const handleBeforeAddSheet = useCallback(
@@ -413,6 +489,7 @@ export function useExcelGridWorkspace({
     sessionKey,
     layoutBySheetId,
     handleChange,
+    handleOp,
     handleActivateSheet,
     handleBeforeAddSheet,
     handleBeforeDeleteSheet,

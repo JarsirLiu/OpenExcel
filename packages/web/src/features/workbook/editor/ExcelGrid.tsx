@@ -1,5 +1,5 @@
 import { Workbook } from "@fortune-sheet/react";
-import type { FortuneCell, SheetConfig } from "@openexcel/core";
+import type { FortuneCell, SheetChangeDelta, SheetConfig } from "@openexcel/core";
 import { useMemo, useRef } from "react";
 import "@fortune-sheet/react/dist/index.css";
 import type { WorkbookFull } from "@/api/workbooks";
@@ -79,6 +79,7 @@ interface Props {
     sheetId: number,
     celldata: FortuneCell[],
     config: SheetConfig | null,
+    mutation?: SheetChangeDelta,
   ) => void;
   demoGridFocus?: DemoGridFocus;
 }
@@ -116,6 +117,7 @@ export function ExcelGrid({
     sessionKey,
     layoutBySheetId,
     handleChange,
+    handleOp,
     handleActivateSheet,
     handleBeforeAddSheet,
     handleBeforeDeleteSheet,
@@ -205,6 +207,7 @@ export function ExcelGrid({
           ref={workbookRef}
           data={sheetData as any}
           onChange={handleChange}
+          onOp={handleOp}
           showSheetTabs={true}
           showToolbar={true}
           showFormulaBar={true}

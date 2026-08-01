@@ -1,4 +1,4 @@
-import type { FortuneCell, SheetConfig } from "@openexcel/core";
+import type { FortuneCell, SheetChangeDelta, SheetConfig } from "@openexcel/core";
 import type { WorkbookFull } from "@/api/workbooks";
 import type { WorkbookStructureUpdate } from "@/features/sync/types";
 import type { ChartMutation } from "@/features/workbook/charts/chartMutation";
@@ -26,6 +26,7 @@ interface Props {
     sheetId: number,
     celldata: FortuneCell[],
     config: SheetConfig | null,
+    mutation?: SheetChangeDelta,
   ) => void;
   demoGridFocus?: DemoGridFocus;
 }
