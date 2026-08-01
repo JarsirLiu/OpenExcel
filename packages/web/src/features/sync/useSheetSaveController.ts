@@ -12,7 +12,8 @@ import {
 type Props = {
   workspaceId: number | null;
   sheetLoaded: boolean;
-  onRevisionChanged?: (sheetId: number, revision: number) => void;
+  getDocumentVersion?: (sheetId: number) => number;
+  onRevisionChanged?: (sheetId: number, revision: number, persistedThroughVersion?: number) => void;
   onRebasedChange?: (change: SheetEditorChange) => void;
 };
 
@@ -25,6 +26,7 @@ function createMutationId(): string {
 export function useSheetSaveController({
   workspaceId,
   sheetLoaded,
+  getDocumentVersion,
   onRevisionChanged,
   onRebasedChange,
 }: Props) {
@@ -72,17 +74,13 @@ export function useSheetSaveController({
         if (generationBySheetRef.current.get(sheetId) !== generation) {
           return { revision: request.baseRevision };
         }
-        setSaveStatus("saved");
-        onRevisionChanged?.(sheetId, result.revision);
-        if (saveStatusResetRef.current) clearTimeout(saveStatusResetRef.current);
-        saveStatusResetRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
         return result;
       } catch (error) {
         setSaveStatus("idle");
         throw error;
       }
     },
-    [onRevisionChanged, workspaceId],
+    [workspaceId],
   );
 
   const reset = useCallback((sheetId: number, snapshot: SheetSnapshotForSave, revision: number) => {
@@ -91,7 +89,7 @@ export function useSheetSaveController({
   }, []);
 
   const schedule = useCallback(
-    (change: SheetEditorChange) => {
+    (change: SheetEditorChange, documentVersion?: number) => {
       if (!sheetLoaded) return;
 
       const coordinator = coordinatorRef.current;
@@ -99,10 +97,11 @@ export function useSheetSaveController({
       const generation = generationBySheetRef.current.get(change.sheetId) ?? 0;
       const isCurrentGeneration = () =>
         generationBySheetRef.current.get(change.sheetId) === generation;
+      const scheduledDocumentVersion = documentVersion ?? getDocumentVersion?.(change.sheetId);
 
-      const onSuccess = (result: { revision: number }) => {
+      const onSuccess = (result: { revision: number }, persistedThroughVersion?: number) => {
         setSaveStatus("saved");
-        onRevisionChanged?.(change.sheetId, result.revision);
+        onRevisionChanged?.(change.sheetId, result.revision, persistedThroughVersion);
         if (saveStatusResetRef.current) clearTimeout(saveStatusResetRef.current);
         saveStatusResetRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
       };
@@ -136,7 +135,11 @@ export function useSheetSaveController({
             onRebasedChange?.(rebasedChange);
             coordinator.schedule(
               change.sheetId,
-              { kind: "snapshot", snapshot: rebased },
+              {
+                kind: "snapshot",
+                snapshot: rebased,
+                documentVersion: getDocumentVersion?.(change.sheetId),
+              },
               (request) => syncSheetToServer(change.sheetId, generation, request),
               { conflictRetry: true, onSuccess, onError },
             );
@@ -156,13 +159,28 @@ export function useSheetSaveController({
       coordinator.schedule(
         change.sheetId,
         change.kind === "patch"
-          ? { kind: "patch", mutation: change.mutation }
-          : { kind: "snapshot", snapshot: change.snapshot },
+          ? {
+              kind: "patch",
+              mutation: change.mutation,
+              documentVersion: scheduledDocumentVersion,
+            }
+          : {
+              kind: "snapshot",
+              snapshot: change.snapshot,
+              documentVersion: scheduledDocumentVersion,
+            },
         (request) => syncSheetToServer(change.sheetId, generation, request),
         { onSuccess, onError },
       );
     },
-    [onRebasedChange, onRevisionChanged, sheetLoaded, syncSheetToServer, workspaceId],
+    [
+      getDocumentVersion,
+      onRebasedChange,
+      onRevisionChanged,
+      sheetLoaded,
+      syncSheetToServer,
+      workspaceId,
+    ],
   );
 
   return { saveStatus, reset, schedule };

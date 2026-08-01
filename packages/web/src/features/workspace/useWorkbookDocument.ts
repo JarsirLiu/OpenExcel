@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { fetchSheet, fetchWorkbookForEditor, type WorkbookFull } from "@/api/workbooks";
 import type { SheetEditorChange } from "@/features/sync/sheetEditorChange";
-import { mergeWorkbookSnapshot } from "@/features/sync/workbookRevision";
 import { WorkbookDocumentStore } from "./WorkbookDocumentStore";
 
 function loadedSheetIds(workbook: WorkbookFull | null): number[] | undefined {
@@ -141,8 +140,8 @@ export function useWorkbookDocument(
   );
 
   const updateSheetRevision = useCallback(
-    (sheetId: number, revision: number) => {
-      const next = documentStore.updateSheetRevision(sheetId, revision);
+    (sheetId: number, revision: number, persistedThroughVersion?: number) => {
+      const next = documentStore.updateSheetRevision(sheetId, revision, persistedThroughVersion);
       currentWorkbookRef.current = next;
     },
     [documentStore],
@@ -201,8 +200,9 @@ export function useWorkbookDocument(
           sheetIds: options?.sheetIds ?? loadedSheetIds(current),
         });
         if (!isCurrentWorkbookRequest(generation, controller.signal)) return null;
-        const merged = mergeWorkbookSnapshot(current, next);
-        replaceCurrentWorkbook(merged);
+        const merged = documentStore.mergeRemoteSnapshot(next);
+        currentWorkbookRef.current = merged;
+        setWorkbookRevision((revision) => revision + 1);
         return merged;
       } catch (error) {
         if (controller.signal.aborted || isAbortError(error)) return null;
@@ -213,7 +213,7 @@ export function useWorkbookDocument(
         }
       }
     },
-    [beginWorkbookRequest, isCurrentWorkbookRequest, replaceCurrentWorkbook, workspaceId],
+    [beginWorkbookRequest, documentStore, isCurrentWorkbookRequest, workspaceId],
   );
 
   const loadSheet = useCallback(
@@ -231,10 +231,10 @@ export function useWorkbookDocument(
         ) {
           return null;
         }
-        return updateCurrentWorkbook((latest) => ({
-          ...latest,
-          sheets: latest.sheets.map((sheet) => (sheet.id === loaded.id ? loaded : sheet)),
-        }));
+        const merged = documentStore.mergeRemoteSheet(loaded);
+        currentWorkbookRef.current = merged;
+        setWorkbookRevision((revision) => revision + 1);
+        return merged;
       } catch (error) {
         if (controller.signal.aborted || isAbortError(error)) return null;
         throw error;
@@ -244,7 +244,7 @@ export function useWorkbookDocument(
         }
       }
     },
-    [beginSheetRequest, isCurrentSheetRequest, updateCurrentWorkbook, workspaceId],
+    [beginSheetRequest, currentWorkbookRef, documentStore, isCurrentSheetRequest, workspaceId],
   );
 
   return {

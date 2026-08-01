@@ -22,6 +22,11 @@ export type FortuneSheetChangeResult = {
   change: SheetEditorChange | null;
 };
 
+const FORMULA_ONLY_HINT: FortuneSheetOpHint = {
+  requiresSnapshot: false,
+  changedCellKeys: new Set(),
+};
+
 function toSheetId(value: string | number): number | null {
   const id = Number(value);
   return Number.isInteger(id) ? id : null;
@@ -69,22 +74,32 @@ export class FortuneSheetEventAdapter {
   handleChange(
     data: readonly FortuneSheetChangeData[],
     activeSheetId: number,
-  ): FortuneSheetChangeResult | null {
-    const hint = this.pendingOpHints.get(activeSheetId);
-    this.pendingOpHints.delete(activeSheetId);
-    const fortuneSheet = data.find((sheet) => String(sheet.id) === String(activeSheetId));
-    const previous = this.snapshots.get(activeSheetId);
-    if (!fortuneSheet || !previous) return null;
+  ): FortuneSheetChangeResult[] {
+    const results: FortuneSheetChangeResult[] = [];
 
-    const config = extractSheetConfig(fortuneSheet);
-    const result = adaptFortuneSheetChange({
-      sheetId: activeSheetId,
-      data: fortuneSheet.data,
-      config,
-      previous,
-      hint,
-    });
-    this.snapshots.set(activeSheetId, result.snapshot);
-    return { sheetId: activeSheetId, change: result.change };
+    for (const fortuneSheet of data) {
+      const sheetId = toSheetId(fortuneSheet.id);
+      if (sheetId === null) continue;
+
+      const previous = this.snapshots.get(sheetId);
+      if (!previous) continue;
+
+      const hint =
+        this.pendingOpHints.get(sheetId) ??
+        (sheetId === activeSheetId ? undefined : FORMULA_ONLY_HINT);
+      this.pendingOpHints.delete(sheetId);
+      const config = extractSheetConfig(fortuneSheet);
+      const result = adaptFortuneSheetChange({
+        sheetId,
+        data: fortuneSheet.data,
+        config,
+        previous,
+        hint,
+      });
+      this.snapshots.set(sheetId, result.snapshot);
+      results.push({ sheetId, change: result.change });
+    }
+
+    return results;
   }
 }

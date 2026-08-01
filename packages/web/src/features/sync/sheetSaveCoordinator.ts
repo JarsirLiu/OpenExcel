@@ -15,10 +15,12 @@ export type SheetSaveInput =
   | {
       kind: "patch";
       mutation: Extract<SheetChangeDelta, { type: "patch" }>;
+      documentVersion?: number;
     }
   | {
       kind: "snapshot";
       snapshot: SheetSnapshotForSave;
+      documentVersion?: number;
     };
 export type SheetSaveRequest =
   | {
@@ -42,7 +44,12 @@ type SheetState = {
   persistedChunks: Map<string, string>;
   persistedConfig: string;
   pendingCells: Map<string, PendingCell>;
-  pendingConfig: { config: SheetConfig | null; version: number } | null;
+  pendingConfig: {
+    config: SheetConfig | null;
+    version: number;
+    documentVersion?: number;
+  } | null;
+  latestDocumentVersion?: number;
   timer: ReturnType<typeof setTimeout> | null;
   inFlight: Promise<void> | null;
   retryAttempt: number;
@@ -55,12 +62,13 @@ type PendingCell = {
   col: number;
   cell: Record<string, unknown> | null;
   version: number;
+  documentVersion?: number;
 };
 
 type SheetSaveOptions = {
   debounceMs?: number;
   conflictRetry?: boolean;
-  onSuccess?: (result: SheetSaveResult) => void;
+  onSuccess?: (result: SheetSaveResult, persistedThroughVersion?: number) => void;
   onError?: (error: unknown) => SheetSaveErrorAction | undefined;
 };
 
@@ -119,6 +127,7 @@ export class SheetSaveCoordinator {
       persistedConfig: serializeSheetConfig(snapshot.config),
       pendingCells: new Map(),
       pendingConfig: null,
+      latestDocumentVersion: 0,
       timer: null,
       inFlight: null,
       retryAttempt: 0,
@@ -136,6 +145,12 @@ export class SheetSaveCoordinator {
     const state = this.states.get(sheetId);
     if (!state) return;
     state.latestVersion += 1;
+    if (input.documentVersion !== undefined) {
+      state.latestDocumentVersion = Math.max(
+        state.latestDocumentVersion ?? 0,
+        input.documentVersion,
+      );
+    }
     state.retryAttempt = 0;
     if (!options?.conflictRetry) state.conflictAttempt = 0;
     if (input.kind === "patch") {
@@ -160,10 +175,15 @@ export class SheetSaveCoordinator {
           col: cell.col,
           cell: cell.cell,
           version: state.latestVersion,
+          documentVersion: input.documentVersion,
         });
       }
       if (input.mutation.config !== undefined) {
-        state.pendingConfig = { config: state.latestConfig, version: state.latestVersion };
+        state.pendingConfig = {
+          config: state.latestConfig,
+          version: state.latestVersion,
+          documentVersion: input.documentVersion,
+        };
       }
     } else {
       state.latestCells = cellsFromCelldata(input.snapshot.celldata);
@@ -247,6 +267,9 @@ export class SheetSaveCoordinator {
     const sentCells = new Map(state.pendingCells);
     const sentConfig = state.pendingConfig;
     const sentConfigValue = sentConfig ? state.latestConfig : null;
+    let persistedThroughVersion = Math.max(
+      ...[...sentCells.values(), sentConfig].map((pending) => pending?.documentVersion ?? 0),
+    );
     let request: SheetSaveRequest;
     let snapshot: SheetSnapshotForSave | null = null;
 
@@ -275,6 +298,7 @@ export class SheetSaveCoordinator {
         config: snapshot.config,
         chunks,
       };
+      persistedThroughVersion = state.latestDocumentVersion ?? 0;
     }
 
     let retryRequested = false;
@@ -337,7 +361,10 @@ export class SheetSaveCoordinator {
         current.retryAttempt = 0;
         current.conflictAttempt = 0;
         current.retryAfterInFlight = false;
-        options?.onSuccess?.(result);
+        options?.onSuccess?.(
+          result,
+          persistedThroughVersion > 0 ? persistedThroughVersion : undefined,
+        );
         if (current.latestVersion !== version) {
           this.armTimer(sheetId, current, task, options, options?.debounceMs ?? 500);
         }

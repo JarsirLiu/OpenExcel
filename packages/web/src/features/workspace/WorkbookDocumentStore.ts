@@ -1,6 +1,7 @@
 import type { FortuneCell, SheetConfig } from "@openexcel/core";
 import type { WorkbookFull } from "@/api/workbooks";
 import type { SheetEditorChange } from "@/features/sync/sheetEditorChange";
+import { mergeWorkbookSnapshot } from "@/features/sync/workbookRevision";
 
 type SheetCellCache = {
   source: readonly FortuneCell[];
@@ -22,6 +23,19 @@ export type WorkbookDocumentChange =
 type ChangeListener = (change: WorkbookDocumentChange) => void;
 
 type SheetPatch = Extract<SheetEditorChange, { kind: "patch" }>["mutation"];
+
+type PendingCellChange = {
+  row: number;
+  col: number;
+  cell: Record<string, unknown> | null;
+  version: number;
+};
+
+type PendingSheetChanges = {
+  snapshot: { change: Extract<SheetEditorChange, { kind: "snapshot" }>; version: number } | null;
+  cells: Map<string, PendingCellChange>;
+  config: { config: SheetConfig | null; version: number } | null;
+};
 
 function cellKey(row: number, col: number): string {
   return `${row},${col}`;
@@ -98,6 +112,10 @@ export class WorkbookDocumentStore {
 
   private readonly sheetCellCache = new Map<number, SheetCellCache>();
 
+  private readonly pendingChangesBySheet = new Map<number, PendingSheetChanges>();
+
+  private readonly changeVersionBySheet = new Map<number, number>();
+
   constructor(initialWorkbook: WorkbookFull | null) {
     this.currentWorkbook = initialWorkbook;
   }
@@ -117,6 +135,8 @@ export class WorkbookDocumentStore {
 
   replace(next: WorkbookFull | null): WorkbookFull | null {
     this.sheetCellCache.clear();
+    this.pendingChangesBySheet.clear();
+    this.changeVersionBySheet.clear();
     this.currentWorkbook = next;
     this.emit({ kind: "workbook" });
     return next;
@@ -154,6 +174,26 @@ export class WorkbookDocumentStore {
           : sheet,
       ),
     };
+    const version = (this.changeVersionBySheet.get(change.sheetId) ?? 0) + 1;
+    this.changeVersionBySheet.set(change.sheetId, version);
+    const pending = this.pendingChangesBySheet.get(change.sheetId) ?? {
+      snapshot: null,
+      cells: new Map(),
+      config: null,
+    };
+    if (change.kind === "snapshot") {
+      pending.snapshot = { change, version };
+      pending.cells.clear();
+      pending.config = null;
+    } else {
+      for (const cell of change.mutation.cells) {
+        pending.cells.set(`${cell.row},${cell.col}`, { ...cell, version });
+      }
+      if (change.mutation.config !== undefined) {
+        pending.config = { config: change.mutation.config as SheetConfig | null, version };
+      }
+    }
+    this.pendingChangesBySheet.set(change.sheetId, pending);
     this.emit({
       kind: "sheet",
       sheetId: change.sheetId,
@@ -167,7 +207,32 @@ export class WorkbookDocumentStore {
     return this.currentWorkbook;
   }
 
-  updateSheetRevision(sheetId: number, revision: number): WorkbookFull | null {
+  getSheetChangeVersion(sheetId: number): number {
+    return this.changeVersionBySheet.get(sheetId) ?? 0;
+  }
+
+  updateSheetRevision(
+    sheetId: number,
+    revision: number,
+    persistedThroughVersion?: number,
+  ): WorkbookFull | null {
+    if (persistedThroughVersion !== undefined) {
+      const pending = this.pendingChangesBySheet.get(sheetId);
+      if (pending) {
+        if (pending.snapshot && pending.snapshot.version <= persistedThroughVersion) {
+          pending.snapshot = null;
+        }
+        for (const [key, cell] of pending.cells) {
+          if (cell.version <= persistedThroughVersion) pending.cells.delete(key);
+        }
+        if (pending.config && pending.config.version <= persistedThroughVersion) {
+          pending.config = null;
+        }
+        if (!pending.snapshot && pending.cells.size === 0 && !pending.config) {
+          this.pendingChangesBySheet.delete(sheetId);
+        }
+      }
+    }
     const current = this.currentWorkbook;
     const sheet = current?.sheets.find((item) => item.id === sheetId);
     if (!current || !sheet || revision <= sheet.revision) return current;
@@ -176,6 +241,33 @@ export class WorkbookDocumentStore {
       sheets: current.sheets.map((item) => (item.id === sheetId ? { ...item, revision } : item)),
     };
     this.emit({ kind: "sheet", sheetId, cells: [], structural: false, configChanged: false });
+    return this.currentWorkbook;
+  }
+
+  mergeRemoteSnapshot(next: WorkbookFull): WorkbookFull | null {
+    const current = this.currentWorkbook;
+    if (!current || current.id !== next.id) return next;
+
+    const merged = mergeWorkbookSnapshot(current, next);
+    const sheets = merged.sheets.map((sheet) => this.applyPendingChanges(sheet));
+    this.sheetCellCache.clear();
+    this.currentWorkbook = { ...merged, sheets };
+    this.emit({ kind: "workbook" });
+    return this.currentWorkbook;
+  }
+
+  mergeRemoteSheet(nextSheet: WorkbookFull["sheets"][number]): WorkbookFull | null {
+    const current = this.currentWorkbook;
+    if (!current) return null;
+
+    this.currentWorkbook = {
+      ...current,
+      sheets: current.sheets.map((sheet) =>
+        sheet.id === nextSheet.id ? this.applyPendingChanges(nextSheet) : sheet,
+      ),
+    };
+    this.sheetCellCache.clear();
+    this.emit({ kind: "workbook" });
     return this.currentWorkbook;
   }
 
@@ -195,5 +287,44 @@ export class WorkbookDocumentStore {
 
   private emit(change: WorkbookDocumentChange): void {
     for (const listener of this.listeners) listener(change);
+  }
+
+  private applyPendingChanges(
+    sheet: WorkbookFull["sheets"][number],
+  ): WorkbookFull["sheets"][number] {
+    const pending = this.pendingChangesBySheet.get(sheet.id);
+    if (!pending) return sheet;
+
+    let nextSheet = sheet;
+    if (pending.snapshot) {
+      nextSheet = {
+        ...nextSheet,
+        uploadedData: pending.snapshot.change.snapshot.celldata.map((cell) => ({
+          ...cell,
+          v: { ...cell.v },
+        })),
+        config: pending.snapshot.change.snapshot.config,
+      };
+    }
+    if (pending.cells.size > 0) {
+      const cache = createCellCache((nextSheet.uploadedData ?? []) as FortuneCell[]);
+      const result = applySheetPatch(cache, {
+        type: "patch",
+        cells: [...pending.cells.values()]
+          .sort((left, right) => left.version - right.version)
+          .map(({ version: _version, ...cell }) => cell),
+        ...(pending.config
+          ? { config: pending.config.config as Record<string, unknown> | null }
+          : {}),
+      });
+      nextSheet = {
+        ...nextSheet,
+        uploadedData: result.celldata,
+        config: pending.config ? pending.config.config : nextSheet.config,
+      };
+    } else if (pending.config) {
+      nextSheet = { ...nextSheet, config: pending.config.config };
+    }
+    return nextSheet;
   }
 }

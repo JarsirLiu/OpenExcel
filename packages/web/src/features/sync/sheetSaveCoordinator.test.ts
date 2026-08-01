@@ -58,6 +58,49 @@ describe("SheetSaveCoordinator", () => {
     }
   });
 
+  it("reports only the document version included in the completed request", async () => {
+    vi.useFakeTimers();
+    try {
+      const coordinator = new SheetSaveCoordinator();
+      coordinator.reset(60, { celldata: [], config: null }, 4);
+      let resolveFirst: ((value: { revision: number }) => void) | undefined;
+      const firstResult = new Promise<{ revision: number }>((resolve) => {
+        resolveFirst = resolve;
+      });
+      const save = vi.fn().mockReturnValueOnce(firstResult).mockResolvedValue({ revision: 6 });
+      const onSuccess = vi.fn();
+
+      coordinator.schedule(
+        60,
+        {
+          kind: "patch",
+          mutation: { type: "patch", cells: [{ row: 1, col: 1, cell: { v: 1, m: "1" } }] },
+          documentVersion: 1,
+        },
+        save,
+        { onSuccess },
+      );
+      await vi.advanceTimersByTimeAsync(500);
+      coordinator.schedule(
+        60,
+        {
+          kind: "patch",
+          mutation: { type: "patch", cells: [{ row: 1, col: 2, cell: { v: 2, m: "2" } }] },
+          documentVersion: 2,
+        },
+        save,
+        { onSuccess },
+      );
+      resolveFirst?.({ revision: 5 });
+      await Promise.resolve();
+
+      expect(onSuccess).toHaveBeenCalledWith({ revision: 5 }, 1);
+      coordinator.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("sends sparse patches and formula caches without materializing the sheet", async () => {
     vi.useFakeTimers();
     try {

@@ -105,8 +105,8 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
   }, []);
 
   const handleSheetRevisionChanged = useCallback(
-    (sheetId: number, revision: number) => {
-      updateSheetRevision(sheetId, revision);
+    (sheetId: number, revision: number, persistedThroughVersion?: number) => {
+      updateSheetRevision(sheetId, revision, persistedThroughVersion);
     },
     [updateSheetRevision],
   );

@@ -116,7 +116,11 @@ dependencies from a mutation.
 - Failed saves retain their pending batch and retry with bounded exponential
   backoff. A save callback may explicitly mark a revision conflict as handled
   while it fetches and rebases the remote Sheet.
-- A revision change cancels pending saves that are no longer applicable.
+- Workbook or Sheet lifecycle changes initialize the affected save baseline;
+  refreshing content for an existing Sheet does not cancel its pending saves.
+  Remote workbook and Sheet snapshots are merged with the document's unpersisted
+  local changes before they replace the editor document. Save acknowledgements
+  clear only the local change versions included in that request.
 - Workbook and Sheet requests use request generations and `AbortController` to ignore stale responses.
 - Workbook switching keeps the old document visible until the new document is ready; on failure, the old document remains usable and retryable.
 
