@@ -34,7 +34,7 @@ OpenExcel 保留熟悉的电子表格网格，同时在旁边提供 AI 工作区
 
 AI 会把意图转换为表格和图表操作；导出或分享前，最终结果仍由你确认。
 
-## 5 分钟本地开发
+## 本地开发
 
 要求：Node.js 22+、pnpm 10.20.0，以及一个openai兼容的模型接口。
 
@@ -81,17 +81,6 @@ docker compose ps
 注意：`pnpm preview` 只是 Vite 前端预览，不会启动 API 或数据库，不能当作完整生产启动。
 
 完整部署说明见 [docs/current/docker-deployment.md](docs/current/docker-deployment.md)。
-
-## Roadmap
-
-- [x] 工作区、工作簿、工作表、导入导出、图表和 AI 对话循环
-- [x] 只读回放案例
-- [x] Docker 本地生产模式
-- [x] 用真实端到端录屏替换占位位置
-- [ ] 增加仓库 License 并发布首个稳定版本
-- [ ] 用真实测量数据替换宣传中的时间节省数字
-- [ ] 补充备份、可观测性和生产加固文档
-- [ ] 完善 PostgreSQL 多实例部署说明
 
 ## 许可证
 

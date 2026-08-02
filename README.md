@@ -140,19 +140,6 @@ The monorepo packages are intentionally separated:
 - `packages/agent` owns the model loop, context, events, retries, and tool adaptation.
 - `packages/core` owns spreadsheet primitives, Excel conversion, chart models, and tool contracts.
 
-## Roadmap
-
-This is a proposed public roadmap, not a description of already-implemented behavior:
-
-- [x] Workspaces, workbooks, sheets, import/export, charts, and AI chat loop
-- [x] Read-only replay examples for product discovery
-- [x] Docker-based local production profile
-- [x] Replace the placeholder with a real end-to-end capture
-- [ ] Add a repository license and publish a first stable release
-- [ ] Add measured workflow benchmarks instead of illustrative time savings
-- [ ] Document production hardening, backups, observability, and deployment profiles
-- [ ] Improve multi-instance deployment guidance for PostgreSQL
-
 ## Contributing
 
 Issues and pull requests are welcome. Before changing code, read [docs/README.md](docs/README.md), the relevant `docs/current/` and `docs/rules/` files, and the nearest package `AGENTS.md`.
