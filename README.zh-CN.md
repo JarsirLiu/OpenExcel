@@ -8,10 +8,7 @@
 
 <p align="center"><a href="README.md">English</a> · <a href="https://github.com/JarsirLiu/OpenExcel">GitHub</a> · <a href="https://github.com/JarsirLiu/OpenExcel/issues">Issues</a></p>
 
-<p align="center">
-  <video src="https://github.com/JarsirLiu/OpenExcel/releases/download/demo-assets/openexcel-demo.mp4" controls width="900"></video><br />
-  <a href="https://github.com/JarsirLiu/OpenExcel/releases/download/demo-assets/openexcel-demo.mp4">观看演示视频</a>
-</p>
+https://github.com/user-attachments/assets/327c10d1-8f9d-45d7-937d-031553be58dc
 
 OpenExcel 保留熟悉的电子表格网格，同时在旁边提供 AI 工作区。导入工作簿，用自然语言描述你想要的变化，检查结果，再导出最终文件。
 
@@ -87,7 +84,7 @@ docker compose ps
 
 ## 更新 README 演示
 
-当演示流程变化时，替换 `demo-assets` Release 中的演示视频文件。
+当演示流程变化时，替换 GitHub user-attachments 中的演示视频地址。
 
 推荐镜头顺序：
 
