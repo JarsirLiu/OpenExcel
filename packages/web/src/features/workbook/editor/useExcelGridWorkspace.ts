@@ -1,5 +1,9 @@
 import type { WorkbookInstance } from "@fortune-sheet/react";
-import type { SheetChangeDelta, SheetChangeVersion } from "@openexcel/core";
+import {
+  extractSheetConfig,
+  type SheetChangeDelta,
+  type SheetChangeVersion,
+} from "@openexcel/core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { WorkbookFull } from "@/api/workbooks";
 import { createSheet, deleteSheet, deleteWorkbook, updateSheetName } from "@/api/workbooks";
@@ -17,6 +21,7 @@ import { confirm, toast } from "@/shared/lib";
 import { adaptFortuneSheetLayout, type SheetGridLayout } from "../layout/fortuneSheetLayout";
 import { findSheetIndexById } from "../sheetIdentity";
 import { FortuneSheetEventAdapter } from "./FortuneSheetEventAdapter";
+import { toFortuneSheetData } from "./fortuneSheet";
 import { planFortuneSheetMutation } from "./fortuneSheetMutationBridge";
 import type { FortuneSheetOp } from "./fortuneSheetOps";
 import { useSheetActivation } from "./SheetActivationContext";
@@ -39,6 +44,7 @@ type UseExcelGridWorkspaceProps = {
   ) => void;
   onSheetContentChanged?: SheetContentChangeHandler;
   onRegisterCommittedSheetMutation?: (handler: CommittedSheetMutationHandler | null) => void;
+  onEnsureAllSheetsLoaded?: () => Promise<WorkbookFull | null>;
   documentStore: WorkbookDocumentStore;
   sheetLoaded: boolean;
 };
@@ -56,6 +62,7 @@ export function useExcelGridWorkspace({
   onSheetRevisionChanged,
   onSheetContentChanged,
   onRegisterCommittedSheetMutation,
+  onEnsureAllSheetsLoaded,
   documentStore,
   sheetLoaded,
 }: UseExcelGridWorkspaceProps) {
@@ -226,12 +233,47 @@ export function useExcelGridWorkspace({
   const handleCommittedSheetMutation = useCallback<CommittedSheetMutationHandler>(
     (sheetId: number, delta: SheetChangeDelta, version: SheetChangeVersion) => {
       const run = async () => {
-        const currentWorkbook = workbookStateRef.current;
+        const initialWorkbook = workbookStateRef.current;
+        const unloadedSheetIds = new Set(
+          initialWorkbook?.sheets
+            .filter((sheet) => sheet.loaded === false)
+            .map((sheet) => sheet.id) ?? [],
+        );
+        const loadedWorkbook = await onEnsureAllSheetsLoaded?.();
+        const currentWorkbook = loadedWorkbook ?? workbookStateRef.current;
+        if (initialWorkbook?.id !== currentWorkbook?.id) {
+          throw new Error("The workbook changed while loading sheets for the committed mutation");
+        }
+        if (currentWorkbook?.sheets.some((item) => item.loaded === false)) {
+          throw new Error(
+            "All workbook sheets must be loaded before applying a committed mutation",
+          );
+        }
         const sheet = currentWorkbook?.sheets.find((item) => item.id === sheetId);
         const instance = workbookRef.current;
         const eventAdapter = eventAdapterRef.current;
         if (!currentWorkbook || !sheet || !instance || !eventAdapter) {
           throw new Error("The active FortuneSheet editor is not ready");
+        }
+
+        if (loadedWorkbook && unloadedSheetIds.size > 0) {
+          const newlyLoadedData = loadedWorkbook.sheets
+            .filter((loadedSheet) => unloadedSheetIds.has(loadedSheet.id))
+            .map(toFortuneSheetData);
+          for (const loadedSheet of newlyLoadedData) {
+            const loadedSheetId = Number(loadedSheet.id);
+            const snapshot = {
+              celldata: loadedSheet.celldata,
+              config: extractSheetConfig(loadedSheet),
+            };
+            eventAdapter.replaceSheetSnapshot(loadedSheetId, snapshot);
+            saveSnapshotsRef.current.set(loadedSheetId, snapshot);
+          }
+          if (newlyLoadedData.length > 0) {
+            instance.updateSheet(
+              newlyLoadedData as unknown as Parameters<typeof instance.updateSheet>[0],
+            );
+          }
         }
 
         const plan = planFortuneSheetMutation(sheet, delta);
@@ -277,7 +319,7 @@ export function useExcelGridWorkspace({
       committedMutationQueueRef.current = queued.catch(() => undefined);
       return queued;
     },
-    [acceptExternalMutation, applyDocumentChange, onSheetRevisionChanged],
+    [acceptExternalMutation, applyDocumentChange, onEnsureAllSheetsLoaded, onSheetRevisionChanged],
   );
 
   useEffect(() => {

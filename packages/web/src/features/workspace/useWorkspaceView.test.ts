@@ -73,7 +73,7 @@ vi.mock("./useWorkbookDocument", () => ({
     updateSheetRevision: vi.fn(),
     updateWorkbookMetadata: vi.fn(),
     loadWorkbook: mocks.loadWorkbook,
-    reloadCurrentWorkbook: vi.fn().mockResolvedValue(null),
+    reloadCurrentWorkbook: mocks.reloadCurrentWorkbook,
     loadSheet: async (sheetId: number) => {
       const loaded = await mocks.fetchSheet(1, sheetId, { signal: new AbortController().signal });
       if (currentWorkbook) {
@@ -100,6 +100,7 @@ describe("useWorkspaceView", () => {
     mocks.replaceCurrentWorkbook.mockReset();
     mocks.updateCurrentWorkbook.mockReset();
     mocks.loadWorkbook.mockReset();
+    mocks.reloadCurrentWorkbook.mockReset();
     mocks.commitWorkbook.mockReset();
     mocks.transition = null;
   });
@@ -171,5 +172,48 @@ describe("useWorkspaceView", () => {
 
     await waitFor(() => expect(mocks.commitWorkbook).toHaveBeenCalledWith(2));
     resolveLoad(loadedWorkbook);
+  });
+
+  it("loads all sheets without requesting an editor session replacement", async () => {
+    const firstSheet: SheetSchema = {
+      id: 1,
+      sheetNo: 0,
+      name: "First",
+      order: 0,
+      columns: [],
+      merges: [],
+      uploadedData: [],
+      config: null,
+      revision: 1,
+      loaded: true,
+    };
+    const unloadedSheet: SheetSchema = {
+      ...firstSheet,
+      id: 2,
+      sheetNo: 1,
+      name: "Second",
+      loaded: false,
+    };
+    const loadedWorkbook: WorkbookFull = {
+      id: 1,
+      publicId: "workbook-1",
+      name: "Workbook 1",
+      sheets: [firstSheet, unloadedSheet],
+      charts: [],
+    };
+    currentWorkbook = { ...loadedWorkbook, sheets: [firstSheet, unloadedSheet] };
+    mocks.reloadCurrentWorkbook.mockResolvedValue({
+      ...loadedWorkbook,
+      sheets: [firstSheet, { ...unloadedSheet, loaded: true }],
+    });
+
+    const { result } = renderHook(() => useWorkspaceView(1));
+
+    await result.current.ensureAllSheetsLoaded();
+
+    expect(mocks.reloadCurrentWorkbook).toHaveBeenCalledWith({
+      sheetIds: [1, 2],
+      preserveEditorSession: true,
+    });
   });
 });

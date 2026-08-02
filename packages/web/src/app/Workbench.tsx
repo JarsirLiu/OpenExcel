@@ -332,6 +332,7 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
           onSheetRevisionChanged={workbook.handleSheetRevisionChanged}
           onSheetContentChanged={workbook.handleSheetContentChanged}
           onRegisterCommittedSheetMutation={registerCommittedSheetMutation}
+          onEnsureAllSheetsLoaded={workbook.ensureAllSheetsLoaded}
         />
         <div className={styles.resizeHandle} onMouseDown={chatSidebarLayout.handleMouseDown} />
       </div>

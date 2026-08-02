@@ -190,7 +190,7 @@ export function useWorkbookDocument(
   );
 
   const reloadCurrentWorkbook = useCallback(
-    async (options?: { sheetIds?: readonly number[] }) => {
+    async (options?: { sheetIds?: readonly number[]; preserveEditorSession?: boolean }) => {
       const current = currentWorkbookRef.current;
       if (workspaceId == null || current == null) return null;
       const { generation, controller } = beginWorkbookRequest();
@@ -202,7 +202,9 @@ export function useWorkbookDocument(
         if (!isCurrentWorkbookRequest(generation, controller.signal)) return null;
         const merged = documentStore.mergeRemoteSnapshot(next);
         currentWorkbookRef.current = merged;
-        setWorkbookRevision((revision) => revision + 1);
+        if (!options?.preserveEditorSession) {
+          setWorkbookRevision((revision) => revision + 1);
+        }
         return merged;
       } catch (error) {
         if (controller.signal.aborted || isAbortError(error)) return null;

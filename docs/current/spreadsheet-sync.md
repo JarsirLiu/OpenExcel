@@ -105,6 +105,11 @@ dependencies from a mutation.
   expression, are copied into the browser workbook document before the sparse
   mutation is scheduled. Charts read that current document data and therefore
   update without waiting for the Server.
+- When a committed AI Sheet mutation arrives and the workbook still contains
+  unloaded Sheets, the Web loads the complete workbook into the existing
+  FortuneSheet instance before running the mutation and full recalculation.
+  This is required for cross-Sheet formula dependencies; it does not change
+  the lazy-loading behavior of ordinary workbook navigation.
 - The Server persists the browser-submitted recalculated cells transactionally;
   it does not recalculate formulas. After a successful save, the Sheet
   revision advances and a reload reads the persisted formula cache back into

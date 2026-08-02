@@ -118,6 +118,16 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
     });
   }, [currentWorkbook, reloadCurrentWorkbook, workspaceId]);
 
+  const ensureAllSheetsLoaded = useCallback(async () => {
+    const current = currentWorkbookRef.current;
+    if (workspaceId == null || current == null) return current;
+    if (current.sheets.every((sheet) => sheet.loaded !== false)) return current;
+    return reloadCurrentWorkbook({
+      sheetIds: current.sheets.map((sheet) => sheet.id),
+      preserveEditorSession: true,
+    });
+  }, [currentWorkbookRef, reloadCurrentWorkbook, workspaceId]);
+
   const refreshCurrentCharts = useCallback(async () => {
     const workbook = currentWorkbookRef.current;
     if (!workbook || workspaceId == null) return;
@@ -450,6 +460,7 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
     handleSheetContentChanged: updateSheetContent,
     handleWorkbookStructureChanged,
     handleWorkbookRefresh: refreshCurrentWorkbook,
+    ensureAllSheetsLoaded,
     handleChartsRefresh: refreshCurrentCharts,
     handleChartMutation,
     handleWorkspaceRefresh,
