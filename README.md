@@ -17,8 +17,8 @@
 </p>
 
 <p align="center">
-  <video src="packages/web/public/assets/openexcel-demo.mp4" controls width="900"></video><br />
-  <a href="packages/web/public/assets/openexcel-demo.mp4">Watch the demo video</a>
+  <video src="https://github.com/JarsirLiu/OpenExcel/releases/download/demo-assets/openexcel-demo.mp4" controls width="900"></video><br />
+  <a href="https://github.com/JarsirLiu/OpenExcel/releases/download/demo-assets/openexcel-demo.mp4">Watch the demo video</a>
 </p>
 
 OpenExcel keeps the spreadsheet grid people already know and adds an AI workspace beside it. Import a workbook, describe the change in natural language, review the result, and export the workbook when it is ready.
@@ -145,7 +145,7 @@ The monorepo packages are intentionally separated:
 
 ## Updating the README demo
 
-Replace `packages/web/public/assets/openexcel-demo.mp4` with a current product recording when the demo flow changes.
+Replace the `demo-assets` release asset with a current product recording when the demo flow changes.
 
 Recommended story:
 
