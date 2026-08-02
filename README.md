@@ -1,7 +1,7 @@
 # OpenExcel
 
 <p align="center">
-  <img src="docs/assets/openexcel-logo.svg" alt="OpenExcel logo" width="112" />
+  <img src="packages/web/public/assets/openexcel-logo.svg" alt="OpenExcel logo" width="112" />
 </p>
 
 <p align="center"><strong>AI-native spreadsheet workbench for importing, editing, charting, and formula-driven workflows.</strong></p>
@@ -16,11 +16,10 @@
   <img src="https://img.shields.io/badge/license-not%20published-lightgrey.svg" alt="License not published" />
 </p>
 
-<!-- After recording the real product tour, uncomment this block:
 <p align="center">
-  <img src="docs/assets/openexcel-demo.gif" alt="OpenExcel product tour" width="900" />
+  <video src="packages/web/public/assets/openexcel-demo.mp4" controls width="900"></video><br />
+  <a href="packages/web/public/assets/openexcel-demo.mp4">Watch the demo video</a>
 </p>
--->
 
 OpenExcel keeps the spreadsheet grid people already know and adds an AI workspace beside it. Import a workbook, describe the change in natural language, review the result, and export the workbook when it is ready.
 
@@ -144,9 +143,9 @@ The monorepo packages are intentionally separated:
 - `packages/agent` owns the model loop, context, events, retries, and tool adaptation.
 - `packages/core` owns spreadsheet primitives, Excel conversion, chart models, and tool contracts.
 
-## Recording the README demo
+## Updating the README demo
 
-Add your real 10–15 second recording at `docs/assets/openexcel-demo.gif`, then uncomment the image block near the top of this file.
+Replace `packages/web/public/assets/openexcel-demo.mp4` with a current product recording when the demo flow changes.
 
 Recommended story:
 
@@ -163,7 +162,7 @@ This is a proposed public roadmap, not a description of already-implemented beha
 - [x] Workspaces, workbooks, sheets, import/export, charts, and AI chat loop
 - [x] Read-only replay examples for product discovery
 - [x] Docker-based local production profile
-- [ ] Replace the placeholder with a real end-to-end capture
+- [x] Replace the placeholder with a real end-to-end capture
 - [ ] Add a repository license and publish a first stable release
 - [ ] Add measured workflow benchmarks instead of illustrative time savings
 - [ ] Document production hardening, backups, observability, and deployment profiles

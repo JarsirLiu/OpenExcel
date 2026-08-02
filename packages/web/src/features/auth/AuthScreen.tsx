@@ -79,11 +79,12 @@ export function AuthScreen({
     <div className={styles.shell}>
       <nav className={styles.nav}>
         <Link className={styles.brand} to={routePaths.home}>
-          <span className={styles.brandMark}>
-            <span className={styles.markLine}></span>
-            <span className={styles.markLine}></span>
-            <span className={styles.markLine}></span>
-          </span>
+          <img
+            className={styles.brandLogo}
+            src="/assets/openexcel-logo.svg"
+            alt=""
+            aria-hidden="true"
+          />
           OpenExcel
         </Link>
         <Link className={styles.catalogLink} to={routePaths.demos}>

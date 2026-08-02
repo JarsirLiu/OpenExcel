@@ -39,32 +39,12 @@
   color: #252521;
 }
 
-.brandMark {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 27px;
-  height: 27px;
-  gap: 2px;
-}
-
-.brandMark::before {
-  position: absolute;
-  inset: 0;
-  border: 1.7px solid #252521;
-  border-radius: 7px;
-  content: "";
-}
-
-.markLine {
-  position: relative;
-  z-index: 1;
-  display: inline-block;
-  width: 6px;
-  height: 1.5px;
-  border-radius: 1px;
-  background: #252521;
+.brandLogo {
+  display: block;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
 }
 
 .liveStatus i {

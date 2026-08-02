@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">OpenExcel logo</title>
+  <desc id="desc">A rounded spreadsheet tile with an AI sparkle</desc>
+  <defs>
+    <linearGradient id="tile" x1="72" y1="56" x2="438" y2="462" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#182A4A"/>
+      <stop offset="1" stop-color="#0B1021"/>
+    </linearGradient>
+    <linearGradient id="sheet" x1="139" y1="122" x2="352" y2="386" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F7FFFC"/>
+      <stop offset="1" stop-color="#D5F4E7"/>
+    </linearGradient>
+    <linearGradient id="spark" x1="372" y1="89" x2="445" y2="166" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#B9F7DE"/>
+      <stop offset="1" stop-color="#62D4B0"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#050814" flood-opacity=".35"/>
+    </filter>
+  </defs>
+  <rect x="40" y="40" width="432" height="432" rx="112" fill="url(#tile)" filter="url(#shadow)"/>
+  <path d="M126 121a25 25 0 0 1 25-25h164l72 72v219a25 25 0 0 1-25 25H151a25 25 0 0 1-25-25V121Z" fill="url(#sheet)"/>
+  <path d="M315 96v58a14 14 0 0 0 14 14h58" fill="#B8E8D6"/>
+  <path d="M171 214h173M171 268h173M171 322h173M228 182v171M286 182v171" fill="none" stroke="#5CB695" stroke-width="15" stroke-linecap="round" opacity=".74"/>
+  <path d="m400 84 11 30 30 11-30 11-11 30-11-30-30-11 30-11 11-30Z" fill="url(#spark)"/>
+  <path d="m369 149 6 16 16 6-16 6-6 16-6-16-16-6 16-6 6-16Z" fill="#E7FFF5" opacity=".95"/>
+  <circle cx="112" cy="385" r="9" fill="#62D4B0" opacity=".9"/>
+  <circle cx="402" cy="381" r="7" fill="#8A9CF7" opacity=".9"/>
+</svg>

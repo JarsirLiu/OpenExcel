@@ -66,7 +66,11 @@ const AttachIcon = () => (
   </svg>
 );
 
-const PLACEHOLDERS = ["使用 @ 来引用表格", "让 AI 来帮你修改表格"];
+const PLACEHOLDER_KEYS = [
+  "chat_placeholder_reference",
+  "chat_placeholder_edit",
+  "chat_placeholder_download",
+] as const;
 
 export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(function ChatComposer(
   { isStreaming, onSend, onStop, onAttachExcel, referenceCacheRevision, workspaceId, contextUsage },
@@ -93,7 +97,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setPlaceholderIndex((prev) => (prev + 1) % PLACEHOLDERS.length);
+      setPlaceholderIndex((prev) => (prev + 1) % PLACEHOLDER_KEYS.length);
     }, 3000);
     return () => clearInterval(interval);
   }, []);
@@ -123,7 +127,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
         <div className={styles.editorWrap}>
           <div className={styles.editorScroll}>{editor && <EditorContent editor={editor} />}</div>
           {editorEmpty && (
-            <span className={styles.placeholder}>{PLACEHOLDERS[placeholderIndex]}</span>
+            <span className={styles.placeholder}>{t(PLACEHOLDER_KEYS[placeholderIndex])}</span>
           )}
         </div>
 

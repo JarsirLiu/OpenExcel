@@ -199,10 +199,7 @@ export function WorkspaceSidebar({
         aria-label={resolvedHomeLabel}
         title={resolvedHomeLabel}
       >
-        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-          <rect x="1.5" y="1.5" width="13" height="13" rx="3" stroke="currentColor" />
-          <path d="M5 1.8v12.4M10.8 1.8v12.4M1.8 6.8h12.4" stroke="currentColor" />
-        </svg>
+        <img src="/assets/openexcel-logo.svg" alt="" aria-hidden="true" />
       </button>
       <button
         className={styles.expandBtn}
@@ -231,10 +228,7 @@ export function WorkspaceSidebar({
           title={resolvedHomeLabel}
         >
           <span className={styles.homeMark} aria-hidden="true">
-            <svg width="17" height="17" viewBox="0 0 18 18" fill="none">
-              <rect x="1.5" y="1.5" width="15" height="15" rx="3.5" stroke="currentColor" />
-              <path d="M6 1.8v14.4M12.2 1.8v14.4M1.8 7.5h14.4" stroke="currentColor" />
-            </svg>
+            <img src="/assets/openexcel-logo.svg" alt="" />
           </span>
           <span className={styles.homeCopy}>
             <strong>OpenExcel</strong>

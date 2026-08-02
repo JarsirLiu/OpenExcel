@@ -1,16 +1,17 @@
 # OpenExcel
 
 <p align="center">
-  <img src="docs/assets/openexcel-logo.svg" alt="OpenExcel Logo" width="112" />
+  <img src="packages/web/public/assets/openexcel-logo.svg" alt="OpenExcel Logo" width="112" />
 </p>
 
 <p align="center"><strong>面向 AI 的多工作表 Excel 工作台：导入数据、编辑表格、生成图表，并用自然语言完成公式工作。</strong></p>
 
 <p align="center"><a href="README.md">English</a> · <a href="https://github.com/JarsirLiu/OpenExcel">GitHub</a> · <a href="https://github.com/JarsirLiu/OpenExcel/issues">Issues</a></p>
 
-<!-- 录制真实 GIF 后，把它放到 docs/assets/openexcel-demo.gif，并取消下面注释：
-<p align="center"><img src="docs/assets/openexcel-demo.gif" alt="OpenExcel 产品演示" width="900" /></p>
--->
+<p align="center">
+  <video src="packages/web/public/assets/openexcel-demo.mp4" controls width="900"></video><br />
+  <a href="packages/web/public/assets/openexcel-demo.mp4">观看演示视频</a>
+</p>
 
 OpenExcel 保留熟悉的电子表格网格，同时在旁边提供 AI 工作区。导入工作簿，用自然语言描述你想要的变化，检查结果，再导出最终文件。
 
@@ -84,9 +85,9 @@ docker compose ps
 
 完整部署说明见 [docs/current/docker-deployment.md](docs/current/docker-deployment.md)。
 
-## 录制 README 演示
+## 更新 README 演示
 
-请把你的真实 10–15 秒 GIF 放到 `docs/assets/openexcel-demo.gif`，再取消 README 顶部的图片注释。
+当演示流程变化时，替换 `packages/web/public/assets/openexcel-demo.mp4`。
 
 推荐镜头顺序：
 
@@ -99,7 +100,7 @@ docker compose ps
 - [x] 工作区、工作簿、工作表、导入导出、图表和 AI 对话循环
 - [x] 只读回放案例
 - [x] Docker 本地生产模式
-- [ ] 用真实端到端录屏替换占位位置
+- [x] 用真实端到端录屏替换占位位置
 - [ ] 增加仓库 License 并发布首个稳定版本
 - [ ] 用真实测量数据替换宣传中的时间节省数字
 - [ ] 补充备份、可观测性和生产加固文档

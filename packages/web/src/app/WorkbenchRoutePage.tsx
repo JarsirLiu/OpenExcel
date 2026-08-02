@@ -34,19 +34,12 @@ function LoadingScreen() {
             letterSpacing: "-0.02em",
           }}
         >
-          <span
-            style={{
-              display: "inline-block",
-              width: 20,
-              height: 20,
-              border: "2px solid var(--text-primary)",
-              borderRadius: 4,
-              backgroundImage:
-                "linear-gradient(to right, transparent 0, transparent calc(33.33% - 1px), var(--text-primary) calc(33.33% - 1px), var(--text-primary) 33.33%, transparent 33.33%), linear-gradient(to right, transparent 0, transparent calc(66.66% - 1px), var(--text-primary) calc(66.66% - 1px), var(--text-primary) 66.66%, transparent 66.66%)",
-              backgroundSize: "100% 100%",
-              backgroundRepeat: "no-repeat",
-            }}
-          ></span>
+          <img
+            src="/assets/openexcel-logo.svg"
+            alt=""
+            aria-hidden="true"
+            style={{ width: 24, height: 24 }}
+          />
           OpenExcel
         </div>
         <div style={{ marginTop: 12, color: "var(--text-secondary)", fontSize: 13 }}>
