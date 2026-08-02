@@ -140,18 +140,6 @@ The monorepo packages are intentionally separated:
 - `packages/agent` owns the model loop, context, events, retries, and tool adaptation.
 - `packages/core` owns spreadsheet primitives, Excel conversion, chart models, and tool contracts.
 
-## Updating the README demo
-
-Replace the GitHub user-attachments video URL with a current product recording when the demo flow changes.
-
-Recommended story:
-
-1. Import an Excel workbook.
-2. Ask: “Create a monthly chart and fill the margin formula for each row.”
-3. Show the changed chart, formula preview, and export action.
-
-Keep the cursor visible, use a realistic workbook, and finish on the result rather than on the prompt. This is the most important asset for converting README visitors into users.
-
 ## Roadmap
 
 This is a proposed public roadmap, not a description of already-implemented behavior:

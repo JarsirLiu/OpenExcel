@@ -82,16 +82,6 @@ docker compose ps
 
 完整部署说明见 [docs/current/docker-deployment.md](docs/current/docker-deployment.md)。
 
-## 更新 README 演示
-
-当演示流程变化时，替换 GitHub user-attachments 中的演示视频地址。
-
-推荐镜头顺序：
-
-1. 导入一个 Excel 工作簿。
-2. 输入“生成月度图表，并为每行补充利润率公式”。
-3. 展示图表、公式预览和导出动作。
-
 ## Roadmap
 
 - [x] 工作区、工作簿、工作表、导入导出、图表和 AI 对话循环
