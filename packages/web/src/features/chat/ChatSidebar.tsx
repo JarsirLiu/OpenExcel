@@ -1,6 +1,7 @@
 import type { SheetChangeDelta, SheetChangeVersion } from "@openexcel/core";
 import { SessionShell } from "@/features/session/SessionShell";
 import type { useSessionWorkspace } from "@/features/session/useSessionWorkspace";
+import type { CommittedSheetMutationHandler } from "@/features/sync/sheetEditorChange";
 import styles from "./ChatSidebar.module.css";
 
 type CurrentUser = {
@@ -14,6 +15,7 @@ export function ChatSidebar({
   onWorkspaceRefresh,
   onChartsRefresh,
   onSheetChanged,
+  onCommittedSheetMutation,
   onAttachExcel,
   referenceCacheRevision,
   workspaceId,
@@ -30,6 +32,7 @@ export function ChatSidebar({
     delta: SheetChangeDelta | null,
     version?: SheetChangeVersion,
   ) => void | Promise<void>;
+  onCommittedSheetMutation?: CommittedSheetMutationHandler;
   onAttachExcel: (files: File[]) => Promise<void> | void;
   referenceCacheRevision: number;
   workspaceId: number | null;
@@ -47,6 +50,7 @@ export function ChatSidebar({
         onWorkspaceRefresh={onWorkspaceRefresh}
         onChartsRefresh={onChartsRefresh}
         onSheetChanged={onSheetChanged}
+        onCommittedSheetMutation={onCommittedSheetMutation}
         referenceCacheRevision={referenceCacheRevision}
         onAttachExcel={onAttachExcel}
         currentUser={currentUser}

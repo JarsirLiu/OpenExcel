@@ -1,5 +1,8 @@
 import type { WorkbookFull } from "@/api/workbooks";
-import type { SheetContentChangeHandler } from "@/features/sync/sheetEditorChange";
+import type {
+  CommittedSheetMutationHandler,
+  SheetContentChangeHandler,
+} from "@/features/sync/sheetEditorChange";
 import type { WorkbookStructureUpdate } from "@/features/sync/types";
 import type { ChartMutation } from "@/features/workbook/charts/chartMutation";
 import type { DemoGridFocus } from "@/features/workbook/editor/demoGridFocus";
@@ -29,6 +32,7 @@ interface Props {
     persistedThroughVersion?: number,
   ) => void;
   onSheetContentChanged?: SheetContentChangeHandler;
+  onRegisterCommittedSheetMutation?: (handler: CommittedSheetMutationHandler | null) => void;
   demoGridFocus?: DemoGridFocus;
 }
 
@@ -50,6 +54,7 @@ export function ExcelWorkspace({
   onWorkbookMutation,
   onSheetRevisionChanged,
   onSheetContentChanged,
+  onRegisterCommittedSheetMutation,
   demoGridFocus,
 }: Props) {
   return (
@@ -73,6 +78,7 @@ export function ExcelWorkspace({
           onWorkbookMutation={onWorkbookMutation}
           onSheetRevisionChanged={onSheetRevisionChanged}
           onSheetContentChanged={onSheetContentChanged}
+          onRegisterCommittedSheetMutation={onRegisterCommittedSheetMutation}
           demoGridFocus={demoGridFocus}
         />
       </div>

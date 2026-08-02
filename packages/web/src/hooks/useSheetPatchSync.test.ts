@@ -1,15 +1,105 @@
 import { renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import {
-  collectChartMutationToolCallIds,
+  collectSheetMutationToolCallIds,
   collectSheetPatchUpdates,
-  collectWorkbookMutationToolCallIds,
-  collectWorkbookRefreshToolCallIds,
-  collectWorkbookStructureUpdates,
+  parseCommittedMutationToolEvent,
+  parseCommittedSheetToolEvent,
   useSheetPatchSync,
 } from "../features/chat/hooks/useSheetPatchSync";
 
 describe("collectSheetPatchUpdates", () => {
+  it("parses a committed sheet mutation from the live event stream", () => {
+    const update = parseCommittedSheetToolEvent({
+      eventId: "event-1",
+      sequence: 4,
+      type: "tool.finished",
+      occurredAt: "2026-08-02T00:00:00.000Z",
+      payload: {
+        toolCallId: "tool-live",
+        toolName: "writeCells",
+        output: {
+          sheetInfo: { sheetId: 11, sheetNo: 2, sheetName: "Budget" },
+          changeSummary: {
+            changedCellCount: 1,
+            changedRanges: ["B1"],
+            omittedRangeCount: 0,
+            truncated: false,
+            operationCount: 1,
+          },
+          delta: {
+            type: "write",
+            operations: [
+              { type: "range", startRow: 1, startCol: 2, endRow: 1, endCol: 2, value: "123" },
+            ],
+          },
+          baseRevision: 7,
+          revision: 8,
+        },
+      },
+    });
+
+    expect(update).toEqual({
+      toolCallId: "tool-live",
+      sheetId: 11,
+      sheetNo: 2,
+      delta: {
+        type: "write",
+        operations: [
+          { type: "range", startRow: 1, startCol: 2, endRow: 1, endCol: 2, value: "123" },
+        ],
+      },
+      version: { baseRevision: 7, revision: 8 },
+    });
+  });
+
+  it("ignores failed or read-tool events", () => {
+    const baseEvent = {
+      eventId: "event-2",
+      sequence: 5,
+      type: "tool.finished" as const,
+      occurredAt: "2026-08-02T00:00:00.000Z",
+      payload: {
+        toolCallId: "tool-read",
+        toolName: "readSheetData",
+        output: {},
+      },
+    };
+
+    expect(parseCommittedSheetToolEvent(baseEvent)).toBeNull();
+    expect(
+      parseCommittedSheetToolEvent({
+        ...baseEvent,
+        payload: { ...baseEvent.payload, toolName: "writeCells", error: { kind: "failed" } },
+      }),
+    ).toBeNull();
+  });
+
+  it("classifies committed workbook and chart mutations", () => {
+    const baseEvent = {
+      eventId: "event-mutation",
+      sequence: 6,
+      type: "tool.finished" as const,
+      occurredAt: "2026-08-02T00:00:00.000Z",
+      payload: {
+        toolCallId: "tool-mutation",
+        toolName: "createChart",
+        output: { success: true },
+      },
+    };
+
+    expect(parseCommittedMutationToolEvent(baseEvent)).toEqual({
+      kind: "chart",
+      toolCallId: "tool-mutation",
+    });
+    expect(
+      parseCommittedMutationToolEvent({
+        ...baseEvent,
+        payload: { ...baseEvent.payload, toolName: "createSheet" },
+      }),
+    ).toEqual({ kind: "workbook", toolCallId: "tool-mutation" });
+  });
+
   it("collects valid completed patch outputs once", () => {
     const messages = [
       {
@@ -169,131 +259,8 @@ describe("collectSheetPatchUpdates", () => {
   });
 });
 
-describe("collectWorkbookStructureUpdates", () => {
-  it("collects workbook and sheet creation outputs once", () => {
-    const messages = [
-      {
-        role: "assistant",
-        parts: [
-          {
-            toolCallId: "tool-5",
-            type: "tool-createWorkbook",
-            state: "output-available",
-            input: { sourceSheetId: 9 },
-            output: {
-              id: 21,
-              name: "Monthly Plan",
-              order: 4,
-              sheets: 1,
-              initialSheet: { id: 88, sheetNo: 1, name: "Sheet 1", order: 0 },
-            },
-          },
-        ],
-      },
-      {
-        role: "assistant",
-        parts: [
-          {
-            toolCallId: "tool-6",
-            type: "tool-createSheet",
-            state: "output-available",
-            input: { workbookId: 21 },
-            output: {
-              workbookId: 21,
-              id: 89,
-              sheetNo: 2,
-              name: "Extra",
-              order: 1,
-            },
-          },
-        ],
-      },
-    ];
-
-    const updates = collectWorkbookStructureUpdates(messages, new Set(["tool-5"]));
-
-    expect(updates).toEqual([
-      {
-        toolCallId: "tool-6",
-        kind: "sheet-created",
-        workbookId: 21,
-        sheetId: 89,
-        sheetNo: 2,
-        sheetName: "Extra",
-        order: 1,
-        sourceSheetId: null,
-      },
-    ]);
-  });
-
-  it("detects createSheet with ai-sdk v7 static tool format (type: tool-{name})", () => {
-    const messages = [
-      {
-        role: "assistant",
-        parts: [
-          {
-            toolCallId: "tool-8",
-            type: "tool-createSheet",
-            state: "output-available",
-            input: { workbookId: 21 },
-            output: {
-              workbookId: 21,
-              id: 91,
-              sheetNo: 3,
-              name: "NewSheet",
-              order: 2,
-            },
-          },
-        ],
-      },
-    ];
-
-    const updates = collectWorkbookStructureUpdates(messages, new Set());
-
-    expect(updates).toEqual([
-      {
-        toolCallId: "tool-8",
-        kind: "sheet-created",
-        workbookId: 21,
-        sheetId: 91,
-        sheetNo: 3,
-        sheetName: "NewSheet",
-        order: 2,
-        sourceSheetId: null,
-      },
-    ]);
-  });
-
-  it("skips malformed structure outputs", () => {
-    const messages = [
-      {
-        role: "assistant",
-        parts: [
-          {
-            toolCallId: "tool-7",
-            type: "tool-createWorkbook",
-            state: "output-available",
-            input: {},
-            output: {
-              id: 22,
-              name: "Broken",
-              order: "bad",
-              sheets: 1,
-              initialSheet: { id: 90, sheetNo: 1, name: "Sheet 1", order: 0 },
-            },
-          },
-        ],
-      },
-    ];
-
-    const updates = collectWorkbookStructureUpdates(messages, new Set());
-
-    expect(updates).toEqual([]);
-  });
-});
-
-describe("collectWorkbookMutationToolCallIds", () => {
-  it("collects new sheet and structure tool calls without duplicating seen ids", () => {
+describe("collectSheetMutationToolCallIds", () => {
+  it("collects new sheet tool calls without duplicating seen ids", () => {
     const messages = [
       {
         role: "assistant",
@@ -318,27 +285,12 @@ describe("collectWorkbookMutationToolCallIds", () => {
               },
             },
           },
-          {
-            toolCallId: "tool-11",
-            type: "tool-createSheet",
-            state: "output-available",
-            input: {},
-            output: {
-              workbookId: 7,
-              id: 32,
-              sheetNo: 2,
-              name: "Sheet2",
-              order: 1,
-            },
-          },
         ],
       },
     ];
 
-    expect(collectWorkbookMutationToolCallIds(messages, new Set(["tool-10"]))).toEqual(["tool-11"]);
-    expect(new Set(collectWorkbookMutationToolCallIds(messages, new Set()))).toEqual(
-      new Set(["tool-10", "tool-11"]),
-    );
+    expect(collectSheetMutationToolCallIds(messages, new Set(["tool-10"]))).toEqual([]);
+    expect(collectSheetMutationToolCallIds(messages, new Set())).toEqual(["tool-10"]);
   });
 
   it("returns an empty list when only historical tool calls are present", () => {
@@ -348,109 +300,16 @@ describe("collectWorkbookMutationToolCallIds", () => {
         parts: [
           {
             toolCallId: "tool-12",
-            type: "tool-createWorkbook",
+            type: "tool-readSheetData",
             state: "output-available",
             input: {},
-            output: {
-              id: 41,
-              name: "Budget",
-              order: 0,
-              sheets: 1,
-              initialSheet: { id: 51, sheetNo: 1, name: "Sheet 1", order: 0 },
-            },
+            output: { cells: [[1]] },
           },
         ],
       },
     ];
 
-    expect(collectWorkbookMutationToolCallIds(messages, new Set(["tool-12"]))).toEqual([]);
-  });
-});
-
-describe("collectWorkbookRefreshToolCallIds", () => {
-  it("does not request a full refresh for handled sheet deltas", () => {
-    const messages = [
-      {
-        role: "assistant",
-        parts: [
-          {
-            toolCallId: "tool-sheet",
-            type: "tool-writeCells",
-            state: "output-available",
-            input: { sheetId: 31 },
-            output: {
-              sheetInfo: { sheetId: 31, sheetNo: 1, sheetName: "Sheet1" },
-              changeSummary: {
-                changedCellCount: 1,
-                changedRanges: ["A1"],
-                omittedRangeCount: 0,
-                truncated: false,
-                operationCount: 1,
-              },
-              delta: {
-                type: "write",
-                operations: [
-                  { type: "range", startRow: 1, startCol: 1, endRow: 1, endCol: 1, value: "x" },
-                ],
-              },
-            },
-          },
-          {
-            toolCallId: "tool-chart",
-            type: "tool-updateChart",
-            state: "output-available",
-            input: { chartId: "chart-1" },
-            output: { success: true },
-          },
-        ],
-      },
-    ];
-
-    expect(
-      collectWorkbookRefreshToolCallIds(messages, new Set(), { sheetDeltasHandled: true }),
-    ).toEqual([]);
-  });
-
-  it("keeps chart mutations in the chart refresh channel", () => {
-    const messages = [
-      {
-        role: "assistant",
-        parts: [
-          {
-            toolCallId: "tool-sheet",
-            type: "tool-writeCells",
-            state: "output-available",
-            input: { sheetId: 31 },
-            output: {
-              sheetInfo: { sheetId: 31, sheetNo: 1, sheetName: "Sheet1" },
-              changeSummary: {
-                changedCellCount: 1,
-                changedRanges: ["A1"],
-                omittedRangeCount: 0,
-                truncated: false,
-                operationCount: 1,
-              },
-              delta: {
-                type: "write",
-                operations: [
-                  { type: "range", startRow: 1, startCol: 1, endRow: 1, endCol: 1, value: "x" },
-                ],
-              },
-            },
-          },
-          {
-            toolCallId: "tool-chart",
-            type: "tool-updateChart",
-            state: "output-available",
-            input: { chartId: "chart-1" },
-            output: { success: true },
-          },
-        ],
-      },
-    ];
-
-    expect(collectChartMutationToolCallIds(messages, new Set())).toEqual(["tool-chart"]);
-    expect(collectWorkbookMutationToolCallIds(messages, new Set())).toEqual(["tool-sheet"]);
+    expect(collectSheetMutationToolCallIds(messages, new Set(["tool-12"]))).toEqual([]);
   });
 });
 
@@ -519,7 +378,7 @@ describe("useSheetPatchSync", () => {
 
     const { rerender } = renderHook(
       ({ messages, historyReady }: { messages: typeof history; historyReady: boolean }) =>
-        useSheetPatchSync(messages, onSheetChanged, undefined, historyReady),
+        useSheetPatchSync(messages, onSheetChanged, historyReady),
       { initialProps: { messages: history, historyReady: true } },
     );
 
@@ -601,7 +460,7 @@ describe("useSheetPatchSync", () => {
 
     const { rerender } = renderHook(
       ({ messages, historyReady }: { messages: typeof liveMessages; historyReady: boolean }) =>
-        useSheetPatchSync(messages, onSheetChanged, undefined, historyReady, historicalToolCallIds),
+        useSheetPatchSync(messages, onSheetChanged, historyReady, historicalToolCallIds),
       { initialProps: { messages: liveMessages, historyReady: false } },
     );
 
@@ -682,12 +541,50 @@ describe("useSheetPatchSync", () => {
 
     const { rerender } = renderHook(
       ({ messages }: { messages: typeof currentMessages }) =>
-        useSheetPatchSync(messages, onSheetChanged, undefined, true, historicalToolCallIds),
+        useSheetPatchSync(messages, onSheetChanged, true, historicalToolCallIds),
       { initialProps: { messages: currentMessages } },
     );
 
     historicalToolCallIds.add("older-tool");
     rerender({ messages: [olderMessage, ...currentMessages] });
+    await waitFor(() => expect(onSheetChanged).not.toHaveBeenCalled());
+  });
+
+  it("does not replay a live delta that was already applied from the event stream", async () => {
+    const onSheetChanged = vi.fn();
+    const liveToolCallIds = new Set(["live-tool"]);
+    const messages = [
+      {
+        role: "assistant",
+        parts: [
+          {
+            toolCallId: "live-tool",
+            type: "tool-writeCells",
+            state: "output-available",
+            input: { sheetId: 31 },
+            output: {
+              sheetInfo: { sheetId: 31, sheetNo: 1, sheetName: "Sheet1" },
+              changeSummary: {
+                changedCellCount: 1,
+                changedRanges: ["A1"],
+                omittedRangeCount: 0,
+                truncated: false,
+                operationCount: 1,
+              },
+              delta: {
+                type: "write",
+                operations: [
+                  { type: "range", startRow: 1, startCol: 1, endRow: 1, endCol: 1, value: "new" },
+                ],
+              },
+            },
+          },
+        ],
+      },
+    ];
+
+    renderHook(() => useSheetPatchSync(messages, onSheetChanged, true, new Set(), liveToolCallIds));
+
     await waitFor(() => expect(onSheetChanged).not.toHaveBeenCalled());
   });
 });

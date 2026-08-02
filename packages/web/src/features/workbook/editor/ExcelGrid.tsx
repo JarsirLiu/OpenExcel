@@ -1,7 +1,10 @@
 import { useMemo, useRef } from "react";
 import "@fortune-sheet/react/dist/index.css";
 import type { WorkbookFull } from "@/api/workbooks";
-import type { SheetContentChangeHandler } from "@/features/sync/sheetEditorChange";
+import type {
+  CommittedSheetMutationHandler,
+  SheetContentChangeHandler,
+} from "@/features/sync/sheetEditorChange";
 import type { WorkbookStructureUpdate } from "@/features/sync/types";
 import { ChartOverlay } from "@/features/workbook/charts/ChartOverlay";
 import type { ChartMutation } from "@/features/workbook/charts/chartMutation";
@@ -82,6 +85,7 @@ interface Props {
     persistedThroughVersion?: number,
   ) => void;
   onSheetContentChanged?: SheetContentChangeHandler;
+  onRegisterCommittedSheetMutation?: (handler: CommittedSheetMutationHandler | null) => void;
   demoGridFocus?: DemoGridFocus;
 }
 
@@ -103,6 +107,7 @@ export function ExcelGrid({
   onWorkbookMutation,
   onSheetRevisionChanged,
   onSheetContentChanged,
+  onRegisterCommittedSheetMutation,
   demoGridFocus,
 }: Props) {
   const gridRootRef = useRef<HTMLDivElement>(null);
@@ -137,6 +142,7 @@ export function ExcelGrid({
     onWorkbookMutation,
     onSheetRevisionChanged,
     onSheetContentChanged,
+    onRegisterCommittedSheetMutation,
     documentStore,
     sheetLoaded,
   });

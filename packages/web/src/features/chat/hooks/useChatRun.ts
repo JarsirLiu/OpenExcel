@@ -3,7 +3,7 @@ import { cancelRun } from "@/api/chat";
 import type { ChatReferenceTarget } from "../composer/chatReferences";
 import type { AssistantActivity } from "../conversation/assistantActivity";
 import type { ConversationStore } from "../conversation/conversationStore";
-import { openChatEventStream } from "../transport/chatEventStream";
+import { type ChatEvent, openChatEventStream } from "../transport/chatEventStream";
 
 type ChatUserMessage = {
   id: string;
@@ -39,6 +39,7 @@ export function useChatRun({
   onSessionActivated,
   onUserTurnAccepted,
   onInvalidateUndo,
+  onToolFinished,
 }: {
   sessionId: number | null;
   workspaceId: number;
@@ -47,6 +48,7 @@ export function useChatRun({
   onSessionActivated?: (sessionId: number) => Promise<void> | void;
   onUserTurnAccepted?: (sessionId: number) => void;
   onInvalidateUndo?: () => void;
+  onToolFinished?: (event: ChatEvent) => void | Promise<void>;
 }) {
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<Error | undefined>();
@@ -222,6 +224,11 @@ export function useChatRun({
               continue;
             }
             store.applyEvent(event);
+            if (event.type === "tool.finished") {
+              void Promise.resolve(onToolFinished?.(event)).catch((error) => {
+                console.error("[chat] Failed to apply committed tool result:", error);
+              });
+            }
             if (cancelRequestedRef.current) {
               clearAssistantActivity();
             } else if (event.type === "step.started") {
@@ -303,6 +310,7 @@ export function useChatRun({
       onInvalidateUndo,
       onSessionActivated,
       onUserTurnAccepted,
+      onToolFinished,
       requestRunCancellation,
       clearAssistantActivity,
       markAssistantResponding,

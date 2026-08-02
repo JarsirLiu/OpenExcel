@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchMessages as fetchChatMessages, fetchContextUsage } from "@/api/chat";
 import type { ConversationStore } from "../conversation/conversationStore";
-import { collectWorkbookMutationToolCallIds } from "./useSheetPatchSync";
+import { collectSheetMutationToolCallIds } from "./useSheetPatchSync";
 
 const PAGE_SIZE = 40;
 
@@ -96,7 +96,7 @@ export function useChatHistory({
           fetchContextUsage(workspaceId, sessionId, { signal: controller.signal }),
         ]);
         if (!mountedRef.current || generation !== generationRef.current) return;
-        for (const toolCallId of collectWorkbookMutationToolCallIds(messages, new Set())) {
+        for (const toolCallId of collectSheetMutationToolCallIds(messages, new Set())) {
           historicalToolCallIds.add(toolCallId);
         }
         const historyIds = new Set(
@@ -140,7 +140,7 @@ export function useChatHistory({
         offset,
       );
       if (!mountedRef.current) return;
-      for (const toolCallId of collectWorkbookMutationToolCallIds(messages, new Set())) {
+      for (const toolCallId of collectSheetMutationToolCallIds(messages, new Set())) {
         historicalToolCallIds.add(toolCallId);
       }
       store.prependHistory(messages);

@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import type { Session } from "@/api/sessions";
 import { Alert } from "@/components/ui/Alert/Alert";
 import { ChatPanel } from "@/features/chat/conversation/ChatPanel";
+import type { CommittedSheetMutationHandler } from "@/features/sync/sheetEditorChange";
 import { t } from "@/lib/i18n";
 import { SessionHeader } from "./components/SessionHeader";
 import { SessionHistoryPopover } from "./components/SessionHistoryPopover";
@@ -37,6 +38,7 @@ type Props = {
     delta: SheetChangeDelta | null,
     version?: SheetChangeVersion,
   ) => void | Promise<void>;
+  onCommittedSheetMutation?: CommittedSheetMutationHandler;
   referenceCacheRevision: number;
   currentUser: CurrentUser;
   onLogout: () => void;
@@ -62,6 +64,7 @@ export function SessionShell({
   onWorkspaceRefresh,
   onChartsRefresh,
   onSheetChanged,
+  onCommittedSheetMutation,
   referenceCacheRevision,
   currentUser,
   onLogout,
@@ -100,6 +103,7 @@ export function SessionShell({
         onWorkspaceRefresh,
         onChartsRefresh,
         onSheetChanged,
+        onCommittedSheetMutation,
         onUndoComplete: handleUndoComplete,
         onUserTurnAccepted: handleUserTurnAccepted,
         onNavigateSheet,

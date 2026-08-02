@@ -174,6 +174,46 @@ describe("SheetSaveCoordinator", () => {
     }
   });
 
+  it("advances an external commit without dropping local pending cells", async () => {
+    vi.useFakeTimers();
+    try {
+      const coordinator = new SheetSaveCoordinator();
+      coordinator.reset(
+        60,
+        {
+          celldata: [
+            { r: 0, c: 0, v: { v: 1, m: "1" } },
+            { r: 0, c: 1, v: { v: 2, m: "2" } },
+          ],
+          config: null,
+        },
+        4,
+      );
+      const save = vi.fn().mockResolvedValue({ revision: 6 });
+
+      coordinator.schedule(60, patch([{ row: 1, col: 1, cell: { v: 9, m: "9" } }]), save);
+      coordinator.acceptExternalMutation(
+        60,
+        patch([{ row: 1, col: 2, cell: { v: 8, m: "8" } }]).mutation,
+        5,
+      );
+
+      await vi.advanceTimersByTimeAsync(500);
+
+      expect(save).toHaveBeenCalledWith({
+        kind: "mutation",
+        baseRevision: 5,
+        mutation: {
+          type: "patch",
+          cells: [{ row: 1, col: 1, cell: { v: 9, m: "9" } }],
+        },
+      });
+      coordinator.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("rebases local cells without overwriting untouched remote cells", () => {
     const coordinator = new SheetSaveCoordinator();
     coordinator.reset(

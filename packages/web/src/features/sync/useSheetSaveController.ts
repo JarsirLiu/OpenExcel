@@ -1,4 +1,4 @@
-import type { FortuneCell, SheetCommand } from "@openexcel/core";
+import type { FortuneCell, SheetChangeDelta, SheetCommand } from "@openexcel/core";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { executeSheetCommand, fetchSheet, SheetRevisionConflictError } from "@/api/workbooks";
 import type { SheetSnapshotForSave } from "./sheetChunkSnapshot";
@@ -87,6 +87,13 @@ export function useSheetSaveController({
     generationBySheetRef.current.set(sheetId, (generationBySheetRef.current.get(sheetId) ?? 0) + 1);
     coordinatorRef.current?.reset(sheetId, snapshot, revision);
   }, []);
+
+  const acceptExternalMutation = useCallback(
+    (sheetId: number, delta: SheetChangeDelta, revision: number) => {
+      coordinatorRef.current?.acceptExternalMutation(sheetId, delta, revision);
+    },
+    [],
+  );
 
   const schedule = useCallback(
     (change: SheetEditorChange, documentVersion?: number) => {
@@ -183,5 +190,5 @@ export function useSheetSaveController({
     ],
   );
 
-  return { saveStatus, reset, schedule };
+  return { saveStatus, reset, acceptExternalMutation, schedule };
 }

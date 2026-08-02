@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ChatSidebar } from "@/features/chat/ChatSidebar";
 import { useSessionWorkspace } from "@/features/session/useSessionWorkspace";
+import type { CommittedSheetMutationHandler } from "@/features/sync/sheetEditorChange";
 import type { ChartMutation } from "@/features/workbook/charts/chartMutation";
 import { useSheetActivation } from "@/features/workbook/editor/SheetActivationContext";
 import { importWarningMessage } from "@/features/workspace/importWarnings";
@@ -67,6 +68,21 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
   );
 
   const workbook = useWorkspaceView(selectedWorkspaceId, domainInitial.workbook);
+  const committedSheetMutationRef = useRef<CommittedSheetMutationHandler | null>(null);
+  const registerCommittedSheetMutation = useCallback(
+    (handler: CommittedSheetMutationHandler | null) => {
+      committedSheetMutationRef.current = handler;
+    },
+    [],
+  );
+  const handleCommittedSheetMutation = useCallback<CommittedSheetMutationHandler>(
+    (sheetId, delta, version) => {
+      const editorHandler = committedSheetMutationRef.current;
+      if (editorHandler) return editorHandler(sheetId, delta, version);
+      return workbook.handleSheetChanged(sheetId, delta, version);
+    },
+    [workbook.handleSheetChanged],
+  );
   const session = useSessionWorkspace(
     selectedWorkspaceId,
     workbook.handleWorkspaceRefresh,
@@ -315,6 +331,7 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
           onWorkbookMutation={refreshUndoAvailability}
           onSheetRevisionChanged={workbook.handleSheetRevisionChanged}
           onSheetContentChanged={workbook.handleSheetContentChanged}
+          onRegisterCommittedSheetMutation={registerCommittedSheetMutation}
         />
         <div className={styles.resizeHandle} onMouseDown={chatSidebarLayout.handleMouseDown} />
       </div>
@@ -325,6 +342,7 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
           onWorkspaceRefresh={workbook.handleWorkspaceRefresh}
           onChartsRefresh={workbook.handleChartsRefresh}
           onSheetChanged={workbook.handleSheetChanged}
+          onCommittedSheetMutation={handleCommittedSheetMutation}
           onAttachExcel={handleAttachExcel}
           referenceCacheRevision={workbook.referenceCacheRevision}
           currentUser={currentUser}

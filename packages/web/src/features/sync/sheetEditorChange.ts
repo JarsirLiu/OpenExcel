@@ -1,4 +1,4 @@
-import type { SheetChangeDelta } from "@openexcel/core";
+import type { SheetChangeDelta, SheetChangeVersion } from "@openexcel/core";
 import type { WorkbookFull } from "@/api/workbooks";
 import type { SheetSnapshotForSave } from "./sheetChunkSnapshot";
 
@@ -17,3 +17,9 @@ export type SheetEditorChange =
 export type SheetContentChangeHandler = (
   change: SheetEditorChange,
 ) => WorkbookFull | null | undefined;
+
+export type CommittedSheetMutationHandler = (
+  sheetId: number,
+  delta: SheetChangeDelta,
+  version: SheetChangeVersion,
+) => Promise<void>;

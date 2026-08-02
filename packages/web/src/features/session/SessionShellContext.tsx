@@ -1,6 +1,7 @@
 import type { SheetChangeDelta, SheetChangeVersion } from "@openexcel/core";
 import { createContext, useContext } from "react";
 import type { Session } from "@/api/sessions";
+import type { CommittedSheetMutationHandler } from "@/features/sync/sheetEditorChange";
 
 type SheetChangedHandler = (
   sheetId: number,
@@ -15,6 +16,7 @@ type SessionInfra = {
   onWorkspaceRefresh?: () => Promise<void> | void;
   onChartsRefresh?: () => Promise<void> | void;
   onSheetChanged?: SheetChangedHandler;
+  onCommittedSheetMutation?: CommittedSheetMutationHandler;
   onUndoComplete?: () => Promise<void> | void;
   onUserTurnAccepted: (sessionId: number) => void;
   onNavigateSheet?: (sheetId: number) => void;

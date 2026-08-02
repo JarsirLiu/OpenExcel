@@ -1,9 +1,10 @@
 import type { SheetChangeDelta, SheetChangeVersion } from "@openexcel/core";
 import { sheetChangePatchOutputSchema } from "@openexcel/core";
 import { useEffect, useRef } from "react";
-import type { SheetPatchUpdate, WorkbookStructureUpdate } from "@/features/sync/types";
+import type { SheetPatchUpdate } from "@/features/sync/types";
+import type { ChatEvent } from "../transport/chatEventStream";
 
-export type { SheetPatchUpdate, WorkbookStructureUpdate } from "@/features/sync/types";
+export type { SheetPatchUpdate } from "@/features/sync/types";
 
 export type SheetPatchMessageLike = {
   role?: unknown;
@@ -34,8 +35,78 @@ function isCompletedToolPart(part: unknown): part is CompletedToolPart {
   );
 }
 
-function getToolName(part: CompletedToolPart): string {
-  return part.type.slice("tool-".length);
+const SHEET_MUTATION_TOOLS = new Set(["writeCells", "clearCells", "mergeCells", "unmergeCells"]);
+const WORKBOOK_MUTATION_TOOLS = new Set(["createWorkbook", "createSheet"]);
+const CHART_MUTATION_TOOLS = new Set(["createChart", "updateChart", "deleteChart"]);
+
+export type CommittedMutationToolEvent =
+  | { kind: "sheet"; update: SheetPatchUpdate }
+  | { kind: "workbook"; toolCallId: string }
+  | { kind: "chart"; toolCallId: string };
+
+function parseSheetPatchUpdate(toolCallId: string, output: unknown): SheetPatchUpdate | null {
+  const parsed = sheetChangePatchOutputSchema.safeParse(output);
+  if (!parsed.success) return null;
+
+  const version =
+    parsed.data.baseRevision != null && parsed.data.revision != null
+      ? {
+          baseRevision: parsed.data.baseRevision,
+          revision: parsed.data.revision,
+        }
+      : undefined;
+
+  return {
+    toolCallId,
+    sheetId: parsed.data.sheetInfo.sheetId,
+    sheetNo: parsed.data.sheetInfo.sheetNo,
+    delta: parsed.data.delta ?? null,
+    ...(version ? { version } : {}),
+  };
+}
+
+/** Parses a server-confirmed sheet mutation directly from the live event stream. */
+export function parseCommittedSheetToolEvent(event: ChatEvent): SheetPatchUpdate | null {
+  if (event.type !== "tool.finished") return null;
+  if (typeof event.payload !== "object" || event.payload === null) return null;
+
+  const payload = event.payload as Record<string, unknown>;
+  if (
+    typeof payload.toolCallId !== "string" ||
+    typeof payload.toolName !== "string" ||
+    payload.error != null ||
+    !SHEET_MUTATION_TOOLS.has(payload.toolName)
+  ) {
+    return null;
+  }
+
+  return parseSheetPatchUpdate(payload.toolCallId, payload.output);
+}
+
+export function parseCommittedMutationToolEvent(
+  event: ChatEvent,
+): CommittedMutationToolEvent | null {
+  if (event.type !== "tool.finished") return null;
+  if (typeof event.payload !== "object" || event.payload === null) return null;
+
+  const payload = event.payload as Record<string, unknown>;
+  if (
+    typeof payload.toolCallId !== "string" ||
+    typeof payload.toolName !== "string" ||
+    payload.error != null
+  ) {
+    return null;
+  }
+
+  const sheetUpdate = parseCommittedSheetToolEvent(event);
+  if (sheetUpdate) return { kind: "sheet", update: sheetUpdate };
+  if (WORKBOOK_MUTATION_TOOLS.has(payload.toolName)) {
+    return { kind: "workbook", toolCallId: payload.toolCallId };
+  }
+  if (CHART_MUTATION_TOOLS.has(payload.toolName)) {
+    return { kind: "chart", toolCallId: payload.toolCallId };
+  }
+  return null;
 }
 
 export function collectSheetPatchUpdates(
@@ -51,164 +122,19 @@ export function collectSheetPatchUpdates(
       if (!isCompletedToolPart(part)) continue;
       if (seenToolCallIds.has(part.toolCallId)) continue;
 
-      const parsed = sheetChangePatchOutputSchema.safeParse(part.output);
-      if (!parsed.success) continue;
-
-      const version =
-        parsed.data.baseRevision != null && parsed.data.revision != null
-          ? {
-              baseRevision: parsed.data.baseRevision,
-              revision: parsed.data.revision,
-            }
-          : undefined;
-
-      updates.push({
-        toolCallId: part.toolCallId,
-        sheetId: parsed.data.sheetInfo.sheetId,
-        sheetNo: parsed.data.sheetInfo.sheetNo,
-        delta: parsed.data.delta ?? null,
-        ...(version ? { version } : {}),
-      });
+      const update = parseSheetPatchUpdate(part.toolCallId, part.output);
+      if (update) updates.push(update);
     }
   }
 
   return updates;
 }
 
-function isWorkbookCreatedOutput(output: unknown): output is {
-  id: number;
-  name: string;
-  order: number;
-  sheets: number;
-  initialSheet: { id: number; sheetNo: number; name: string; order: number };
-} {
-  if (!isRecord(output)) return false;
-  return (
-    typeof output.id === "number" &&
-    typeof output.name === "string" &&
-    typeof output.order === "number" &&
-    typeof output.sheets === "number" &&
-    isRecord(output.initialSheet) &&
-    typeof output.initialSheet.id === "number" &&
-    typeof output.initialSheet.sheetNo === "number" &&
-    typeof output.initialSheet.name === "string" &&
-    typeof output.initialSheet.order === "number"
-  );
-}
-
-function isSheetCreatedOutput(output: unknown): output is {
-  workbookId: number;
-  id: number;
-  sheetNo: number;
-  name: string;
-  order: number;
-} {
-  if (!isRecord(output)) return false;
-  return (
-    typeof output.workbookId === "number" &&
-    typeof output.id === "number" &&
-    typeof output.sheetNo === "number" &&
-    typeof output.name === "string" &&
-    typeof output.order === "number"
-  );
-}
-
-export function collectWorkbookStructureUpdates(
-  messages: ReadonlyArray<SheetPatchMessageLike>,
-  seenToolCallIds: ReadonlySet<string>,
-): WorkbookStructureUpdate[] {
-  const updates: WorkbookStructureUpdate[] = [];
-
-  for (const message of messages) {
-    if (message.role !== "assistant" || !Array.isArray(message.parts)) continue;
-
-    for (const part of message.parts) {
-      if (!isCompletedToolPart(part)) continue;
-      if (seenToolCallIds.has(part.toolCallId)) continue;
-
-      const toolName = getToolName(part);
-      const input = isRecord(part.input) ? part.input : null;
-
-      if (toolName === "createWorkbook" && isWorkbookCreatedOutput(part.output)) {
-        updates.push({
-          toolCallId: part.toolCallId,
-          kind: "workbook-created",
-          workbookId: part.output.id,
-          workbookName: part.output.name,
-          order: part.output.order,
-          sourceSheetId: typeof input?.sourceSheetId === "number" ? input.sourceSheetId : null,
-          initialSheet: part.output.initialSheet,
-        });
-        continue;
-      }
-
-      if (toolName === "createSheet" && isSheetCreatedOutput(part.output)) {
-        updates.push({
-          toolCallId: part.toolCallId,
-          kind: "sheet-created",
-          workbookId: part.output.workbookId,
-          sheetId: part.output.id,
-          sheetNo: part.output.sheetNo,
-          sheetName: part.output.name,
-          order: part.output.order,
-          sourceSheetId: typeof input?.sourceSheetId === "number" ? input.sourceSheetId : null,
-        });
-      }
-    }
-  }
-
-  return updates;
-}
-
-export function collectWorkbookMutationToolCallIds(
+export function collectSheetMutationToolCallIds(
   messages: ReadonlyArray<SheetPatchMessageLike>,
   seenToolCallIds: ReadonlySet<string>,
 ): string[] {
-  return collectWorkbookRefreshToolCallIds(messages, seenToolCallIds, {
-    sheetDeltasHandled: false,
-  });
-}
-
-export function collectWorkbookRefreshToolCallIds(
-  messages: ReadonlyArray<SheetPatchMessageLike>,
-  seenToolCallIds: ReadonlySet<string>,
-  options: { sheetDeltasHandled?: boolean } = {},
-): string[] {
-  const toolCallIds = new Set<string>();
-  const patchUpdates = collectSheetPatchUpdates(messages, seenToolCallIds);
-  const seenAfterPatchUpdates = new Set(seenToolCallIds);
-  if (!options.sheetDeltasHandled) {
-    for (const update of patchUpdates) {
-      toolCallIds.add(update.toolCallId);
-    }
-  }
-  for (const update of patchUpdates) {
-    seenAfterPatchUpdates.add(update.toolCallId);
-  }
-
-  const structureUpdates = collectWorkbookStructureUpdates(messages, seenAfterPatchUpdates);
-  for (const update of structureUpdates) {
-    toolCallIds.add(update.toolCallId);
-  }
-
-  return Array.from(toolCallIds);
-}
-
-export function collectChartMutationToolCallIds(
-  messages: ReadonlyArray<SheetPatchMessageLike>,
-  seenToolCallIds: ReadonlySet<string>,
-): string[] {
-  const toolCallIds: string[] = [];
-  for (const message of messages) {
-    if (message.role !== "assistant" || !Array.isArray(message.parts)) continue;
-    for (const part of message.parts) {
-      if (!isCompletedToolPart(part) || seenToolCallIds.has(part.toolCallId)) continue;
-      if (["createChart", "updateChart", "deleteChart"].includes(getToolName(part))) {
-        toolCallIds.push(part.toolCallId);
-      }
-    }
-  }
-  return toolCallIds;
+  return collectSheetPatchUpdates(messages, seenToolCallIds).map((update) => update.toolCallId);
 }
 
 export function useSheetPatchSync(
@@ -218,9 +144,9 @@ export function useSheetPatchSync(
     delta: SheetChangeDelta | null,
     version?: SheetChangeVersion,
   ) => void,
-  onWorkbookStructureChanged?: (update: WorkbookStructureUpdate) => void,
   historyReady = true,
   historicalToolCallIds?: ReadonlySet<string>,
+  liveToolCallIds?: ReadonlySet<string>,
 ) {
   const appliedToolCallIdsRef = useRef<Set<string>>(new Set());
   const historyPrimedRef = useRef(false);
@@ -231,7 +157,10 @@ export function useSheetPatchSync(
     if (!historyPrimedRef.current) {
       const initialPatchUpdates = collectSheetPatchUpdates(messages, new Set());
       for (const update of initialPatchUpdates) {
-        if (historicalToolCallIds?.has(update.toolCallId) ?? true) {
+        if (
+          (historicalToolCallIds?.has(update.toolCallId) ?? true) ||
+          liveToolCallIds?.has(update.toolCallId)
+        ) {
           appliedToolCallIdsRef.current.add(update.toolCallId);
           continue;
         }
@@ -242,21 +171,15 @@ export function useSheetPatchSync(
         }
       }
 
-      const initialStructureUpdates = collectWorkbookStructureUpdates(messages, new Set());
-      for (const update of initialStructureUpdates) {
-        if (historicalToolCallIds?.has(update.toolCallId) ?? true) {
-          appliedToolCallIdsRef.current.add(update.toolCallId);
-          continue;
-        }
-        onWorkbookStructureChanged?.(update);
-      }
-
       historyPrimedRef.current = true;
       return;
     }
 
     const seenToolCallIds = new Set(appliedToolCallIdsRef.current);
     for (const toolCallId of historicalToolCallIds ?? []) {
+      seenToolCallIds.add(toolCallId);
+    }
+    for (const toolCallId of liveToolCallIds ?? []) {
       seenToolCallIds.add(toolCallId);
     }
 
@@ -269,18 +192,5 @@ export function useSheetPatchSync(
         onSheetChanged?.(update.sheetId, update.delta);
       }
     }
-
-    const seenAfterPatchUpdates = new Set(seenToolCallIds);
-    for (const update of patchUpdates) {
-      seenAfterPatchUpdates.add(update.toolCallId);
-    }
-
-    const structureUpdates = onWorkbookStructureChanged
-      ? collectWorkbookStructureUpdates(messages, seenAfterPatchUpdates)
-      : [];
-    for (const update of structureUpdates) {
-      appliedToolCallIdsRef.current.add(update.toolCallId);
-      onWorkbookStructureChanged?.(update);
-    }
-  }, [historyReady, historicalToolCallIds, messages, onSheetChanged, onWorkbookStructureChanged]);
+  }, [historyReady, historicalToolCallIds, liveToolCallIds, messages, onSheetChanged]);
 }

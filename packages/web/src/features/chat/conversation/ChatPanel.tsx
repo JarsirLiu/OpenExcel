@@ -2,11 +2,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert } from "@/components/ui/Alert/Alert";
 import { ChatComposer, type ChatComposerHandle } from "@/features/chat/composer/ChatComposer";
 import { useChatConversation } from "@/features/chat/hooks/useChatConversation";
-import { useSheetPatchSync } from "@/features/chat/hooks/useSheetPatchSync";
+import {
+  parseCommittedMutationToolEvent,
+  useSheetPatchSync,
+} from "@/features/chat/hooks/useSheetPatchSync";
 import { MessageList } from "@/features/chat/message/MessageList";
 import msgStyles from "@/features/chat/message/MessageList.module.css";
 import { useSessionInfra } from "@/features/session/SessionShellContext";
 import { t } from "@/lib/i18n";
+import type { ChatEvent } from "../transport/chatEventStream";
 import styles from "./ChatPanel.module.css";
 
 export function ChatPanel({
@@ -23,6 +27,7 @@ export function ChatPanel({
     onWorkspaceRefresh,
     onChartsRefresh,
     onSheetChanged,
+    onCommittedSheetMutation,
     onUndoComplete,
     onUserTurnAccepted,
     onAttachExcel,
@@ -31,6 +36,49 @@ export function ChatPanel({
     createSession,
     activateSession,
   } = useSessionInfra();
+
+  const liveToolCallIdsRef = useRef(new Set<string>());
+  const handleCommittedTool = useCallback(
+    async (event: ChatEvent) => {
+      const mutation = parseCommittedMutationToolEvent(event);
+      if (!mutation) {
+        return;
+      }
+      const toolCallId =
+        mutation.kind === "sheet" ? mutation.update.toolCallId : mutation.toolCallId;
+      if (liveToolCallIdsRef.current.has(toolCallId)) return;
+
+      if (mutation.kind === "sheet" && !onCommittedSheetMutation && !onSheetChanged) {
+        return;
+      }
+      liveToolCallIdsRef.current.add(toolCallId);
+      try {
+        if (mutation.kind === "sheet") {
+          if (mutation.update.delta && mutation.update.version && onCommittedSheetMutation) {
+            await onCommittedSheetMutation(
+              mutation.update.sheetId,
+              mutation.update.delta,
+              mutation.update.version,
+            );
+          } else {
+            await onSheetChanged?.(
+              mutation.update.sheetId,
+              mutation.update.delta,
+              mutation.update.version,
+            );
+          }
+        } else if (mutation.kind === "workbook") {
+          await onWorkspaceRefresh?.();
+        } else {
+          await onChartsRefresh?.();
+        }
+      } catch (error) {
+        liveToolCallIdsRef.current.delete(toolCallId);
+        throw error;
+      }
+    },
+    [onChartsRefresh, onCommittedSheetMutation, onSheetChanged, onWorkspaceRefresh],
+  );
 
   const {
     messages,
@@ -54,12 +102,16 @@ export function ChatPanel({
     onSessionActivated: activateSession,
     onUserTurnAccepted,
     initialCanUndo,
-    onWorkspaceRefresh,
-    onChartsRefresh,
-    onSheetChanged,
+    onToolFinished: handleCommittedTool,
   });
 
-  useSheetPatchSync(messages, onSheetChanged, undefined, initialLoaded, historicalToolCallIds);
+  useSheetPatchSync(
+    messages,
+    onSheetChanged,
+    initialLoaded,
+    historicalToolCallIds,
+    liveToolCallIdsRef.current,
+  );
 
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [isUndoing, setIsUndoing] = useState(false);

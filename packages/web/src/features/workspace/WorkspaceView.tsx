@@ -1,6 +1,9 @@
 import { useEffect, useRef } from "react";
 import type { WorkbookFull } from "@/api/workbooks";
-import type { SheetContentChangeHandler } from "@/features/sync/sheetEditorChange";
+import type {
+  CommittedSheetMutationHandler,
+  SheetContentChangeHandler,
+} from "@/features/sync/sheetEditorChange";
 import type { WorkbookStructureUpdate } from "@/features/sync/types";
 import type { ChartMutation } from "@/features/workbook/charts/chartMutation";
 import type { DemoGridFocus } from "@/features/workbook/editor/demoGridFocus";
@@ -51,6 +54,7 @@ type Props = {
     persistedThroughVersion?: number,
   ) => void;
   onSheetContentChanged?: SheetContentChangeHandler;
+  onRegisterCommittedSheetMutation?: (handler: CommittedSheetMutationHandler | null) => void;
   presentationMode?: boolean;
   demoGridFocus?: DemoGridFocus;
 };
@@ -83,6 +87,7 @@ export function WorkspaceView({
   onChartMutation,
   onSheetRevisionChanged,
   onSheetContentChanged,
+  onRegisterCommittedSheetMutation,
   presentationMode = false,
   demoGridFocus,
 }: Props) {
@@ -151,6 +156,7 @@ export function WorkspaceView({
           onChartMutation={onChartMutation}
           onSheetRevisionChanged={onSheetRevisionChanged}
           onSheetContentChanged={onSheetContentChanged}
+          onRegisterCommittedSheetMutation={onRegisterCommittedSheetMutation}
           demoGridFocus={demoGridFocus}
         />
         {transition?.status === "loading" && (

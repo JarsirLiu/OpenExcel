@@ -58,6 +58,11 @@ export class FortuneSheetEventAdapter {
     return saveSnapshots;
   }
 
+  replaceSheetSnapshot(sheetId: number, snapshot: SheetSnapshotForSave): void {
+    this.pendingOpHints.delete(sheetId);
+    this.snapshots.set(sheetId, createSheetEditorSnapshot(snapshot.celldata, snapshot.config));
+  }
+
   handleOp(ops: readonly FortuneSheetOp[], activeSheetId: number): void {
     const hints = collectFortuneSheetOpHints(ops, activeSheetId);
     for (const [sheetId, hint] of hints) {

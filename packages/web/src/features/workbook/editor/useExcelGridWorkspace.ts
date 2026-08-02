@@ -1,9 +1,11 @@
 import type { WorkbookInstance } from "@fortune-sheet/react";
+import type { SheetChangeDelta, SheetChangeVersion } from "@openexcel/core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { WorkbookFull } from "@/api/workbooks";
 import { createSheet, deleteSheet, deleteWorkbook, updateSheetName } from "@/api/workbooks";
 import type { SheetSnapshotForSave } from "@/features/sync/sheetChunkSnapshot";
 import type {
+  CommittedSheetMutationHandler,
   SheetContentChangeHandler,
   SheetEditorChange,
 } from "@/features/sync/sheetEditorChange";
@@ -15,6 +17,7 @@ import { confirm, toast } from "@/shared/lib";
 import { adaptFortuneSheetLayout, type SheetGridLayout } from "../layout/fortuneSheetLayout";
 import { findSheetIndexById } from "../sheetIdentity";
 import { FortuneSheetEventAdapter } from "./FortuneSheetEventAdapter";
+import { planFortuneSheetMutation } from "./fortuneSheetMutationBridge";
 import type { FortuneSheetOp } from "./fortuneSheetOps";
 import { useSheetActivation } from "./SheetActivationContext";
 import { useWorkbookEditorSession } from "./useWorkbookEditorSession";
@@ -35,6 +38,7 @@ type UseExcelGridWorkspaceProps = {
     persistedThroughVersion?: number,
   ) => void;
   onSheetContentChanged?: SheetContentChangeHandler;
+  onRegisterCommittedSheetMutation?: (handler: CommittedSheetMutationHandler | null) => void;
   documentStore: WorkbookDocumentStore;
   sheetLoaded: boolean;
 };
@@ -51,6 +55,7 @@ export function useExcelGridWorkspace({
   onWorkbookMutation,
   onSheetRevisionChanged,
   onSheetContentChanged,
+  onRegisterCommittedSheetMutation,
   documentStore,
   sheetLoaded,
 }: UseExcelGridWorkspaceProps) {
@@ -73,6 +78,7 @@ export function useExcelGridWorkspace({
   );
   const {
     saveStatus,
+    acceptExternalMutation,
     reset: resetSave,
     schedule: scheduleSave,
   } = useSheetSaveController({
@@ -88,6 +94,13 @@ export function useExcelGridWorkspace({
   const activeSheetIndexRef = useRef(activeSheetIndex);
   const sheetLoadedRef = useRef(sheetLoaded);
   const editorSessionRef = useRef(sessionKey);
+  const pendingCommittedMutationRef = useRef<{
+    sheetId: number;
+    token: object;
+    resolve: () => void;
+    reject: (error: unknown) => void;
+  } | null>(null);
+  const committedMutationQueueRef = useRef(Promise.resolve());
   workbookStateRef.current = documentStore.getSnapshot() ?? workbook;
   activeSheetIndexRef.current = activeSheetIndex;
   sheetLoadedRef.current = sheetLoaded;
@@ -200,9 +213,77 @@ export function useExcelGridWorkspace({
         applyDocumentChange(result.change);
         scheduleSave(result.change, documentStore.getSheetChangeVersion(result.sheetId));
       }
+
+      const pending = pendingCommittedMutationRef.current;
+      if (pending && results.some((result) => result.sheetId === pending.sheetId)) {
+        pendingCommittedMutationRef.current = null;
+        pending.resolve();
+      }
     },
     [applyDocumentChange, documentStore, initialLayouts, layoutSessionKey, scheduleSave],
   );
+
+  const handleCommittedSheetMutation = useCallback<CommittedSheetMutationHandler>(
+    (sheetId: number, delta: SheetChangeDelta, version: SheetChangeVersion) => {
+      const run = async () => {
+        const currentWorkbook = workbookStateRef.current;
+        const sheet = currentWorkbook?.sheets.find((item) => item.id === sheetId);
+        const instance = workbookRef.current;
+        const eventAdapter = eventAdapterRef.current;
+        if (!currentWorkbook || !sheet || !instance || !eventAdapter) {
+          throw new Error("The active FortuneSheet editor is not ready");
+        }
+
+        const plan = planFortuneSheetMutation(sheet, delta);
+        const rawChange: SheetEditorChange | null = plan.patch
+          ? { kind: "patch", sheetId, mutation: plan.patch }
+          : null;
+        if (rawChange) applyDocumentChange(rawChange);
+        onSheetRevisionChanged?.(sheetId, version.revision);
+        eventAdapter.replaceSheetSnapshot(sheetId, plan.snapshot);
+        saveSnapshotsRef.current.set(sheetId, plan.snapshot);
+        acceptExternalMutation(sheetId, delta, version.revision);
+
+        await new Promise<void>((resolve, reject) => {
+          const token = {};
+          const timeout = setTimeout(() => {
+            if (pendingCommittedMutationRef.current?.token !== token) return;
+            pendingCommittedMutationRef.current = null;
+            reject(new Error("FortuneSheet formula recalculation timed out"));
+          }, 5000);
+          pendingCommittedMutationRef.current = {
+            sheetId,
+            token,
+            resolve: () => {
+              clearTimeout(timeout);
+              resolve();
+            },
+            reject: (error) => {
+              clearTimeout(timeout);
+              reject(error);
+            },
+          };
+          try {
+            instance.batchCallApis(plan.apiCalls);
+          } catch (error) {
+            clearTimeout(timeout);
+            pendingCommittedMutationRef.current = null;
+            reject(error);
+          }
+        });
+      };
+
+      const queued = committedMutationQueueRef.current.then(run, run);
+      committedMutationQueueRef.current = queued.catch(() => undefined);
+      return queued;
+    },
+    [acceptExternalMutation, applyDocumentChange, onSheetRevisionChanged],
+  );
+
+  useEffect(() => {
+    onRegisterCommittedSheetMutation?.(handleCommittedSheetMutation);
+    return () => onRegisterCommittedSheetMutation?.(null);
+  }, [handleCommittedSheetMutation, onRegisterCommittedSheetMutation]);
 
   const handleOp = useCallback((ops: readonly FortuneSheetOp[]) => {
     const currentWorkbook = workbookStateRef.current;
