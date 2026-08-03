@@ -38,6 +38,7 @@ export function ChatPanel({
   } = useSessionInfra();
 
   const liveToolCallIdsRef = useRef(new Set<string>());
+  const [liveToolCallIds, setLiveToolCallIds] = useState<ReadonlySet<string>>(new Set());
   const handleCommittedTool = useCallback(
     async (event: ChatEvent) => {
       const mutation = parseCommittedMutationToolEvent(event);
@@ -52,6 +53,10 @@ export function ChatPanel({
         return;
       }
       liveToolCallIdsRef.current.add(toolCallId);
+      setLiveToolCallIds((current) => {
+        if (current.has(toolCallId)) return current;
+        return new Set(current).add(toolCallId);
+      });
       try {
         if (mutation.kind === "sheet") {
           if (mutation.update.delta && mutation.update.version && onCommittedSheetMutation) {
@@ -74,6 +79,12 @@ export function ChatPanel({
         }
       } catch (error) {
         liveToolCallIdsRef.current.delete(toolCallId);
+        setLiveToolCallIds((current) => {
+          if (!current.has(toolCallId)) return current;
+          const next = new Set(current);
+          next.delete(toolCallId);
+          return next;
+        });
         throw error;
       }
     },
@@ -110,7 +121,7 @@ export function ChatPanel({
     onSheetChanged,
     initialLoaded,
     historicalToolCallIds,
-    liveToolCallIdsRef.current,
+    liveToolCallIds,
   );
 
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);

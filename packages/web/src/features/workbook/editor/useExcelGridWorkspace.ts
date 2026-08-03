@@ -281,10 +281,14 @@ export function useExcelGridWorkspace({
           ? { kind: "patch", sheetId, mutation: plan.patch }
           : null;
         if (rawChange) applyDocumentChange(rawChange);
-        onSheetRevisionChanged?.(sheetId, version.revision);
         eventAdapter.replaceSheetSnapshot(sheetId, plan.snapshot);
         saveSnapshotsRef.current.set(sheetId, plan.snapshot);
         acceptExternalMutation(sheetId, delta, version.revision);
+
+        if (!plan.patch) {
+          onSheetRevisionChanged?.(sheetId, version.revision);
+          return;
+        }
 
         await new Promise<void>((resolve, reject) => {
           const token = {};
@@ -313,6 +317,7 @@ export function useExcelGridWorkspace({
             reject(error);
           }
         });
+        onSheetRevisionChanged?.(sheetId, version.revision);
       };
 
       const queued = committedMutationQueueRef.current.then(run, run);

@@ -157,13 +157,11 @@ export function useSheetPatchSync(
     if (!historyPrimedRef.current) {
       const initialPatchUpdates = collectSheetPatchUpdates(messages, new Set());
       for (const update of initialPatchUpdates) {
-        if (
-          (historicalToolCallIds?.has(update.toolCallId) ?? true) ||
-          liveToolCallIds?.has(update.toolCallId)
-        ) {
+        if (historicalToolCallIds?.has(update.toolCallId) ?? true) {
           appliedToolCallIdsRef.current.add(update.toolCallId);
           continue;
         }
+        if (liveToolCallIds?.has(update.toolCallId)) continue;
         if (update.version) {
           onSheetChanged?.(update.sheetId, update.delta, update.version);
         } else {

@@ -68,7 +68,8 @@ export function buildSheetChangePreview(
   const values = new Map<string, string>();
   for (const cell of celldata) {
     if (cell.r >= minRow0 && cell.r <= endRow0 && cell.c >= startCol0 && cell.c <= endCol0) {
-      values.set(`${cell.r},${cell.c}`, fortuneDateText(cell.v) ?? String(cell.v?.v ?? ""));
+      const value = cell.v?.f ?? fortuneDateText(cell.v) ?? cell.v?.m ?? String(cell.v?.v ?? "");
+      values.set(`${cell.r},${cell.c}`, String(value));
     }
   }
 

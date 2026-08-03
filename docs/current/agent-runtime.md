@@ -162,6 +162,13 @@ subscriber. Closing a browser connection cancels the reader but does not
 directly terminate the server Run. An explicit cancellation request triggers
 Run cancellation.
 
+For committed Sheet mutations, the Web first attempts the live editor
+application. A tool call is considered live-applied only after that handler
+completes; while the handler is pending, history projection temporarily skips
+the same tool call. If the handler fails, the live marker is removed through
+reactive state so the persisted tool result is processed by the normal Sheet
+synchronization path instead of being silently dropped.
+
 ### Next-turn availability after failure
 
 A tool business failure ends neither the Run nor the conversation: the

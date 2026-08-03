@@ -114,6 +114,8 @@ dependencies from a mutation.
   it does not recalculate formulas. After a successful save, the Sheet
   revision advances and a reload reads the persisted formula cache back into
   the browser document.
+- AI Sheet mutation previews display formula text directly for formula cells;
+  they do not wait for or imply a server-side calculated cache value.
 - Revision conflicts rebase local cell changes against the remote snapshot at
   cell granularity, preserving remote changes to untouched cells. Structural
   or large replacement operations remain chunk-based and are retried from the

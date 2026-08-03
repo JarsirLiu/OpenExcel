@@ -472,6 +472,54 @@ describe("useSheetPatchSync", () => {
     });
   });
 
+  it("retries a live delta when its direct editor application is removed", async () => {
+    const onSheetChanged = vi.fn();
+    const messages = [
+      {
+        role: "assistant",
+        parts: [
+          {
+            toolCallId: "live-tool",
+            type: "tool-writeCells",
+            state: "output-available",
+            input: { sheetId: 31 },
+            output: {
+              sheetInfo: { sheetId: 31, sheetNo: 1, sheetName: "Sheet1" },
+              changeSummary: {
+                changedCellCount: 1,
+                changedRanges: ["A1"],
+                omittedRangeCount: 0,
+                truncated: false,
+                operationCount: 1,
+              },
+              delta: {
+                type: "write",
+                operations: [
+                  { type: "range", startRow: 1, startCol: 1, endRow: 1, endCol: 1, value: "new" },
+                ],
+              },
+            },
+          },
+        ],
+      },
+    ];
+    const liveToolCallIds = new Set(["live-tool"]);
+    const { rerender } = renderHook(
+      ({ liveIds }: { liveIds: ReadonlySet<string> }) =>
+        useSheetPatchSync(messages, onSheetChanged, true, new Set(), liveIds),
+      { initialProps: { liveIds: liveToolCallIds } },
+    );
+
+    expect(onSheetChanged).not.toHaveBeenCalled();
+
+    rerender({ liveIds: new Set() });
+    await waitFor(() => expect(onSheetChanged).toHaveBeenCalledOnce());
+    expect(onSheetChanged).toHaveBeenCalledWith(31, {
+      type: "write",
+      operations: [{ type: "range", startRow: 1, startCol: 1, endRow: 1, endCol: 1, value: "new" }],
+    });
+  });
+
   it("does not replay historical deltas added by pagination", async () => {
     const onSheetChanged = vi.fn();
     const currentMessages = [
