@@ -134,6 +134,12 @@ async function configuredXlsxBytes(): Promise<ArrayBuffer> {
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet("配置");
   worksheet.getCell("A1").value = "带图片的工作表";
+  worksheet.getCell("A1").border = {
+    top: { style: "thin" },
+    bottom: { style: "thin" },
+    left: { style: "thin" },
+    right: { style: "thin" },
+  };
   worksheet.getColumn(1).width = 24;
   worksheet.getRow(1).height = 28;
   const imageId = workbook.addImage({
@@ -337,6 +343,23 @@ describe("parseSpreadsheetFile", () => {
     expect(() => JSON.stringify(sheet?.config)).not.toThrow();
     expect(sheet?.config.config).toEqual(
       expect.objectContaining({ columnlen: expect.any(Object), rowlen: expect.any(Object) }),
+    );
+    expect(sheet?.config.config).toEqual(
+      expect.objectContaining({
+        borderInfo: expect.arrayContaining([
+          expect.objectContaining({
+            rangeType: "cell",
+            value: expect.objectContaining({
+              row_index: 0,
+              col_index: 0,
+              t: expect.objectContaining({ style: expect.any(Number) }),
+              b: expect.objectContaining({ style: expect.any(Number) }),
+              l: expect.objectContaining({ style: expect.any(Number) }),
+              r: expect.objectContaining({ style: expect.any(Number) }),
+            }),
+          }),
+        ]),
+      }),
     );
   });
 

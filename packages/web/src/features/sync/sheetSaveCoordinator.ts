@@ -66,6 +66,7 @@ type PendingCell = {
   row: number;
   col: number;
   cell: Record<string, unknown> | null;
+  removed?: readonly string[];
   version: number;
   documentVersion?: number;
 };
@@ -204,10 +205,16 @@ export class SheetSaveCoordinator {
         if (cell.cell === null) {
           state.latestCells.delete(key);
         } else {
+          const previous = state.latestCells.get(key);
+          const nextValue: Record<string, unknown> = {
+            ...((previous?.v ?? {}) as unknown as Record<string, unknown>),
+            ...cell.cell,
+          };
+          for (const field of cell.removed ?? []) delete nextValue[field];
           state.latestCells.set(key, {
             r: cell.row - 1,
             c: cell.col - 1,
-            v: { ...(cell.cell as unknown as FortuneCell["v"]) },
+            v: nextValue as unknown as FortuneCell["v"],
           });
         }
       }
@@ -215,10 +222,25 @@ export class SheetSaveCoordinator {
         state.latestConfig = input.mutation.config as SheetConfig | null;
       }
       for (const cell of input.mutation.cells) {
-        state.pendingCells.set(`${cell.row},${cell.col}`, {
+        const key = `${cell.row},${cell.col}`;
+        const previous = state.pendingCells.get(key);
+        if (cell.cell === null) {
+          state.pendingCells.set(key, {
+            row: cell.row,
+            col: cell.col,
+            cell: null,
+            version: state.latestVersion,
+            documentVersion: input.documentVersion,
+          });
+          continue;
+        }
+        const removed = new Set([...(previous?.removed ?? []), ...(cell.removed ?? [])]);
+        for (const field of Object.keys(cell.cell)) removed.delete(field);
+        state.pendingCells.set(key, {
           row: cell.row,
           col: cell.col,
-          cell: cell.cell,
+          cell: { ...(previous?.cell ?? {}), ...cell.cell },
+          ...(removed.size > 0 ? { removed: [...removed] } : {}),
           version: state.latestVersion,
           documentVersion: input.documentVersion,
         });
@@ -319,7 +341,12 @@ export class SheetSaveCoordinator {
     let snapshot: SheetSnapshotForSave | null = null;
 
     if (sentCells.size > 0 || sentConfig) {
-      const cells = [...sentCells.values()].map(({ row, col, cell }) => ({ row, col, cell }));
+      const cells = [...sentCells.values()].map(({ row, col, cell, removed }) => ({
+        row,
+        col,
+        cell,
+        ...(removed ? { removed: [...removed] } : {}),
+      }));
       request = {
         kind: "mutation",
         baseRevision: state.persistedRevision,
@@ -388,10 +415,16 @@ export class SheetSaveCoordinator {
               if (sent.cell === null) {
                 cellMap.delete(cellKey);
               } else {
+                const previous = cellMap.get(cellKey);
+                const nextValue: Record<string, unknown> = {
+                  ...((previous?.v ?? {}) as unknown as Record<string, unknown>),
+                  ...sent.cell,
+                };
+                for (const field of sent.removed ?? []) delete nextValue[field];
                 cellMap.set(cellKey, {
                   r: sent.row - 1,
                   c: sent.col - 1,
-                  v: sent.cell as unknown as FortuneCell["v"],
+                  v: nextValue as unknown as FortuneCell["v"],
                 });
               }
             }

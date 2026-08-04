@@ -28,6 +28,7 @@ type PendingCellChange = {
   row: number;
   col: number;
   cell: Record<string, unknown> | null;
+  removed?: string[];
   version: number;
 };
 
@@ -79,10 +80,16 @@ function applySheetPatch(
       continue;
     }
 
+    const previousCell = index === undefined ? undefined : nextCelldata[index];
+    const nextValue: Record<string, unknown> = {
+      ...((previousCell?.v ?? {}) as unknown as Record<string, unknown>),
+      ...change.cell,
+    };
+    for (const field of change.removed ?? []) delete nextValue[field];
     const nextCell = {
       r: row,
       c: col,
-      v: { ...change.cell } as unknown as FortuneCell["v"],
+      v: nextValue as unknown as FortuneCell["v"],
     };
     if (index === undefined) {
       ensureWritableIndexes();
@@ -187,7 +194,20 @@ export class WorkbookDocumentStore {
       pending.config = null;
     } else {
       for (const cell of change.mutation.cells) {
-        pending.cells.set(`${cell.row},${cell.col}`, { ...cell, version });
+        const key = `${cell.row},${cell.col}`;
+        const previous = pending.cells.get(key);
+        if (cell.cell === null) {
+          pending.cells.set(key, { ...cell, version });
+          continue;
+        }
+        const removed = new Set([...(previous?.removed ?? []), ...(cell.removed ?? [])]);
+        for (const field of Object.keys(cell.cell)) removed.delete(field);
+        pending.cells.set(key, {
+          ...cell,
+          cell: { ...(previous?.cell ?? {}), ...cell.cell },
+          ...(removed.size > 0 ? { removed: [...removed] } : {}),
+          version,
+        });
       }
       if (change.mutation.config !== undefined) {
         pending.config = { config: change.mutation.config as SheetConfig | null, version };

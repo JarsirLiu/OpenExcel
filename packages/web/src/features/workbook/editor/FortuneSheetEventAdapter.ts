@@ -17,6 +17,11 @@ type FortuneSheetChangeData = {
   data: readonly FortuneSheetCell[][];
 };
 
+type FortuneSheetChangeOptions = {
+  loadedSheetIds?: ReadonlySet<number>;
+  allowUntrackedChanges?: boolean;
+};
+
 export type FortuneSheetChangeResult = {
   sheetId: number;
   change: SheetEditorChange | null;
@@ -25,6 +30,7 @@ export type FortuneSheetChangeResult = {
 const FORMULA_ONLY_HINT: FortuneSheetOpHint = {
   requiresSnapshot: false,
   changedCellKeys: new Set(),
+  changedCellFields: new Map(),
 };
 
 function toSheetId(value: string | number): number | null {
@@ -73,18 +79,35 @@ export class FortuneSheetEventAdapter {
       }
       current.requiresSnapshot ||= hint.requiresSnapshot;
       for (const cellKey of hint.changedCellKeys) current.changedCellKeys.add(cellKey);
+      if (hint.changedCellFields) {
+        const fieldsByCell = current.changedCellFields ?? new Map<string, Set<string>>();
+        for (const [cellKey, fields] of hint.changedCellFields) {
+          const currentFields = fieldsByCell.get(cellKey) ?? new Set<string>();
+          for (const field of fields) currentFields.add(field);
+          fieldsByCell.set(cellKey, currentFields);
+        }
+        current.changedCellFields = fieldsByCell;
+      }
     }
   }
 
   handleChange(
     data: readonly FortuneSheetChangeData[],
     activeSheetId: number,
+    options: FortuneSheetChangeOptions = {},
   ): FortuneSheetChangeResult[] {
+    const loadedSheetIds = options.loadedSheetIds;
+    const hasPendingOperation = [...this.pendingOpHints.keys()].some((sheetId) =>
+      loadedSheetIds ? loadedSheetIds.has(sheetId) : true,
+    );
+    if (!hasPendingOperation && !options.allowUntrackedChanges) return [];
+
     const results: FortuneSheetChangeResult[] = [];
 
     for (const fortuneSheet of data) {
       const sheetId = toSheetId(fortuneSheet.id);
       if (sheetId === null) continue;
+      if (loadedSheetIds && !loadedSheetIds.has(sheetId)) continue;
 
       const previous = this.snapshots.get(sheetId);
       if (!previous) continue;

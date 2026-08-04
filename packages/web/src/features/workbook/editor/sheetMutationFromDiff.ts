@@ -9,6 +9,7 @@ type CellPatch = {
   row: number;
   col: number;
   cell: Record<string, unknown> | null;
+  removed?: string[];
 };
 
 export type SheetEditorSnapshot = {
@@ -46,6 +47,61 @@ function configSignature(config: SheetConfig | null): string {
   return JSON.stringify(config);
 }
 
+function hasOwnField(value: object, field: string): boolean {
+  return Object.keys(value).includes(field);
+}
+
+function mergeObservedCellValue(
+  previous: FortuneCell["v"] | undefined,
+  observed: FortuneCell["v"] | null,
+  changedFields: ReadonlySet<string> | undefined,
+): FortuneCell["v"] | null {
+  if (observed === null) {
+    if (!previous) return null;
+    if (!changedFields || changedFields.size === 0) return null;
+    const next = { ...previous } as Record<string, unknown>;
+    for (const field of changedFields) delete next[field];
+    return next as unknown as FortuneCell["v"];
+  }
+
+  const next = { ...(previous ?? {}), ...observed } as Record<string, unknown>;
+  if (changedFields) {
+    for (const field of changedFields) {
+      if (!hasOwnField(observed, field)) delete next[field];
+    }
+  }
+  return next as unknown as FortuneCell["v"];
+}
+
+function diffCellValue(
+  previous: FortuneCell["v"] | undefined,
+  next: FortuneCell["v"] | null,
+  changedFields: ReadonlySet<string> | undefined,
+): { cell: Record<string, unknown> | null; removed?: string[] } {
+  if (next === null) return { cell: null };
+
+  const cell: Record<string, unknown> = {};
+  const removed: string[] = [];
+  const nextRecord = next as unknown as Record<string, unknown>;
+  const previousRecord = previous as unknown as Record<string, unknown> | undefined;
+  const keys = new Set([...Object.keys(previousRecord ?? {}), ...Object.keys(nextRecord)]);
+  for (const key of keys) {
+    const previousValue = previousRecord?.[key];
+    const nextValue = nextRecord[key];
+    if (JSON.stringify(previousValue) === JSON.stringify(nextValue)) continue;
+    if (hasOwnField(nextRecord, key)) {
+      cell[key] = nextValue;
+    } else if (changedFields?.has(key)) {
+      removed.push(key);
+    }
+  }
+
+  return {
+    cell,
+    ...(removed.length > 0 ? { removed } : {}),
+  };
+}
+
 export function createSheetEditorSnapshot(
   celldata: readonly FortuneCell[],
   config: SheetConfig | null,
@@ -76,6 +132,7 @@ export function updateSheetEditorSnapshotFromMatrix(
   data: readonly (Readonly<Record<string, unknown>> | null)[][],
   config: SheetConfig | null,
   observedCellKeys?: ReadonlySet<string>,
+  changedCellFields?: ReadonlyMap<string, ReadonlySet<string>>,
 ): { snapshot: SheetEditorSnapshot; mutation: SheetChangeDelta | null } {
   const cells = previous.cellsByKey;
   const formulaKeys = previous.formulaKeys;
@@ -93,27 +150,30 @@ export function updateSheetEditorSnapshotFromMatrix(
     const key = cellKey(row, col);
     const rawCell = readCell(row, col);
     if (scanAllCells) seenKeys.add(key);
-    if (rawCell == null) {
-      if (!cells.has(key)) return;
+    const previousCell = cells.get(key);
+    const changedFields = changedCellFields?.get(key);
+    const normalizedValue =
+      rawCell == null ? null : normalizeFortuneCellValue(rawCell as unknown as FortuneCell["v"]);
+    const nextValue = mergeObservedCellValue(previousCell?.v, normalizedValue, changedFields);
+    if (JSON.stringify(previousCell?.v ?? null) === JSON.stringify(nextValue)) return;
+
+    const patch = diffCellValue(previousCell?.v, nextValue, changedFields);
+    if (nextValue === null) {
       cells.delete(key);
       formulaKeys.delete(key);
       changedCells.push({ row: row + 1, col: col + 1, cell: null });
       return;
     }
 
-    const normalizedValue = normalizeFortuneCellValue(rawCell as unknown as FortuneCell["v"]);
-    const previousCell = cells.get(key);
-    if (JSON.stringify(previousCell?.v ?? null) === JSON.stringify(normalizedValue)) return;
-
     const nextCell: FortuneCell = {
       r: row,
       c: col,
-      v: cloneFortuneCellValue(normalizedValue),
+      v: cloneFortuneCellValue(nextValue),
     };
     changedCells.push({
       row: row + 1,
       col: col + 1,
-      cell: { ...(nextCell.v as unknown as Record<string, unknown>) },
+      ...patch,
     });
     cells.set(key, nextCell);
     if (isFormulaCell(nextCell)) formulaKeys.add(key);
@@ -172,10 +232,12 @@ export function sheetMutationFromSnapshotDiff(
     const previous = before.cellsByKey.get(key);
     if (JSON.stringify(previous?.v ?? null) === JSON.stringify(next?.v ?? null)) continue;
     const [row, col] = key.split(",").map(Number);
+    const removed = Object.keys(previous?.v ?? {}).filter((field) => !hasOwnField(next.v, field));
     cells.push({
       row: row + 1,
       col: col + 1,
       cell: next?.v ? (next.v as unknown as Record<string, unknown>) : null,
+      ...(removed.length > 0 ? { removed } : {}),
     });
   }
 

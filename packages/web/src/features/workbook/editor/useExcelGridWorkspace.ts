@@ -187,7 +187,17 @@ export function useExcelGridWorkspace({
       if (!sheet) return;
       const eventAdapter = eventAdapterRef.current;
       if (!eventAdapter) return;
-      const results = eventAdapter.handleChange(data, sheet.id);
+      const loadedSheetIds = new Set(
+        currentWorkbook.sheets.filter((item) => item.loaded !== false).map((item) => item.id),
+      );
+      const loadedData = data.filter((fortuneSheet) => {
+        const id = Number(fortuneSheet?.id);
+        return Number.isInteger(id) && loadedSheetIds.has(id);
+      });
+      const results = eventAdapter.handleChange(data, sheet.id, {
+        loadedSheetIds,
+        allowUntrackedChanges: pendingCommittedMutationRef.current !== null,
+      });
       if (results.length === 0) return;
 
       const layoutChanged = results.some(
@@ -202,7 +212,7 @@ export function useExcelGridWorkspace({
               ? { ...current.bySheetId }
               : { ...initialLayouts };
           let changed = current.sessionKey !== layoutSessionKey;
-          for (const fortuneSheet of data) {
+          for (const fortuneSheet of loadedData) {
             if (fortuneSheet?.id == null) continue;
             const key = String(fortuneSheet.id);
             const nextLayout = adaptFortuneSheetLayout(fortuneSheet);

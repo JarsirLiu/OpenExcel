@@ -19,6 +19,7 @@ describe("collectFortuneSheetOpHints", () => {
     expect(hints.get(60)).toEqual({
       requiresSnapshot: false,
       changedCellKeys: new Set(["0,0", "0,1"]),
+      changedCellFields: new Map(),
     });
   });
 
@@ -29,6 +30,18 @@ describe("collectFortuneSheetOpHints", () => {
     );
 
     expect(hints.get(60)?.requiresSnapshot).toBe(true);
+  });
+
+  it("records the changed cell fields for content and style operations", () => {
+    const hints = collectFortuneSheetOpHints(
+      [
+        { op: "replace", id: "60", path: ["data", 0, 0, "v", "v"], value: "new" },
+        { op: "remove", id: "60", path: ["data", 0, 0, "v", "bg"] },
+      ],
+      60,
+    );
+
+    expect(hints.get(60)?.changedCellFields).toEqual(new Map([["0,0", new Set(["v", "bg"])]]));
   });
 
   it("ignores runtime calcChain changes", () => {

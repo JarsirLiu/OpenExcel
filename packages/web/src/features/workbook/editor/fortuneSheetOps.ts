@@ -8,6 +8,7 @@ export type FortuneSheetOp = {
 export type FortuneSheetOpHint = {
   requiresSnapshot: boolean;
   changedCellKeys: Set<string>;
+  changedCellFields?: Map<string, Set<string>>;
 };
 
 function isCellCoordinate(value: unknown): value is number {
@@ -27,6 +28,7 @@ export function collectFortuneSheetOpHints(
     const hint = hints.get(sheetId) ?? {
       requiresSnapshot: false,
       changedCellKeys: new Set<string>(),
+      changedCellFields: new Map<string, Set<string>>(),
     };
     const [root, row, col] = op.path;
 
@@ -34,7 +36,22 @@ export function collectFortuneSheetOpHints(
     if (root !== "data" || !isCellCoordinate(row) || !isCellCoordinate(col)) {
       hint.requiresSnapshot = true;
     } else {
-      hint.changedCellKeys.add(`${row},${col}`);
+      const cellKey = `${row},${col}`;
+      hint.changedCellKeys.add(cellKey);
+      const fieldPath = op.path.slice(3);
+      const field =
+        fieldPath[0] === "v" && typeof fieldPath[1] === "string"
+          ? fieldPath[1]
+          : typeof fieldPath[0] === "string" && fieldPath[0] !== "v"
+            ? fieldPath[0]
+            : null;
+      if (field) {
+        const changedCellFields = hint.changedCellFields ?? new Map<string, Set<string>>();
+        const fields = changedCellFields.get(cellKey) ?? new Set<string>();
+        fields.add(field);
+        changedCellFields.set(cellKey, fields);
+        hint.changedCellFields = changedCellFields;
+      }
     }
 
     if (

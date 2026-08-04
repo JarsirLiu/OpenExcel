@@ -40,6 +40,20 @@ function mapCells(celldata: FortuneCell[]): CellMap {
   return new Map(celldata.map((cell) => [cellKey(cell.r, cell.c), { ...cell, v: { ...cell.v } }]));
 }
 
+function applyPatchCell(
+  current: FortuneCell | undefined,
+  patch: { cell: Record<string, unknown> | null; removed?: readonly string[] },
+  row: number,
+  col: number,
+): FortuneCell | null {
+  if (patch.cell === null) return null;
+
+  const nextValue: Record<string, unknown> = { ...(current?.v ?? {}), ...patch.cell };
+  for (const field of patch.removed ?? []) delete nextValue[field];
+  if (Object.keys(nextValue).length === 0) return null;
+  return { r: row, c: col, v: nextValue as unknown as FortuneCell["v"] };
+}
+
 type CellCoordinate = { row: number; col: number };
 
 function captureBefore(
@@ -390,15 +404,9 @@ export function applySheetMutation(
     for (const patch of internal.cells) {
       capture(patch.row, patch.col);
       const key = cellKey(patch.row, patch.col);
-      if (patch.cell === null) {
-        cells.delete(key);
-        continue;
-      }
-      cells.set(key, {
-        r: patch.row,
-        c: patch.col,
-        v: patch.cell as unknown as FortuneCell["v"],
-      });
+      const nextCell = applyPatchCell(cells.get(key), patch, patch.row, patch.col);
+      if (nextCell) cells.set(key, nextCell);
+      else cells.delete(key);
     }
     if (internal.config !== undefined) {
       config = internal.config ? structuredClone(internal.config) : {};

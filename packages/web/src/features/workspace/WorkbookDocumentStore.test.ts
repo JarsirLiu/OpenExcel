@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
+import type { WorkbookFull } from "@/api/workbooks";
 import type { SheetEditorChange } from "@/features/sync/sheetEditorChange";
 import { WorkbookDocumentStore } from "./WorkbookDocumentStore";
 
-function createWorkbook() {
+function createWorkbook(): WorkbookFull {
   return {
     id: 1,
     publicId: "workbook-1",
@@ -51,6 +52,31 @@ describe("WorkbookDocumentStore", () => {
       structural: false,
       configChanged: false,
     });
+  });
+
+  it("merges sparse cell patches without dropping imported styles", () => {
+    const workbook = createWorkbook();
+    workbook.sheets[0].uploadedData = [
+      {
+        r: 0,
+        c: 0,
+        v: { v: 90, m: "90", bd: { b: { s: 1 } }, ct: { fa: "0.00" } },
+      },
+    ];
+    const store = new WorkbookDocumentStore(workbook);
+
+    store.updateSheetContent({
+      kind: "patch",
+      sheetId: 10,
+      mutation: {
+        type: "patch",
+        cells: [{ row: 1, col: 1, cell: { v: 9, m: "9" } }],
+      },
+    });
+
+    expect(store.getSnapshot()?.sheets[0]?.uploadedData).toEqual([
+      { r: 0, c: 0, v: { v: 9, m: "9", bd: { b: { s: 1 } }, ct: { fa: "0.00" } } },
+    ]);
   });
 
   it("publishes configuration changes when cells change in the same patch", () => {

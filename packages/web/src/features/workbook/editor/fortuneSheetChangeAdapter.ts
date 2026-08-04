@@ -21,6 +21,7 @@ export function adaptFortuneSheetChange(input: {
     input.data,
     input.config,
     input.hint?.requiresSnapshot ? undefined : input.hint?.changedCellKeys,
+    input.hint?.requiresSnapshot ? undefined : input.hint?.changedCellFields,
   );
   if (!result.mutation) return { snapshot: result.snapshot, change: null };
 

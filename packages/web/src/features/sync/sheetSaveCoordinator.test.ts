@@ -2,7 +2,12 @@ import type { FortuneCell } from "@openexcel/core";
 import { describe, expect, it, vi } from "vitest";
 import { SheetSaveCoordinator } from "./sheetSaveCoordinator";
 
-type PatchCell = { row: number; col: number; cell: Record<string, unknown> | null };
+type PatchCell = {
+  row: number;
+  col: number;
+  cell: Record<string, unknown> | null;
+  removed?: string[];
+};
 
 const snapshot = (celldata: FortuneCell[]) => ({
   kind: "snapshot" as const,
@@ -166,6 +171,34 @@ describe("SheetSaveCoordinator", () => {
             { row: 1, col: 1 },
             { row: 301, col: 301 },
           ],
+        },
+      });
+      coordinator.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("preserves explicit format removals in patch transport", async () => {
+    vi.useFakeTimers();
+    try {
+      const coordinator = new SheetSaveCoordinator();
+      coordinator.reset(
+        60,
+        { celldata: [{ r: 0, c: 0, v: { v: 1, m: "1", bg: "#FFFF00" } }], config: null },
+        4,
+      );
+      const save = vi.fn().mockResolvedValue({ revision: 5 });
+
+      coordinator.schedule(60, patch([{ row: 1, col: 1, cell: {}, removed: ["bg"] }]), save);
+      await vi.advanceTimersByTimeAsync(500);
+
+      expect(save).toHaveBeenCalledWith({
+        kind: "mutation",
+        baseRevision: 4,
+        mutation: {
+          type: "patch",
+          cells: [{ row: 1, col: 1, cell: {}, removed: ["bg"] }],
         },
       });
       coordinator.dispose();

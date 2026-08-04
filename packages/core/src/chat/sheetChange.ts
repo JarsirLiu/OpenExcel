@@ -97,6 +97,7 @@ const sheetChangePatchCellSchema = z.object({
   row: z.number().int().positive(),
   col: z.number().int().positive(),
   cell: z.record(z.string(), z.unknown()).nullable(),
+  removed: z.array(z.string().min(1)).optional(),
 });
 
 const sheetChangePatchSchema = z

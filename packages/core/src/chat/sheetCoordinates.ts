@@ -144,6 +144,7 @@ export type ZeroBasedSheetChangeDelta =
         row: StorageIndex;
         col: StorageIndex;
         cell: Record<string, unknown> | null;
+        removed?: string[];
       }>;
       config?: Record<string, unknown> | null;
     };
@@ -287,6 +288,7 @@ export function sheetChangeDeltaToZeroBased(delta: SheetChangeDelta): ZeroBasedS
         row: toolIndexToStorage(toolIndex(cell.row)),
         col: toolIndexToStorage(toolIndex(cell.col)),
         cell: cell.cell,
+        ...(cell.removed ? { removed: cell.removed } : {}),
       })),
       config: delta.config,
     };
@@ -408,6 +410,7 @@ export function zeroBasedSheetChangeDeltaToSheetChangeDelta(
         row: storageIndexToTool(cell.row),
         col: storageIndexToTool(cell.col),
         cell: cell.cell,
+        ...(cell.removed ? { removed: cell.removed } : {}),
       })),
       config: delta.config,
     };

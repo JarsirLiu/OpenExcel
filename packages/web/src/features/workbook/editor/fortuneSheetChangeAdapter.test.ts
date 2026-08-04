@@ -33,7 +33,7 @@ describe("adaptFortuneSheetChange", () => {
         type: "patch",
         cells: [
           { row: 1, col: 1, cell: { v: 9, m: "9" } },
-          { row: 1, col: 2, cell: { v: 9, m: "9", f: "=SUM(A1:A1)" } },
+          { row: 1, col: 2, cell: { v: 9, m: "9" } },
         ],
       },
     });

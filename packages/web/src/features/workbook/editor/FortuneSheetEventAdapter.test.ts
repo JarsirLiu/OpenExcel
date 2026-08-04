@@ -47,7 +47,7 @@ describe("FortuneSheetEventAdapter", () => {
           type: "patch",
           cells: [
             { row: 1, col: 1, cell: { v: 2, m: "2" } },
-            { row: 1, col: 2, cell: { v: 2, m: "2", f: "=A1" } },
+            { row: 1, col: 2, cell: { v: 2, m: "2" } },
           ],
         },
       },
@@ -56,9 +56,55 @@ describe("FortuneSheetEventAdapter", () => {
         sheetId: 61,
         mutation: {
           type: "patch",
-          cells: [{ row: 1, col: 1, cell: { v: 2, m: "2", f: "='60'!A1" } }],
+          cells: [{ row: 1, col: 1, cell: { v: 2, m: "2" } }],
         },
       },
     ]);
+  });
+
+  it("ignores changes from sheets that have not been loaded from the server", () => {
+    const adapter = new FortuneSheetEventAdapter();
+    adapter.reset([
+      {
+        id: 60,
+        celldata: [{ r: 0, c: 0, v: { v: "loaded", m: "loaded" } }],
+        config: { config: { columnlen: { 0: 180 } } },
+      } as never,
+      {
+        id: 61,
+        celldata: [{ r: 0, c: 0, v: { v: "unloaded", m: "unloaded" } }],
+        config: { config: { columnlen: { 0: 240 } }, borderInfo: [{ rangeType: "cell" }] },
+      } as never,
+    ]);
+
+    const results = adapter.handleChange(
+      [
+        { id: 60, data: [[{ v: "edited", m: "edited" }]] },
+        { id: 61, data: [[{ v: "default", m: "default" }]] },
+      ],
+      60,
+      { loadedSheetIds: new Set([60]), allowUntrackedChanges: true },
+    );
+
+    expect(results).toHaveLength(1);
+    expect(results[0]?.sheetId).toBe(60);
+  });
+
+  it("ignores change callbacks that are not tied to a user or AI operation", () => {
+    const adapter = new FortuneSheetEventAdapter();
+    adapter.reset([
+      {
+        id: 60,
+        celldata: [{ r: 0, c: 0, v: { v: "server", m: "server" } }],
+      } as never,
+    ]);
+
+    expect(
+      adapter.handleChange(
+        [{ id: 60, data: [[{ v: "fortune-default", m: "fortune-default" }]] }],
+        60,
+        { loadedSheetIds: new Set([60]) },
+      ),
+    ).toEqual([]);
   });
 });

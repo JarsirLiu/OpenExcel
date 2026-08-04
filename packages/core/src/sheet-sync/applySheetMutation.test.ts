@@ -8,6 +8,110 @@ const snapshot: SheetSnapshot = {
 };
 
 describe("applySheetMutation", () => {
+  it("merges sparse cell patches without dropping styles", () => {
+    const result = applySheetMutation(
+      {
+        celldata: [
+          {
+            r: 0,
+            c: 0,
+            v: {
+              v: "old",
+              m: "old",
+              bd: { b: { s: 1, c: "#000" } },
+              ct: { fa: "0.00" },
+            },
+          },
+        ],
+        config: { columnlen: { 0: 180 }, borderInfo: [{ rangeType: "cell" }] },
+      },
+      {
+        type: "patch",
+        cells: [{ row: 1, col: 1, cell: { v: "new", m: "new" } }],
+      },
+    );
+
+    expect(result.snapshot).toEqual({
+      celldata: [
+        {
+          r: 0,
+          c: 0,
+          v: {
+            v: "new",
+            m: "new",
+            bd: { b: { s: 1, c: "#000" } },
+            ct: { fa: "0.00" },
+          },
+        },
+      ],
+      config: { columnlen: { 0: 180 }, borderInfo: [{ rangeType: "cell" }] },
+    });
+  });
+
+  it("removes only explicitly deleted cell fields", () => {
+    const result = applySheetMutation(
+      {
+        celldata: [{ r: 0, c: 0, v: { v: "value", m: "value", bg: "#fff", fc: "#000" } }],
+        config: null,
+      },
+      {
+        type: "patch",
+        cells: [{ row: 1, col: 1, cell: {}, removed: ["bg"] }],
+      },
+    );
+
+    expect(result.snapshot.celldata).toEqual([
+      { r: 0, c: 0, v: { v: "value", m: "value", fc: "#000" } },
+    ]);
+  });
+
+  it("keeps unrelated styles and layout across AI content and color mutations", () => {
+    const initial: SheetSnapshot = {
+      celldata: [
+        {
+          r: 0,
+          c: 0,
+          v: {
+            v: "old",
+            m: "old",
+            bd: { b: { s: 1, c: "#000" } },
+            ct: { fa: "0.00" },
+            fc: "#000000",
+          },
+        },
+      ],
+      config: { config: { columnlen: { 0: 180 } }, borderInfo: [{ rangeType: "cell" }] },
+    };
+    const written = applySheetMutation(initial, {
+      type: "write",
+      operations: [{ type: "cell", row: 1, col: 1, value: "new" }],
+    });
+    const formatted = applySheetMutation(written.snapshot, {
+      type: "format",
+      operations: [
+        { type: "range", startRow: 1, startCol: 1, endRow: 1, endCol: 1, fill: "yellow" },
+      ],
+    });
+
+    expect(formatted.snapshot).toEqual({
+      celldata: [
+        {
+          r: 0,
+          c: 0,
+          v: {
+            v: "new",
+            m: "new",
+            bd: { b: { s: 1, c: "#000" } },
+            ct: { fa: "0.00" },
+            fc: "#000000",
+            bg: "#FFFF00",
+          },
+        },
+      ],
+      config: { config: { columnlen: { 0: 180 } }, borderInfo: [{ rangeType: "cell" }] },
+    });
+  });
+
   it("applies a sparse patch without changing untouched cells", () => {
     const result = applySheetMutation(
       {

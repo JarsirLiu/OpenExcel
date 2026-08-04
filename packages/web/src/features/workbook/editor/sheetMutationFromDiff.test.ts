@@ -143,8 +143,67 @@ describe("sheetMutationFromDiff", () => {
       type: "patch",
       cells: [
         { row: 1, col: 1, cell: { v: 9, m: "9" } },
-        { row: 1, col: 2, cell: { v: 9, m: "9", f: "=SUM(A1:A1)" } },
+        { row: 1, col: 2, cell: { v: 9, m: "9" } },
       ],
+    });
+  });
+
+  it("keeps imported styles when a value callback omits them", () => {
+    const previous = createSheetEditorSnapshot(
+      [
+        {
+          r: 0,
+          c: 0,
+          v: {
+            v: "old",
+            m: "old",
+            bd: { b: { s: 1, c: "#000" } },
+            ct: { fa: "0.00" },
+            bg: "#fff2cc",
+          },
+        },
+      ],
+      { config: { columnlen: { 0: 180 } }, borderInfo: [{ rangeType: "cell" }] } as never,
+    );
+
+    const result = updateSheetEditorSnapshotFromMatrix(
+      previous,
+      [[{ v: "new", m: "new" }]],
+      previous.config,
+      new Set(["0,0"]),
+      new Map([["0,0", new Set(["v", "m"])]]),
+    );
+
+    expect(result.mutation).toEqual({
+      type: "patch",
+      cells: [{ row: 1, col: 1, cell: { v: "new", m: "new" } }],
+    });
+    expect(result.snapshot.cellsByKey.get("0,0")?.v).toEqual({
+      v: "new",
+      m: "new",
+      bd: { b: { s: 1, c: "#000" } },
+      ct: { fa: "0.00" },
+      bg: "#fff2cc",
+    });
+  });
+
+  it("uses explicit operation fields to remove a cleared style", () => {
+    const previous = createSheetEditorSnapshot(
+      [{ r: 0, c: 0, v: { v: "value", m: "value", bg: "#fff2cc", fc: "#000" } }],
+      null,
+    );
+
+    const result = updateSheetEditorSnapshotFromMatrix(
+      previous,
+      [[{ v: "value", m: "value", fc: "#000" }]],
+      null,
+      new Set(["0,0"]),
+      new Map([["0,0", new Set(["bg"])]]),
+    );
+
+    expect(result.mutation).toEqual({
+      type: "patch",
+      cells: [{ row: 1, col: 1, cell: {}, removed: ["bg"] }],
     });
   });
 });

@@ -87,15 +87,22 @@ dependencies from a mutation.
 - Sheet saves are debounced per Sheet; the current scheduler defaults to 500 ms.
 - Normal Web edits are submitted as `mutation` commands containing the cell
   changes found by comparing the post-calculation `onChange` snapshot with the
-  previous editor snapshot. `onOp` supplies changed-cell coordinates and
-  identifies structural or non-cell operations; it is not authoritative for
-  values because FortuneSheet may omit formula-dependent cells from the
-  operation list. The adapter therefore observes the direct cells plus the
-  existing formula cells, so recalculated formula caches are included without
-  scanning or materializing the complete Sheet for ordinary edits. Each
-  changed cell carries its complete FortuneCell value, including formula,
-  cached value, display value, and formatting. Sheet-level configuration changes
-  are included in the same patch when possible. The browser retains the
+  previous editor snapshot. `onChange` is only a save candidate when it is
+  paired with a user `onOp` event or an active committed AI mutation;
+  workbook hydration, Sheet loading, editor initialization, and `updateSheet`
+  callbacks never schedule persistence. `onOp` supplies changed-cell
+  coordinates and identifies structural or non-cell operations; it is not
+  authoritative for values because FortuneSheet may omit formula-dependent
+  cells from the operation list. The adapter therefore observes the direct
+  cells plus the existing formula cells, so recalculated formula caches are
+  included without scanning or materializing the complete Sheet for ordinary
+  edits. Unloaded Sheet placeholders are excluded from change and layout
+  processing. Each changed cell patch carries only fields that changed and an
+  explicit `removed` list for fields intentionally deleted. Core, the browser
+  document, and the save queue merge those fields with the current cell, so a
+  content or formula-cache update cannot replace unrelated borders, number
+  formats, or other styles. Sheet-level configuration changes are included in
+  the same patch when possible. The browser retains the
   complete current Sheet so FortuneSheet and charts always read one document,
   while the Server applies those cell patches transactionally to the affected
   persisted chunks. Bulk or structural operations use `replaceChunks` with
