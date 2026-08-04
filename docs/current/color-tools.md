@@ -29,10 +29,10 @@ The following concepts are separate:
 | Capability | Current behavior | Source of truth | Limitation |
 | --- | --- | --- | --- |
 | Store direct fill/font colors | Supported as `bg` and `fc` | `FortuneCellValue` | No separate color-reference metadata |
-| Import direct XLSX/XLS colors | Supported for the imported style shapes | Core importer and style conversion | Custom XLSX themes use a fixed fallback theme table |
+| Import direct XLSX/XLS colors | Supported for the imported style shapes | Core importer and style conversion | Theme/indexed/tint values are resolved to direct colors; original references are not retained |
 | Persist colors | Supported in SheetChunk JSON payloads | Server SheetChunk | No dedicated style table or style index |
 | Read a range with colors | Not exposed in `range` projections | Core sheet projections | Values, formulas, dates, merges, and number-format annotations are exposed instead |
-| Find by exact fill/font color | Supported by `readSheetData` with `operation: "find"` | Core query plus Server read tool | Exact normalized string matching; no color-name resolution |
+| Find by fill/font color | Supported by `readSheetData` with `operation: "find"` | Core query plus Server read tool | Exact matching after hex/name normalization; no approximate or effective conditional-format matching |
 | Write cell contents without changing styles | Supported | `writeCells` and SheetCommand | Content-only by contract |
 | AI style mutation | Not supported | No Core contract or Server manifest entry | Do not simulate it with `writeCells` |
 | Browser edit/save of complete cell styles | Supported through complete cell patches | Web editor diff and Sheet save coordinator | AI external mutation must still use the common Sheet delta path |
@@ -88,10 +88,11 @@ The shared conversion owner is:
   - `normalizeHex` (internal)
   - border and alignment conversions in the same module
 
-The current converter accepts RGB, indexed, theme, and tint fields. Indexed and
-theme colors are resolved through in-module tables. The theme table represents
-the default palette and is not loaded from `xl/theme/theme1.xml`, so it is not
-authoritative for workbooks with custom themes.
+The current converter accepts RGB, indexed, theme, and tint fields. The XLSX
+import path uses `@corbe30/fortune-excel`, which reads `xl/theme/theme1.xml`
+and resolves theme plus tint to direct colors before the cell enters the shared
+model. `fortuneStyle.ts` remains the conversion owner for the fallback SheetJS
+path and for export normalization.
 
 Do not add another color converter in Server, Agent, or Web. Any future color
 normalization, alias handling, theme resolution, or comparison rule belongs at
@@ -198,7 +199,8 @@ schema, mutation application, result summary, Server tool, and Web delta path.
 
 The current `readSheetData` modes are:
 
-- `overview`: structure and formula summary; no cell styles.
+- `overview`: structure and formula summary plus `styleColors`, a distinct/count
+  index of direct fill and font colors present in the Sheet.
 - `range`: compact or exact values, formulas, dates, merges, and number-format
   annotations; fill and font colors are not included.
 - `find`: value, type, formula, or direct style search.
@@ -218,20 +220,41 @@ Code locations:
 
 - [`packages/core/src/sheetTools/sheetCellQuery.ts`](../../packages/core/src/sheetTools/sheetCellQuery.ts)
   - `SheetCellQuery`
-  - `normalizeColor`
+  - `normalizeStyleQuery`
   - `matchesValue`
   - `querySheetCells`
   - `SheetCellMatch`
+- [`packages/core/src/excel/fortuneStyle.ts`](../../packages/core/src/excel/fortuneStyle.ts)
+  - `normalizeColorQuery`
+- [`packages/core/src/tools/excelToolContract.ts`](../../packages/core/src/tools/excelToolContract.ts)
+  - `sheetCellStyleSchema` accepts color names and normalized hex forms
+  - `sheetCellMatchesOutputSchema` exposes the canonical queried `color`
 - [`packages/server/src/modules/sheets/tools/readSheetData.ts`](../../packages/server/src/modules/sheets/tools/readSheetData.ts)
   - `readSheetData.execute`
 - [`packages/server/src/modules/sheets/infrastructure/sheetRepository.ts`](../../packages/server/src/modules/sheets/infrastructure/sheetRepository.ts)
   - `findSheetForWorkspace`
 
 The current style query compares normalized strings for `bg` and `fc`, and can
-also compare `bold` and `numberFormat`. It does not recognize Chinese color
-names, CSS names, approximate colors, theme references, or effective colors.
-Results are grouped ranges with a count and a reason, not a per-cell style
-object.
+also compare `bold` and `numberFormat`. Hex queries accept `#RGB`, `#RRGGBB`,
+and ARGB forms. The first color-name vocabulary is deliberately small and
+deterministic: Chinese and English red, green, blue, yellow, black, and white.
+Aliases are converted to canonical colors in Core before matching. Results are
+grouped ranges with a count, a reason, and the canonical `color` when the query
+contains one color criterion. Approximate colors, light/dark names, CSS color
+names, theme references, and effective conditional-format colors are not
+supported.
+
+The intended natural-language flow is two calls: first read `overview`, let the
+model choose the matching entry from `styleColors` by its human-readable name,
+then pass that entry's exact `color` to `find`. This keeps matching deterministic
+without requiring the user to know a hex value. For example, if overview returns
+`{ role: "fill", color: "#FFF2CC", name: "浅黄色 (light yellow)", count: 24 }`,
+the model should call the existing `find` operation with
+`{ style: { fill: "#FFF2CC" } }`. Core compares it with the stored `bg` and
+returns the matching ranges plus the canonical `color`. The fixed aliases such
+as `黄色` remain available for common exact colors, but a query such as a color
+that is merely close to yellow intentionally returns no approximate match in
+this phase.
 
 ### Range Projection Path
 
@@ -247,9 +270,9 @@ object.
   - range projection selection and continuation serialization
 
 `SheetTableAnnotation` currently carries formulas, dates, and non-default number
-formats. Adding style metadata to this default projection would increase token
-usage; style metadata should remain an explicit, bounded read in a future tool
-operation.
+formats. Direct style metadata is intentionally kept out of `range` projections;
+the separate `overview.styleColors` index provides the small color catalog needed
+before an exact style query.
 
 ## Current Write and Clear Boundaries
 

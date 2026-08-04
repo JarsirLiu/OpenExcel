@@ -1,5 +1,6 @@
 import type { FortuneCell } from "../excel/celldataUtils.js";
 import { fortuneCellValueToScalar, isFortuneDateCell } from "../excel/fortuneCellValue.js";
+import { normalizeColorQuery } from "../excel/fortuneStyle.js";
 import { formulaToR1C1 } from "../formula/formulaR1C1.js";
 import { type SheetDataValue, type SheetToolRange, sheetUsedRange } from "./sheetDataProjection.js";
 
@@ -26,6 +27,7 @@ export type SheetCellMatch = {
   range: string;
   count: number;
   reason: string;
+  color?: string;
 };
 
 function cellKey(row: number, col: number): string {
@@ -37,16 +39,26 @@ function cellValue(cell: FortuneCell): SheetDataValue {
   return value instanceof Date ? value.toISOString() : value;
 }
 
-function normalizeColor(value: unknown): string | undefined {
-  return typeof value === "string" ? value.toUpperCase() : undefined;
-}
-
 function isFormula(cell: FortuneCell | undefined): boolean {
   return typeof cell?.v.f === "string" && cell.v.f.trim() !== "";
 }
 
 function isEmptyValue(cell: FortuneCell | undefined, value: SheetDataValue): boolean {
   return !isFormula(cell) && (cell == null || value == null || value === "");
+}
+
+function normalizeStyleQuery(style: SheetCellQuery["style"]): SheetCellQuery["style"] {
+  if (!style) return undefined;
+  return {
+    ...style,
+    fill: style.fill === undefined ? undefined : (normalizeColorQuery(style.fill) ?? ""),
+    fontColor:
+      style.fontColor === undefined ? undefined : (normalizeColorQuery(style.fontColor) ?? ""),
+  };
+}
+
+function normalizeQuery(query: SheetCellQuery): SheetCellQuery {
+  return { ...query, style: normalizeStyleQuery(query.style) };
 }
 
 function matchesValue(cell: FortuneCell | undefined, query: SheetCellQuery): boolean {
@@ -77,8 +89,8 @@ function matchesValue(cell: FortuneCell | undefined, query: SheetCellQuery): boo
   if (query.style) {
     if (!cell) return false;
     const style = query.style;
-    if (style.fill && normalizeColor(cell.v.bg) !== normalizeColor(style.fill)) return false;
-    if (style.fontColor && normalizeColor(cell.v.fc) !== normalizeColor(style.fontColor))
+    if (style.fill !== undefined && normalizeColorQuery(cell.v.bg) !== style.fill) return false;
+    if (style.fontColor !== undefined && normalizeColorQuery(cell.v.fc) !== style.fontColor)
       return false;
     if (style.bold !== undefined && Boolean(cell.v.bl) !== style.bold) return false;
     if (style.numberFormat && cell.v.ct?.fa !== style.numberFormat) return false;
@@ -155,7 +167,10 @@ function toRange(startRow: number, startCol: number, endRow: number, endCol: num
   return start === end ? start : `${start}:${end}`;
 }
 
-function buildMatches(cells: FortuneCell[], reason: string): SheetCellMatch[] {
+function buildMatches(
+  cells: FortuneCell[],
+  match: Pick<SheetCellMatch, "reason" | "color">,
+): SheetCellMatch[] {
   const remaining = new Set(cells.map((cell) => cellKey(cell.r, cell.c)));
   const sorted = [...cells].sort((left, right) => left.r - right.r || left.c - right.c);
   const matches: SheetCellMatch[] = [];
@@ -168,7 +183,7 @@ function buildMatches(cells: FortuneCell[], reason: string): SheetCellMatch[] {
       matches.push({
         range: toRange(cell.r, cell.c, endRow, cell.c),
         count: endRow - cell.r + 1,
-        reason,
+        ...match,
       });
       continue;
     }
@@ -178,7 +193,7 @@ function buildMatches(cells: FortuneCell[], reason: string): SheetCellMatch[] {
     matches.push({
       range: toRange(cell.r, cell.c, cell.r, endCol),
       count: endCol - cell.c + 1,
-      reason,
+      ...match,
     });
   }
   return matches;
@@ -189,20 +204,30 @@ export function querySheetCells(
   query: SheetCellQuery,
   options: SheetCellQueryOptions = {},
 ): SheetCellMatch[] {
+  const normalizedQuery = normalizeQuery(query);
   const range = options.range ?? sheetUsedRange(celldata);
   const maxCells = options.maxCells ?? DEFAULT_MAX_QUERY_CELLS;
-  const candidates = buildCandidateCells(celldata, range, query, maxCells);
-  const matched = candidates.filter((cell) => matchesValue(cell, query));
+  const candidates = buildCandidateCells(celldata, range, normalizedQuery, maxCells);
+  const matched = candidates.filter((cell) => matchesValue(cell, normalizedQuery));
+  const fill = normalizedQuery.style?.fill;
+  const fontColor = normalizedQuery.style?.fontColor;
   const reason = [
-    query.value !== undefined ? `value=${String(query.value)}` : null,
-    query.valueType ? `type=${query.valueType}` : null,
-    query.formula ? `formula=${query.formula === "exists" ? "exists" : "specified"}` : null,
-    query.style?.fill ? `fill=${query.style.fill}` : null,
-    query.style?.fontColor ? `fontColor=${query.style.fontColor}` : null,
-    query.style?.bold !== undefined ? `bold=${query.style.bold}` : null,
-    query.style?.numberFormat ? `numberFormat=${query.style.numberFormat}` : null,
+    normalizedQuery.value !== undefined ? `value=${String(normalizedQuery.value)}` : null,
+    normalizedQuery.valueType ? `type=${normalizedQuery.valueType}` : null,
+    normalizedQuery.formula
+      ? `formula=${normalizedQuery.formula === "exists" ? "exists" : "specified"}`
+      : null,
+    query.style?.fill ? `fill=${fill ?? query.style.fill}` : null,
+    query.style?.fontColor ? `fontColor=${fontColor ?? query.style.fontColor}` : null,
+    normalizedQuery.style?.bold !== undefined ? `bold=${normalizedQuery.style.bold}` : null,
+    normalizedQuery.style?.numberFormat
+      ? `numberFormat=${normalizedQuery.style.numberFormat}`
+      : null,
   ]
     .filter((item): item is string => item != null)
     .join(", ");
-  return buildMatches(matched, reason || "matched");
+  return buildMatches(matched, {
+    reason: reason || "matched",
+    color: fill ?? (fontColor && !fill ? fontColor : undefined),
+  });
 }

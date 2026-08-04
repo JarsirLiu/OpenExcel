@@ -31,6 +31,39 @@ const themeColors: Record<number, string> = {
   9: "#F79646",
 };
 
+const colorQueryAliases: Record<string, string> = {
+  红色: "#FF0000",
+  red: "#FF0000",
+  绿色: "#00FF00",
+  green: "#00FF00",
+  蓝色: "#0000FF",
+  blue: "#0000FF",
+  黄色: "#FFFF00",
+  yellow: "#FFFF00",
+  黑色: "#000000",
+  black: "#000000",
+  白色: "#FFFFFF",
+  white: "#FFFFFF",
+};
+
+const colorQueryNames: Record<string, string> = {
+  "#000000": "黑色 (black)",
+  "#FFFFFF": "白色 (white)",
+  "#FF0000": "红色 (red)",
+  "#00FF00": "绿色 (green)",
+  "#0000FF": "蓝色 (blue)",
+  "#FFFF00": "黄色 (yellow)",
+  "#FFF2CC": "浅黄色 (light yellow)",
+  "#FCE4D6": "浅橙色 (light orange)",
+  "#F4B183": "橙色 (orange)",
+  "#E2F0D9": "浅绿色 (light green)",
+  "#92D050": "绿色 (green)",
+  "#DDEBF7": "浅蓝色 (light blue)",
+  "#D9E1F2": "淡蓝色 (pale blue)",
+  "#F2F2F2": "浅灰色 (light gray)",
+  "#D9D9D9": "灰色 (gray)",
+};
+
 // FortuneSheet/Luckysheet border codes are also the codes emitted by
 // @corbe30/fortune-excel. Keep this table as the only numeric border mapping.
 const fortuneToExcelBorderStyles: Record<number, string> = {
@@ -77,8 +110,31 @@ function applyTint(hex: string, tint?: number): string {
 
 function normalizeHex(value: string): string | undefined {
   const hex = value.replace(/^#/, "");
+  if (/^[0-9a-f]{3}$/i.test(hex)) {
+    return `#${hex
+      .split("")
+      .map((channel) => `${channel}${channel}`)
+      .join("")
+      .toUpperCase()}`;
+  }
   if (!/^[0-9a-f]{6}([0-9a-f]{2})?$/i.test(hex)) return undefined;
-  return `#${hex.toUpperCase()}`;
+  const normalized = hex.toUpperCase();
+  return normalized.length === 8 && normalized.startsWith("FF")
+    ? `#${normalized.slice(2)}`
+    : `#${normalized}`;
+}
+
+export function normalizeColorQuery(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const input = value.trim();
+  if (!input) return undefined;
+  const alias = colorQueryAliases[input.toLowerCase()];
+  return alias ?? normalizeHex(input);
+}
+
+export function describeColor(value: unknown): string {
+  const normalized = normalizeColorQuery(value);
+  return normalized ? (colorQueryNames[normalized] ?? "自定义颜色 (custom color)") : "未知颜色";
 }
 
 export function excelColorToFortune(color?: ExcelColorInput | string): string | undefined {

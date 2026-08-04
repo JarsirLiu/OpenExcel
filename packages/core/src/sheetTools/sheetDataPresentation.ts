@@ -1,6 +1,7 @@
 import { fortuneMergesToToolRanges } from "../chat/sheetGeometry.js";
 import type { FortuneCell } from "../excel/celldataUtils.js";
 import { fortuneCellValueToScalar, isFortuneDateCell } from "../excel/fortuneCellValue.js";
+import { describeColor, normalizeColorQuery } from "../excel/fortuneStyle.js";
 import { formulaToR1C1 } from "../formula/formulaR1C1.js";
 import {
   projectSheetData,
@@ -41,12 +42,20 @@ export type SheetOverviewColumn = {
   types: Array<"string" | "number" | "boolean" | "date" | "formula">;
 };
 
+export type SheetOverviewStyleColor = {
+  role: "fill" | "font";
+  color: string;
+  name: string;
+  count: number;
+};
+
 export type SheetOverviewProjection = {
   usedRange: string;
   nonEmptyCellCount: number;
   mergeRanges: string[];
   formulaPatterns: Array<{ formulaR1C1: string; count: number }>;
   columns: SheetOverviewColumn[];
+  styleColors: SheetOverviewStyleColor[];
 };
 
 function columnName(column: number): string {
@@ -169,6 +178,7 @@ export function projectSheetOverview(celldata: readonly FortuneCell[]): SheetOve
   const used = sheetUsedRange(celldata);
   const formulaCounts = new Map<string, number>();
   const columnTypes = new Map<number, Set<SheetOverviewColumn["types"][number]>>();
+  const styleColors = new Map<string, SheetOverviewStyleColor>();
   let nonEmptyCellCount = 0;
 
   for (const cell of celldata) {
@@ -177,6 +187,25 @@ export function projectSheetOverview(celldata: readonly FortuneCell[]): SheetOve
     const types = columnTypes.get(cell.c + 1) ?? new Set<SheetOverviewColumn["types"][number]>();
     types.add(type);
     columnTypes.set(cell.c + 1, types);
+    for (const [role, value] of [
+      ["fill", cell.v.bg],
+      ["font", cell.v.fc],
+    ] as const) {
+      const color = normalizeColorQuery(value);
+      if (!color) continue;
+      const key = `${role}:${color}`;
+      const current = styleColors.get(key);
+      if (current) {
+        current.count += 1;
+      } else {
+        styleColors.set(key, {
+          role,
+          color,
+          name: describeColor(color),
+          count: 1,
+        });
+      }
+    }
     if (type === "formula") {
       const pattern = formulaToR1C1(cell.v.f ?? "", cell.r, cell.c);
       formulaCounts.set(pattern, (formulaCounts.get(pattern) ?? 0) + 1);
@@ -194,5 +223,12 @@ export function projectSheetOverview(celldata: readonly FortuneCell[]): SheetOve
     columns: [...columnTypes.entries()]
       .sort(([left], [right]) => left - right)
       .map(([column, types]) => ({ column: columnName(column), types: [...types] })),
+    styleColors: [...styleColors.values()].sort((left, right) => {
+      const roleOrder = { fill: 0, font: 1 } as const;
+      if (roleOrder[left.role] !== roleOrder[right.role]) {
+        return roleOrder[left.role] - roleOrder[right.role];
+      }
+      return left.color < right.color ? -1 : left.color > right.color ? 1 : 0;
+    }),
   };
 }

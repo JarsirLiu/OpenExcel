@@ -113,8 +113,18 @@ const toolPageOutputSchema = z.object({
 
 const sheetCellStyleSchema = z
   .object({
-    fill: z.string().trim().min(1).optional(),
-    fontColor: z.string().trim().min(1).optional(),
+    fill: z
+      .string()
+      .trim()
+      .min(1)
+      .describe("填充色：可用中英文基础色名或 #RGB/#RRGGBB/ARGB")
+      .optional(),
+    fontColor: z
+      .string()
+      .trim()
+      .min(1)
+      .describe("字体色：可用中英文基础色名或 #RGB/#RRGGBB/ARGB")
+      .optional(),
     bold: z.boolean().optional(),
     numberFormat: z.string().trim().min(1).optional(),
   })
@@ -494,6 +504,14 @@ const sheetOverviewOutputSchema = z.object({
       types: z.array(z.enum(["string", "number", "boolean", "date", "formula"])),
     }),
   ),
+  styleColors: z.array(
+    z.object({
+      role: z.enum(["fill", "font"]),
+      color: z.string().min(1),
+      name: z.string().min(1),
+      count: z.number().int().positive(),
+    }),
+  ),
 });
 
 const sheetCellMatchesOutputSchema = z.object({
@@ -505,6 +523,7 @@ const sheetCellMatchesOutputSchema = z.object({
       range: z.string().min(1),
       count: z.number().int().positive(),
       reason: z.string().min(1),
+      color: z.string().min(1).optional(),
     }),
   ),
   ...toolPageOutputSchema.shape,
@@ -669,7 +688,7 @@ export const excelToolSpecs = {
   },
   readSheetData: {
     description:
-      "读取指定 Sheet 的数据。operation=overview 返回低 token 的使用范围、合并区域、公式模式和列类型；operation=range 默认返回带列标题和行号的紧凑布局，format=exact 返回完整二维 values、日期、公式和合并区域；operation=find 按值、类型、公式或直接格式定位单元格。compact 中省略空尾列和空行，合并区域单独在 merges 中描述，日期在 annotations 中使用无时区字符串，公式缓存值按单元格保留，重复公式通过 formulaPatterns 表达。range 超过单次网格预算时返回 continuation，下一次原样传回 continuation。",
+      "读取指定 Sheet 的数据。operation=overview 返回低 token 的使用范围、合并区域、公式模式、列类型和当前存在的直接填充色/字体色索引；先查看 styleColors，再将其中的实际 color 传给 operation=find 的 style.fill 或 style.fontColor。operation=range 默认返回带列标题和行号的紧凑布局，format=exact 返回完整二维 values、日期、公式和合并区域；operation=find 按值、类型、公式或直接格式定位单元格。compact 中省略空尾列和空行，合并区域单独在 merges 中描述，日期在 annotations 中使用无时区字符串，公式缓存值按单元格保留，重复公式通过 formulaPatterns 表达。range 超过单次网格预算时返回 continuation，下一次原样传回 continuation。",
     inputSchema: readSheetDataInputSchema,
     needsRunContext: false,
     outputSchema: sheetReadOutputSchema,

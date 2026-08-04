@@ -58,5 +58,21 @@ describe("projectSheetOverview", () => {
       { column: "A", types: ["string"] },
       { column: "B", types: ["formula"] },
     ]);
+    expect(result.styleColors).toEqual([]);
+  });
+
+  it("indexes direct fill and font colors for follow-up exact queries", () => {
+    const result = projectSheetOverview([
+      { r: 0, c: 0, v: { v: "标题", m: "标题", bg: "#fff2cc", fc: "#FF0000" } },
+      { r: 1, c: 0, v: { v: "内容", m: "内容", bg: "#FFF2CC", fc: "#FF0000" } },
+      { r: 2, c: 0, v: { v: "重点", m: "重点", bg: "#DDEBF7", fc: "#112233" } },
+    ]);
+
+    expect(result.styleColors).toEqual([
+      { role: "fill", color: "#DDEBF7", name: "浅蓝色 (light blue)", count: 1 },
+      { role: "fill", color: "#FFF2CC", name: "浅黄色 (light yellow)", count: 2 },
+      { role: "font", color: "#112233", name: "自定义颜色 (custom color)", count: 1 },
+      { role: "font", color: "#FF0000", name: "红色 (red)", count: 2 },
+    ]);
   });
 });

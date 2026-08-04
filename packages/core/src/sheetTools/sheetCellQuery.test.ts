@@ -12,7 +12,24 @@ describe("querySheetCells", () => {
       { style: { fill: "#92D050" } },
     );
 
-    expect(matches).toEqual([{ range: "B1:B3", count: 3, reason: "fill=#92D050" }]);
+    expect(matches).toEqual([
+      { range: "B1:B3", count: 3, reason: "fill=#92D050", color: "#92D050" },
+    ]);
+  });
+
+  it("matches named colors and normalizes short and ARGB hex values", () => {
+    const celldata = [
+      { r: 0, c: 0, v: { v: "红", m: "红", bg: "#FF0000" } },
+      { r: 1, c: 0, v: { v: "红", m: "红", bg: "#f00" } },
+      { r: 2, c: 0, v: { v: "红", m: "红", fc: "FFFF0000" } },
+    ];
+
+    expect(querySheetCells(celldata, { style: { fill: "红色" } })).toEqual([
+      { range: "A1:A2", count: 2, reason: "fill=#FF0000", color: "#FF0000" },
+    ]);
+    expect(querySheetCells(celldata, { style: { fontColor: "red" } })).toEqual([
+      { range: "A3", count: 1, reason: "fontColor=#FF0000", color: "#FF0000" },
+    ]);
   });
 
   it("matches a formula pattern at the cell level", () => {
@@ -55,7 +72,7 @@ describe("querySheetCells", () => {
       { range: "A1:A2", count: 2, reason: "formula=exists" },
     ]);
     expect(querySheetCells(celldata, { style: { fill: "#92D050" } }, { range })).toEqual([
-      { range: "A1:A2", count: 2, reason: "fill=#92D050" },
+      { range: "A1:A2", count: 2, reason: "fill=#92D050", color: "#92D050" },
     ]);
     expect(querySheetCells(celldata, { valueType: "formula" }, { range })).toEqual([
       { range: "A1:A2", count: 2, reason: "type=formula" },

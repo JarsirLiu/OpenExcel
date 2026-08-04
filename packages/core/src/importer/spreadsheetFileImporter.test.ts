@@ -48,6 +48,52 @@ async function styledXlsxBytes(): Promise<ArrayBuffer> {
   return workbook.xlsx.writeBuffer();
 }
 
+async function customThemeXlsxBytes(): Promise<ArrayBuffer> {
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet("主题色");
+  worksheet.getCell("A1").value = "自定义主题";
+  worksheet.getCell("A1").fill = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { theme: 4 } as never,
+  };
+  worksheet.getCell("A1").font = { color: { theme: 5 } as never };
+  worksheet.getCell("A2").value = "主题色加亮";
+  worksheet.getCell("A2").fill = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { theme: 4, tint: 0.2 } as never,
+  };
+  worksheet.getCell("A3").value = "主题色变暗";
+  worksheet.getCell("A3").font = { color: { theme: 5, tint: -0.2 } as never };
+
+  const bytes = await workbook.xlsx.writeBuffer();
+  const zip = await JSZip.loadAsync(bytes);
+  zip.file(
+    "xl/theme/theme1.xml",
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="Custom">
+  <a:themeElements>
+    <a:clrScheme name="Custom">
+      <a:dk1><a:srgbClr val="000000"/></a:dk1>
+      <a:lt1><a:srgbClr val="FFFFFF"/></a:lt1>
+      <a:dk2><a:srgbClr val="111111"/></a:dk2>
+      <a:lt2><a:srgbClr val="EEEEEE"/></a:lt2>
+      <a:accent1><a:srgbClr val="123456"/></a:accent1>
+      <a:accent2><a:srgbClr val="654321"/></a:accent2>
+      <a:accent3><a:srgbClr val="ABCDEF"/></a:accent3>
+      <a:accent4><a:srgbClr val="FEDCBA"/></a:accent4>
+      <a:accent5><a:srgbClr val="135790"/></a:accent5>
+      <a:accent6><a:srgbClr val="975310"/></a:accent6>
+      <a:hlink><a:srgbClr val="0000FF"/></a:hlink>
+      <a:folHlink><a:srgbClr val="800080"/></a:folHlink>
+    </a:clrScheme>
+  </a:themeElements>
+</a:theme>`,
+  );
+  return zip.generateAsync({ type: "arraybuffer" });
+}
+
 async function datedXlsxBytes(): Promise<ArrayBuffer> {
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet("日期");
@@ -230,6 +276,34 @@ describe("parseSpreadsheetFile", () => {
         ]),
       );
     }
+  });
+
+  it("resolves custom theme colors before storing cell styles", async () => {
+    const result = await parseSpreadsheetFile({
+      fileName: "主题色.xlsx",
+      format: "xlsx",
+      bytes: await customThemeXlsxBytes(),
+    });
+
+    expect(result.sheets[0]?.celldata).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          r: 0,
+          c: 0,
+          v: expect.objectContaining({ bg: "#123456", fc: "#654321" }),
+        }),
+        expect.objectContaining({
+          r: 1,
+          c: 0,
+          v: expect.objectContaining({ bg: "#205d99" }),
+        }),
+        expect.objectContaining({
+          r: 2,
+          c: 0,
+          v: expect.objectContaining({ fc: "#51361a" }),
+        }),
+      ]),
+    );
   });
 
   it("normalizes the BIFF style shape returned by xlsx-js-style", () => {

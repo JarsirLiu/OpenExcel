@@ -73,6 +73,29 @@ describe("sheet read tools", () => {
     expect(result.merges).toEqual([{ range: "A1:B1", anchor: "A1", rowSpan: 1, colSpan: 2 }]);
   });
 
+  it("returns direct colors in overview for follow-up exact find queries", async () => {
+    mockFindFirst.mockResolvedValue({
+      id: 1,
+      name: "Sheet1",
+      sheetNo: 1,
+      workbookId: 3,
+      uploadedData: JSON.stringify([
+        { r: 0, c: 0, v: { v: "标题", bg: "#FFF2CC", fc: "#FF0000" } },
+        { r: 1, c: 0, v: { v: "内容", bg: "#FFF2CC", fc: "#FF0000" } },
+      ]),
+      config: null,
+      workbook: { workspaceId: 1, id: 3, name: "Workbook" },
+    });
+
+    const result = await readSheetData.execute({ sheetId: 1, operation: "overview" }, context());
+
+    expectMode(result, "overview");
+    expect(result.styleColors).toEqual([
+      { role: "fill", color: "#FFF2CC", name: "浅黄色 (light yellow)", count: 2 },
+      { role: "font", color: "#FF0000", name: "红色 (red)", count: 2 },
+    ]);
+  });
+
   it("continues a wide read from the structured cursor", async () => {
     mockFindFirst.mockResolvedValue({
       id: 1,
@@ -218,7 +241,34 @@ describe("sheet read tools", () => {
     );
 
     expectMode(result, "find");
-    expect(result.matches).toEqual([{ range: "A1", count: 1, reason: "fill=#92D050" }]);
+    expect(result.matches).toEqual([
+      { range: "A1", count: 1, reason: "fill=#92D050", color: "#92D050" },
+    ]);
+  });
+
+  it("normalizes a named font color through the unified read tool", async () => {
+    mockFindFirst.mockResolvedValue({
+      id: 1,
+      name: "Sheet1",
+      sheetNo: 1,
+      workbookId: 3,
+      uploadedData: JSON.stringify([
+        { r: 0, c: 0, v: { v: "红色文字", fc: "FFFF0000" } },
+        { r: 1, c: 0, v: { v: "其他", fc: "#0000FF" } },
+      ]),
+      config: null,
+      workbook: { workspaceId: 1, id: 3, name: "Workbook" },
+    });
+
+    const result = await readSheetData.execute(
+      { sheetId: 1, operation: "find", query: { style: { fontColor: "red" } } },
+      context(),
+    );
+
+    expectMode(result, "find");
+    expect(result.matches).toEqual([
+      { range: "A1", count: 1, reason: "fontColor=#FF0000", color: "#FF0000" },
+    ]);
   });
 
   it("finds empty cells inside the requested range without matching zero", async () => {

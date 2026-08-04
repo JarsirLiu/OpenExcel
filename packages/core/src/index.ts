@@ -152,6 +152,7 @@ export {
   fortuneHorizontalToExcel,
   fortuneVerticalToExcel,
   fortuneWrapToExcel,
+  normalizeColorQuery,
 } from "./excel/fortuneStyle.js";
 export { type JsonValue, toJsonObject, toJsonValue } from "./excel/jsonValue.js";
 export type { FilterSelection, FortuneSheetData, SheetConfig } from "./excel/sheetConfig.js";
@@ -221,6 +222,7 @@ export {
   projectSheetOverview,
   projectSheetTable,
   type SheetOverviewProjection,
+  type SheetOverviewStyleColor,
   type SheetTableAnnotation,
   type SheetTableProjection,
   type SheetTableRow,
