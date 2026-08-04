@@ -45,6 +45,8 @@ with the server through HTTP and does not import server code.
 - `packages/core/src/sheetTools/`: model-facing reads, queries, object projections, and paging.
 - `packages/core/src/chart/`: ChartSpec, references, dependencies, and chart commands.
 - `packages/core/src/tools/`: Excel tool contracts and model catalog generation.
+- `docs/current/color-tools.md`: current color/style data flow and code map.
+- `docs/design/color-tools.md`: draft theme-aware color and AI style mutation design.
 
 ### Agent
 

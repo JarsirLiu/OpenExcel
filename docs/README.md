@@ -63,6 +63,7 @@ runtime.
 - [Current Agent runtime](current/agent-runtime.md)
 - [Current Sheet synchronization](current/spreadsheet-sync.md)
 - [Current AI tools](current/tools.md)
+- [Current color and style tooling](current/color-tools.md)
 - [Current internationalization](current/i18n.md)
 
 ## Engineering rules
