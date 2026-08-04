@@ -35,7 +35,13 @@ function isCompletedToolPart(part: unknown): part is CompletedToolPart {
   );
 }
 
-const SHEET_MUTATION_TOOLS = new Set(["writeCells", "clearCells", "mergeCells", "unmergeCells"]);
+const SHEET_MUTATION_TOOLS = new Set([
+  "writeCells",
+  "formatCells",
+  "clearCells",
+  "mergeCells",
+  "unmergeCells",
+]);
 const WORKBOOK_MUTATION_TOOLS = new Set(["createWorkbook", "createSheet"]);
 const CHART_MUTATION_TOOLS = new Set(["createChart", "updateChart", "deleteChart"]);
 

@@ -1,6 +1,7 @@
 import type {
   SheetChangeCell,
   SheetChangeDelta,
+  SheetChangeFormatOperation,
   SheetChangeRange,
   SheetChangeWriteOperation,
 } from "./sheetChange.js";
@@ -82,6 +83,16 @@ export type ZeroBasedSheetChangeWriteOperation =
       formula?: string;
     };
 
+export type ZeroBasedSheetChangeFormatOperation = {
+  type: "range";
+  startRow: StorageIndex;
+  startCol: StorageIndex;
+  endRow: StorageIndex;
+  endCol: StorageIndex;
+  fill?: string | null;
+  fontColor?: string | null;
+};
+
 export type ZeroBasedSheetChangeRange = {
   startRow: StorageIndex;
   startCol: StorageIndex;
@@ -122,6 +133,10 @@ export type ZeroBasedSheetChangeDelta =
   | {
       type: "unmerge";
       operations: ZeroBasedSheetChangeRange[];
+    }
+  | {
+      type: "format";
+      operations: ZeroBasedSheetChangeFormatOperation[];
     }
   | {
       type: "patch";
@@ -210,6 +225,17 @@ export function sheetChangeRangeToZeroBased(range: SheetChangeRange): ZeroBasedS
   };
 }
 
+function sheetChangeFormatOperationToZeroBased(
+  operation: SheetChangeFormatOperation,
+): ZeroBasedSheetChangeFormatOperation {
+  return {
+    type: "range",
+    ...sheetChangeRangeToZeroBased(operation),
+    fill: operation.fill,
+    fontColor: operation.fontColor,
+  };
+}
+
 export function sheetChangeDeltaToZeroBased(delta: SheetChangeDelta): ZeroBasedSheetChangeDelta {
   if (delta.type === "write") {
     return {
@@ -244,6 +270,13 @@ export function sheetChangeDeltaToZeroBased(delta: SheetChangeDelta): ZeroBasedS
         type: "range",
         ...sheetChangeRangeToZeroBased(operation),
       })),
+    };
+  }
+
+  if (delta.type === "format") {
+    return {
+      type: "format",
+      operations: delta.operations.map(sheetChangeFormatOperationToZeroBased),
     };
   }
 
@@ -311,6 +344,17 @@ export function zeroBasedSheetChangeRangeToSheetChangeRange(
   };
 }
 
+function zeroBasedFormatOperationToSheetChangeFormatOperation(
+  operation: ZeroBasedSheetChangeFormatOperation,
+): SheetChangeFormatOperation {
+  return {
+    type: "range",
+    ...zeroBasedSheetChangeRangeToSheetChangeRange(operation),
+    fill: operation.fill,
+    fontColor: operation.fontColor,
+  };
+}
+
 export function zeroBasedSheetChangeDeltaToSheetChangeDelta(
   delta: ZeroBasedSheetChangeDelta,
 ): SheetChangeDelta {
@@ -347,6 +391,13 @@ export function zeroBasedSheetChangeDeltaToSheetChangeDelta(
         type: "range",
         ...zeroBasedSheetChangeRangeToSheetChangeRange(operation),
       })),
+    };
+  }
+
+  if (delta.type === "format") {
+    return {
+      type: "format",
+      operations: delta.operations.map(zeroBasedFormatOperationToSheetChangeFormatOperation),
     };
   }
 

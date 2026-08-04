@@ -57,6 +57,7 @@ function getToolSummary(toolName: string, output: unknown, input: unknown): stri
     "readSheetData",
     "readSheetObjects",
     "writeCells",
+    "formatCells",
     "clearCells",
     "mergeCells",
     "unmergeCells",
@@ -79,6 +80,8 @@ function getToolSummary(toolName: string, output: unknown, input: unknown): stri
       return t("tool_read_sheet_objects", { sheet: sheetLabel });
     case "writeCells":
       return t("tool_write_sheet", { sheet: sheetLabel });
+    case "formatCells":
+      return t("tool_format_sheet", { sheet: sheetLabel });
     case "clearCells":
       return t("tool_clear_sheet", { sheet: sheetLabel });
     case "mergeCells":
@@ -98,6 +101,8 @@ function getSheetActionLabel(toolName: string): string {
       return t("sheet_action_read_objects");
     case "writeCells":
       return t("sheet_action_write");
+    case "formatCells":
+      return t("sheet_action_format");
     case "clearCells":
       return t("sheet_action_clear");
     case "mergeCells":

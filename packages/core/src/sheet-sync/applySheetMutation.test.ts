@@ -103,6 +103,95 @@ describe("applySheetMutation", () => {
     expect(result.snapshot.celldata).toEqual([{ r: 0, c: 0, v: { bg: "#fff" } }]);
   });
 
+  it("formats ranges without changing values, formulas, or other styles", () => {
+    const result = applySheetMutation(
+      {
+        celldata: [
+          {
+            r: 0,
+            c: 0,
+            v: { v: "value", m: "value", f: "=1+1", bg: "#DDEBF7", bl: 1 },
+          },
+        ],
+        config: null,
+      },
+      {
+        type: "format",
+        operations: [
+          { type: "range", startRow: 1, startCol: 1, endRow: 1, endCol: 1, fill: "yellow" },
+          { type: "range", startRow: 1, startCol: 1, endRow: 1, endCol: 1, fontColor: "red" },
+        ],
+      },
+    );
+
+    expect(result.snapshot.celldata).toEqual([
+      {
+        r: 0,
+        c: 0,
+        v: {
+          v: "value",
+          m: "value",
+          f: "=1+1",
+          bg: "#FFFF00",
+          fc: "#FF0000",
+          bl: 1,
+        },
+      },
+    ]);
+    expect(result.changeSummary).toMatchObject({
+      changedCellCount: 1,
+      changedRanges: ["A1"],
+      operationCount: 2,
+    });
+  });
+
+  it("clears one color while preserving the other color and removes an empty cell", () => {
+    const result = applySheetMutation(
+      {
+        celldata: [
+          { r: 0, c: 0, v: { v: "value", m: "value", bg: "#FFF2CC", fc: "#FF0000" } },
+          { r: 0, c: 1, v: { v: "", m: "", bg: "#FFF2CC" } },
+        ],
+        config: null,
+      },
+      {
+        type: "format",
+        operations: [
+          { type: "range", startRow: 1, startCol: 1, endRow: 1, endCol: 1, fill: null },
+          { type: "range", startRow: 1, startCol: 2, endRow: 1, endCol: 2, fill: null },
+        ],
+      },
+    );
+
+    expect(result.snapshot.celldata).toEqual([
+      { r: 0, c: 0, v: { v: "value", m: "value", fc: "#FF0000" } },
+    ]);
+    expect(result.changeSummary.changedCellCount).toBe(2);
+  });
+
+  it("formats blank cells and clears only the requested font color", () => {
+    const result = applySheetMutation(
+      {
+        celldata: [{ r: 0, c: 0, v: { v: "value", m: "value", bg: "#FFF2CC", fc: "#FF0000" } }],
+        config: null,
+      },
+      {
+        type: "format",
+        operations: [
+          { type: "range", startRow: 1, startCol: 1, endRow: 1, endCol: 1, fontColor: null },
+          { type: "range", startRow: 2, startCol: 2, endRow: 2, endCol: 2, fill: "#DDEBF7" },
+        ],
+      },
+    );
+
+    expect(result.snapshot.celldata).toContainEqual({
+      r: 0,
+      c: 0,
+      v: { v: "value", m: "value", bg: "#FFF2CC" },
+    });
+    expect(result.snapshot.celldata).toContainEqual({ r: 1, c: 1, v: { bg: "#DDEBF7" } });
+  });
+
   it("clears a large sparse range without iterating empty coordinates", () => {
     const result = applySheetMutation(
       {

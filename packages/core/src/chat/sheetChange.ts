@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { normalizeColorQuery } from "../excel/fortuneStyle.js";
 
 const sheetChangeValueSchema = z.union([z.string(), z.number(), z.boolean()]);
 const sheetChangeMatrixSchema = z.array(z.array(sheetChangeValueSchema).min(1)).min(1);
@@ -145,6 +146,39 @@ export const sheetChangeWriteOperationSchema = z.union([
   sheetChangeWriteRangeSchema,
 ]);
 
+const sheetChangeFormatColorSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .superRefine((color, ctx) => {
+    if (!normalizeColorQuery(color)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Format colors must be a supported color name or hexadecimal value",
+      });
+    }
+  });
+
+export const sheetChangeFormatOperationSchema = z
+  .object({
+    type: z.literal("range"),
+    ...sheetChangeRangePayloadSchema.shape,
+    fill: z.union([sheetChangeFormatColorSchema, z.null()]).optional(),
+    fontColor: z.union([sheetChangeFormatColorSchema, z.null()]).optional(),
+  })
+  .strict()
+  .refine((operation) => operation.fill !== undefined || operation.fontColor !== undefined, {
+    message: "A format operation must specify fill or fontColor",
+  })
+  .refine((operation) => operation.endRow >= operation.startRow, {
+    path: ["endRow"],
+    message: "Invalid sheet range",
+  })
+  .refine((operation) => operation.endCol >= operation.startCol, {
+    path: ["endCol"],
+    message: "Invalid sheet range",
+  });
+
 export const sheetChangeClearRangeSchema = sheetChangeRangePayloadSchema.refine(
   (range) => range.endRow >= range.startRow && range.endCol >= range.startCol,
   {
@@ -191,6 +225,10 @@ export const sheetChangeDeltaSchema = z.union([
     type: z.literal("unmerge"),
     operations: z.array(sheetChangeRangeOperationSchema).min(1),
   }),
+  z.object({
+    type: z.literal("format"),
+    operations: z.array(sheetChangeFormatOperationSchema).min(1),
+  }),
   sheetChangePatchSchema,
 ]);
 
@@ -229,6 +267,7 @@ export type SheetChangeClearCell = z.infer<typeof sheetChangeClearCellSchema>;
 export type SheetChangeRange = z.infer<typeof sheetChangeRangeSchema>;
 export type SheetChangeClearRange = z.infer<typeof sheetChangeClearRangeSchema>;
 export type SheetChangeRangeOperation = z.infer<typeof sheetChangeRangeOperationSchema>;
+export type SheetChangeFormatOperation = z.infer<typeof sheetChangeFormatOperationSchema>;
 export type SheetChangeClearOperation = z.infer<typeof sheetChangeClearOperationSchema>;
 export type SheetChangeDelta = z.infer<typeof sheetChangeDeltaSchema>;
 export type SheetChangePatch = z.infer<typeof sheetChangePatchSchema>;

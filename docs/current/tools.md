@@ -36,6 +36,7 @@ tool catalog from the registry.
 - `readSheetData`
 - `readSheetObjects`
 - `writeCells`
+- `formatCells`
 - `clearCells`
 - `mergeCells`
 - `unmergeCells`
@@ -51,10 +52,10 @@ tool catalog from the registry.
 
 - AI tool row and column numbers are one-based. Core owns conversion to Core and persisted grid coordinates.
 - `readSheetData` is the unified Sheet read tool. `operation: "overview"` returns a low-token structural summary and a `styleColors` index of direct fill/font colors currently present in the Sheet; use its actual `color` values for a follow-up exact `find` query. `operation: "range"` returns either a compact column-header/row-number layout or the exact two-dimensional projection; `operation: "find"` returns matching A1-range summaries for values, types, formulas, and direct styles. Direct style search compares normalized fill/font color strings, including the small set of supported color aliases, bold, and number formats; it does not resolve approximate colors, workbook themes at query time, or conditional-format effective colors. Compact range reads keep cached values per cell, represent repeated formulas through `formulaPatterns`, and use `annotations` for dates and non-default number formats. Range reads use `continuation`; find reads use `offset` and `nextOffset`.
-- `writeCells`, `clearCells`, `mergeCells`, and `unmergeCells` use the SheetCommand write boundary. One `writeCells` call may contain multiple A1-range operations; Core applies them serially in array order, and a later overlapping operation overwrites an earlier one. Separate `writeCells` calls may write the same cell when their calls are serialized by the Server mutation path. Each operation uses exactly one of `value`, strict 2D `values`, or relative-fill `formula` modes. Core owns the canonical A1 parser and range validation; the server passes the parsed range operation through to SheetCommand. Web previews use the authoritative `changeSummary.changedRanges` projection and do not expand the delta into a per-cell list. AI style mutation is not currently supported; do not use `writeCells` to simulate it.
+- `writeCells`, `formatCells`, `clearCells`, `mergeCells`, and `unmergeCells` use the SheetCommand write boundary. `formatCells` only changes direct `bg` and `fc`; a color string sets the property, `null` removes it, and an omitted property is preserved. One call may contain multiple A1-range operations, applied serially in array order; later overlapping operations overwrite earlier values or format properties. `formatCells` accepts color aliases or normalized hexadecimal values and is limited to 10,000 addressed cells per call. Core owns the canonical A1 parser, color normalization, style-preserving mutation, and range validation; the Server passes the parsed operation through to SheetCommand. Web applies the committed delta through the existing workbook document path. `writeCells` remains content-only.
 - A single `writeCells` call can write at most 10,000 cells.
 - Mutation summaries report the complete `changedCellCount`, but expose at most 20 compressed `changedRanges`. `omittedRangeCount` reports ranges not returned and `truncated` marks an incomplete range list.
-- If a `writeCells` result would exceed its model-result budget, the Server keeps the complete bounded summary and revisions, removes `preview`, and returns `delta: null`; Web then reloads the current workbook instead of applying a partial delta.
+- If a `writeCells` or `formatCells` result would exceed its model-result budget, the Server keeps the complete bounded summary and revisions, removes the delta projection, and returns `delta: null`; Web then reloads the current workbook instead of applying a partial delta.
 - `readSheetObjects` currently reads the active filter range for a Sheet. Use `listCharts` for workbook chart definitions. Tables and PivotTables are not exposed until they have a complete object model.
 - Chart tools write the persisted `ChartSpec`; they do not use ECharts options as the domain model.
 - `createChart` supports two mutually exclusive data-source modes:

@@ -86,6 +86,44 @@ describe("executeSheetCommand", () => {
     expect(JSON.parse(commitInput.result)).not.toHaveProperty("snapshot");
   });
 
+  it("persists format clears without reintroducing the default font color", async () => {
+    mocks.findChunks.mockResolvedValue([
+      {
+        chunkRow: 0,
+        chunkCol: 0,
+        payload: JSON.stringify({
+          celldata: [{ r: 0, c: 0, v: { v: "value", m: "value", fc: "#FF0000" } }],
+        }),
+      },
+    ]);
+
+    await executeSheetCommand(3, {
+      kind: "mutation",
+      mutationId: "format-1",
+      sheetId: 7,
+      baseRevision: 2,
+      mutation: {
+        type: "format",
+        operations: [
+          { type: "range", startRow: 1, startCol: 1, endRow: 1, endCol: 1, fontColor: null },
+        ],
+      },
+    });
+
+    expect(mocks.commitSheetCommand).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        chunks: [
+          {
+            chunkRow: 0,
+            chunkCol: 0,
+            payload: JSON.stringify({ celldata: [{ r: 0, c: 0, v: { v: "value", m: "value" } }] }),
+          },
+        ],
+      }),
+    );
+  });
+
   it("replaces only submitted chunks and preserves formula cache values", async () => {
     const result = await executeSheetCommand(3, {
       kind: "replaceChunks",

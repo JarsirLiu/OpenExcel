@@ -53,6 +53,7 @@ export type {
   SheetChangeClearOperation,
   SheetChangeClearRange,
   SheetChangeDelta,
+  SheetChangeFormatOperation,
   SheetChangePatch,
   SheetChangePatchOutput,
   SheetChangeRange,
@@ -67,6 +68,7 @@ export {
   sheetChangeClearOperationSchema,
   sheetChangeClearRangeSchema,
   sheetChangeDeltaSchema,
+  sheetChangeFormatOperationSchema,
   sheetChangePatchOutputSchema,
   sheetChangeRangeOperationSchema,
   sheetChangeRangeSchema,
@@ -81,6 +83,7 @@ export type {
   ZeroBasedSheetChangeCell,
   ZeroBasedSheetChangeClearOperation,
   ZeroBasedSheetChangeDelta,
+  ZeroBasedSheetChangeFormatOperation,
   ZeroBasedSheetChangeRange,
 } from "./chat/sheetCoordinates.js";
 export {
@@ -263,6 +266,7 @@ export {
   type ExcelToolName,
   type ExcelToolSpec,
   excelToolSpecs,
+  MAX_FORMAT_CELLS_PER_CALL,
   MAX_WRITE_CELLS_PER_CALL,
 } from "./tools/excelToolContract.js";
 export type {

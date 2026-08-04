@@ -40,6 +40,29 @@ describe("patchWorkbookWithDelta", () => {
     expect(result?.sheets[0].revision).toBe(5);
   });
 
+  it("applies committed format deltas through the shared Core mutation", () => {
+    const result = patchWorkbookWithDelta(
+      workbook(),
+      10,
+      {
+        type: "format",
+        operations: [
+          { type: "range", startRow: 1, startCol: 1, endRow: 1, endCol: 1, fill: "yellow" },
+          { type: "range", startRow: 1, startCol: 1, endRow: 1, endCol: 1, fontColor: null },
+          { type: "range", startRow: 2, startCol: 2, endRow: 2, endCol: 2, fill: "#DDEBF7" },
+        ],
+      },
+      { baseRevision: 4, revision: 5 },
+    );
+
+    expect(result?.sheets[0].uploadedData).toContainEqual({
+      r: 0,
+      c: 0,
+      v: { v: "old", m: "old", bg: "#FFFF00" },
+    });
+    expect(result?.sheets[0].uploadedData).toContainEqual({ r: 1, c: 1, v: { bg: "#DDEBF7" } });
+  });
+
   it("rejects a delta based on an old sheet revision", () => {
     const result = patchWorkbookWithDelta(
       workbook(),

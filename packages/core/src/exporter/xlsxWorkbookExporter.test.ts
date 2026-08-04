@@ -64,6 +64,7 @@ describe("workbookToXlsx", () => {
               v: {
                 v: "店铺",
                 m: "店铺",
+                bg: "#FFF2CC",
                 fc: "#80112233",
                 ht: 0,
                 vt: 1,
@@ -89,6 +90,11 @@ describe("workbookToXlsx", () => {
     expect(worksheet?.autoFilter).toBe("A1:E3");
     expect(worksheet?.getColumn(1).width).toBeCloseTo(219 / 7);
     expect(worksheet?.getCell("A1").font?.color).toEqual({ argb: "80112233" });
+    expect(worksheet?.getCell("A1").fill).toEqual({
+      fgColor: { argb: "FFFFF2CC" },
+      pattern: "solid",
+      type: "pattern",
+    });
   });
 
   it("writes chart, drawing, and relationship parts from ChartSpec", async () => {

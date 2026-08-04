@@ -38,10 +38,10 @@ receipts. The Web owns editor state and save scheduling.
 4. If the current revision differs from `baseRevision`, return a revision conflict.
 5. On success, increment the revision once and save the mutation receipt.
 
-For `write` mutations, operations within one command are applied in array order;
-when ranges overlap, later operations overwrite earlier operations. Separate
-commands are serialized by the Server mutation path. Different workspaces use
-independent queues.
+For `write` and `format` mutations, operations within one command are applied in
+array order; when ranges overlap, later operations overwrite earlier values or
+format properties. Separate commands are serialized by the Server mutation
+path. Different workspaces use independent queues.
 
 Mutation inputs are not rejected based on a fixed cell or chunk count. Normal
 spreadsheet actions such as clearing a large area or pasting a large range must
@@ -61,7 +61,7 @@ Change summaries are bounded projections: the cell count is complete, while
 `omittedRangeCount` and `truncated` when more ranges exist. Preview data is
 also bounded to 50 rows by 32 columns.
 
-When a `writeCells` result exceeds the model-result budget, the Server returns
+When a `writeCells` or `formatCells` result exceeds the model-result budget, the Server returns
 the bounded summary and revision fields with `delta: null` and without a
 preview. The Web treats this as an authoritative refresh signal and reloads
 the current workbook; it does not reconstruct the omitted delta.

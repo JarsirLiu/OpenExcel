@@ -2,6 +2,7 @@ import { z } from "zod";
 import { chartSpecSchema } from "../chart/chartModel.js";
 import { sheetChangePatchOutputSchema } from "../chat/sheetChange.js";
 import { parseWriteRange, writeRangeCellCount } from "../chat/writeRange.js";
+import { normalizeColorQuery } from "../excel/fortuneStyle.js";
 
 const writeCellValueSchema = z.union([z.string(), z.number(), z.boolean()]);
 const writeCellValueTypeSchema = z.enum(["date", "string"]);
@@ -82,6 +83,44 @@ const writeOperationSchema = z
         code: z.ZodIssueCode.custom,
         path: ["range"],
         message: "The A1 range is invalid or outside the worksheet boundary",
+      });
+    }
+  });
+
+const formatColorSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .superRefine((color, ctx) => {
+    if (!normalizeColorQuery(color)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "颜色必须是支持的颜色名称或十六进制值",
+      });
+    }
+  });
+
+const formatOperationSchema = z
+  .object({
+    range: writeRangeSchema.describe("A1 范围，例如 B2:B20"),
+    fill: z.union([formatColorSchema, z.null()]).optional().describe("背景色；null 表示清空"),
+    fontColor: z.union([formatColorSchema, z.null()]).optional().describe("字体色；null 表示清空"),
+  })
+  .strict()
+  .superRefine((operation, ctx) => {
+    if (operation.fill === undefined && operation.fontColor === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "每个格式操作至少需要指定 fill 或 fontColor",
+      });
+    }
+    try {
+      parseWriteRange(operation.range);
+    } catch {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["range"],
+        message: "A1 范围无效或超出工作表边界",
       });
     }
   });
@@ -652,6 +691,7 @@ export type ExcelToolSpec = {
 };
 
 export const MAX_WRITE_CELLS_PER_CALL = 10_000;
+export const MAX_FORMAT_CELLS_PER_CALL = 10_000;
 
 export const excelToolSpecs = {
   createWorkbook: {
@@ -732,6 +772,36 @@ export const excelToolSpecs = {
           }
         })
         .describe("Write operations, each using an A1 range"),
+    }),
+  },
+  formatCells: {
+    description:
+      "设置或清空单元格的直接背景色和字体色。使用 operations 数组和 A1 范围；fill 设置背景色，fontColor 设置字体色，传 null 清空对应颜色，未传的颜色保持不变。颜色可使用中英文基础色名或标准十六进制值。先用 readSheetData(operation=overview) 查看当前 Sheet 的 styleColors，再使用其中实际的 color 值。每次最多处理 10000 个范围单元格；不修改单元格内容、公式或其他格式。",
+    needsRunContext: true,
+    outputSchema: sheetMutationOutputSchema,
+    inputSchema: z.object({
+      sheetId: z.coerce.number().int().positive().describe("Sheet ID"),
+      operations: z
+        .array(formatOperationSchema)
+        .min(1)
+        .superRefine((operations, ctx) => {
+          let cellCount = 0;
+          for (const operation of operations) {
+            try {
+              cellCount += writeRangeCellCount(parseWriteRange(operation.range));
+            } catch {
+              continue;
+            }
+            if (cellCount > MAX_FORMAT_CELLS_PER_CALL) {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "一次 formatCells 最多处理 10000 个单元格",
+              });
+              return;
+            }
+          }
+        })
+        .describe("格式操作列表，每项使用一个 A1 范围"),
     }),
   },
   clearCells: {

@@ -8,10 +8,10 @@
 
 ## Scope
 
-OpenExcel currently represents direct cell formatting in the FortuneSheet cell
-value and carries it through import, SheetChunk persistence, Web synchronization,
-and XLSX export. The current AI surface can search for some direct styles, but it
-cannot write styles through an AI tool.
+OpenExcel represents direct cell formatting in the FortuneSheet cell value and
+carries it through import, SheetChunk persistence, Web synchronization, and XLSX
+export. The AI surface can search direct colors and can set or clear direct
+fill/font colors through `formatCells`.
 
 The following concepts are separate:
 
@@ -34,7 +34,7 @@ The following concepts are separate:
 | Read a range with colors | Not exposed in `range` projections | Core sheet projections | Values, formulas, dates, merges, and number-format annotations are exposed instead |
 | Find by fill/font color | Supported by `readSheetData` with `operation: "find"` | Core query plus Server read tool | Exact matching after hex/name normalization; no approximate or effective conditional-format matching |
 | Write cell contents without changing styles | Supported | `writeCells` and SheetCommand | Content-only by contract |
-| AI style mutation | Not supported | No Core contract or Server manifest entry | Do not simulate it with `writeCells` |
+| AI direct color mutation | Supported for fill/font colors | `formatCells` and the common SheetCommand path | Other styles and conditional-format rules are out of scope |
 | Browser edit/save of complete cell styles | Supported through complete cell patches | Web editor diff and Sheet save coordinator | AI external mutation must still use the common Sheet delta path |
 | XLSX export of direct colors | Supported as explicit ARGB/style values | ExcelJS exporter | Original theme references are not preserved |
 | Conditional-format effective colors | Not supported | No current domain model | Direct color must not be described as final rendered color when conditional formatting exists |
@@ -281,15 +281,18 @@ before an exact style query.
 - [`packages/core/src/chat/sheetChange.ts`](../../packages/core/src/chat/sheetChange.ts)
   - `sheetChangeDeltaSchema`
   - `sheetChangeWriteOperationSchema`
+  - `sheetChangeFormatOperationSchema`
   - `sheetChangePatchSchema`
 - [`packages/core/src/sheet-sync/applySheetMutation.ts`](../../packages/core/src/sheet-sync/applySheetMutation.ts)
   - `applyWrite`
   - `applyWriteRange`
   - `removeContent`
-  - `contentSignature`
+  - `cellChangeSignature` (format mutations use its direct-color mode)
   - `applySheetMutation`
 - [`packages/server/src/modules/sheets/tools/writeCells.ts`](../../packages/server/src/modules/sheets/tools/writeCells.ts)
   - content-only AI executor
+- [`packages/server/src/modules/sheets/tools/formatCells.ts`](../../packages/server/src/modules/sheets/tools/formatCells.ts)
+  - direct fill/font color executor using the common mutation transaction
 - [`packages/server/src/modules/sheets/tools/clearCells.ts`](../../packages/server/src/modules/sheets/tools/clearCells.ts)
   - content clear that preserves non-content style fields
 - [`packages/server/src/modules/sheets/tools/runSheetMutation.ts`](../../packages/server/src/modules/sheets/tools/runSheetMutation.ts)
@@ -300,17 +303,20 @@ before an exact style query.
   - Sheet command result adaptation
 
 `writeCells` deliberately changes values/formulas only. Do not add style fields
-to its write operation while keeping the same name and semantics. A future
-`formatCells` tool should use the same SheetCommand application and persistence
-path with a separate mutation kind.
+to its write operation while keeping the same name and semantics. `formatCells`
+uses a separate `format` mutation kind on the same SheetCommand application and
+persistence path. Its first supported fields are `fill` and `fontColor`; each
+may be a normalized color string, `null` to remove that direct property, or
+omitted to preserve it. The operation schema is strict so unsupported style
+fields cannot silently enter the format mutation.
 
-### Current Style-Only Change Risk
+### Style-Only Change Tracking
 
-`applySheetMutation` uses `contentSignature` when calculating changed cells.
-That signature currently contains value, display value, and formula, but not
-style fields. A future style mutation must update the signature or use a
-separate style-aware signature; otherwise a style-only change can persist while
-reporting an incorrect `changedCellCount` and `changedRanges`.
+`applySheetMutation` uses a color-aware mode of `cellChangeSignature` for
+`format` mutations. It then includes value, display value, formula, direct fill,
+and direct font color, so color-only changes appear in `changedCellCount` and
+`changedRanges`. Existing content, merge, and snapshot-replacement summary
+semantics remain unchanged.
 
 ## Web Synchronization Chain
 
@@ -353,8 +359,10 @@ Code locations:
 - [`packages/web/src/features/sync/sheetChunkSnapshot.ts`](../../packages/web/src/features/sync/sheetChunkSnapshot.ts)
   - browser chunk serialization and changed chunk calculation
 
-The Web path should not add a second style store. A future AI format delta must
-be applied through `applySheetMutation` and the existing workbook document path.
+The Web path does not add a second style store. `formatCells` is recognized by
+`useSheetPatchSync`, applied by the shared Core mutation, and sent to the
+FortuneSheet editor through its native `setCellFormat` API. The authoritative
+workbook document and existing save/rebase path remain unchanged.
 
 ## Agent and Model Prompt Boundary
 
@@ -408,10 +416,9 @@ The authoritative capability text is:
 
 - [`packages/core/src/tools/capabilities.ts`](../../packages/core/src/tools/capabilities.ts)
 
-It currently states that AI tools can read direct styles through `find`, but do
-not modify colors, fonts, borders, alignment, conditional formatting, or other
-styles. Keep this text synchronized with the Core contract and Server manifests
-when the capability changes.
+It states that AI tools can read direct styles through `find` and can modify
+direct fill/font colors through `formatCells`; other style and conditional
+formatting mutations remain unsupported.
 
 ## Development Impact Checklist
 
@@ -440,7 +447,9 @@ When changing direct color recognition or AI color tools, inspect these areas:
 - Content mutation: `packages/core/src/sheet-sync/applySheetMutation.test.ts`
 - Server mutation boundary: `packages/server/src/modules/sheets/tools/runSheetMutation.test.ts`
 - AI write executor: `packages/server/src/modules/sheets/tools/writeCells.test.ts`
+- AI format executor: `packages/server/src/modules/sheets/tools/formatCells.test.ts`
 - Export: `packages/core/src/exporter/xlsxWorkbookExporter.test.ts`
+- Web format API bridge: `packages/web/src/features/workbook/editor/fortuneSheetMutationBridge.test.ts`
 - Web editor style patch: `packages/web/src/features/workbook/editor/sheetMutationFromDiff.test.ts`
 - Web delta application: `packages/web/src/features/workbook/utils/patchWorkbook.test.ts`
 - Web save/rebase: `packages/web/src/features/sync/sheetSaveCoordinator.test.ts`

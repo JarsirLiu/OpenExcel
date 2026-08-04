@@ -1,6 +1,7 @@
 import {
   applySheetMutation,
   type FortuneCell,
+  normalizeColorQuery,
   type SheetChangeDelta,
   type SheetConfig,
 } from "@openexcel/core";
@@ -178,6 +179,33 @@ function appendUnmergeCalls(
   }
 }
 
+function appendFormatCalls(
+  apiCalls: FortuneSheetApiCall[],
+  delta: Extract<SheetChangeDelta, { type: "format" }>,
+  sheetId: number,
+): void {
+  for (const operation of delta.operations) {
+    const range = toZeroBasedRange(operation);
+    const attributes = [
+      ["bg", operation.fill],
+      ["fc", operation.fontColor],
+    ] as const;
+    for (const [attribute, color] of attributes) {
+      if (color === undefined) continue;
+      const value = color === null ? null : normalizeColorQuery(color);
+      if (color !== null && !value) {
+        throw new Error("Format colors must be a supported color name or hexadecimal value");
+      }
+      forEachRange(range, (row, col) => {
+        apiCalls.push({
+          name: "setCellFormat",
+          args: [row, col, attribute, value, { id: String(sheetId) }],
+        });
+      });
+    }
+  }
+}
+
 function buildApiCalls(
   delta: SheetChangeDelta,
   before: readonly FortuneCell[],
@@ -196,6 +224,8 @@ function buildApiCalls(
     appendMergeCalls(apiCalls, delta.operations, sheetId);
   } else if (delta.type === "unmerge") {
     appendUnmergeCalls(apiCalls, delta.operations, sheetId);
+  } else if (delta.type === "format") {
+    appendFormatCalls(apiCalls, delta, sheetId);
   } else {
     for (const change of delta.cells) {
       apiCalls.push({

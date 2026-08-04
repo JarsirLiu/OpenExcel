@@ -116,4 +116,33 @@ describe("planFortuneSheetMutation", () => {
       { name: "calculateFormula", args: [] },
     ]);
   });
+
+  it("uses FortuneSheet's native format API for color mutations", () => {
+    const plan = planFortuneSheetMutation(
+      {
+        id: 60,
+        sheetNo: 1,
+        name: "Sheet1",
+        order: 0,
+        columns: [],
+        merges: [],
+        uploadedData: [{ r: 0, c: 0, v: { v: "value", m: "value" } }],
+        config: null,
+        revision: 3,
+      },
+      {
+        type: "format",
+        operations: [
+          { type: "range", startRow: 1, startCol: 1, endRow: 1, endCol: 1, fill: "yellow" },
+          { type: "range", startRow: 1, startCol: 1, endRow: 1, endCol: 1, fontColor: null },
+        ],
+      },
+    );
+
+    expect(plan.apiCalls).toEqual([
+      { name: "setCellFormat", args: [0, 0, "bg", "#FFFF00", { id: "60" }] },
+      { name: "setCellFormat", args: [0, 0, "fc", null, { id: "60" }] },
+      { name: "calculateFormula", args: [] },
+    ]);
+  });
 });

@@ -75,6 +75,64 @@ describe("collectSheetPatchUpdates", () => {
     ).toBeNull();
   });
 
+  it("accepts a committed formatCells delta as a sheet mutation", () => {
+    expect(
+      parseCommittedSheetToolEvent({
+        eventId: "event-format",
+        sequence: 5,
+        type: "tool.finished",
+        occurredAt: "2026-08-02T00:00:00.000Z",
+        payload: {
+          toolCallId: "tool-format",
+          toolName: "formatCells",
+          output: {
+            sheetInfo: { sheetId: 11, sheetNo: 2, sheetName: "Budget" },
+            changeSummary: {
+              changedCellCount: 1,
+              changedRanges: ["B1"],
+              omittedRangeCount: 0,
+              truncated: false,
+              operationCount: 1,
+            },
+            delta: {
+              type: "format",
+              operations: [
+                {
+                  type: "range",
+                  startRow: 1,
+                  startCol: 2,
+                  endRow: 1,
+                  endCol: 2,
+                  fill: "#FFF2CC",
+                },
+              ],
+            },
+            baseRevision: 7,
+            revision: 8,
+          },
+        },
+      }),
+    ).toEqual({
+      toolCallId: "tool-format",
+      sheetId: 11,
+      sheetNo: 2,
+      delta: {
+        type: "format",
+        operations: [
+          {
+            type: "range",
+            startRow: 1,
+            startCol: 2,
+            endRow: 1,
+            endCol: 2,
+            fill: "#FFF2CC",
+          },
+        ],
+      },
+      version: { baseRevision: 7, revision: 8 },
+    });
+  });
+
   it("classifies committed workbook and chart mutations", () => {
     const baseEvent = {
       eventId: "event-mutation",

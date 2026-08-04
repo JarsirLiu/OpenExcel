@@ -1,5 +1,6 @@
 import type { ServerToolDefinition } from "../../../shared/tools/serverTool.js";
 import { clearCells } from "./clearCells.js";
+import { formatCells } from "./formatCells.js";
 import { mergeCells } from "./mergeCells.js";
 import { readSheetData } from "./readSheetData.js";
 import { readSheetObjects } from "./readSheetObjects.js";
@@ -10,6 +11,7 @@ export const excelToolManifest = [
   readSheetData,
   readSheetObjects,
   writeCells,
+  formatCells,
   clearCells,
   mergeCells,
   unmergeCells,

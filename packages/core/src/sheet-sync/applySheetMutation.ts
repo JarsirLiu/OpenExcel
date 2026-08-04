@@ -3,6 +3,7 @@ import { sheetChangeDeltaToZeroBased } from "../chat/sheetCoordinates.js";
 import { formatWriteRange } from "../chat/writeRange.js";
 import type { FortuneCell } from "../excel/celldataUtils.js";
 import { fortuneDateCellValue, normalizeFortuneFormula } from "../excel/fortuneCellValue.js";
+import { normalizeColorQuery } from "../excel/fortuneStyle.js";
 import { tokenizeFormula } from "../formula/formulaReferenceTokenizer.js";
 import type { SheetMutation } from "./sheetMutation.js";
 import { cloneSheetSnapshot, type SheetSnapshot } from "./sheetSnapshot.js";
@@ -22,8 +23,17 @@ function removeContent(cell: FortuneCell): FortuneCell | null {
   return Object.keys(format).length > 0 ? { ...cell, v: format as FortuneCell["v"] } : null;
 }
 
-function contentSignature(cell: FortuneCell | undefined): string {
-  return JSON.stringify({ v: cell?.v.v, m: cell?.v.m ?? "", f: cell?.v.f });
+function cellChangeSignature(cell: FortuneCell | undefined, includeColors = false): string {
+  const signature: Record<string, unknown> = {
+    v: cell?.v.v,
+    m: cell?.v.m ?? "",
+    f: cell?.v.f,
+  };
+  if (includeColors) {
+    signature.bg = cell?.v.bg;
+    signature.fc = cell?.v.fc;
+  }
+  return JSON.stringify(signature);
 }
 
 function mapCells(celldata: FortuneCell[]): CellMap {
@@ -37,10 +47,14 @@ function captureBefore(
   touched: Map<string, { coordinate: CellCoordinate; before: string }>,
   row: number,
   col: number,
+  includeColors = false,
 ): void {
   const key = cellKey(row, col);
   if (!touched.has(key)) {
-    touched.set(key, { coordinate: { row, col }, before: contentSignature(cells.get(key)) });
+    touched.set(key, {
+      coordinate: { row, col },
+      before: cellChangeSignature(cells.get(key), includeColors),
+    });
   }
 }
 
@@ -178,6 +192,54 @@ function applyClearRange(
   }
 }
 
+function formatColor(color: string | null | undefined): string | null | undefined {
+  if (color === undefined || color === null) return color;
+  const normalized = normalizeColorQuery(color);
+  if (!normalized) {
+    throw new Error("Format colors must be a supported color name or hexadecimal value");
+  }
+  return normalized;
+}
+
+function applyFormat(
+  cells: CellMap,
+  range: {
+    startRow: number;
+    startCol: number;
+    endRow: number;
+    endCol: number;
+    fill?: string | null;
+    fontColor?: string | null;
+  },
+  capture?: (row: number, col: number) => void,
+): void {
+  const fill = formatColor(range.fill);
+  const fontColor = formatColor(range.fontColor);
+  forEachRange(range, (row, col) => {
+    capture?.(row, col);
+    const key = cellKey(row, col);
+    const current = cells.get(key) ?? ({ r: row, c: col, v: {} } as FortuneCell);
+    const nextValue: Record<string, unknown> = { ...current.v };
+
+    if (fill !== undefined) {
+      if (fill === null) delete nextValue.bg;
+      else nextValue.bg = fill;
+    }
+    if (fontColor !== undefined) {
+      if (fontColor === null) delete nextValue.fc;
+      else nextValue.fc = fontColor;
+    }
+
+    if ((nextValue.v === "" || nextValue.v === null) && nextValue.m === "") {
+      delete nextValue.v;
+      delete nextValue.m;
+    }
+
+    if (Object.keys(nextValue).length === 0) cells.delete(key);
+    else cells.set(key, { ...current, v: nextValue as unknown as FortuneCell["v"] });
+  });
+}
+
 function forEachRange(
   range: { startRow: number; startCol: number; endRow: number; endCol: number },
   callback: (row: number, col: number) => void,
@@ -274,7 +336,9 @@ export function applySheetMutation(
   const next = cloneSheetSnapshot(snapshot);
   const cells = mapCells(next.celldata);
   const touched = new Map<string, { coordinate: CellCoordinate; before: string }>();
-  const capture = (row: number, col: number) => captureBefore(cells, touched, row, col);
+  const includeColors = internal.type === "format";
+  const capture = (row: number, col: number) =>
+    captureBefore(cells, touched, row, col, includeColors);
   let config = parseConfig(next.config);
   const writeOperations = internal.type === "write" ? internal.operations : null;
 
@@ -303,6 +367,8 @@ export function applySheetMutation(
       if (operation.type === "cell") applyClear(cells, operation.row, operation.col, capture);
       else applyClearRange(cells, operation, capture);
     }
+  } else if (internal.type === "format") {
+    for (const operation of internal.operations) applyFormat(cells, operation, capture);
   } else if (internal.type === "merge") {
     for (const range of internal.operations) {
       applyMerge(cells, range, capture);
@@ -345,7 +411,8 @@ export function applySheetMutation(
   const changedCoordinates = [...touched.values()]
     .filter(
       ({ coordinate, before }) =>
-        before !== contentSignature(cells.get(cellKey(coordinate.row, coordinate.col))),
+        before !==
+        cellChangeSignature(cells.get(cellKey(coordinate.row, coordinate.col)), includeColors),
     )
     .map(({ coordinate }) => [coordinate.row, coordinate.col] as [number, number]);
   const operationCount =
@@ -370,7 +437,7 @@ export function summarizeSheetSnapshotChange(
   const changedCoordinates: Array<[number, number]> = [];
 
   for (const key of keys) {
-    if (contentSignature(beforeCells.get(key)) !== contentSignature(afterCells.get(key))) {
+    if (cellChangeSignature(beforeCells.get(key)) !== cellChangeSignature(afterCells.get(key))) {
       const [row, col] = key.split(",").map(Number);
       changedCoordinates.push([row, col]);
     }

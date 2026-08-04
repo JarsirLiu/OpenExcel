@@ -6,6 +6,7 @@ import {
   type SheetCommand,
   type SheetCommandReceipt,
   type SheetCommandResult,
+  type SheetMutation,
   type SheetSnapshot,
   sheetCommandReceiptSchema,
   sheetCommandSchema,
@@ -225,6 +226,17 @@ function applyCommand(
       };
 }
 
+function normalizeMutationSnapshot(
+  snapshot: SheetSnapshot,
+  mutation: SheetMutation,
+): SheetSnapshot {
+  if (mutation.type === "format") return snapshot;
+  return {
+    ...snapshot,
+    celldata: normalizeFortuneCellData(snapshot.celldata),
+  };
+}
+
 export async function executeSheetCommandInTransaction(
   tx: SheetTransaction,
   workspaceId: number,
@@ -267,7 +279,7 @@ export async function executeSheetCommandInTransaction(
       ranges.length > 0 ? await findMutationChunks(tx, command.sheetId, ranges) : [];
     const current = snapshotFromSheetChunks(storedChunks, parseConfig(sheet.config), false);
     applied = applyCommand(current, command);
-    applied.snapshot.celldata = normalizeFortuneCellData(applied.snapshot.celldata);
+    applied.snapshot = normalizeMutationSnapshot(applied.snapshot, command.mutation);
     chunks = chunkUpdatesForSnapshot(
       applied.snapshot,
       ranges,

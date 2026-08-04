@@ -160,4 +160,37 @@ describe("Excel tool contract", () => {
 
     expect(result.success).toBe(true);
   });
+
+  it("validates formatCells colors, null clearing, and the cell budget", () => {
+    expect(
+      excelToolSpecs.formatCells.inputSchema.safeParse({
+        sheetId: 1,
+        operations: [
+          { range: "B2:B20", fill: "浅黄色" },
+          { range: "C2:C20", fontColor: null },
+        ],
+      }).success,
+    ).toBe(false);
+    expect(
+      excelToolSpecs.formatCells.inputSchema.safeParse({
+        sheetId: 1,
+        operations: [
+          { range: "B2:B20", fill: "#FFF2CC" },
+          { range: "C2:C20", fontColor: null },
+        ],
+      }).success,
+    ).toBe(true);
+    expect(
+      excelToolSpecs.formatCells.inputSchema.safeParse({
+        sheetId: 1,
+        operations: [{ range: "A1", fill: "#FFFF00", bold: true }],
+      }).success,
+    ).toBe(false);
+    expect(
+      excelToolSpecs.formatCells.inputSchema.safeParse({
+        sheetId: 1,
+        operations: [{ range: "A1:QZR1", fill: "#FFFF00" }],
+      }).success,
+    ).toBe(false);
+  });
 });
