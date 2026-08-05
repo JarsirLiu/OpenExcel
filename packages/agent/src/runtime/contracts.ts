@@ -13,6 +13,7 @@ import type {
   AgentEventType,
   PersistenceBarrier,
 } from "./events/types.js";
+import type { ToolResultBudget } from "./tools/toolResultBudget.js";
 
 export type AgentTranscriptMessage = Record<string, unknown>;
 
@@ -78,6 +79,8 @@ export interface AgentRunnerInput {
   toolCatalog: string;
   tools: readonly AgentToolDefinition[];
   toolExecutor: ToolExecutor;
+  resultBudget?: ToolResultBudget;
+  eventDataTools?: ReadonlySet<string>;
   executionContext?: unknown;
   abortSignal?: AbortSignal;
   maxRetries?: number;

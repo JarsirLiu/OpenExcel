@@ -108,6 +108,8 @@ export async function runAgentLoop(input: AgentLoopInput): Promise<AgentRunResul
     tools: input.tools,
     toolExecutor: input.toolExecutor,
     executionContext: input.executionContext,
+    resultBudget: input.resultBudget,
+    eventDataTools: input.eventDataTools,
     emitter: createEventEmitter,
     getStepIndex: () => stepIndex,
     onFinish: input.onFinish,

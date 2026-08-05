@@ -86,7 +86,7 @@ export function parseCommittedSheetToolEvent(event: ChatEvent): SheetPatchUpdate
     return null;
   }
 
-  return parseSheetPatchUpdate(payload.toolCallId, payload.output);
+  return parseSheetPatchUpdate(payload.toolCallId, payload.eventData ?? payload.output);
 }
 
 export function parseCommittedMutationToolEvent(

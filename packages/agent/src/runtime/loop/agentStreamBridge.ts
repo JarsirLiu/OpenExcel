@@ -2,6 +2,7 @@ import type { AgentToolDefinition, ToolExecutor } from "../contracts.js";
 import { AgentProtocolError } from "../events/types.js";
 import { isToolError } from "../tools/errors.js";
 import { createAgentToolSet } from "../tools/toolAdapter.js";
+import type { ToolResultBudget } from "../tools/toolResultBudget.js";
 import { createToolCallLifecycle } from "./toolCallLifecycle.js";
 
 export interface AgentStreamBridgeOptions {
@@ -11,6 +12,8 @@ export interface AgentStreamBridgeOptions {
   executionContext: unknown;
   emitter: Parameters<typeof createToolCallLifecycle>[0]["emitter"];
   getStepIndex: () => number;
+  resultBudget?: ToolResultBudget;
+  eventDataTools?: ReadonlySet<string>;
   onFinish?: (...args: any[]) => void | Promise<void>;
   onAbort?: (...args: any[]) => void | Promise<void>;
   onError?: (...args: any[]) => void | Promise<void>;
@@ -74,6 +77,8 @@ export function createAgentStreamBridge(options: AgentStreamBridgeOptions): Agen
   }
 
   const tools = createAgentToolSet(options.tools, options.toolExecutor, options.executionContext, {
+    resultBudget: options.resultBudget,
+    eventDataTools: options.eventDataTools,
     onToolStart: async (event) => {
       await toolLifecycle.start(event);
     },

@@ -17,6 +17,7 @@ export interface ToolCallLifecycle {
     toolCallId: string;
     input?: unknown;
     output?: unknown;
+    eventData?: unknown;
     error?: unknown;
     source?: ToolFinishSource;
   }): Promise<void>;
@@ -94,6 +95,7 @@ export function createToolCallLifecycle(options: ToolCallLifecycleOptions): Tool
     toolCallId: string;
     input?: unknown;
     output?: unknown;
+    eventData?: unknown;
     error?: unknown;
     source?: ToolFinishSource;
   }) {
@@ -116,7 +118,12 @@ export function createToolCallLifecycle(options: ToolCallLifecycleOptions): Tool
           : {}),
       outcome: hasError ? "failed" : "completed",
       ...(event.source ? { source: event.source } : {}),
-      ...(hasError ? { error: lifecycleErrorOf(event.error) } : { output: event.output }),
+      ...(hasError
+        ? { error: lifecycleErrorOf(event.error) }
+        : {
+            output: event.output,
+            ...(event.eventData !== undefined ? { eventData: event.eventData } : {}),
+          }),
       turnId: options.turnId,
       stepIndex: options.getStepIndex(),
       messageId: assistantMessageId,

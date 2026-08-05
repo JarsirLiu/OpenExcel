@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { estimateTokens } from "../../session/contextWindow.js";
-import { ToolResultBudget, wrapToolExecutorWithResultBudget } from "./toolResultBudget.js";
+import { ToolResultBudget } from "./toolResultBudget.js";
 
 describe("ToolResultBudget", () => {
   it("should use the tool-owned compactor for an oversized result", () => {
@@ -46,25 +46,19 @@ describe("ToolResultBudget", () => {
     expect(budget.snapshot.calls).toBe(4);
   });
 
-  it("applies the result budget at the ToolExecutor boundary", async () => {
-    const executor = vi.fn().mockResolvedValue("x".repeat(10_000));
+  it("compacts the complete result for the model branch", () => {
     const budget = new ToolResultBudget({
       toolPolicies: {
-        readSheetData: { maxTokens: 10, compact: () => "small" },
+        writeCells: { maxTokens: 10, compact: () => ({ summary: true }) },
       },
     });
-    const wrapped = wrapToolExecutorWithResultBudget({ execute: executor }, budget);
 
-    const result = await wrapped.execute({
-      toolName: "readSheetData",
-      toolCallId: "call-1",
-      input: {},
-      context: {},
+    const result = budget.finish(budget.reserve("writeCells"), {
+      oversized: "x".repeat(10_000),
+      delta: { type: "write", operations: [{ type: "cell", row: 1, col: 1, value: "x" }] },
     });
 
-    expect(executor).toHaveBeenCalledOnce();
-    expect(typeof result).toBe("string");
-    expect(estimateTokens(result)).toBeLessThanOrEqual(10);
+    expect(result).toEqual({ summary: true });
   });
 
   it("fails loudly when a tool-owned projection still exceeds its limit", () => {

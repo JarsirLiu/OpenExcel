@@ -1,5 +1,5 @@
 import { estimateTokens } from "../../session/contextWindow.js";
-import type { ToolExecutionRequest, ToolExecutor } from "../contracts.js";
+import type { ToolExecutionRequest } from "../contracts.js";
 import { ToolExecutionError } from "./errors.js";
 
 export interface ToolResultPolicy {
@@ -93,25 +93,4 @@ export class ToolResultBudget {
     );
     return output;
   }
-}
-
-export function wrapToolExecutorWithResultBudget(
-  executor: ToolExecutor,
-  budget: ToolResultBudget,
-): ToolExecutor {
-  return {
-    async execute(request: ToolExecutionRequest) {
-      const reservation = budget.reserve(request.toolName);
-      const context =
-        typeof request.context === "object" && request.context !== null
-          ? {
-              ...(request.context as Record<string, unknown>),
-              resultBudget: { maxTokens: reservation.policy.maxTokens },
-            }
-          : { resultBudget: { maxTokens: reservation.policy.maxTokens } };
-
-      const output = await executor.execute({ ...request, context });
-      return budget.finish(reservation, output);
-    },
-  };
 }

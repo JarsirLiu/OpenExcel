@@ -87,7 +87,7 @@ The Agent exposes one provider-neutral lifecycle for every model tool call:
 | Event | Meaning | Required timing |
 | --- | --- | --- |
 | `tool.started` | The Agent has observed a tool name and call id. This is a progress fact, not proof of execution or a committed mutation. | Emit from the earliest provider stream marker (`tool-input-start`, `tool-input-available`, or complete `tool-call`). The execution adapter is only a fallback. |
-| `tool.finished` with `outcome: "completed"` | The executor returned a model-safe output. | Emit after execution and output validation, before the next model step can consume the result. |
+| `tool.finished` with `outcome: "completed"` | The executor returned a model-safe output; an optional opaque `eventData` projection is available to event consumers and is not model input. | Emit after execution and output validation, before the next model step can consume the result. |
 | `tool.finished` with `outcome: "failed"` | The call reached a terminal error outcome. | Emit exactly once, with a structured `error`. The `source` identifies `adapter`, `provider`, `reconciliation`, or `terminal`. |
 
 The `toolCallId` is the lifecycle identity. Repeated provider chunks,

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { AgentProtocolError } from "../events/types.js";
 import { ToolExecutionError } from "./errors.js";
 import { createAgentToolSet } from "./toolAdapter.js";
+import { ToolResultBudget } from "./toolResultBudget.js";
 
 describe("createAgentToolSet", () => {
   it("routes AI SDK tool execution through the injected executor", async () => {
@@ -47,6 +48,40 @@ describe("createAgentToolSet", () => {
       output: { ok: true },
       source: "adapter",
     });
+  });
+
+  it("returns only the model result while forwarding event data to lifecycle hooks", async () => {
+    const onToolFinish = vi.fn();
+    const tools = createAgentToolSet(
+      [{ name: "writeCells", description: "Write cells", inputSchema: z.object({}) }],
+      {
+        execute: vi.fn().mockResolvedValue({
+          oversized: "x".repeat(10_000),
+          delta: { type: "write", operations: [{ type: "cell", row: 1, col: 1, value: "x" }] },
+        }),
+      },
+      undefined,
+      {
+        resultBudget: new ToolResultBudget({
+          toolPolicies: { writeCells: { maxTokens: 10, compact: () => ({ summary: true }) } },
+        }),
+        eventDataTools: new Set(["writeCells"]),
+        onToolFinish,
+      },
+    );
+
+    await expect(
+      (tools.writeCells as any).execute({}, { toolCallId: "call-sync", abortSignal: undefined }),
+    ).resolves.toEqual({ summary: true });
+    expect(onToolFinish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        output: { summary: true },
+        eventData: {
+          oversized: "x".repeat(10_000),
+          delta: { type: "write", operations: [{ type: "cell", row: 1, col: 1, value: "x" }] },
+        },
+      }),
+    );
   });
 
   it("returns a model-visible error when adapter input validation fails", async () => {

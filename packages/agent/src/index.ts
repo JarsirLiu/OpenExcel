@@ -116,7 +116,6 @@ export {
   type ToolResultBudgetOptions,
   type ToolResultBudgetSnapshot,
   type ToolResultPolicy,
-  wrapToolExecutorWithResultBudget,
 } from "./runtime/tools/toolResultBudget.js";
 export {
   buildWorkspaceContext,

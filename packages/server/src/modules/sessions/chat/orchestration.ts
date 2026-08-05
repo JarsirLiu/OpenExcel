@@ -9,7 +9,6 @@ import {
   ToolInputValidationError,
   ToolResultBudget,
   toModelSafeJsonValue,
-  wrapToolExecutorWithResultBudget,
 } from "@openexcel/agent";
 import type { ExcelToolName } from "@openexcel/core";
 import { buildExcelToolCatalog } from "@openexcel/core";
@@ -23,6 +22,15 @@ import {
 import { type ChatTurnRequest, toCanonicalUserMessage } from "../application/chatTurn.js";
 import { extractMessageText } from "../application/messageText.js";
 import { withSessionLock } from "../infrastructure/sessionLock.js";
+
+const SHEET_SYNC_TOOLS = new Set([
+  "writeCells",
+  "formatCells",
+  "clearCells",
+  "mergeCells",
+  "unmergeCells",
+]);
+
 import * as repo from "../infrastructure/sessionRepository.js";
 import {
   createAgentPersistenceBarrier,
@@ -186,11 +194,7 @@ export async function streamChat(workspaceId: number, sessionId: number, turn: C
       workspaceId,
     };
     const concreteToolExecutor = createConcreteToolExecutor(serverToolRegistry, toolsContext);
-    const budgetedToolExecutor = wrapToolExecutorWithResultBudget(
-      concreteToolExecutor,
-      toolResultBudget,
-    );
-    const toolExecutor = createIdempotentToolExecutor(lease.run.id, budgetedToolExecutor, {
+    const toolExecutor = createIdempotentToolExecutor(lease.run.id, concreteToolExecutor, {
       isTransactionalTool: (toolName) =>
         serverToolRegistry[toolName as ExcelToolName]?.persistenceMode === "mutation",
     });
@@ -228,6 +232,8 @@ export async function streamChat(workspaceId: number, sessionId: number, turn: C
       tools: toolDefinitions,
       toolCatalog: buildExcelToolCatalog(toolDefinitions.map((tool) => tool.name)),
       toolExecutor,
+      resultBudget: toolResultBudget,
+      eventDataTools: SHEET_SYNC_TOOLS,
       executionContext,
       persistenceBarrier: createAgentPersistenceBarrier(lease.run.id),
       eventSink: eventStream.sink,

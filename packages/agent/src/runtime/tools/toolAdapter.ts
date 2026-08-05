@@ -5,8 +5,11 @@ import { isToolError, ToolConcurrencyError, type ToolError } from "./errors.js";
 import { validateToolInput } from "./inputValidation.js";
 import { toModelSafeJsonValue } from "./modelSafeJson.js";
 import { createToolConcurrencyGate, MAX_PARALLEL_TOOL_CALLS } from "./toolConcurrency.js";
+import type { ToolResultBudget } from "./toolResultBudget.js";
 
 export interface ToolAdapterHooks {
+  resultBudget?: ToolResultBudget;
+  eventDataTools?: ReadonlySet<string>;
   onToolStart?: (event: {
     toolName: string;
     toolCallId: string;
@@ -17,6 +20,7 @@ export interface ToolAdapterHooks {
     toolCallId: string;
     input: unknown;
     output?: unknown;
+    eventData?: unknown;
     error?: unknown;
     source?: "adapter";
   }) => void | Promise<void>;
@@ -164,8 +168,19 @@ export function createAgentToolSet(
 
             try {
               throwIfAborted(executionOptions.abortSignal);
-              const output = toModelSafeJsonValue(await executor.execute(executionOptions));
-              await finish({ output });
+              const executionResult = await executor.execute(executionOptions);
+              const completeResult = toModelSafeJsonValue(executionResult);
+              const resultBudget = hooks.resultBudget;
+              const output =
+                resultBudget == null
+                  ? completeResult
+                  : toModelSafeJsonValue(
+                      resultBudget.finish(resultBudget.reserve(definition.name), completeResult),
+                    );
+              const eventData = hooks.eventDataTools?.has(definition.name)
+                ? completeResult
+                : undefined;
+              await finish({ output, ...(eventData !== undefined ? { eventData } : {}) });
               return output;
             } catch (error) {
               const cancelled = isAbortError(error, executionOptions.abortSignal);

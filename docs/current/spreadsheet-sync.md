@@ -61,10 +61,12 @@ Change summaries are bounded projections: the cell count is complete, while
 `omittedRangeCount` and `truncated` when more ranges exist. Preview data is
 also bounded to 50 rows by 32 columns.
 
-When a `writeCells` or `formatCells` result exceeds the model-result budget, the Server returns
-the bounded summary and revision fields with `delta: null` and without a
-preview. The Web treats this as an authoritative refresh signal and reloads
-the current workbook; it does not reconstruct the omitted delta.
+Sheet mutation tool results have separate projections. The model-visible tool
+result may omit the delta when its result budget requires compaction. The
+The live `tool.finished` event carries the complete opaque `eventData`
+projection, including the delta and revision, and the Web applies that
+projection once to the current editor. Historical message projection only
+keeps the model-visible result; it never re-applies `eventData`.
 
 The Sheet repository only performs database reads and writes. It does not
 rebuild an Excel calculation engine or derive filter, sort, or formula

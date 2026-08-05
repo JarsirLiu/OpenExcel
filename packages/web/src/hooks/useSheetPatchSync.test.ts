@@ -53,6 +53,53 @@ describe("collectSheetPatchUpdates", () => {
     });
   });
 
+  it("uses eventData for editor sync when the card result is compacted", () => {
+    const update = parseCommittedSheetToolEvent({
+      eventId: "event-sync",
+      sequence: 5,
+      type: "tool.finished",
+      occurredAt: "2026-08-02T00:00:00.000Z",
+      payload: {
+        toolCallId: "tool-sync",
+        toolName: "writeCells",
+        output: {
+          sheetInfo: { sheetId: 11, sheetNo: 2, sheetName: "Budget" },
+          changeSummary: {
+            changedCellCount: 1,
+            changedRanges: ["B1"],
+            omittedRangeCount: 0,
+            truncated: false,
+            operationCount: 1,
+          },
+          delta: null,
+        },
+        eventData: {
+          sheetInfo: { sheetId: 11, sheetNo: 2, sheetName: "Budget" },
+          changeSummary: {
+            changedCellCount: 1,
+            changedRanges: ["B1"],
+            omittedRangeCount: 0,
+            truncated: false,
+            operationCount: 1,
+          },
+          delta: {
+            type: "write",
+            operations: [
+              { type: "range", startRow: 1, startCol: 2, endRow: 1, endCol: 2, value: "123" },
+            ],
+          },
+          baseRevision: 7,
+          revision: 8,
+        },
+      },
+    });
+
+    expect(update?.delta).toEqual({
+      type: "write",
+      operations: [{ type: "range", startRow: 1, startCol: 2, endRow: 1, endCol: 2, value: "123" }],
+    });
+  });
+
   it("ignores failed or read-tool events", () => {
     const baseEvent = {
       eventId: "event-2",
