@@ -60,9 +60,7 @@ describe("executeSheetCommand", () => {
 
     expect(result.outcome).toBe("committed");
     expect(result.result.revision).toBe(3);
-    expect(result.result.snapshot?.celldata).toEqual([
-      { r: 0, c: 0, v: { v: "next", m: "next", fc: "#000000" } },
-    ]);
+    expect(result.result.snapshot?.celldata).toEqual([{ r: 0, c: 0, v: { v: "next", m: "next" } }]);
     expect(mocks.commitSheetCommand).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
@@ -76,7 +74,7 @@ describe("executeSheetCommand", () => {
             chunkRow: 0,
             chunkCol: 0,
             payload: JSON.stringify({
-              celldata: [{ r: 0, c: 0, v: { v: "next", m: "next", fc: "#000000" } }],
+              celldata: [{ r: 0, c: 0, v: { v: "next", m: "next" } }],
             }),
           },
         ],
@@ -118,6 +116,49 @@ describe("executeSheetCommand", () => {
             chunkRow: 0,
             chunkCol: 0,
             payload: JSON.stringify({ celldata: [{ r: 0, c: 0, v: { v: "value", m: "value" } }] }),
+          },
+        ],
+      }),
+    );
+  });
+
+  it("does not normalize untouched cell styles during a write", async () => {
+    mocks.findChunks.mockResolvedValue([
+      {
+        chunkRow: 0,
+        chunkCol: 0,
+        payload: JSON.stringify({
+          celldata: [
+            { r: 0, c: 0, v: { v: "existing", m: "existing" } },
+            { r: 0, c: 1, v: { v: "styled", m: "styled", bg: "#FFFF00" } },
+          ],
+        }),
+      },
+    ]);
+
+    await executeSheetCommand(3, {
+      ...command,
+      mutation: {
+        type: "write",
+        operations: [
+          { type: "range", startRow: 1, startCol: 1, endRow: 1, endCol: 1, value: "updated" },
+        ],
+      },
+    });
+
+    expect(mocks.commitSheetCommand).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        chunks: [
+          {
+            chunkRow: 0,
+            chunkCol: 0,
+            payload: JSON.stringify({
+              celldata: [
+                { r: 0, c: 0, v: { v: "updated", m: "updated" } },
+                { r: 0, c: 1, v: { v: "styled", m: "styled", bg: "#FFFF00" } },
+              ],
+            }),
           },
         ],
       }),
@@ -217,9 +258,7 @@ describe("executeSheetCommand", () => {
     });
 
     expect(result.outcome).toBe("committed");
-    expect(result.result.snapshot?.celldata).toEqual([
-      { r: 0, c: 0, v: { v: "A", m: "A", fc: "#000000" } },
-    ]);
+    expect(result.result.snapshot?.celldata).toEqual([{ r: 0, c: 0, v: { v: "A", m: "A" } }]);
     expect(mocks.commitSheetCommand).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
@@ -229,7 +268,7 @@ describe("executeSheetCommand", () => {
             chunkRow: 0,
             chunkCol: 0,
             payload: JSON.stringify({
-              celldata: [{ r: 0, c: 0, v: { v: "A", m: "A", fc: "#000000" } }],
+              celldata: [{ r: 0, c: 0, v: { v: "A", m: "A" } }],
             }),
           },
         ],

@@ -1,7 +1,6 @@
 import {
   applySheetMutation,
   cloneSheetSnapshot,
-  normalizeFortuneCellData,
   normalizeFortuneCellValue,
   type SheetCommand,
   type SheetCommandReceipt,
@@ -226,17 +225,6 @@ function applyCommand(
       };
 }
 
-function normalizeMutationSnapshot(
-  snapshot: SheetSnapshot,
-  mutation: SheetMutation,
-): SheetSnapshot {
-  if (mutation.type === "format") return snapshot;
-  return {
-    ...snapshot,
-    celldata: normalizeFortuneCellData(snapshot.celldata),
-  };
-}
-
 export async function executeSheetCommandInTransaction(
   tx: SheetTransaction,
   workspaceId: number,
@@ -279,7 +267,6 @@ export async function executeSheetCommandInTransaction(
       ranges.length > 0 ? await findMutationChunks(tx, command.sheetId, ranges) : [];
     const current = snapshotFromSheetChunks(storedChunks, parseConfig(sheet.config), false);
     applied = applyCommand(current, command);
-    applied.snapshot = normalizeMutationSnapshot(applied.snapshot, command.mutation);
     chunks = chunkUpdatesForSnapshot(
       applied.snapshot,
       ranges,
