@@ -62,11 +62,12 @@ Change summaries are bounded projections: the cell count is complete, while
 also bounded to 50 rows by 32 columns.
 
 Sheet mutation tool results have separate projections. The model-visible tool
-result may omit the delta when its result budget requires compaction. The
-The live `tool.finished` event carries the complete opaque `eventData`
+result may omit the delta when its result budget requires compaction. The live
+`tool.finished` event carries the complete opaque `eventData`
 projection, including the delta and revision, and the Web applies that
-projection once to the current editor. Historical message projection only
-keeps the model-visible result; it never re-applies `eventData`.
+projection once to the current editor. `eventData` is stripped at the
+AgentEvent persistence boundary. Historical message projection only keeps the
+model-visible result; it never re-applies `eventData`.
 
 The Sheet repository only performs database reads and writes. It does not
 rebuild an Excel calculation engine or derive filter, sort, or formula

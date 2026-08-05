@@ -69,8 +69,17 @@ function eventPersistenceData(runId: number, event: AgentEvent) {
     sequence: event.sequence,
     type: event.type,
     occurredAt: new Date(event.occurredAt),
-    payload: JSON.stringify(event.payload),
+    payload: JSON.stringify(persistableEventPayload(event.payload)),
   };
+}
+
+function persistableEventPayload(payload: unknown): unknown {
+  if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {
+    return payload;
+  }
+
+  const { eventData: _eventData, ...persistedPayload } = payload as Record<string, unknown>;
+  return persistedPayload;
 }
 
 type AgentEventDatabase = Pick<typeof prisma, "agentEvent">;

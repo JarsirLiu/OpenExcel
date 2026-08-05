@@ -88,4 +88,29 @@ describe("persistAgentEvent", () => {
     await expect(persistAgentEvent(9, event)).resolves.toEqual(existing);
     expect(mocks.transaction).toHaveBeenCalledOnce();
   });
+
+  it("does not persist ephemeral tool event data", async () => {
+    const toolEvent = {
+      ...event,
+      type: "tool.finished" as const,
+      payload: {
+        toolCallId: "call-1",
+        toolName: "writeCells",
+        output: { revision: 8 },
+        eventData: { delta: { type: "write" } },
+      },
+    };
+
+    await persistAgentEvent(9, toolEvent);
+
+    expect(mocks.eventCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        payload: JSON.stringify({
+          toolCallId: "call-1",
+          toolName: "writeCells",
+          output: { revision: 8 },
+        }),
+      }),
+    });
+  });
 });
