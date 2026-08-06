@@ -1,5 +1,6 @@
 import type { WorkbookFull } from "@/api/workbooks";
 import type {
+  CommittedSheetContentChangeHandler,
   CommittedSheetMutationHandler,
   SheetContentChangeHandler,
 } from "@/features/sync/sheetEditorChange";
@@ -32,6 +33,7 @@ interface Props {
     persistedThroughVersion?: number,
   ) => void;
   onSheetContentChanged?: SheetContentChangeHandler;
+  onCommittedSheetContentChanged?: CommittedSheetContentChangeHandler;
   onRegisterCommittedSheetMutation?: (handler: CommittedSheetMutationHandler | null) => void;
   onEnsureAllSheetsLoaded?: () => Promise<WorkbookFull | null>;
   demoGridFocus?: DemoGridFocus;
@@ -55,6 +57,7 @@ export function ExcelWorkspace({
   onWorkbookMutation,
   onSheetRevisionChanged,
   onSheetContentChanged,
+  onCommittedSheetContentChanged,
   onRegisterCommittedSheetMutation,
   onEnsureAllSheetsLoaded,
   demoGridFocus,
@@ -80,6 +83,7 @@ export function ExcelWorkspace({
           onWorkbookMutation={onWorkbookMutation}
           onSheetRevisionChanged={onSheetRevisionChanged}
           onSheetContentChanged={onSheetContentChanged}
+          onCommittedSheetContentChanged={onCommittedSheetContentChanged}
           onRegisterCommittedSheetMutation={onRegisterCommittedSheetMutation}
           onEnsureAllSheetsLoaded={onEnsureAllSheetsLoaded}
           demoGridFocus={demoGridFocus}

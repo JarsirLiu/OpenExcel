@@ -333,6 +333,7 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
           onWorkbookMutation={refreshUndoAvailability}
           onSheetRevisionChanged={workbook.handleSheetRevisionChanged}
           onSheetContentChanged={workbook.handleSheetContentChanged}
+          onCommittedSheetContentChanged={workbook.handleCommittedSheetContentChanged}
           onRegisterCommittedSheetMutation={registerCommittedSheetMutation}
           onEnsureAllSheetsLoaded={workbook.ensureAllSheetsLoaded}
         />

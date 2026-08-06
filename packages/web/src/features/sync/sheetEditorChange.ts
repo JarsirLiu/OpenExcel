@@ -18,6 +18,11 @@ export type SheetContentChangeHandler = (
   change: SheetEditorChange,
 ) => WorkbookFull | null | undefined;
 
+export type CommittedSheetContentChangeHandler = (
+  change: Extract<SheetEditorChange, { kind: "patch" }>,
+  revision: number,
+) => WorkbookFull | null | undefined;
+
 export type CommittedSheetMutationHandler = (
   sheetId: number,
   delta: SheetChangeDelta,

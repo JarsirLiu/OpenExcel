@@ -13,14 +13,17 @@ type AiSheetEditorOptions = {
   getWorkbook: () => WorkbookFull | null;
   getWorkbookInstance: () => WorkbookInstance | null;
   ensureAllSheetsLoaded?: () => Promise<WorkbookFull | null>;
-  updateDocument: (change: {
-    kind: "patch";
-    sheetId: number;
-    mutation: Extract<SheetChangeDelta, { type: "patch" }>;
-  }) => void;
+  applyCommittedDocument: (
+    change: {
+      kind: "patch";
+      sheetId: number;
+      mutation: Extract<SheetChangeDelta, { type: "patch" }>;
+    },
+    revision: number,
+  ) => void;
   advanceManualBaseline: (sheetId: number, snapshot: SheetSnapshotForSave) => void;
   setSnapshot: (sheetId: number, snapshot: SheetSnapshotForSave) => void;
-  onRevisionChanged?: (sheetId: number, revision: number) => void;
+  updateCommittedRevision: (sheetId: number, revision: number) => void;
 };
 
 export class AiSheetEditor {
@@ -70,16 +73,20 @@ export class AiSheetEditor {
       }
 
       const plan = planFortuneSheetMutation(sheet, delta);
-      if (plan.patch) this.options.updateDocument({ kind: "patch", sheetId, mutation: plan.patch });
+      if (plan.patch) {
+        this.options.applyCommittedDocument(
+          { kind: "patch", sheetId, mutation: plan.patch },
+          version.revision,
+        );
+      }
       this.options.advanceManualBaseline(sheetId, plan.snapshot);
       this.options.setSnapshot(sheetId, plan.snapshot);
       if (!plan.patch) {
-        this.options.onRevisionChanged?.(sheetId, version.revision);
+        this.options.updateCommittedRevision(sheetId, version.revision);
         return;
       }
 
       instance.batchCallApis(plan.apiCalls);
-      this.options.onRevisionChanged?.(sheetId, version.revision);
     };
     const queued = this.queue.then(run, run);
     this.queue = queued.catch(() => undefined);

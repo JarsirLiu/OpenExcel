@@ -5,6 +5,7 @@ import type { WorkbookFull } from "@/api/workbooks";
 import { createSheet, deleteSheet, deleteWorkbook, updateSheetName } from "@/api/workbooks";
 import type { SheetSnapshotForSave } from "@/features/sync/sheetChunkSnapshot";
 import type {
+  CommittedSheetContentChangeHandler,
   CommittedSheetMutationHandler,
   SheetContentChangeHandler,
   SheetEditorChange,
@@ -38,6 +39,7 @@ type UseExcelGridWorkspaceProps = {
     persistedThroughVersion?: number,
   ) => void;
   onSheetContentChanged?: SheetContentChangeHandler;
+  onCommittedSheetContentChanged?: CommittedSheetContentChangeHandler;
   onRegisterCommittedSheetMutation?: (handler: CommittedSheetMutationHandler | null) => void;
   onEnsureAllSheetsLoaded?: () => Promise<WorkbookFull | null>;
   documentStore: WorkbookDocumentStore;
@@ -56,6 +58,7 @@ export function useExcelGridWorkspace({
   onWorkbookMutation,
   onSheetRevisionChanged,
   onSheetContentChanged,
+  onCommittedSheetContentChanged,
   onRegisterCommittedSheetMutation,
   onEnsureAllSheetsLoaded,
   documentStore,
@@ -120,14 +123,18 @@ export function useExcelGridWorkspace({
       getWorkbook: () => workbookStateRef.current,
       getWorkbookInstance: () => workbookRef.current,
       ensureAllSheetsLoaded: onEnsureAllSheetsLoaded,
-      updateDocument: applyDocumentChange,
+      applyCommittedDocument: (change, revision) => {
+        onCommittedSheetContentChanged?.(change, revision);
+      },
       advanceManualBaseline: (sheetId, snapshot) => {
         manualEditorRef.current?.replaceSheetSnapshot(sheetId, snapshot);
       },
       setSnapshot: (sheetId, snapshot) => {
         saveSnapshotsRef.current.set(sheetId, snapshot);
       },
-      onRevisionChanged: onSheetRevisionChanged,
+      updateCommittedRevision: (sheetId, revision) => {
+        onSheetRevisionChanged?.(sheetId, revision);
+      },
     });
   }
   useEffect(() => {

@@ -156,6 +156,15 @@ export function useWorkbookDocument(
     [documentStore],
   );
 
+  const applyCommittedSheetPatch = useCallback(
+    (change: Extract<SheetEditorChange, { kind: "patch" }>, revision: number) => {
+      const next = documentStore.applyCommittedSheetPatch(change, revision);
+      currentWorkbookRef.current = next;
+      return next;
+    },
+    [documentStore],
+  );
+
   const updateWorkbookMetadata = useCallback(
     (updater: WorkbookUpdater) => {
       const next = documentStore.update(updater);
@@ -258,6 +267,7 @@ export function useWorkbookDocument(
     updateCharts,
     updateSheetRevision,
     updateSheetContent,
+    applyCommittedSheetPatch,
     updateWorkbookMetadata,
     loadWorkbook,
     reloadCurrentWorkbook,

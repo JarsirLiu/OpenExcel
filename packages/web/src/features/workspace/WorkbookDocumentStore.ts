@@ -227,6 +227,44 @@ export class WorkbookDocumentStore {
     return this.currentWorkbook;
   }
 
+  /** Applies a server-confirmed patch without creating browser-pending state. */
+  applyCommittedSheetPatch(
+    change: Extract<SheetEditorChange, { kind: "patch" }>,
+    revision: number,
+  ): WorkbookFull | null {
+    const current = this.currentWorkbook;
+    const currentSheet = current?.sheets.find((sheet) => sheet.id === change.sheetId);
+    if (!current || !currentSheet) return null;
+
+    const currentCelldata = (currentSheet.uploadedData ?? []) as FortuneCell[];
+    const cached = this.sheetCellCache.get(change.sheetId);
+    const cache = cached?.source === currentCelldata ? cached : createCellCache(currentCelldata);
+    const patchResult = applySheetPatch(cache, change.mutation);
+    const nextConfig =
+      change.mutation.config === undefined ? currentSheet.config : change.mutation.config;
+    const configChanged = configSignature(currentSheet.config) !== configSignature(nextConfig);
+    const nextSheet = {
+      ...currentSheet,
+      uploadedData: patchResult.celldata,
+      config: nextConfig,
+      revision: Math.max(currentSheet.revision, revision),
+    };
+
+    this.sheetCellCache.set(change.sheetId, patchResult.cache);
+    this.currentWorkbook = {
+      ...current,
+      sheets: current.sheets.map((sheet) => (sheet.id === change.sheetId ? nextSheet : sheet)),
+    };
+    this.emit({
+      kind: "sheet",
+      sheetId: change.sheetId,
+      cells: change.mutation.cells.map((cell) => ({ row: cell.row - 1, col: cell.col - 1 })),
+      structural: false,
+      configChanged,
+    });
+    return this.currentWorkbook;
+  }
+
   getSheetChangeVersion(sheetId: number): number {
     return this.changeVersionBySheet.get(sheetId) ?? 0;
   }

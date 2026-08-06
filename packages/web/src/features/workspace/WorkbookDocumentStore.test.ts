@@ -178,4 +178,35 @@ describe("WorkbookDocumentStore", () => {
       { r: 0, c: 0, v: { v: 90, m: "90" } },
     ]);
   });
+
+  it("does not retain a committed AI patch as browser-pending state", () => {
+    const store = new WorkbookDocumentStore(createWorkbook());
+
+    store.applyCommittedSheetPatch(
+      {
+        kind: "patch",
+        sheetId: 10,
+        mutation: {
+          type: "patch",
+          cells: [{ row: 1, col: 1, cell: { v: 100, m: "100" } }],
+        },
+      },
+      1,
+    );
+    store.mergeRemoteSnapshot({
+      ...createWorkbook(),
+      sheets: [
+        {
+          ...createWorkbook().sheets[0],
+          uploadedData: [{ r: 0, c: 0, v: { v: 120, m: "120" } }],
+          revision: 2,
+        },
+      ],
+    });
+
+    expect(store.getSnapshot()?.sheets[0]).toMatchObject({
+      revision: 2,
+      uploadedData: [{ r: 0, c: 0, v: { v: 120, m: "120" } }],
+    });
+  });
 });

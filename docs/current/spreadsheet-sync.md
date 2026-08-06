@@ -118,6 +118,10 @@ dependencies from a mutation.
   FortuneSheet instance before running the mutation and full recalculation.
   This is required for cross-Sheet formula dependencies; it does not change
   the lazy-loading behavior of ordinary workbook navigation.
+- A committed AI patch updates the browser document and Sheet revision directly.
+  It is not recorded as a browser-pending edit and is never re-applied during a
+  later remote snapshot merge. Browser-pending changes only represent manual
+  edits that still need the Web save path.
 - The Server persists the browser-submitted recalculated cells transactionally;
   it does not recalculate formulas. After a successful save, the Sheet
   revision advances and a reload reads the persisted formula cache back into

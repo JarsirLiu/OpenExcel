@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { WorkbookFull } from "@/api/workbooks";
 import type {
+  CommittedSheetContentChangeHandler,
   CommittedSheetMutationHandler,
   SheetContentChangeHandler,
 } from "@/features/sync/sheetEditorChange";
@@ -54,6 +55,7 @@ type Props = {
     persistedThroughVersion?: number,
   ) => void;
   onSheetContentChanged?: SheetContentChangeHandler;
+  onCommittedSheetContentChanged?: CommittedSheetContentChangeHandler;
   onRegisterCommittedSheetMutation?: (handler: CommittedSheetMutationHandler | null) => void;
   onEnsureAllSheetsLoaded?: () => Promise<WorkbookFull | null>;
   presentationMode?: boolean;
@@ -88,6 +90,7 @@ export function WorkspaceView({
   onChartMutation,
   onSheetRevisionChanged,
   onSheetContentChanged,
+  onCommittedSheetContentChanged,
   onRegisterCommittedSheetMutation,
   onEnsureAllSheetsLoaded,
   presentationMode = false,
@@ -158,6 +161,7 @@ export function WorkspaceView({
           onChartMutation={onChartMutation}
           onSheetRevisionChanged={onSheetRevisionChanged}
           onSheetContentChanged={onSheetContentChanged}
+          onCommittedSheetContentChanged={onCommittedSheetContentChanged}
           onRegisterCommittedSheetMutation={onRegisterCommittedSheetMutation}
           onEnsureAllSheetsLoaded={onEnsureAllSheetsLoaded}
           demoGridFocus={demoGridFocus}
