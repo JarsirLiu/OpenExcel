@@ -90,10 +90,8 @@ dependencies from a mutation.
 - Sheet saves are debounced per Sheet; the current scheduler defaults to 500 ms.
 - Normal Web edits are submitted as `mutation` commands containing the cell
   changes found by comparing the post-calculation `onChange` snapshot with the
-  previous editor snapshot. `onChange` is only a save candidate when it is
-  paired with a user `onOp` event or an active committed AI mutation;
-  workbook hydration, Sheet loading, editor initialization, and `updateSheet`
-  callbacks never schedule persistence. `onOp` supplies changed-cell
+  previous editor snapshot. The active Sheet's `onChange` is the manual edit
+  signal; `onOp` supplies changed-cell
   coordinates and identifies structural or non-cell operations; it is not
   authoritative for values because FortuneSheet may omit formula-dependent
   cells from the operation list. The adapter therefore observes the direct

@@ -1,9 +1,5 @@
 import type { WorkbookInstance } from "@fortune-sheet/react";
-import {
-  extractSheetConfig,
-  type SheetChangeDelta,
-  type SheetChangeVersion,
-} from "@openexcel/core";
+import type { SheetChangeDelta, SheetChangeVersion } from "@openexcel/core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { WorkbookFull } from "@/api/workbooks";
 import { createSheet, deleteSheet, deleteWorkbook, updateSheetName } from "@/api/workbooks";
@@ -20,10 +16,9 @@ import type { WorkbookDocumentStore } from "@/features/workspace/WorkbookDocumen
 import { confirm, toast } from "@/shared/lib";
 import { adaptFortuneSheetLayout, type SheetGridLayout } from "../layout/fortuneSheetLayout";
 import { findSheetIndexById } from "../sheetIdentity";
-import { FortuneSheetEventAdapter } from "./FortuneSheetEventAdapter";
-import { toFortuneSheetData } from "./fortuneSheet";
-import { planFortuneSheetMutation } from "./fortuneSheetMutationBridge";
+import { AiSheetEditor } from "./aiSheetEditor";
 import type { FortuneSheetOp } from "./fortuneSheetOps";
+import { ManualSheetEditor } from "./manualSheetEditor";
 import { useSheetActivation } from "./SheetActivationContext";
 import { useWorkbookEditorSession } from "./useWorkbookEditorSession";
 
@@ -70,13 +65,14 @@ export function useExcelGridWorkspace({
   const workbookRef = useRef<WorkbookInstance>(null);
   const { sheetData, sessionKey } = useWorkbookEditorSession(workbook, workbookRevision);
   const { registerActivateSheet } = useSheetActivation();
-  const eventAdapterRef = useRef<FortuneSheetEventAdapter | null>(null);
+  const manualEditorRef = useRef<ManualSheetEditor | null>(null);
+  const aiEditorRef = useRef<AiSheetEditor | null>(null);
   const saveSnapshotsRef = useRef<Map<number, SheetSnapshotForSave>>(new Map());
   const saveLifecycleRef = useRef<{
     workbookId: number | null;
     bySheetId: Map<number, string>;
   }>({ workbookId: null, bySheetId: new Map() });
-  if (!eventAdapterRef.current) eventAdapterRef.current = new FortuneSheetEventAdapter();
+  if (!manualEditorRef.current) manualEditorRef.current = new ManualSheetEditor();
   const applyDocumentChange = useCallback(
     (change: SheetEditorChange) => {
       return onSheetContentChanged?.(change);
@@ -85,7 +81,6 @@ export function useExcelGridWorkspace({
   );
   const {
     saveStatus,
-    acceptExternalMutation,
     reset: resetSave,
     schedule: scheduleSave,
   } = useSheetSaveController({
@@ -101,13 +96,6 @@ export function useExcelGridWorkspace({
   const activeSheetIndexRef = useRef(activeSheetIndex);
   const sheetLoadedRef = useRef(sheetLoaded);
   const editorSessionRef = useRef(sessionKey);
-  const pendingCommittedMutationRef = useRef<{
-    sheetId: number;
-    token: object;
-    resolve: () => void;
-    reject: (error: unknown) => void;
-  } | null>(null);
-  const committedMutationQueueRef = useRef(Promise.resolve());
   workbookStateRef.current = documentStore.getSnapshot() ?? workbook;
   activeSheetIndexRef.current = activeSheetIndex;
   sheetLoadedRef.current = sheetLoaded;
@@ -127,9 +115,24 @@ export function useExcelGridWorkspace({
   }>({ sessionKey: layoutSessionKey, bySheetId: initialLayouts });
   const layoutBySheetId =
     layoutState.sessionKey === layoutSessionKey ? layoutState.bySheetId : initialLayouts;
+  if (!aiEditorRef.current) {
+    aiEditorRef.current = new AiSheetEditor({
+      getWorkbook: () => workbookStateRef.current,
+      getWorkbookInstance: () => workbookRef.current,
+      ensureAllSheetsLoaded: onEnsureAllSheetsLoaded,
+      updateDocument: applyDocumentChange,
+      advanceManualBaseline: (sheetId, snapshot) => {
+        manualEditorRef.current?.replaceSheetSnapshot(sheetId, snapshot);
+      },
+      setSnapshot: (sheetId, snapshot) => {
+        saveSnapshotsRef.current.set(sheetId, snapshot);
+      },
+      onRevisionChanged: onSheetRevisionChanged,
+    });
+  }
   useEffect(() => {
     saveSnapshotsRef.current = workbook
-      ? (eventAdapterRef.current?.reset(sheetData) ?? new Map())
+      ? (manualEditorRef.current?.reset(sheetData) ?? new Map())
       : new Map();
   }, [sheetData, workbook?.id, workbookRevision]);
 
@@ -185,8 +188,8 @@ export function useExcelGridWorkspace({
 
       const sheet = currentWorkbook.sheets[currentSheetIndex];
       if (!sheet) return;
-      const eventAdapter = eventAdapterRef.current;
-      if (!eventAdapter) return;
+      const manualEditor = manualEditorRef.current;
+      if (!manualEditor) return;
       const loadedSheetIds = new Set(
         currentWorkbook.sheets.filter((item) => item.loaded !== false).map((item) => item.id),
       );
@@ -194,10 +197,7 @@ export function useExcelGridWorkspace({
         const id = Number(fortuneSheet?.id);
         return Number.isInteger(id) && loadedSheetIds.has(id);
       });
-      const results = eventAdapter.handleChange(data, sheet.id, {
-        loadedSheetIds,
-        allowUntrackedChanges: pendingCommittedMutationRef.current !== null,
-      });
+      const results = manualEditor.handleChange(data, sheet.id, loadedSheetIds);
       if (results.length === 0) return;
 
       const layoutChanged = results.some(
@@ -230,111 +230,18 @@ export function useExcelGridWorkspace({
         applyDocumentChange(result.change);
         scheduleSave(result.change, documentStore.getSheetChangeVersion(result.sheetId));
       }
-
-      const pending = pendingCommittedMutationRef.current;
-      if (pending && results.some((result) => result.sheetId === pending.sheetId)) {
-        pendingCommittedMutationRef.current = null;
-        pending.resolve();
-      }
     },
     [applyDocumentChange, documentStore, initialLayouts, layoutSessionKey, scheduleSave],
   );
 
   const handleCommittedSheetMutation = useCallback<CommittedSheetMutationHandler>(
     (sheetId: number, delta: SheetChangeDelta, version: SheetChangeVersion) => {
-      const run = async () => {
-        const initialWorkbook = workbookStateRef.current;
-        const unloadedSheetIds = new Set(
-          initialWorkbook?.sheets
-            .filter((sheet) => sheet.loaded === false)
-            .map((sheet) => sheet.id) ?? [],
-        );
-        const loadedWorkbook = await onEnsureAllSheetsLoaded?.();
-        const currentWorkbook = loadedWorkbook ?? workbookStateRef.current;
-        if (initialWorkbook?.id !== currentWorkbook?.id) {
-          throw new Error("The workbook changed while loading sheets for the committed mutation");
-        }
-        if (currentWorkbook?.sheets.some((item) => item.loaded === false)) {
-          throw new Error(
-            "All workbook sheets must be loaded before applying a committed mutation",
-          );
-        }
-        const sheet = currentWorkbook?.sheets.find((item) => item.id === sheetId);
-        const instance = workbookRef.current;
-        const eventAdapter = eventAdapterRef.current;
-        if (!currentWorkbook || !sheet || !instance || !eventAdapter) {
-          throw new Error("The active FortuneSheet editor is not ready");
-        }
-
-        if (loadedWorkbook && unloadedSheetIds.size > 0) {
-          const newlyLoadedData = loadedWorkbook.sheets
-            .filter((loadedSheet) => unloadedSheetIds.has(loadedSheet.id))
-            .map(toFortuneSheetData);
-          for (const loadedSheet of newlyLoadedData) {
-            const loadedSheetId = Number(loadedSheet.id);
-            const snapshot = {
-              celldata: loadedSheet.celldata,
-              config: extractSheetConfig(loadedSheet),
-            };
-            eventAdapter.replaceSheetSnapshot(loadedSheetId, snapshot);
-            saveSnapshotsRef.current.set(loadedSheetId, snapshot);
-          }
-          if (newlyLoadedData.length > 0) {
-            instance.updateSheet(
-              newlyLoadedData as unknown as Parameters<typeof instance.updateSheet>[0],
-            );
-          }
-        }
-
-        const plan = planFortuneSheetMutation(sheet, delta);
-        const rawChange: SheetEditorChange | null = plan.patch
-          ? { kind: "patch", sheetId, mutation: plan.patch }
-          : null;
-        if (rawChange) applyDocumentChange(rawChange);
-        eventAdapter.replaceSheetSnapshot(sheetId, plan.snapshot);
-        saveSnapshotsRef.current.set(sheetId, plan.snapshot);
-        acceptExternalMutation(sheetId, delta, version.revision);
-
-        if (!plan.patch) {
-          onSheetRevisionChanged?.(sheetId, version.revision);
-          return;
-        }
-
-        await new Promise<void>((resolve, reject) => {
-          const token = {};
-          const timeout = setTimeout(() => {
-            if (pendingCommittedMutationRef.current?.token !== token) return;
-            pendingCommittedMutationRef.current = null;
-            reject(new Error("FortuneSheet formula recalculation timed out"));
-          }, 5000);
-          pendingCommittedMutationRef.current = {
-            sheetId,
-            token,
-            resolve: () => {
-              clearTimeout(timeout);
-              resolve();
-            },
-            reject: (error) => {
-              clearTimeout(timeout);
-              reject(error);
-            },
-          };
-          try {
-            instance.batchCallApis(plan.apiCalls);
-          } catch (error) {
-            clearTimeout(timeout);
-            pendingCommittedMutationRef.current = null;
-            reject(error);
-          }
-        });
-        onSheetRevisionChanged?.(sheetId, version.revision);
-      };
-
-      const queued = committedMutationQueueRef.current.then(run, run);
-      committedMutationQueueRef.current = queued.catch(() => undefined);
-      return queued;
+      return (
+        aiEditorRef.current?.applyCommittedMutation(sheetId, delta, version) ??
+        Promise.reject(new Error("The AI sheet editor is not ready"))
+      );
     },
-    [acceptExternalMutation, applyDocumentChange, onEnsureAllSheetsLoaded, onSheetRevisionChanged],
+    [],
   );
 
   useEffect(() => {
@@ -348,7 +255,7 @@ export function useExcelGridWorkspace({
     if (!currentWorkbook) return;
     const activeSheet = currentWorkbook.sheets[currentSheetIndex];
     if (!activeSheet) return;
-    eventAdapterRef.current?.handleOp(ops, activeSheet.id);
+    manualEditorRef.current?.recordOperation(ops, activeSheet.id);
   }, []);
 
   const handleActivateSheet = useCallback(

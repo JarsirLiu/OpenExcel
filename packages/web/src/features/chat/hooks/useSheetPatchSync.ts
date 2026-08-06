@@ -145,7 +145,7 @@ export function collectSheetMutationToolCallIds(
 
 export function useSheetPatchSync(
   messages: ReadonlyArray<SheetPatchMessageLike>,
-  onSheetChanged?: (
+  onAiSheetMutation?: (
     sheetId: number,
     delta: SheetChangeDelta | null,
     version?: SheetChangeVersion,
@@ -168,10 +168,13 @@ export function useSheetPatchSync(
           continue;
         }
         if (liveToolCallIds?.has(update.toolCallId)) continue;
+        // Mark updates applied during initial hydration so later chat
+        // messages cannot replay an AI delta over manual edits.
+        appliedToolCallIdsRef.current.add(update.toolCallId);
         if (update.version) {
-          onSheetChanged?.(update.sheetId, update.delta, update.version);
+          onAiSheetMutation?.(update.sheetId, update.delta, update.version);
         } else {
-          onSheetChanged?.(update.sheetId, update.delta);
+          onAiSheetMutation?.(update.sheetId, update.delta);
         }
       }
 
@@ -187,14 +190,16 @@ export function useSheetPatchSync(
       seenToolCallIds.add(toolCallId);
     }
 
-    const patchUpdates = onSheetChanged ? collectSheetPatchUpdates(messages, seenToolCallIds) : [];
+    const patchUpdates = onAiSheetMutation
+      ? collectSheetPatchUpdates(messages, seenToolCallIds)
+      : [];
     for (const update of patchUpdates) {
       appliedToolCallIdsRef.current.add(update.toolCallId);
       if (update.version) {
-        onSheetChanged?.(update.sheetId, update.delta, update.version);
+        onAiSheetMutation?.(update.sheetId, update.delta, update.version);
       } else {
-        onSheetChanged?.(update.sheetId, update.delta);
+        onAiSheetMutation?.(update.sheetId, update.delta);
       }
     }
-  }, [historyReady, historicalToolCallIds, liveToolCallIds, messages, onSheetChanged]);
+  }, [historyReady, historicalToolCallIds, liveToolCallIds, messages, onAiSheetMutation]);
 }

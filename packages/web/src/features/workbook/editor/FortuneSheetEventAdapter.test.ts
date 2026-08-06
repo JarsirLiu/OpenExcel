@@ -83,14 +83,14 @@ describe("FortuneSheetEventAdapter", () => {
         { id: 61, data: [[{ v: "default", m: "default" }]] },
       ],
       60,
-      { loadedSheetIds: new Set([60]), allowUntrackedChanges: true },
+      { loadedSheetIds: new Set([60]) },
     );
 
     expect(results).toHaveLength(1);
     expect(results[0]?.sheetId).toBe(60);
   });
 
-  it("ignores change callbacks that are not tied to a user or AI operation", () => {
+  it("persists an active Sheet change without an operation hint", () => {
     const adapter = new FortuneSheetEventAdapter();
     adapter.reset([
       {
@@ -100,11 +100,21 @@ describe("FortuneSheetEventAdapter", () => {
     ]);
 
     expect(
-      adapter.handleChange(
-        [{ id: 60, data: [[{ v: "fortune-default", m: "fortune-default" }]] }],
-        60,
-        { loadedSheetIds: new Set([60]) },
-      ),
-    ).toEqual([]);
+      adapter.handleChange([{ id: 60, data: [[{ v: "edited", m: "edited" }]] }], 60, {
+        loadedSheetIds: new Set([60]),
+      }),
+    ).toEqual([
+      {
+        sheetId: 60,
+        change: {
+          kind: "patch",
+          sheetId: 60,
+          mutation: {
+            type: "patch",
+            cells: [{ row: 1, col: 1, cell: { v: "edited", m: "edited" } }],
+          },
+        },
+      },
+    ]);
   });
 });

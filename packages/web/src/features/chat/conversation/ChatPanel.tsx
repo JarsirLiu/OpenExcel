@@ -26,8 +26,7 @@ export function ChatPanel({
     workspaceId,
     onWorkspaceRefresh,
     onChartsRefresh,
-    onSheetChanged,
-    onCommittedSheetMutation,
+    onAiSheetMutation,
     onUndoComplete,
     onUserTurnAccepted,
     onAttachExcel,
@@ -49,7 +48,7 @@ export function ChatPanel({
         mutation.kind === "sheet" ? mutation.update.toolCallId : mutation.toolCallId;
       if (liveToolCallIdsRef.current.has(toolCallId)) return;
 
-      if (mutation.kind === "sheet" && !onCommittedSheetMutation && !onSheetChanged) {
+      if (mutation.kind === "sheet" && !onAiSheetMutation) {
         return;
       }
       liveToolCallIdsRef.current.add(toolCallId);
@@ -59,14 +58,8 @@ export function ChatPanel({
       });
       try {
         if (mutation.kind === "sheet") {
-          if (mutation.update.delta && mutation.update.version && onCommittedSheetMutation) {
-            await onCommittedSheetMutation(
-              mutation.update.sheetId,
-              mutation.update.delta,
-              mutation.update.version,
-            );
-          } else {
-            await onSheetChanged?.(
+          if (mutation.update.delta && mutation.update.version) {
+            await onAiSheetMutation!(
               mutation.update.sheetId,
               mutation.update.delta,
               mutation.update.version,
@@ -88,7 +81,7 @@ export function ChatPanel({
         throw error;
       }
     },
-    [onChartsRefresh, onCommittedSheetMutation, onSheetChanged, onWorkspaceRefresh],
+    [onAiSheetMutation, onChartsRefresh, onWorkspaceRefresh],
   );
 
   const {
@@ -118,7 +111,13 @@ export function ChatPanel({
 
   useSheetPatchSync(
     messages,
-    onSheetChanged,
+    onAiSheetMutation
+      ? (sheetId, delta, version) => {
+          if (delta && version) {
+            void onAiSheetMutation(sheetId, delta, version);
+          }
+        }
+      : undefined,
     initialLoaded,
     historicalToolCallIds,
     liveToolCallIds,

@@ -5,6 +5,7 @@ import {
   collectSheetPatchUpdates,
   parseCommittedMutationToolEvent,
   parseCommittedSheetToolEvent,
+  type SheetPatchMessageLike,
   useSheetPatchSync,
 } from "../features/chat/hooks/useSheetPatchSync";
 
@@ -701,6 +702,57 @@ describe("useSheetPatchSync", () => {
     historicalToolCallIds.add("older-tool");
     rerender({ messages: [olderMessage, ...currentMessages] });
     await waitFor(() => expect(onSheetChanged).not.toHaveBeenCalled());
+  });
+
+  it("does not replay an initially applied AI delta after the user edits the sheet", async () => {
+    const onSheetChanged = vi.fn();
+    const initialMessages: SheetPatchMessageLike[] = [
+      {
+        role: "assistant",
+        parts: [
+          {
+            toolCallId: "initial-ai-tool",
+            type: "tool-writeCells",
+            state: "output-available",
+            input: { sheetId: 31 },
+            output: {
+              sheetInfo: { sheetId: 31, sheetNo: 1, sheetName: "Sheet1" },
+              changeSummary: {
+                changedCellCount: 1,
+                changedRanges: ["A1"],
+                omittedRangeCount: 0,
+                truncated: false,
+                operationCount: 1,
+              },
+              delta: {
+                type: "write",
+                operations: [
+                  { type: "range", startRow: 1, startCol: 1, endRow: 1, endCol: 1, value: "ai" },
+                ],
+              },
+            },
+          },
+        ],
+      },
+    ];
+
+    const { rerender } = renderHook(
+      ({ messages }: { messages: SheetPatchMessageLike[] }) =>
+        useSheetPatchSync(messages, onSheetChanged, true, new Set()),
+      { initialProps: { messages: initialMessages } },
+    );
+
+    await waitFor(() => expect(onSheetChanged).toHaveBeenCalledOnce());
+
+    rerender({
+      messages: [
+        ...initialMessages,
+        { role: "assistant", parts: [{ type: "text", text: "Chart created" }] },
+      ],
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(onSheetChanged).toHaveBeenCalledOnce();
   });
 
   it("does not replay a live delta that was already applied from the event stream", async () => {

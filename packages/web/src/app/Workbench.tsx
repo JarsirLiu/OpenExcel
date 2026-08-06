@@ -78,10 +78,12 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
   const handleCommittedSheetMutation = useCallback<CommittedSheetMutationHandler>(
     (sheetId, delta, version) => {
       const editorHandler = committedSheetMutationRef.current;
-      if (editorHandler) return editorHandler(sheetId, delta, version);
-      return workbook.handleSheetChanged(sheetId, delta, version);
+      if (!editorHandler) {
+        return Promise.reject(new Error("The AI sheet editor is not registered"));
+      }
+      return editorHandler(sheetId, delta, version);
     },
-    [workbook.handleSheetChanged],
+    [],
   );
   const session = useSessionWorkspace(
     selectedWorkspaceId,
@@ -342,8 +344,7 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
           workspaceId={selectedWorkspaceId}
           onWorkspaceRefresh={workbook.handleWorkspaceRefresh}
           onChartsRefresh={workbook.handleChartsRefresh}
-          onSheetChanged={workbook.handleSheetChanged}
-          onCommittedSheetMutation={handleCommittedSheetMutation}
+          onAiSheetMutation={handleCommittedSheetMutation}
           onAttachExcel={handleAttachExcel}
           referenceCacheRevision={workbook.referenceCacheRevision}
           currentUser={currentUser}

@@ -15,8 +15,7 @@ type SessionInfra = {
   referenceCacheRevision: number;
   onWorkspaceRefresh?: () => Promise<void> | void;
   onChartsRefresh?: () => Promise<void> | void;
-  onSheetChanged?: SheetChangedHandler;
-  onCommittedSheetMutation?: CommittedSheetMutationHandler;
+  onAiSheetMutation?: CommittedSheetMutationHandler;
   onUndoComplete?: () => Promise<void> | void;
   onUserTurnAccepted: (sessionId: number) => void;
   onNavigateSheet?: (sheetId: number) => void;

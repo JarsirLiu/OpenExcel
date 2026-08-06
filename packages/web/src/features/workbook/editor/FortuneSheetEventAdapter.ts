@@ -19,7 +19,6 @@ type FortuneSheetChangeData = {
 
 type FortuneSheetChangeOptions = {
   loadedSheetIds?: ReadonlySet<number>;
-  allowUntrackedChanges?: boolean;
 };
 
 export type FortuneSheetChangeResult = {
@@ -97,14 +96,18 @@ export class FortuneSheetEventAdapter {
     options: FortuneSheetChangeOptions = {},
   ): FortuneSheetChangeResult[] {
     const loadedSheetIds = options.loadedSheetIds;
-    const hasPendingOperation = [...this.pendingOpHints.keys()].some((sheetId) =>
-      loadedSheetIds ? loadedSheetIds.has(sheetId) : true,
-    );
-    if (!hasPendingOperation && !options.allowUntrackedChanges) return [];
-
     const results: FortuneSheetChangeResult[] = [];
+    let activeSheetChanged = false;
 
-    for (const fortuneSheet of data) {
+    // Process the active Sheet first. FortuneSheet's onChange is the actual
+    // value-change signal; onOp is only an optimization hint and is not
+    // required for a manual edit to reach persistence.
+    const orderedData = [
+      ...data.filter((fortuneSheet) => Number(fortuneSheet.id) === activeSheetId),
+      ...data.filter((fortuneSheet) => Number(fortuneSheet.id) !== activeSheetId),
+    ];
+
+    for (const fortuneSheet of orderedData) {
       const sheetId = toSheetId(fortuneSheet.id);
       if (sheetId === null) continue;
       if (loadedSheetIds && !loadedSheetIds.has(sheetId)) continue;
@@ -125,6 +128,7 @@ export class FortuneSheetEventAdapter {
         hint,
       });
       this.snapshots.set(sheetId, result.snapshot);
+      activeSheetChanged ||= sheetId === activeSheetId && result.change !== null;
       results.push({ sheetId, change: result.change });
     }
 
