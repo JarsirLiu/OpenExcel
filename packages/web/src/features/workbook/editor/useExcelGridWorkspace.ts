@@ -2,7 +2,7 @@ import type { WorkbookInstance } from "@fortune-sheet/react";
 import type { SheetChangeDelta, SheetChangeVersion } from "@openexcel/core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { WorkbookFull } from "@/api/workbooks";
-import { createSheet, deleteSheet, deleteWorkbook, updateSheetName } from "@/api/workbooks";
+import { deleteSheet, deleteWorkbook, updateSheetName } from "@/api/workbooks";
 import type { SheetSnapshotForSave } from "@/features/sync/sheetChunkSnapshot";
 import type {
   CommittedSheetContentChangeHandler,
@@ -18,6 +18,7 @@ import { confirm, toast } from "@/shared/lib";
 import { adaptFortuneSheetLayout, type SheetGridLayout } from "../layout/fortuneSheetLayout";
 import { findSheetIndexById } from "../sheetIdentity";
 import { AiSheetEditor } from "./aiSheetEditor";
+import { createSheetFromEditor } from "./createSheetFromEditor";
 import type { FortuneSheetOp } from "./fortuneSheetOps";
 import { ManualSheetEditor } from "./manualSheetEditor";
 import { useSheetActivation } from "./SheetActivationContext";
@@ -279,23 +280,18 @@ export function useExcelGridWorkspace({
 
   const handleBeforeAddSheet = useCallback(
     (sheet: any) => {
-      if (!workbook) return false;
+      const currentWorkbook = workbookStateRef.current;
+      if (!currentWorkbook) return false;
       const name = typeof sheet?.name === "string" ? sheet.name : undefined;
       void (async () => {
         try {
           if (workspaceId == null) return;
-          const result = await createSheet(workspaceId, workbook.id, { name });
-          await onWorkbookMutation?.();
-          await onWorkbookStructureChanged?.({
-            toolCallId: `ui-create-sheet:${workbook.id}:${result.id}`,
-            kind: "sheet-created",
-            workbookId: result.workbookId,
-            sheetId: result.id,
-            sheetNo: result.sheetNo,
-            sheetName: result.name,
-            order: result.order,
-            sourceSheetId: null,
+          const update = await createSheetFromEditor({
+            workspaceId,
+            workbookId: currentWorkbook.id,
+            name,
           });
+          await onWorkbookStructureChanged?.(update);
         } catch (error) {
           console.error("创建 Sheet 失败:", error);
           await onWorkbookRefresh?.();
@@ -303,7 +299,7 @@ export function useExcelGridWorkspace({
       })();
       return false;
     },
-    [onWorkbookMutation, onWorkbookRefresh, onWorkbookStructureChanged, workbook, workspaceId],
+    [onWorkbookRefresh, onWorkbookStructureChanged, workspaceId],
   );
 
   const handleBeforeDeleteSheet = useCallback(

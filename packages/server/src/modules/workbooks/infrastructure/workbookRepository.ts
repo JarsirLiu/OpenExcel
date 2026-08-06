@@ -188,20 +188,28 @@ export async function createSheet(
   },
   db: Prisma.TransactionClient = prisma,
 ) {
-  const sheet = await db.sheet.create({
-    data: {
-      ...data,
-      config: data.config ?? null,
-    },
-  });
-  const cells = JSON.parse(data.celldata) as Parameters<typeof serializeSheetChunks>[0];
-  const chunks = serializeSheetChunks(cells);
-  if (chunks.length > 0) {
-    await db.sheetChunk.createMany({
-      data: chunks.map((chunk) => ({ ...chunk, sheetId: sheet.id })),
+  const create = async (tx: Prisma.TransactionClient) => {
+    const sheet = await tx.sheet.create({
+      data: {
+        workbookId: data.workbookId,
+        sheetNo: data.sheetNo,
+        name: data.name,
+        order: data.order,
+        columns: data.columns,
+        config: data.config ?? null,
+      },
     });
-  }
-  return sheet;
+    const cells = JSON.parse(data.celldata) as Parameters<typeof serializeSheetChunks>[0];
+    const chunks = serializeSheetChunks(cells);
+    if (chunks.length > 0) {
+      await tx.sheetChunk.createMany({
+        data: chunks.map((chunk) => ({ ...chunk, sheetId: sheet.id })),
+      });
+    }
+    return sheet;
+  };
+
+  return db === prisma ? prisma.$transaction(create) : create(db);
 }
 
 export async function deleteSheetAndReindex(
