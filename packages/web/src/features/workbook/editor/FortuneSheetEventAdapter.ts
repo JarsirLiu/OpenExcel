@@ -97,7 +97,6 @@ export class FortuneSheetEventAdapter {
   ): FortuneSheetChangeResult[] {
     const loadedSheetIds = options.loadedSheetIds;
     const results: FortuneSheetChangeResult[] = [];
-    let activeSheetChanged = false;
 
     // Process the active Sheet first. FortuneSheet's onChange is the actual
     // value-change signal; onOp is only an optimization hint and is not
@@ -128,7 +127,6 @@ export class FortuneSheetEventAdapter {
         hint,
       });
       this.snapshots.set(sheetId, result.snapshot);
-      activeSheetChanged ||= sheetId === activeSheetId && result.change !== null;
       results.push({ sheetId, change: result.change });
     }
 

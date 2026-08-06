@@ -1,9 +1,4 @@
-import {
-  applySheetMutation,
-  type FortuneCell,
-  type SheetChangeDelta,
-  type SheetConfig,
-} from "@openexcel/core";
+import type { FortuneCell, SheetChangeDelta, SheetConfig } from "@openexcel/core";
 import {
   changedSheetChunks,
   SHEET_CHUNK_COLUMNS,
@@ -140,46 +135,6 @@ export class SheetSaveCoordinator {
       conflictAttempt: 0,
       retryAfterInFlight: false,
     });
-  }
-
-  /**
-   * Advances the server baseline for a mutation committed outside this save queue.
-   * Local pending edits remain pending and are compared against the new baseline.
-   */
-  acceptExternalMutation(sheetId: number, delta: SheetChangeDelta, revision: number): void {
-    const state = this.states.get(sheetId);
-    if (!state) return;
-
-    const persistedBefore = cellsFromChunks(state.persistedChunks);
-    const localCells = state.latestCells;
-    const persistedConfig =
-      state.persistedConfig === "null" ? null : JSON.parse(state.persistedConfig);
-    const persisted = applySheetMutation(
-      {
-        celldata: [...persistedBefore.values()],
-        config: persistedConfig,
-      },
-      delta,
-    ).snapshot;
-    const externalCells = cellsFromCelldata(persisted.celldata);
-    const mergedCells = new Map(externalCells);
-    const localKeys = new Set([...persistedBefore.keys(), ...localCells.keys()]);
-    for (const key of localKeys) {
-      const persistedCell = persistedBefore.get(key);
-      const localCell = localCells.get(key);
-      if (sameCell(persistedCell, localCell)) continue;
-      if (localCell) mergedCells.set(key, localCell);
-      else mergedCells.delete(key);
-    }
-    const localConfigChanged = serializeSheetConfig(state.latestConfig) !== state.persistedConfig;
-    const mergedConfig = localConfigChanged ? state.latestConfig : persisted.config;
-
-    state.persistedRevision = revision;
-    state.persistedChunks = serializeSheetChunkSnapshot(persisted.celldata);
-    state.persistedConfig = serializeSheetConfig(persisted.config);
-    state.latestCells = mergedCells;
-    state.latestConfig = mergedConfig;
-    state.conflictAttempt = 0;
   }
 
   schedule(
