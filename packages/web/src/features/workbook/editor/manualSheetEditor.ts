@@ -9,12 +9,16 @@ import type { FortuneSheetOp } from "./fortuneSheetOps";
 export class ManualSheetEditor {
   private readonly eventAdapter = new FortuneSheetEventAdapter();
 
-  reset(sheets: readonly FortuneSheetData[]): Map<number, SheetSnapshotForSave> {
-    return this.eventAdapter.reset(sheets);
+  reset(sheets: readonly FortuneSheetData[]): void {
+    this.eventAdapter.reset(sheets);
   }
 
-  replaceSheetSnapshot(sheetId: number, snapshot: SheetSnapshotForSave): void {
+  replaceFromServerSnapshot(sheetId: number, snapshot: SheetSnapshotForSave): void {
     this.eventAdapter.replaceSheetSnapshot(sheetId, snapshot);
+  }
+
+  getBaseline(sheetId: number): SheetSnapshotForSave | null {
+    return this.eventAdapter.getSheetSnapshot(sheetId);
   }
 
   recordOperation(ops: readonly FortuneSheetOp[], activeSheetId: number): void {

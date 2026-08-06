@@ -43,7 +43,7 @@ export function parseDemoGridRange(value: string): DemoGridRange | null {
 type UseDemoGridFocusInput = {
   workbookRef: RefObject<WorkbookInstance | null>;
   focus?: DemoGridFocus;
-  sessionKey: number;
+  sessionKey: string;
 };
 
 export function useDemoGridFocus({

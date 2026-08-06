@@ -81,7 +81,10 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
       if (!editorHandler) {
         return Promise.reject(new Error("The AI sheet editor is not registered"));
       }
-      return editorHandler(sheetId, delta, version);
+      return workbook.ensureAllSheetsLoaded().then((loadedWorkbook) => {
+        if (!loadedWorkbook) throw new Error("The workbook is no longer available");
+        return editorHandler(sheetId, delta, version);
+      });
     },
     [],
   );
@@ -335,7 +338,6 @@ export function Workbench({ currentUser, onLogout, routeData }: Props) {
           onSheetContentChanged={workbook.handleSheetContentChanged}
           onCommittedSheetContentChanged={workbook.handleCommittedSheetContentChanged}
           onRegisterCommittedSheetMutation={registerCommittedSheetMutation}
-          onEnsureAllSheetsLoaded={workbook.ensureAllSheetsLoaded}
         />
         <div className={styles.resizeHandle} onMouseDown={chatSidebarLayout.handleMouseDown} />
       </div>

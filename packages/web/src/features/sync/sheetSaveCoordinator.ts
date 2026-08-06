@@ -1,15 +1,13 @@
 import type { FortuneCell, SheetChangeDelta, SheetConfig } from "@openexcel/core";
 import {
   changedSheetChunks,
-  SHEET_CHUNK_COLUMNS,
-  SHEET_CHUNK_ROWS,
   type SheetChunkReplacement,
   type SheetSnapshotForSave,
   serializeSheetChunkSnapshot,
   serializeSheetConfig,
 } from "./sheetChunkSnapshot";
 
-export type SheetSaveResult = { revision: number };
+export type SheetSaveResult = { revision: number; snapshot?: SheetSnapshotForSave };
 export type SheetSaveErrorAction = "handled" | "retry" | "stop";
 export type SheetSaveInput =
   | {
@@ -36,13 +34,16 @@ export type SheetSaveRequest =
     };
 export type SheetSaveTask = (request: SheetSaveRequest) => Promise<SheetSaveResult>;
 
+type SheetSnapshot = {
+  revision: number;
+  celldata: FortuneCell[];
+  config: SheetConfig | null;
+};
+
 type SheetState = {
   latestVersion: number;
-  latestCells: Map<string, FortuneCell>;
-  latestConfig: SheetConfig | null;
-  persistedRevision: number;
-  persistedChunks: Map<string, string>;
-  persistedConfig: string;
+  desiredCells: Map<string, FortuneCell>;
+  desiredConfig: SheetConfig | null;
   pendingCells: Map<string, PendingCell>;
   pendingConfig: {
     config: SheetConfig | null;
@@ -100,32 +101,25 @@ function snapshotFromCells(
   };
 }
 
-function sameCell(left: FortuneCell | undefined, right: FortuneCell | undefined): boolean {
-  return JSON.stringify(left?.v ?? null) === JSON.stringify(right?.v ?? null);
-}
-
-function cellsFromChunks(chunks: ReadonlyMap<string, string>): Map<string, FortuneCell> {
-  const cells = new Map<string, FortuneCell>();
-  for (const payload of chunks.values()) {
-    const parsed = JSON.parse(payload) as { celldata?: FortuneCell[] };
-    for (const cell of parsed.celldata ?? []) cells.set(`${cell.r},${cell.c}`, cell);
-  }
-  return cells;
-}
+export type SheetSaveCoordinatorOptions = {
+  getSheetState: (sheetId: number) => SheetSnapshot | null;
+};
 
 /** Debounces and serializes browser Sheet saves without making the editor await HTTP. */
 export class SheetSaveCoordinator {
+  private readonly options: SheetSaveCoordinatorOptions;
   private readonly states = new Map<number, SheetState>();
 
-  reset(sheetId: number, snapshot: SheetSnapshotForSave, revision: number): void {
+  constructor(options: SheetSaveCoordinatorOptions) {
+    this.options = options;
+  }
+
+  reset(sheetId: number, snapshot: SheetSnapshotForSave): void {
     this.cancel(sheetId);
     this.states.set(sheetId, {
       latestVersion: 0,
-      latestCells: cellsFromCelldata(snapshot.celldata),
-      latestConfig: snapshot.config ? structuredClone(snapshot.config) : null,
-      persistedRevision: revision,
-      persistedChunks: serializeSheetChunkSnapshot(snapshot.celldata),
-      persistedConfig: serializeSheetConfig(snapshot.config),
+      desiredCells: cellsFromCelldata(snapshot.celldata),
+      desiredConfig: snapshot.config ? structuredClone(snapshot.config) : null,
       pendingCells: new Map(),
       pendingConfig: null,
       latestDocumentVersion: 0,
@@ -158,15 +152,15 @@ export class SheetSaveCoordinator {
       for (const cell of input.mutation.cells) {
         const key = `${cell.row - 1},${cell.col - 1}`;
         if (cell.cell === null) {
-          state.latestCells.delete(key);
+          state.desiredCells.delete(key);
         } else {
-          const previous = state.latestCells.get(key);
+          const previous = state.desiredCells.get(key);
           const nextValue: Record<string, unknown> = {
             ...((previous?.v ?? {}) as unknown as Record<string, unknown>),
             ...cell.cell,
           };
           for (const field of cell.removed ?? []) delete nextValue[field];
-          state.latestCells.set(key, {
+          state.desiredCells.set(key, {
             r: cell.row - 1,
             c: cell.col - 1,
             v: nextValue as unknown as FortuneCell["v"],
@@ -174,7 +168,7 @@ export class SheetSaveCoordinator {
         }
       }
       if (input.mutation.config !== undefined) {
-        state.latestConfig = input.mutation.config as SheetConfig | null;
+        state.desiredConfig = input.mutation.config as SheetConfig | null;
       }
       for (const cell of input.mutation.cells) {
         const key = `${cell.row},${cell.col}`;
@@ -202,14 +196,14 @@ export class SheetSaveCoordinator {
       }
       if (input.mutation.config !== undefined) {
         state.pendingConfig = {
-          config: state.latestConfig,
+          config: state.desiredConfig,
           version: state.latestVersion,
           documentVersion: input.documentVersion,
         };
       }
     } else {
-      state.latestCells = cellsFromCelldata(input.snapshot.celldata);
-      state.latestConfig = input.snapshot.config ? structuredClone(input.snapshot.config) : null;
+      state.desiredCells = cellsFromCelldata(input.snapshot.celldata);
+      state.desiredConfig = input.snapshot.config ? structuredClone(input.snapshot.config) : null;
       state.pendingCells.clear();
       state.pendingConfig = null;
     }
@@ -231,39 +225,39 @@ export class SheetSaveCoordinator {
     this.armTimer(sheetId, state, task, options, delay);
   }
 
-  rebase(
-    sheetId: number,
-    remote: SheetSnapshotForSave,
-    revision: number,
-  ): SheetSnapshotForSave | null {
+  rebase(sheetId: number, remote: SheetSnapshotForSave): SheetSnapshotForSave | null {
     const state = this.states.get(sheetId);
     if (!state) return null;
     if (state.conflictAttempt >= MAX_CONFLICT_ATTEMPTS) return null;
 
-    const baseCells = cellsFromChunks(state.persistedChunks);
-    const localCells = state.latestCells;
     const remoteCells = new Map(remote.celldata.map((cell) => [`${cell.r},${cell.c}`, cell]));
-    const keys = new Set([...baseCells.keys(), ...localCells.keys()]);
-    for (const key of keys) {
-      const baseCell = baseCells.get(key);
-      const localCell = localCells.get(key);
-      if (sameCell(baseCell, localCell)) continue;
-      if (localCell) remoteCells.set(key, localCell);
-      else remoteCells.delete(key);
+    for (const pending of state.pendingCells.values()) {
+      const key = `${pending.row - 1},${pending.col - 1}`;
+      if (pending.cell === null) {
+        remoteCells.delete(key);
+        continue;
+      }
+      const previous = remoteCells.get(key);
+      const nextValue: Record<string, unknown> = {
+        ...((previous?.v ?? {}) as unknown as Record<string, unknown>),
+        ...pending.cell,
+      };
+      for (const field of pending.removed ?? []) delete nextValue[field];
+      remoteCells.set(key, {
+        r: pending.row - 1,
+        c: pending.col - 1,
+        v: nextValue as unknown as FortuneCell["v"],
+      });
     }
 
-    const localConfigChanged = serializeSheetConfig(state.latestConfig) !== state.persistedConfig;
     const merged = {
       celldata: [...remoteCells.values()].sort(
         (left, right) => left.r - right.r || left.c - right.c,
       ),
-      config: localConfigChanged ? state.latestConfig : remote.config,
+      config: state.pendingConfig?.config ?? remote.config,
     };
-    state.persistedRevision = revision;
-    state.persistedChunks = serializeSheetChunkSnapshot(remote.celldata);
-    state.persistedConfig = serializeSheetConfig(remote.config);
-    state.latestCells = cellsFromCelldata(merged.celldata);
-    state.latestConfig = merged.config;
+    state.desiredCells = cellsFromCelldata(merged.celldata);
+    state.desiredConfig = merged.config;
     state.pendingCells.clear();
     state.pendingConfig = null;
     state.retryAfterInFlight = false;
@@ -285,10 +279,17 @@ export class SheetSaveCoordinator {
     const state = this.states.get(sheetId);
     if (!state || state.inFlight) return;
 
+    const sheetState = this.options.getSheetState(sheetId);
+    const baseRevision = sheetState?.revision ?? 0;
+    const persistedChunks = sheetState
+      ? serializeSheetChunkSnapshot(sheetState.celldata)
+      : new Map<string, string>();
+    const persistedConfig = serializeSheetConfig(sheetState?.config ?? null);
+
     const version = state.latestVersion;
     const sentCells = new Map(state.pendingCells);
     const sentConfig = state.pendingConfig;
-    const sentConfigValue = sentConfig ? state.latestConfig : null;
+    const sentConfigValue = sentConfig?.config ?? null;
     let persistedThroughVersion = Math.max(
       ...[...sentCells.values(), sentConfig].map((pending) => pending?.documentVersion ?? 0),
     );
@@ -304,7 +305,7 @@ export class SheetSaveCoordinator {
       }));
       request = {
         kind: "mutation",
-        baseRevision: state.persistedRevision,
+        baseRevision,
         mutation: {
           type: "patch",
           cells,
@@ -312,16 +313,16 @@ export class SheetSaveCoordinator {
         },
       };
     } else {
-      snapshot = snapshotFromCells(state.latestCells, state.latestConfig);
+      snapshot = snapshotFromCells(state.desiredCells, state.desiredConfig);
       const chunks = changedSheetChunks(
-        state.persistedChunks,
+        persistedChunks,
         serializeSheetChunkSnapshot(snapshot.celldata),
       );
-      const configChanged = serializeSheetConfig(snapshot.config) !== state.persistedConfig;
+      const configChanged = serializeSheetConfig(snapshot.config) !== persistedConfig;
       if (chunks.length === 0 && !configChanged) return;
       request = {
         kind: "replaceChunks",
-        baseRevision: state.persistedRevision,
+        baseRevision,
         config: snapshot.config,
         chunks,
       };
@@ -342,55 +343,7 @@ export class SheetSaveCoordinator {
           if (sentConfig && current.pendingConfig?.version === sentConfig.version) {
             current.pendingConfig = null;
           }
-        } else {
-          current.persistedChunks = serializeSheetChunkSnapshot(snapshot?.celldata ?? []);
-          current.persistedConfig = serializeSheetConfig(snapshot?.config ?? null);
         }
-        if (request.kind === "mutation") {
-          current.persistedConfig = sentConfig
-            ? serializeSheetConfig(sentConfigValue)
-            : current.persistedConfig;
-          const sentCellsByChunk = new Map<string, PendingCell[]>();
-          for (const sent of sentCells.values()) {
-            const key = `${Math.floor((sent.row - 1) / SHEET_CHUNK_ROWS)},${Math.floor(
-              (sent.col - 1) / SHEET_CHUNK_COLUMNS,
-            )}`;
-            const chunkCells = sentCellsByChunk.get(key);
-            if (chunkCells) chunkCells.push(sent);
-            else sentCellsByChunk.set(key, [sent]);
-          }
-          for (const [key, chunkCells] of sentCellsByChunk) {
-            const payload = current.persistedChunks.get(key);
-            const cells = payload
-              ? ((JSON.parse(payload) as { celldata?: FortuneCell[] }).celldata ?? [])
-              : [];
-            const cellMap = new Map(cells.map((cell) => [`${cell.r},${cell.c}`, cell]));
-            for (const sent of chunkCells) {
-              const cellKey = `${sent.row - 1},${sent.col - 1}`;
-              if (sent.cell === null) {
-                cellMap.delete(cellKey);
-              } else {
-                const previous = cellMap.get(cellKey);
-                const nextValue: Record<string, unknown> = {
-                  ...((previous?.v ?? {}) as unknown as Record<string, unknown>),
-                  ...sent.cell,
-                };
-                for (const field of sent.removed ?? []) delete nextValue[field];
-                cellMap.set(cellKey, {
-                  r: sent.row - 1,
-                  c: sent.col - 1,
-                  v: nextValue as unknown as FortuneCell["v"],
-                });
-              }
-            }
-            const nextCells = [...cellMap.values()].sort(
-              (left, right) => left.r - right.r || left.c - right.c,
-            );
-            current.persistedChunks.set(key, JSON.stringify({ celldata: nextCells }));
-            if (nextCells.length === 0) current.persistedChunks.delete(key);
-          }
-        }
-        current.persistedRevision = result.revision;
         current.retryAttempt = 0;
         current.conflictAttempt = 0;
         current.retryAfterInFlight = false;

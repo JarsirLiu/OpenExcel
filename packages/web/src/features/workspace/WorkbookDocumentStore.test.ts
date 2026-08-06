@@ -129,7 +129,7 @@ describe("WorkbookDocumentStore", () => {
     expect(listener).toHaveBeenCalledWith({ kind: "charts" });
   });
 
-  it("reapplies unpersisted local changes when a remote snapshot replaces the document", () => {
+  it("replaces the current document with the remote snapshot", () => {
     const store = new WorkbookDocumentStore(createWorkbook());
     const localChange: SheetEditorChange = {
       kind: "patch",
@@ -153,11 +153,11 @@ describe("WorkbookDocumentStore", () => {
     });
 
     expect(store.getSnapshot()?.sheets[0]?.uploadedData).toEqual([
-      { r: 0, c: 0, v: { v: 9, m: "9" } },
+      { r: 0, c: 0, v: { v: 100, m: "100" } },
     ]);
   });
 
-  it("clears only local changes confirmed by the corresponding save version", () => {
+  it("keeps only the current remote document after a revision update", () => {
     const store = new WorkbookDocumentStore(createWorkbook());
     const createChange = (value: number): SheetEditorChange => ({
       kind: "patch",
@@ -176,7 +176,7 @@ describe("WorkbookDocumentStore", () => {
       sheets: [{ ...createWorkbook().sheets[0], revision: 1 }],
     });
     expect(store.getSnapshot()?.sheets[0]?.uploadedData).toEqual([
-      { r: 0, c: 0, v: { v: 8, m: "8" } },
+      { r: 0, c: 0, v: { v: 90, m: "90" } },
     ]);
 
     store.updateSheetRevision(10, 2, 2);

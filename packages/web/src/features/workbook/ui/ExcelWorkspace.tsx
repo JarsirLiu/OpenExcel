@@ -35,7 +35,6 @@ interface Props {
   onSheetContentChanged?: SheetContentChangeHandler;
   onCommittedSheetContentChanged?: CommittedSheetContentChangeHandler;
   onRegisterCommittedSheetMutation?: (handler: CommittedSheetMutationHandler | null) => void;
-  onEnsureAllSheetsLoaded?: () => Promise<WorkbookFull | null>;
   demoGridFocus?: DemoGridFocus;
 }
 
@@ -59,7 +58,6 @@ export function ExcelWorkspace({
   onSheetContentChanged,
   onCommittedSheetContentChanged,
   onRegisterCommittedSheetMutation,
-  onEnsureAllSheetsLoaded,
   demoGridFocus,
 }: Props) {
   return (
@@ -85,7 +83,6 @@ export function ExcelWorkspace({
           onSheetContentChanged={onSheetContentChanged}
           onCommittedSheetContentChanged={onCommittedSheetContentChanged}
           onRegisterCommittedSheetMutation={onRegisterCommittedSheetMutation}
-          onEnsureAllSheetsLoaded={onEnsureAllSheetsLoaded}
           demoGridFocus={demoGridFocus}
         />
       </div>

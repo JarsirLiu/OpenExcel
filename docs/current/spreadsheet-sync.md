@@ -135,11 +135,19 @@ dependencies from a mutation.
 - Failed saves retain their pending batch and retry with bounded exponential
   backoff. A save callback may explicitly mark a revision conflict as handled
   while it fetches and rebases the remote Sheet.
-- Workbook or Sheet lifecycle changes initialize the affected save baseline;
-  refreshing content for an existing Sheet does not cancel its pending saves.
-  Remote workbook and Sheet snapshots are merged with the document's unpersisted
-  local changes before they replace the editor document. Save acknowledgements
-  clear only the local change versions included in that request.
+- `ManualSheetEditor` owns the only content diff baseline for the current
+  workbook editor session, keyed by Sheet ID. It is initialized from a server
+  Sheet snapshot and replaced only by a server snapshot after a successful
+  save, AI commit, or Sheet load. Manual changes never advance this baseline;
+  they produce mutations against it. The save coordinator receives already-
+  diffed manual mutations and retains only unsent mutations, desired content
+  for chunk replacement, retry state, and the in-flight request.
+- Workbook or Sheet lifecycle changes initialize the affected editor and save
+  state; refreshing content for an existing Sheet does not reset either one.
+  The document Store holds only the current workbook. Remote snapshots replace
+  that current document, while the save coordinator replays its unsent manual
+  mutations on a conflict. AI mutations never enter the manual save queue and
+  never remain as browser-pending state.
 - Workbook and Sheet requests use request generations and `AbortController` to ignore stale responses.
 - Workbook switching keeps the old document visible until the new document is ready; on failure, the old document remains usable and retryable.
 

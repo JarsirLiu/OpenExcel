@@ -43,10 +43,9 @@ export class FortuneSheetEventAdapter {
 
   private readonly snapshots = new Map<number, SheetEditorSnapshot>();
 
-  reset(sheets: readonly FortuneSheetData[]): Map<number, SheetSnapshotForSave> {
+  reset(sheets: readonly FortuneSheetData[]): void {
     this.pendingOpHints.clear();
     this.snapshots.clear();
-    const saveSnapshots = new Map<number, SheetSnapshotForSave>();
 
     for (const sheet of sheets) {
       const sheetId = toSheetId(sheet.id);
@@ -54,18 +53,21 @@ export class FortuneSheetEventAdapter {
       const config = extractSheetConfig(sheet);
       const snapshot = createSheetEditorSnapshot(sheet.celldata, config);
       this.snapshots.set(sheetId, snapshot);
-      saveSnapshots.set(sheetId, {
-        celldata: [...snapshot.cellsByKey.values()],
-        config,
-      });
     }
-
-    return saveSnapshots;
   }
 
   replaceSheetSnapshot(sheetId: number, snapshot: SheetSnapshotForSave): void {
     this.pendingOpHints.delete(sheetId);
     this.snapshots.set(sheetId, createSheetEditorSnapshot(snapshot.celldata, snapshot.config));
+  }
+
+  getSheetSnapshot(sheetId: number): SheetSnapshotForSave | null {
+    const snapshot = this.snapshots.get(sheetId);
+    if (!snapshot) return null;
+    return {
+      celldata: [...snapshot.cellsByKey.values()].map((cell) => ({ ...cell, v: { ...cell.v } })),
+      config: snapshot.config ? structuredClone(snapshot.config) : null,
+    };
   }
 
   handleOp(ops: readonly FortuneSheetOp[], activeSheetId: number): void {
@@ -126,7 +128,6 @@ export class FortuneSheetEventAdapter {
         previous,
         hint,
       });
-      this.snapshots.set(sheetId, result.snapshot);
       results.push({ sheetId, change: result.change });
     }
 

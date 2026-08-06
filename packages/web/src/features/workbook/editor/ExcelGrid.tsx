@@ -88,7 +88,6 @@ interface Props {
   onSheetContentChanged?: SheetContentChangeHandler;
   onCommittedSheetContentChanged?: CommittedSheetContentChangeHandler;
   onRegisterCommittedSheetMutation?: (handler: CommittedSheetMutationHandler | null) => void;
-  onEnsureAllSheetsLoaded?: () => Promise<WorkbookFull | null>;
   demoGridFocus?: DemoGridFocus;
 }
 
@@ -112,7 +111,6 @@ export function ExcelGrid({
   onSheetContentChanged,
   onCommittedSheetContentChanged,
   onRegisterCommittedSheetMutation,
-  onEnsureAllSheetsLoaded,
   demoGridFocus,
 }: Props) {
   const gridRootRef = useRef<HTMLDivElement>(null);
@@ -149,7 +147,6 @@ export function ExcelGrid({
     onSheetContentChanged,
     onCommittedSheetContentChanged,
     onRegisterCommittedSheetMutation,
-    onEnsureAllSheetsLoaded,
     documentStore,
     sheetLoaded,
   });

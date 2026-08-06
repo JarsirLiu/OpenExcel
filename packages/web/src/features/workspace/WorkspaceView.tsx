@@ -57,7 +57,6 @@ type Props = {
   onSheetContentChanged?: SheetContentChangeHandler;
   onCommittedSheetContentChanged?: CommittedSheetContentChangeHandler;
   onRegisterCommittedSheetMutation?: (handler: CommittedSheetMutationHandler | null) => void;
-  onEnsureAllSheetsLoaded?: () => Promise<WorkbookFull | null>;
   presentationMode?: boolean;
   demoGridFocus?: DemoGridFocus;
 };
@@ -92,7 +91,6 @@ export function WorkspaceView({
   onSheetContentChanged,
   onCommittedSheetContentChanged,
   onRegisterCommittedSheetMutation,
-  onEnsureAllSheetsLoaded,
   presentationMode = false,
   demoGridFocus,
 }: Props) {
@@ -163,7 +161,6 @@ export function WorkspaceView({
           onSheetContentChanged={onSheetContentChanged}
           onCommittedSheetContentChanged={onCommittedSheetContentChanged}
           onRegisterCommittedSheetMutation={onRegisterCommittedSheetMutation}
-          onEnsureAllSheetsLoaded={onEnsureAllSheetsLoaded}
           demoGridFocus={demoGridFocus}
         />
         {transition?.status === "loading" && (

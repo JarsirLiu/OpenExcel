@@ -4,7 +4,7 @@ import { type FortuneSheetData, toFortuneSheetData } from "./fortuneSheet";
 
 type WorkbookEditorSession = {
   sheetData: FortuneSheetData[];
-  sessionKey: number;
+  sessionKey: string;
 };
 
 function cloneForEditor<T>(value: T): T {
@@ -18,13 +18,17 @@ export function useWorkbookEditorSession(
   workbook: WorkbookFull | null,
   revision: number,
 ): WorkbookEditorSession {
+  const sheetLoadKey =
+    workbook?.sheets
+      .map((sheet) => `${sheet.id}:${sheet.loaded === false ? "unloaded" : "loaded"}`)
+      .join(",") ?? "none";
   const sheetData = useMemo(() => {
     if (!workbook) return [];
     return workbook.sheets.map((sheet) => cloneForEditor(toFortuneSheetData(sheet)));
-  }, [workbook?.id, revision]);
+  }, [sheetLoadKey, workbook?.id, revision]);
 
   return {
     sheetData,
-    sessionKey: revision,
+    sessionKey: `${revision}:${sheetLoadKey}`,
   };
 }
