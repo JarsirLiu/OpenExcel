@@ -12,6 +12,7 @@ import { getSheetIndexAfterDeletion, normalizeSheetIndex } from "./sheetIndex";
 import { useSheetNavigation } from "./useSheetNavigation";
 import { useWorkbookCatalog, type WorkbookInitial } from "./useWorkbookCatalog";
 import { useWorkbookDocument } from "./useWorkbookDocument";
+import { useWorkbookSession } from "./useWorkbookSession";
 
 const MAX_IMPORT_WORKBOOKS = 20;
 
@@ -43,7 +44,6 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
   const {
     currentWorkbook,
     currentWorkbookRef,
-    workbookRevision,
     replaceCurrentWorkbook,
     updateCharts,
     updateSheetRevision,
@@ -55,6 +55,7 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
     loadSheet,
     documentStore,
   } = useWorkbookDocument(workspaceId, initial?.currentWorkbook);
+  const { sessionRevision, bumpSession } = useWorkbookSession();
   const [referenceCacheRevision, setReferenceCacheRevision] = useState(0);
 
   useEffect(() => {
@@ -125,7 +126,6 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
     if (current.sheets.every((sheet) => sheet.loaded !== false)) return current;
     return reloadCurrentWorkbook({
       sheetIds: current.sheets.map((sheet) => sheet.id),
-      preserveEditorSession: true,
     });
   }, [currentWorkbookRef, reloadCurrentWorkbook, workspaceId]);
 
@@ -243,6 +243,9 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
         return;
       }
 
+      // Structure changes (sheet created/deleted) require editor rebuild
+      bumpSession();
+
       if (update.kind === "sheet-deleted") {
         const nextIndex = nextWorkbook.sheets.findIndex((sheet) => sheet.id === update.sheetId);
         setCurrentSheetIndex(
@@ -259,6 +262,7 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
       );
     },
     [
+      bumpSession,
       currentWorkbookRef,
       invalidateReferenceCache,
       refreshCatalog,
@@ -446,7 +450,7 @@ export function useWorkspaceView(workspaceId: number | null, initial?: WorkbookI
     workbookIdx,
     currentWorkbook,
     documentStore,
-    workbookRevision,
+    workbookRevision: sessionRevision,
     loading,
     transition,
     retryWorkbookTransition: retryTransition,

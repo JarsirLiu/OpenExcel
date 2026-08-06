@@ -12,6 +12,7 @@ type Listener = () => void;
 
 export type WorkbookDocumentChange =
   | { kind: "workbook" }
+  | { kind: "charts" }
   | {
       kind: "sheet";
       sheetId: number;
@@ -332,7 +333,7 @@ export class WorkbookDocumentStore {
   updateCharts(charts: WorkbookFull["charts"]): WorkbookFull | null {
     if (!this.currentWorkbook) return null;
     this.currentWorkbook = { ...this.currentWorkbook, charts };
-    this.emit({ kind: "workbook" });
+    this.emit({ kind: "charts" });
     return this.currentWorkbook;
   }
 

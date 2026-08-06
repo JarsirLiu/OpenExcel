@@ -23,7 +23,9 @@ function chartReferences(chart: ChartSpec): RangeReference[] {
 }
 
 export function chartAffectsChange(chart: ChartSpec, change: WorkbookDocumentChange): boolean {
-  if (change.kind === "workbook" || change.structural) return true;
+  if (change.kind === "workbook") return true;
+  if (change.kind !== "sheet") return false;
+  if (change.structural) return true;
   return chartReferences(chart).some(
     (reference) =>
       normalizedId(reference.sheetId) === normalizedId(change.sheetId) &&

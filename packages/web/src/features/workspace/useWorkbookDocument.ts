@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 import { fetchSheet, fetchWorkbookForEditor, type WorkbookFull } from "@/api/workbooks";
 import type { SheetEditorChange } from "@/features/sync/sheetEditorChange";
 import { WorkbookDocumentStore } from "./WorkbookDocumentStore";
@@ -34,9 +34,8 @@ export function useWorkbookDocument(
       documentStore.subscribeToChanges((change) => {
         if (
           change.kind === "workbook" ||
-          change.structural ||
-          change.configChanged ||
-          change.cells.length === 0
+          (change.kind === "sheet" &&
+            (change.structural || change.configChanged || change.cells.length === 0))
         ) {
           listener();
         }
@@ -48,7 +47,6 @@ export function useWorkbookDocument(
     documentStore.getSnapshot,
     documentStore.getSnapshot,
   );
-  const [workbookRevision, setWorkbookRevision] = useState(0);
   const currentWorkbookRef = useRef(documentStore.getSnapshot());
   const workbookRequestGenerationRef = useRef(0);
   const workbookRequestControllerRef = useRef<AbortController | null>(null);
@@ -76,7 +74,6 @@ export function useWorkbookDocument(
 
   const beginWorkbookRequest = useCallback(() => {
     const generation = invalidateWorkbookRequests();
-    // A workbook replacement invalidates any sheet request for the old document.
     invalidateSheetRequests();
     const controller = new AbortController();
     workbookRequestControllerRef.current = controller;
@@ -103,7 +100,6 @@ export function useWorkbookDocument(
     const next = initialWorkbook ?? null;
     const replaced = documentStore.replace(next);
     currentWorkbookRef.current = replaced;
-    setWorkbookRevision((revision) => revision + 1);
 
     return () => {
       invalidateRequests();
@@ -114,19 +110,7 @@ export function useWorkbookDocument(
     (next: WorkbookFull | null) => {
       const replaced = documentStore.replace(next);
       currentWorkbookRef.current = replaced;
-      setWorkbookRevision((revision) => revision + 1);
-    },
-    [documentStore],
-  );
-
-  const updateCurrentWorkbook = useCallback(
-    (updater: WorkbookUpdater) => {
-      const current = currentWorkbookRef.current;
-      if (!current) return null;
-      const next = documentStore.update(updater);
-      currentWorkbookRef.current = next;
-      setWorkbookRevision((revision) => revision + 1);
-      return next;
+      return replaced;
     },
     [documentStore],
   );
@@ -199,7 +183,7 @@ export function useWorkbookDocument(
   );
 
   const reloadCurrentWorkbook = useCallback(
-    async (options?: { sheetIds?: readonly number[]; preserveEditorSession?: boolean }) => {
+    async (options?: { sheetIds?: readonly number[] }) => {
       const current = currentWorkbookRef.current;
       if (workspaceId == null || current == null) return null;
       const { generation, controller } = beginWorkbookRequest();
@@ -211,9 +195,6 @@ export function useWorkbookDocument(
         if (!isCurrentWorkbookRequest(generation, controller.signal)) return null;
         const merged = documentStore.mergeRemoteSnapshot(next);
         currentWorkbookRef.current = merged;
-        if (!options?.preserveEditorSession) {
-          setWorkbookRevision((revision) => revision + 1);
-        }
         return merged;
       } catch (error) {
         if (controller.signal.aborted || isAbortError(error)) return null;
@@ -244,7 +225,6 @@ export function useWorkbookDocument(
         }
         const merged = documentStore.mergeRemoteSheet(loaded);
         currentWorkbookRef.current = merged;
-        setWorkbookRevision((revision) => revision + 1);
         return merged;
       } catch (error) {
         if (controller.signal.aborted || isAbortError(error)) return null;
@@ -261,9 +241,7 @@ export function useWorkbookDocument(
   return {
     currentWorkbook,
     currentWorkbookRef,
-    workbookRevision,
     replaceCurrentWorkbook,
-    updateCurrentWorkbook,
     updateCharts,
     updateSheetRevision,
     updateSheetContent,

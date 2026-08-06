@@ -119,6 +119,16 @@ describe("WorkbookDocumentStore", () => {
     });
   });
 
+  it("publishes chart changes separately from workbook changes", () => {
+    const store = new WorkbookDocumentStore(createWorkbook());
+    const listener = vi.fn();
+
+    store.subscribeToChanges(listener);
+    store.updateCharts([]);
+
+    expect(listener).toHaveBeenCalledWith({ kind: "charts" });
+  });
+
   it("reapplies unpersisted local changes when a remote snapshot replaces the document", () => {
     const store = new WorkbookDocumentStore(createWorkbook());
     const localChange: SheetEditorChange = {

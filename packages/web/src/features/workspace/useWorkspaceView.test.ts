@@ -6,7 +6,6 @@ const mocks = vi.hoisted(() => ({
   fetchSheet: vi.fn(),
   toast: vi.fn(),
   replaceCurrentWorkbook: vi.fn(),
-  updateCurrentWorkbook: vi.fn(),
   reloadCurrentWorkbook: vi.fn(),
   loadWorkbook: vi.fn(),
   loadSheet: vi.fn(),
@@ -19,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   commitWorkbook: vi.fn(),
   failWorkbookTransition: vi.fn(),
   clearActiveWorkbook: vi.fn(),
+  bumpSession: vi.fn(),
   transition: null as { targetWorkbookId: number; status: "loading" | "failed" } | null,
 }));
 
@@ -33,10 +33,8 @@ vi.mock("@/features/workspace/useWorkbookCatalog", () => ({
     workbooks: [],
     workbookIdx: 0,
     currentWorkbook,
-    workbookRevision: 0,
     loading: false,
     replaceCurrentWorkbook: mocks.replaceCurrentWorkbook,
-    updateCurrentWorkbook: mocks.updateCurrentWorkbook,
     reloadCurrentWorkbook: mocks.reloadCurrentWorkbook,
     loadWorkbook: mocks.loadWorkbook,
     loadSheet: mocks.loadSheet,
@@ -60,15 +58,7 @@ vi.mock("./useWorkbookDocument", () => ({
   useWorkbookDocument: () => ({
     currentWorkbook,
     currentWorkbookRef: { current: currentWorkbook },
-    workbookRevision: 0,
     replaceCurrentWorkbook: mocks.replaceCurrentWorkbook,
-    updateCurrentWorkbook: (updater: (workbook: WorkbookFull) => WorkbookFull) => {
-      if (currentWorkbook) {
-        currentWorkbook = updater(currentWorkbook);
-        mocks.replaceCurrentWorkbook(currentWorkbook);
-      }
-      return currentWorkbook;
-    },
     updateCharts: vi.fn(),
     updateSheetRevision: vi.fn(),
     updateWorkbookMetadata: vi.fn(),
@@ -85,6 +75,14 @@ vi.mock("./useWorkbookDocument", () => ({
       }
       return currentWorkbook;
     },
+    documentStore: null,
+  }),
+}));
+
+vi.mock("./useWorkbookSession", () => ({
+  useWorkbookSession: () => ({
+    sessionRevision: 0,
+    bumpSession: mocks.bumpSession,
   }),
 }));
 
@@ -98,7 +96,7 @@ describe("useWorkspaceView", () => {
     mocks.fetchSheet.mockReset();
     mocks.toast.mockReset();
     mocks.replaceCurrentWorkbook.mockReset();
-    mocks.updateCurrentWorkbook.mockReset();
+    mocks.bumpSession.mockReset();
     mocks.loadWorkbook.mockReset();
     mocks.reloadCurrentWorkbook.mockReset();
     mocks.commitWorkbook.mockReset();
@@ -174,7 +172,7 @@ describe("useWorkspaceView", () => {
     resolveLoad(loadedWorkbook);
   });
 
-  it("loads all sheets without requesting an editor session replacement", async () => {
+  it("loads all sheets without triggering an editor session bump", async () => {
     const firstSheet: SheetSchema = {
       id: 1,
       sheetNo: 0,
@@ -213,7 +211,7 @@ describe("useWorkspaceView", () => {
 
     expect(mocks.reloadCurrentWorkbook).toHaveBeenCalledWith({
       sheetIds: [1, 2],
-      preserveEditorSession: true,
     });
+    expect(mocks.bumpSession).not.toHaveBeenCalled();
   });
 });

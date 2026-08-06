@@ -46,16 +46,18 @@ export function ChatPanel({
       }
       const toolCallId =
         mutation.kind === "sheet" ? mutation.update.toolCallId : mutation.toolCallId;
-      if (liveToolCallIdsRef.current.has(toolCallId)) return;
+      if (mutation.kind === "sheet" && liveToolCallIdsRef.current.has(toolCallId)) return;
 
       if (mutation.kind === "sheet" && !onAiSheetMutation) {
         return;
       }
-      liveToolCallIdsRef.current.add(toolCallId);
-      setLiveToolCallIds((current) => {
-        if (current.has(toolCallId)) return current;
-        return new Set(current).add(toolCallId);
-      });
+      if (mutation.kind === "sheet") {
+        liveToolCallIdsRef.current.add(toolCallId);
+        setLiveToolCallIds((current) => {
+          if (current.has(toolCallId)) return current;
+          return new Set(current).add(toolCallId);
+        });
+      }
       try {
         if (mutation.kind === "sheet") {
           if (mutation.update.delta && mutation.update.version) {
@@ -71,13 +73,15 @@ export function ChatPanel({
           await onChartsRefresh?.();
         }
       } catch (error) {
-        liveToolCallIdsRef.current.delete(toolCallId);
-        setLiveToolCallIds((current) => {
-          if (!current.has(toolCallId)) return current;
-          const next = new Set(current);
-          next.delete(toolCallId);
-          return next;
-        });
+        if (mutation.kind === "sheet") {
+          liveToolCallIdsRef.current.delete(toolCallId);
+          setLiveToolCallIds((current) => {
+            if (!current.has(toolCallId)) return current;
+            const next = new Set(current);
+            next.delete(toolCallId);
+            return next;
+          });
+        }
         throw error;
       }
     },

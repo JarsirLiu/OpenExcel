@@ -38,7 +38,7 @@ export function ChartOverlay({
   const subscribeToOverlayChanges = useCallback(
     (listener: () => void) =>
       documentStore.subscribeToChanges((change) => {
-        if (change.kind === "workbook" || change.structural) listener();
+        if (change.kind === "workbook" || change.kind === "charts" || change.structural) listener();
       }),
     [documentStore],
   );
