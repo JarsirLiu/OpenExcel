@@ -54,6 +54,10 @@ Build the image from the repository root:
 docker build -t openexcel:local .
 ```
 
+The Dockerfile uses BuildKit cache mounts for pnpm packages and Prisma engines.
+Prisma client generation retries transient download failures up to three times;
+after that, the build fails without producing a partial image.
+
 Start the local image with Compose:
 
 ```bash

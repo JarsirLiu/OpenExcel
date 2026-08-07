@@ -13,8 +13,24 @@ RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile --ignore-scripts
 
 COPY packages/server/prisma ./packages/server/prisma
-RUN pnpm --filter @openexcel/server exec prisma generate --schema prisma/schema.prisma
-RUN pnpm --filter @openexcel/server exec prisma generate --schema prisma/postgresql/schema.prisma
+RUN --mount=type=cache,target=/root/.cache/prisma \
+    set -eu; \
+    generate_prisma() { \
+      schema="$1"; \
+      attempt=1; \
+      while [ "$attempt" -le 3 ]; do \
+        if pnpm --filter @openexcel/server exec prisma generate --schema "$schema"; then \
+          return 0; \
+        fi; \
+        if [ "$attempt" -eq 3 ]; then \
+          return 1; \
+        fi; \
+        sleep "$((attempt * 5))"; \
+        attempt=$((attempt + 1)); \
+      done; \
+    }; \
+    generate_prisma prisma/schema.prisma; \
+    generate_prisma prisma/postgresql/schema.prisma
 
 COPY packages/core/src ./packages/core/src
 COPY packages/agent/src ./packages/agent/src
