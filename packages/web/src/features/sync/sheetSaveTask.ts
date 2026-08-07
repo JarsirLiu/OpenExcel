@@ -1,8 +1,8 @@
 import type { FortuneCell } from "@openexcel/core";
 import { fetchSheet } from "@/api/workbooks";
 import type { SheetSnapshotForSave } from "./sheetChunkSnapshot";
-import type { SheetSaveRequest, SheetSaveResult } from "./sheetSaveCoordinator";
 import { saveSheet } from "./sheetSaveTransport";
+import type { SheetSaveRequest, SheetSaveResult } from "./sheetSaveTypes";
 
 type SheetSaveTaskOptions = {
   workspaceId: number | null;

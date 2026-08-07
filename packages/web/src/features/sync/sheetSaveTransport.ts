@@ -6,7 +6,7 @@ import {
   type SheetCellChange,
   type SheetChangeSet,
 } from "./sheetChangeSet";
-import type { SheetSaveRequest } from "./sheetSaveCoordinator";
+import type { SheetSaveRequest } from "./sheetSaveTypes";
 
 type PatchMutation = Extract<SheetChangeDelta, { type: "patch" }>;
 

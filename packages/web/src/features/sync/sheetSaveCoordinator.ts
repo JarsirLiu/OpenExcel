@@ -1,41 +1,12 @@
 import type { FortuneCell, SheetConfig } from "@openexcel/core";
-import { hasSheetChanges, type SheetChangeSet } from "./sheetChangeSet";
+import type { SheetChangeSet } from "./sheetChangeSet";
 import { applySheetChangeSetToSnapshot } from "./sheetChangeSetApplier";
 import { createSheetChangeSet } from "./sheetChangeSetDiff";
-import {
-  changedSheetChunks,
-  type SheetChunkReplacement,
-  type SheetSnapshotForSave,
-  serializeSheetChunkSnapshot,
-  serializeSheetConfig,
-} from "./sheetChunkSnapshot";
+import type { SheetSnapshotForSave } from "./sheetChunkSnapshot";
+import { planSheetSaveRequest } from "./sheetSaveRequestPlanner";
+import type { SheetSaveInput, SheetSaveResult, SheetSaveTask } from "./sheetSaveTypes";
 
-export type SheetSaveResult = { revision: number; snapshot?: SheetSnapshotForSave };
 export type SheetSaveErrorAction = "handled" | "retry" | "stop";
-export type SheetSaveInput =
-  | {
-      kind: "patch";
-      changeSet: SheetChangeSet;
-      documentVersion?: number;
-    }
-  | {
-      kind: "snapshot";
-      snapshot: SheetSnapshotForSave;
-      documentVersion?: number;
-    };
-export type SheetSaveRequest =
-  | {
-      kind: "changeSet";
-      baseRevision: number;
-      changeSet: SheetChangeSet;
-    }
-  | {
-      kind: "replaceChunks";
-      baseRevision: number;
-      config: SheetConfig | null;
-      chunks: SheetChunkReplacement[];
-    };
-export type SheetSaveTask = (request: SheetSaveRequest) => Promise<SheetSaveResult>;
 
 type SheetSnapshot = {
   revision: number;
@@ -224,25 +195,14 @@ export class SheetSaveCoordinator {
       .map(([, documentVersion]) => documentVersion ?? 0)
       .reduce((maximum, documentVersion) => Math.max(maximum, documentVersion), 0);
 
-    let request: SheetSaveRequest;
-    if (state.requiresChunkReplacement) {
-      const persistedChunks = serializeSheetChunkSnapshot(state.persistedSnapshot.celldata);
-      const desiredChunks = serializeSheetChunkSnapshot(desiredSnapshot.celldata);
-      const chunks = changedSheetChunks(persistedChunks, desiredChunks);
-      const configChanged =
-        serializeSheetConfig(desiredSnapshot.config) !==
-        serializeSheetConfig(state.persistedSnapshot.config);
-      if (chunks.length === 0 && !configChanged) return;
-      request = {
-        kind: "replaceChunks",
-        baseRevision,
-        config: desiredSnapshot.config,
-        chunks,
-      };
-    } else {
-      if (!hasSheetChanges(changeSet)) return;
-      request = { kind: "changeSet", baseRevision, changeSet };
-    }
+    const request = planSheetSaveRequest({
+      baseRevision,
+      persistedSnapshot: state.persistedSnapshot,
+      desiredSnapshot,
+      changeSet,
+      requiresChunkReplacement: state.requiresChunkReplacement,
+    });
+    if (!request) return;
 
     let retryRequested = false;
     const inFlight = task(request)

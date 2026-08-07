@@ -9,10 +9,9 @@ import {
   SheetSaveCoordinator,
   type SheetSaveErrorAction,
   type SheetSaveIdentity,
-  type SheetSaveRequest,
-  type SheetSaveResult,
 } from "./sheetSaveCoordinator";
 import { createSheetSaveTask } from "./sheetSaveTask";
+import type { SheetSaveRequest, SheetSaveResult } from "./sheetSaveTypes";
 
 type SheetState = {
   revision: number;
