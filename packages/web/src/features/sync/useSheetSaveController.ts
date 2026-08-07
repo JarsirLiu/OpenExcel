@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchSheet, SheetRevisionConflictError } from "@/api/workbooks";
 import type { FortuneSheetData } from "@/features/workbook/editor/fortuneSheet";
 import type { SheetSnapshotForSave } from "./sheetChunkSnapshot";
+import { rebaseSheetAfterConflict } from "./sheetConflictRebase";
 import type { SheetEditorChange } from "./sheetEditorChange";
 import {
   SheetSaveCoordinator,
@@ -122,29 +123,24 @@ export function useSheetSaveController({
           return "retry";
         }
 
-        void fetchSheet(workspaceId, change.sheetId)
-          .then((remote) => {
+        void rebaseSheetAfterConflict({
+          sheetId: change.sheetId,
+          loadRemote: (sheetId) => fetchSheet(workspaceId, sheetId),
+          rebase: (sheetId, remote) => coordinator.rebase(sheetId, remote),
+        })
+          .then((rebasedChange) => {
             if (!isCurrentGeneration()) return;
-            const rebased = coordinator.rebase(change.sheetId, {
-              celldata: (remote.uploadedData ?? []) as FortuneCell[],
-              config: remote.config,
-            });
-            if (!rebased) {
+            if (!rebasedChange) {
               setSaveStatus("idle");
               return;
             }
 
-            const rebasedChange: SheetEditorChange = {
-              kind: "snapshot",
-              sheetId: change.sheetId,
-              snapshot: rebased,
-            };
             onRebasedChange?.(rebasedChange);
             coordinator.schedule(
               change.sheetId,
               {
                 kind: "snapshot",
-                snapshot: rebased,
+                snapshot: rebasedChange.snapshot,
                 documentVersion: getDocumentVersion?.(change.sheetId),
               },
               (request) => syncSheetToServer(change.sheetId, generation, request),
