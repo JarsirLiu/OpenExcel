@@ -1,4 +1,5 @@
 import type { SheetConfig } from "@openexcel/core";
+import { hasSheetChanges } from "@/features/sync/sheetChangeSet";
 import type { SheetEditorChange } from "@/features/sync/sheetEditorChange";
 import type { FortuneSheetOpHint } from "./fortuneSheetOps";
 import { classifySheetChange } from "./sheetChangeSet";
@@ -50,12 +51,7 @@ export function adaptFortuneSheetChange(input: {
   }
 
   const changeSet = classifySheetChange(previousSnapshot, result.snapshot);
-  if (
-    changeSet.valueChanges.length === 0 &&
-    changeSet.formulaCacheChanges.length === 0 &&
-    changeSet.formatChanges.length === 0 &&
-    changeSet.configChanges.length === 0
-  ) {
+  if (!hasSheetChanges(changeSet)) {
     return { snapshot: result.snapshot, change: null };
   }
   return {

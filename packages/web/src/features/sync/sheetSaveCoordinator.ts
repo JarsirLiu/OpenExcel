@@ -1,10 +1,7 @@
 import type { FortuneCell, SheetConfig } from "@openexcel/core";
-import {
-  applySheetChangeSetToSnapshot,
-  createSheetChangeSet,
-  hasSheetChanges,
-  type SheetChangeSet,
-} from "./sheetChangeSet";
+import { hasSheetChanges, type SheetChangeSet } from "./sheetChangeSet";
+import { applySheetChangeSetToSnapshot } from "./sheetChangeSetApplier";
+import { createSheetChangeSet } from "./sheetChangeSetDiff";
 import {
   changedSheetChunks,
   type SheetChunkReplacement,

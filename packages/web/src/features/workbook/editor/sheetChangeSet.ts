@@ -1,5 +1,6 @@
 import type { FortuneCell, SheetConfig } from "@openexcel/core";
-import { createSheetChangeSet, type SheetChangeSet } from "@/features/sync/sheetChangeSet";
+import { hasSheetChanges, type SheetChangeSet } from "@/features/sync/sheetChangeSet";
+import { createSheetChangeSet } from "@/features/sync/sheetChangeSetDiff";
 import type { SheetEditorSnapshot } from "./sheetEditorSnapshot";
 import { createSheetEditorSnapshot } from "./sheetEditorSnapshot";
 
@@ -36,15 +37,6 @@ export function sheetChangeSetFromDiff(
   return sheetChangeSetFromSnapshotDiff(
     createSheetEditorSnapshot(before, beforeConfig),
     createSheetEditorSnapshot(after, afterConfig),
-  );
-}
-
-function hasSheetChanges(changeSet: SheetChangeSet): boolean {
-  return (
-    changeSet.valueChanges.length > 0 ||
-    changeSet.formulaCacheChanges.length > 0 ||
-    changeSet.formatChanges.length > 0 ||
-    changeSet.configChanges.length > 0
   );
 }
 

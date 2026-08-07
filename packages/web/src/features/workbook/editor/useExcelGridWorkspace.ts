@@ -2,7 +2,7 @@ import type { WorkbookInstance } from "@fortune-sheet/react";
 import type { FortuneCell, SheetChangeDelta, SheetChangeVersion } from "@openexcel/core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { WorkbookFull } from "@/api/workbooks";
-import { deleteSheet, deleteWorkbook, fetchSheet, updateSheetName } from "@/api/workbooks";
+import { fetchSheet } from "@/api/workbooks";
 import type { SheetSnapshotForSave } from "@/features/sync/sheetChunkSnapshot";
 import type {
   CommittedSheetContentChangeHandler,
@@ -14,15 +14,14 @@ import type { WorkbookStructureUpdate } from "@/features/sync/types";
 import { useSheetSaveController } from "@/features/sync/useSheetSaveController";
 import { normalizeSheetIndex } from "@/features/workspace/sheetIndex";
 import type { WorkbookDocumentStore } from "@/features/workspace/WorkbookDocumentStore";
-import { confirm, toast } from "@/shared/lib";
 import { adaptFortuneSheetLayout, type SheetGridLayout } from "../layout/fortuneSheetLayout";
 import { findSheetIndexById } from "../sheetIdentity";
 import { AiSheetEditor } from "./aiSheetEditor";
-import { createSheetFromEditor } from "./createSheetFromEditor";
 import type { FortuneSheetOp } from "./fortuneSheetOps";
 import { ManualSheetEditor } from "./manualSheetEditor";
 import { useSheetActivation } from "./SheetActivationContext";
 import { useWorkbookEditorSession } from "./useWorkbookEditorSession";
+import { useWorkbookStructureActions } from "./useWorkbookStructureActions";
 
 type UseExcelGridWorkspaceProps = {
   workspaceId: number | null;
@@ -82,7 +81,6 @@ export function useExcelGridWorkspace({
   documentStore,
   sheetLoaded,
 }: UseExcelGridWorkspaceProps) {
-  const deletingSheetRef = useRef(false);
   const workbookRef = useRef<WorkbookInstance>(null);
   const { sheetData, sessionKey } = useWorkbookEditorSession(workbook, workbookRevision);
   const { registerActivateSheet } = useSheetActivation();
@@ -133,6 +131,20 @@ export function useExcelGridWorkspace({
   workbookStateRef.current = documentStore.getSnapshot() ?? workbook;
   activeSheetIndexRef.current = activeSheetIndex;
   sheetLoadedRef.current = sheetLoaded;
+
+  const {
+    handleBeforeAddSheet,
+    handleBeforeDeleteSheet,
+    handleBeforeUpdateSheetName,
+    handleDeleteWorkbook,
+  } = useWorkbookStructureActions({
+    workspaceId,
+    workbook,
+    onWorkbookDelete,
+    onWorkbookStructureChanged,
+    onWorkbookRefresh,
+    onWorkbookMutation,
+  });
   if (editorSessionRef.current !== sessionKey) {
     editorSessionRef.current = sessionKey;
     editorSessionReadyRef.current = null;
@@ -327,105 +339,6 @@ export function useExcelGridWorkspace({
     },
     [onSheetIndexChange],
   );
-
-  const handleBeforeAddSheet = useCallback(
-    (sheet: any) => {
-      const currentWorkbook = workbookStateRef.current;
-      if (!currentWorkbook) return false;
-      const name = typeof sheet?.name === "string" ? sheet.name : undefined;
-      void (async () => {
-        try {
-          if (workspaceId == null) return;
-          const update = await createSheetFromEditor({
-            workspaceId,
-            workbookId: currentWorkbook.id,
-            name,
-          });
-          await onWorkbookStructureChanged?.(update);
-        } catch (error) {
-          console.error("创建 Sheet 失败:", error);
-          await onWorkbookRefresh?.();
-        }
-      })();
-      return false;
-    },
-    [onWorkbookRefresh, onWorkbookStructureChanged, workspaceId],
-  );
-
-  const handleBeforeDeleteSheet = useCallback(
-    (sheetId: string | number) => {
-      if (!workbook) return false;
-      const numericSheetId = Number(sheetId);
-      if (!Number.isInteger(numericSheetId)) return false;
-      const deletedSheet = workbook.sheets.find((sheet) => sheet.id === numericSheetId);
-      if (!deletedSheet) return false;
-      if (deletingSheetRef.current) return false;
-      deletingSheetRef.current = true;
-
-      void (async () => {
-        try {
-          if (workspaceId == null) return;
-          await deleteSheet(workspaceId, workbook.id, numericSheetId);
-          await onWorkbookStructureChanged?.({
-            toolCallId: `ui-delete-sheet:${workbook.id}:${numericSheetId}`,
-            kind: "sheet-deleted",
-            workbookId: workbook.id,
-            sheetId: numericSheetId,
-            sheetNo: deletedSheet.sheetNo,
-            order: deletedSheet.order,
-          });
-          try {
-            await onWorkbookMutation?.();
-          } catch (error) {
-            console.error("删除 Sheet 后刷新工作簿状态失败:", error);
-          }
-          toast({ message: "Sheet 已删除", variant: "success" });
-        } catch (error) {
-          console.error("删除 Sheet 失败:", error);
-          toast({
-            message: error instanceof Error ? error.message : "删除 Sheet 失败",
-            variant: "error",
-          });
-          await onWorkbookRefresh?.();
-        } finally {
-          deletingSheetRef.current = false;
-        }
-      })();
-      return false;
-    },
-    [onWorkbookMutation, onWorkbookRefresh, onWorkbookStructureChanged, workbook, workspaceId],
-  );
-
-  const handleBeforeUpdateSheetName = useCallback(
-    (sheetId: string, _oldName: string, newName: string) => {
-      void (async () => {
-        try {
-          if (workspaceId == null) return;
-          await updateSheetName(workspaceId, Number(sheetId), newName);
-          await onWorkbookMutation?.();
-        } catch (error) {
-          console.error("重命名 Sheet 失败:", error);
-        }
-      })();
-      return true;
-    },
-    [onWorkbookMutation, workspaceId],
-  );
-
-  const handleDeleteWorkbook = useCallback(async () => {
-    if (!workbook) return;
-    const ok = await confirm({
-      title: "删除 Excel",
-      message: `确认删除「${workbook.name}」？此操作不可恢复。`,
-      confirmText: "删除",
-      cancelText: "取消",
-    });
-    if (!ok) return;
-    if (workspaceId == null) return;
-    await deleteWorkbook(workspaceId, workbook.id);
-    await onWorkbookMutation?.();
-    onWorkbookDelete?.(workbook.id);
-  }, [onWorkbookDelete, onWorkbookMutation, workbook, workspaceId]);
 
   return {
     saveStatus,

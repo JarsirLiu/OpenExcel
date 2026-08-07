@@ -1,7 +1,7 @@
 import type { WorkbookInstance } from "@fortune-sheet/react";
 import type { SheetChangeDelta, SheetChangeVersion } from "@openexcel/core";
 import type { WorkbookFull } from "@/api/workbooks";
-import type { SheetChangeSet } from "@/features/sync/sheetChangeSet";
+import { hasSheetChanges, type SheetChangeSet } from "@/features/sync/sheetChangeSet";
 import type { SheetSnapshotForSave } from "@/features/sync/sheetChunkSnapshot";
 import { planFortuneSheetMutation } from "./fortuneSheetMutationBridge";
 
@@ -48,23 +48,13 @@ export class AiSheetEditor {
         throw new Error("The active FortuneSheet editor is not ready");
 
       const plan = planFortuneSheetMutation(sheet, delta);
-      if (
-        plan.changeSet.valueChanges.length > 0 ||
-        plan.changeSet.formulaCacheChanges.length > 0 ||
-        plan.changeSet.formatChanges.length > 0 ||
-        plan.changeSet.configChanges.length > 0
-      ) {
+      if (hasSheetChanges(plan.changeSet)) {
         this.options.applyCommittedDocument(
           { kind: "patch", sheetId, changeSet: plan.changeSet },
           version.revision,
         );
       }
-      if (
-        plan.changeSet.valueChanges.length === 0 &&
-        plan.changeSet.formulaCacheChanges.length === 0 &&
-        plan.changeSet.formatChanges.length === 0 &&
-        plan.changeSet.configChanges.length === 0
-      ) {
+      if (!hasSheetChanges(plan.changeSet)) {
         this.options.updateCommittedRevision(sheetId, version.revision);
         return;
       }
