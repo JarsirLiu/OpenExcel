@@ -1,7 +1,7 @@
 import { type ReactNode, useId, useState } from "react";
+import { SettingsDialog } from "@/features/settings/components/SettingsDialog";
 import { t } from "@/lib/i18n";
 import styles from "./SessionHeader.module.css";
-import { SettingsDialog } from "./SettingsDialog";
 
 type CurrentUser = {
   email: string;
