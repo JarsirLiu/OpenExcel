@@ -34,9 +34,11 @@ describe("WorkbookDocumentStore", () => {
     const change: SheetEditorChange = {
       kind: "patch",
       sheetId: 10,
-      mutation: {
-        type: "patch",
-        cells: [{ row: 1, col: 1, cell: { v: 9, m: "9" } }],
+      changeSet: {
+        valueChanges: [{ row: 1, col: 1, cell: { v: 9, m: "9" } }],
+        formulaCacheChanges: [],
+        formatChanges: [],
+        configChanges: [],
       },
     };
 
@@ -68,9 +70,11 @@ describe("WorkbookDocumentStore", () => {
     store.updateSheetContent({
       kind: "patch",
       sheetId: 10,
-      mutation: {
-        type: "patch",
-        cells: [{ row: 1, col: 1, cell: { v: 9, m: "9" } }],
+      changeSet: {
+        valueChanges: [{ row: 1, col: 1, cell: { v: 9, m: "9" } }],
+        formulaCacheChanges: [],
+        formatChanges: [],
+        configChanges: [],
       },
     });
 
@@ -87,10 +91,11 @@ describe("WorkbookDocumentStore", () => {
     store.updateSheetContent({
       kind: "patch",
       sheetId: 10,
-      mutation: {
-        type: "patch",
-        cells: [{ row: 1, col: 1, cell: { v: 9, m: "9" } }],
-        config: { columnlen: { 0: 120 } },
+      changeSet: {
+        valueChanges: [{ row: 1, col: 1, cell: { v: 9, m: "9" } }],
+        formulaCacheChanges: [],
+        formatChanges: [],
+        configChanges: [{ config: { columnlen: { 0: 120 } } as never }],
       },
     });
 
@@ -134,9 +139,11 @@ describe("WorkbookDocumentStore", () => {
     const localChange: SheetEditorChange = {
       kind: "patch",
       sheetId: 10,
-      mutation: {
-        type: "patch",
-        cells: [{ row: 1, col: 1, cell: { v: 9, m: "9" } }],
+      changeSet: {
+        valueChanges: [{ row: 1, col: 1, cell: { v: 9, m: "9" } }],
+        formulaCacheChanges: [],
+        formatChanges: [],
+        configChanges: [],
       },
     };
 
@@ -162,9 +169,11 @@ describe("WorkbookDocumentStore", () => {
     const createChange = (value: number): SheetEditorChange => ({
       kind: "patch",
       sheetId: 10,
-      mutation: {
-        type: "patch",
-        cells: [{ row: 1, col: 1, cell: { v: value, m: String(value) } }],
+      changeSet: {
+        valueChanges: [{ row: 1, col: 1, cell: { v: value, m: String(value) } }],
+        formulaCacheChanges: [],
+        formatChanges: [],
+        configChanges: [],
       },
     });
 
@@ -192,13 +201,15 @@ describe("WorkbookDocumentStore", () => {
   it("does not retain a committed AI patch as browser-pending state", () => {
     const store = new WorkbookDocumentStore(createWorkbook());
 
-    store.applyCommittedSheetPatch(
+    store.applyCommittedSheetChange(
       {
         kind: "patch",
         sheetId: 10,
-        mutation: {
-          type: "patch",
-          cells: [{ row: 1, col: 1, cell: { v: 100, m: "100" } }],
+        changeSet: {
+          valueChanges: [{ row: 1, col: 1, cell: { v: 100, m: "100" } }],
+          formulaCacheChanges: [],
+          formatChanges: [],
+          configChanges: [],
         },
       },
       1,

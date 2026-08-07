@@ -43,20 +43,21 @@ describe("FortuneSheetEventAdapter", () => {
       {
         kind: "patch",
         sheetId: 60,
-        mutation: {
-          type: "patch",
-          cells: [
-            { row: 1, col: 1, cell: { v: 2, m: "2" } },
-            { row: 1, col: 2, cell: { v: 2, m: "2" } },
-          ],
+        changeSet: {
+          valueChanges: [{ row: 1, col: 1, cell: { v: 2, m: "2" } }],
+          formulaCacheChanges: [{ row: 1, col: 2, cell: { v: 2, m: "2" } }],
+          formatChanges: [],
+          configChanges: [],
         },
       },
       {
         kind: "patch",
         sheetId: 61,
-        mutation: {
-          type: "patch",
-          cells: [{ row: 1, col: 1, cell: { v: 2, m: "2" } }],
+        changeSet: {
+          valueChanges: [],
+          formulaCacheChanges: [{ row: 1, col: 1, cell: { v: 2, m: "2" } }],
+          formatChanges: [],
+          configChanges: [],
         },
       },
     ]);
@@ -109,9 +110,11 @@ describe("FortuneSheetEventAdapter", () => {
         change: {
           kind: "patch",
           sheetId: 60,
-          mutation: {
-            type: "patch",
-            cells: [{ row: 1, col: 1, cell: { v: "edited", m: "edited" } }],
+          changeSet: {
+            valueChanges: [{ row: 1, col: 1, cell: { v: "edited", m: "edited" } }],
+            formulaCacheChanges: [],
+            formatChanges: [],
+            configChanges: [],
           },
         },
       },

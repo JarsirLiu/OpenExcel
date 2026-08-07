@@ -1,12 +1,10 @@
 import type { FortuneCell } from "@openexcel/core";
 import { describe, expect, it } from "vitest";
-import {
-  createSheetEditorSnapshot,
-  sheetMutationFromDiff,
-  updateSheetEditorSnapshotFromMatrix,
-} from "./sheetMutationFromDiff";
+import { sheetChangeSetFromDiff, sheetChangeSetFromSnapshotDiff } from "./sheetChangeSet";
+import { createSheetEditorSnapshot } from "./sheetEditorSnapshot";
+import { updateSheetEditorSnapshotFromMatrix } from "./sheetEditorSnapshotUpdater";
 
-describe("sheetMutationFromDiff", () => {
+describe("sheetChangeSetFromDiff", () => {
   it("returns only changed cells and config", () => {
     const before: FortuneCell[] = [
       { r: 0, c: 0, v: { v: "old", m: "old" } },
@@ -17,17 +15,18 @@ describe("sheetMutationFromDiff", () => {
       { r: 0, c: 1, v: { v: "keep", m: "keep" } },
     ];
 
-    expect(sheetMutationFromDiff(before, after, null, { showGridLines: false })).toEqual({
-      type: "patch",
-      cells: [{ row: 1, col: 1, cell: { v: "new", m: "new" } }],
-      config: { showGridLines: false },
+    expect(sheetChangeSetFromDiff(before, after, null, { showGridLines: false })).toEqual({
+      valueChanges: [{ row: 1, col: 1, cell: { v: "new", m: "new" } }],
+      formulaCacheChanges: [],
+      formatChanges: [],
+      configChanges: [{ config: { showGridLines: false } }],
     });
   });
 
   it("returns null when the sheet is unchanged", () => {
     const cells: FortuneCell[] = [{ r: 0, c: 0, v: { v: "same", m: "same" } }];
 
-    expect(sheetMutationFromDiff(cells, cells, null, null)).toBeNull();
+    expect(sheetChangeSetFromDiff(cells, cells, null, null)).toBeNull();
   });
 
   it("persists a recalculated formula cell together with its cached value", () => {
@@ -42,12 +41,11 @@ describe("sheetMutationFromDiff", () => {
       { r: 0, c: 2, v: { v: 5, m: "5", f: "=SUM(A1:B1)" } },
     ];
 
-    expect(sheetMutationFromDiff(before, after, null, null)).toEqual({
-      type: "patch",
-      cells: [
-        { row: 1, col: 1, cell: { v: 2, m: "2" } },
-        { row: 1, col: 3, cell: { v: 5, m: "5", f: "=SUM(A1:B1)" } },
-      ],
+    expect(sheetChangeSetFromDiff(before, after, null, null)).toEqual({
+      valueChanges: [{ row: 1, col: 1, cell: { v: 2, m: "2" } }],
+      formulaCacheChanges: [{ row: 1, col: 3, cell: { v: 5, m: "5" } }],
+      formatChanges: [],
+      configChanges: [],
     });
   });
 
@@ -61,15 +59,11 @@ describe("sheetMutationFromDiff", () => {
       },
     ];
 
-    expect(sheetMutationFromDiff(before, after, null, null)).toEqual({
-      type: "patch",
-      cells: [
-        {
-          row: 1,
-          col: 1,
-          cell: { v: "OpenExcel", m: "OpenExcel", bg: "#fff2cc", fc: "#1f4e78", un: 1 },
-        },
-      ],
+    expect(sheetChangeSetFromDiff(before, after, null, null)).toEqual({
+      valueChanges: [],
+      formulaCacheChanges: [],
+      formatChanges: [{ row: 1, col: 1, cell: { bg: "#fff2cc", fc: "#1f4e78", un: 1 } }],
+      configChanges: [],
     });
   });
 
@@ -95,13 +89,15 @@ describe("sheetMutationFromDiff", () => {
       null,
     );
 
-    expect(result.mutation).toEqual({
-      type: "patch",
-      cells: [
+    expect(sheetChangeSetFromSnapshotDiff(previous, result.snapshot)).toEqual({
+      valueChanges: [
         { row: 1, col: 1, cell: { v: 9, m: "9" } },
-        { row: 1, col: 2, cell: { v: false, m: "FALSE", un: 1 } },
+        { row: 1, col: 2, cell: { v: false, m: "FALSE" } },
         { row: 1, col: 3, cell: { v: "", m: "" } },
       ],
+      formulaCacheChanges: [],
+      formatChanges: [{ row: 1, col: 2, cell: { un: 1 } }],
+      configChanges: [],
     });
   });
 
@@ -113,9 +109,11 @@ describe("sheetMutationFromDiff", () => {
 
     const result = updateSheetEditorSnapshotFromMatrix(previous, [[], []], null);
 
-    expect(result.mutation).toEqual({
-      type: "patch",
-      cells: [{ row: 2, col: 1, cell: null }],
+    expect(sheetChangeSetFromSnapshotDiff(previous, result.snapshot)).toEqual({
+      valueChanges: [{ row: 2, col: 1, cell: null }],
+      formulaCacheChanges: [],
+      formatChanges: [],
+      configChanges: [],
     });
   });
 
@@ -139,12 +137,11 @@ describe("sheetMutationFromDiff", () => {
       null,
     );
 
-    expect(result.mutation).toEqual({
-      type: "patch",
-      cells: [
-        { row: 1, col: 1, cell: { v: 9, m: "9" } },
-        { row: 1, col: 2, cell: { v: 9, m: "9" } },
-      ],
+    expect(sheetChangeSetFromSnapshotDiff(previous, result.snapshot)).toEqual({
+      valueChanges: [{ row: 1, col: 1, cell: { v: 9, m: "9" } }],
+      formulaCacheChanges: [{ row: 1, col: 2, cell: { v: 9, m: "9" } }],
+      formatChanges: [],
+      configChanges: [],
     });
   });
 
@@ -174,9 +171,11 @@ describe("sheetMutationFromDiff", () => {
       new Map([["0,0", new Set(["v", "m"])]]),
     );
 
-    expect(result.mutation).toEqual({
-      type: "patch",
-      cells: [{ row: 1, col: 1, cell: { v: "new", m: "new" } }],
+    expect(sheetChangeSetFromSnapshotDiff(previous, result.snapshot)).toEqual({
+      valueChanges: [{ row: 1, col: 1, cell: { v: "new", m: "new" } }],
+      formulaCacheChanges: [],
+      formatChanges: [],
+      configChanges: [],
     });
     expect(result.snapshot.cellsByKey.get("0,0")?.v).toEqual({
       v: "new",
@@ -201,9 +200,11 @@ describe("sheetMutationFromDiff", () => {
       new Map([["0,0", new Set(["bg"])]]),
     );
 
-    expect(result.mutation).toEqual({
-      type: "patch",
-      cells: [{ row: 1, col: 1, cell: {}, removed: ["bg"] }],
+    expect(sheetChangeSetFromSnapshotDiff(previous, result.snapshot)).toEqual({
+      valueChanges: [],
+      formulaCacheChanges: [],
+      formatChanges: [{ row: 1, col: 1, cell: {}, removed: ["bg"] }],
+      configChanges: [],
     });
   });
 });

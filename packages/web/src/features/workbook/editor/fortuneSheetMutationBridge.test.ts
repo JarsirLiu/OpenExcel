@@ -58,6 +58,31 @@ describe("planFortuneSheetMutation", () => {
     ]);
   });
 
+  it("does not pass existing cell formatting through content writes", () => {
+    const plan = planFortuneSheetMutation(
+      {
+        id: 60,
+        sheetNo: 1,
+        name: "Sheet1",
+        order: 0,
+        columns: [],
+        merges: [],
+        uploadedData: [{ r: 0, c: 0, v: { v: "old", m: "old", ht: 2, bg: "#FFFF00" } }],
+        config: null,
+        revision: 3,
+      },
+      {
+        type: "write",
+        operations: [{ type: "cell", row: 1, col: 1, value: "new" }],
+      },
+    );
+
+    expect(plan.apiCalls[0]).toEqual({
+      name: "setCellValue",
+      args: [0, 0, { v: "new", m: "new" }, null, { id: "60" }],
+    });
+  });
+
   it("uses FortuneSheet merge APIs instead of writing merge metadata as cell values", () => {
     const plan = planFortuneSheetMutation(
       {

@@ -1,5 +1,6 @@
 import type { FortuneCell, SheetConfig } from "@openexcel/core";
 import type { WorkbookFull } from "@/api/workbooks";
+import type { SheetCellChange, SheetChangeSet } from "@/features/sync/sheetChangeSet";
 import type { SheetEditorChange } from "@/features/sync/sheetEditorChange";
 import { mergeWorkbookSnapshot } from "@/features/sync/workbookRevision";
 
@@ -23,8 +24,6 @@ export type WorkbookDocumentChange =
 
 type ChangeListener = (change: WorkbookDocumentChange) => void;
 
-type SheetPatch = Extract<SheetEditorChange, { kind: "patch" }>["mutation"];
-
 function cellKey(row: number, col: number): string {
   return `${row},${col}`;
 }
@@ -40,9 +39,9 @@ function createCellCache(celldata: readonly FortuneCell[]): SheetCellCache {
   };
 }
 
-function applySheetPatch(
+function applyCellChanges(
   cache: SheetCellCache,
-  patch: SheetPatch,
+  changes: readonly SheetCellChange[],
 ): { celldata: FortuneCell[]; cache: SheetCellCache } {
   const nextCelldata: (FortuneCell | null)[] = [...cache.source];
   let indexes = cache.indexes;
@@ -52,7 +51,7 @@ function applySheetPatch(
     if (indexes === cache.indexes) indexes = new Map(indexes);
   };
 
-  for (const change of patch.cells) {
+  for (const change of changes) {
     const row = change.row - 1;
     const col = change.col - 1;
     const key = cellKey(row, col);
@@ -98,6 +97,25 @@ function applySheetPatch(
   return { celldata, cache: { source: celldata, indexes } };
 }
 
+function applySheetChangeSet(
+  cache: SheetCellCache,
+  changeSet: SheetChangeSet,
+): { celldata: FortuneCell[]; cache: SheetCellCache; config?: SheetConfig | null } {
+  let result = { celldata: [...cache.source], cache };
+  for (const changes of [
+    changeSet.valueChanges,
+    changeSet.formulaCacheChanges,
+    changeSet.formatChanges,
+  ]) {
+    result = applyCellChanges(result.cache, changes);
+  }
+  const configChange = changeSet.configChanges.at(-1);
+  return {
+    ...result,
+    ...(configChange ? { config: configChange.config } : {}),
+  };
+}
+
 /** Owns the browser's current workbook document and its focused subscriptions. */
 export class WorkbookDocumentStore {
   private currentWorkbook: WorkbookFull | null;
@@ -141,22 +159,26 @@ export class WorkbookDocumentStore {
     const currentCelldata = (currentSheet.uploadedData ?? []) as FortuneCell[];
     const cached = this.sheetCellCache.get(change.sheetId);
     const cache = cached?.source === currentCelldata ? cached : createCellCache(currentCelldata);
-    const patchResult = change.kind === "patch" ? applySheetPatch(cache, change.mutation) : null;
+    const changeSetResult =
+      change.kind === "patch" ? applySheetChangeSet(cache, change.changeSet) : null;
     const nextCelldata =
       change.kind === "patch"
-        ? (patchResult?.celldata ?? currentCelldata)
+        ? (changeSetResult?.celldata ?? currentCelldata)
         : change.snapshot.celldata;
     const nextConfig: SheetConfig | null =
       change.kind === "patch"
-        ? change.mutation.config === undefined
+        ? changeSetResult?.config === undefined
           ? currentSheet.config
-          : change.mutation.config
+          : changeSetResult.config
         : change.snapshot.config;
     const configChanged =
       change.kind === "snapshot" ||
       configSignature(currentSheet.config) !== configSignature(nextConfig);
 
-    this.sheetCellCache.set(change.sheetId, patchResult?.cache ?? createCellCache(nextCelldata));
+    this.sheetCellCache.set(
+      change.sheetId,
+      changeSetResult?.cache ?? createCellCache(nextCelldata),
+    );
     this.currentWorkbook = {
       ...current,
       sheets: current.sheets.map((sheet) =>
@@ -172,7 +194,11 @@ export class WorkbookDocumentStore {
       sheetId: change.sheetId,
       cells:
         change.kind === "patch"
-          ? change.mutation.cells.map((cell) => ({ row: cell.row - 1, col: cell.col - 1 }))
+          ? [
+              ...change.changeSet.valueChanges,
+              ...change.changeSet.formulaCacheChanges,
+              ...change.changeSet.formatChanges,
+            ].map((cell) => ({ row: cell.row - 1, col: cell.col - 1 }))
           : [],
       structural: change.kind === "snapshot",
       configChanged,
@@ -180,8 +206,8 @@ export class WorkbookDocumentStore {
     return this.currentWorkbook;
   }
 
-  /** Applies a server-confirmed patch without creating browser-pending state. */
-  applyCommittedSheetPatch(
+  /** Applies a server-confirmed change without creating browser-pending state. */
+  applyCommittedSheetChange(
     change: Extract<SheetEditorChange, { kind: "patch" }>,
     revision: number,
   ): WorkbookFull | null {
@@ -192,18 +218,18 @@ export class WorkbookDocumentStore {
     const currentCelldata = (currentSheet.uploadedData ?? []) as FortuneCell[];
     const cached = this.sheetCellCache.get(change.sheetId);
     const cache = cached?.source === currentCelldata ? cached : createCellCache(currentCelldata);
-    const patchResult = applySheetPatch(cache, change.mutation);
+    const changeSetResult = applySheetChangeSet(cache, change.changeSet);
     const nextConfig =
-      change.mutation.config === undefined ? currentSheet.config : change.mutation.config;
+      changeSetResult.config === undefined ? currentSheet.config : changeSetResult.config;
     const configChanged = configSignature(currentSheet.config) !== configSignature(nextConfig);
     const nextSheet = {
       ...currentSheet,
-      uploadedData: patchResult.celldata,
+      uploadedData: changeSetResult.celldata,
       config: nextConfig,
       revision: Math.max(currentSheet.revision, revision),
     };
 
-    this.sheetCellCache.set(change.sheetId, patchResult.cache);
+    this.sheetCellCache.set(change.sheetId, changeSetResult.cache);
     this.currentWorkbook = {
       ...current,
       sheets: current.sheets.map((sheet) => (sheet.id === change.sheetId ? nextSheet : sheet)),
@@ -211,7 +237,11 @@ export class WorkbookDocumentStore {
     this.emit({
       kind: "sheet",
       sheetId: change.sheetId,
-      cells: change.mutation.cells.map((cell) => ({ row: cell.row - 1, col: cell.col - 1 })),
+      cells: [
+        ...change.changeSet.valueChanges,
+        ...change.changeSet.formulaCacheChanges,
+        ...change.changeSet.formatChanges,
+      ].map((cell) => ({ row: cell.row - 1, col: cell.col - 1 })),
       structural: false,
       configChanged,
     });

@@ -8,7 +8,7 @@ import {
   type FortuneSheetOp,
   type FortuneSheetOpHint,
 } from "./fortuneSheetOps";
-import { createSheetEditorSnapshot, type SheetEditorSnapshot } from "./sheetMutationFromDiff";
+import { createSheetEditorSnapshot, type SheetEditorSnapshot } from "./sheetEditorSnapshot";
 
 type FortuneSheetCell = Readonly<Record<string, unknown>> | null;
 

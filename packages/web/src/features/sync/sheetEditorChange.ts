@@ -1,12 +1,13 @@
 import type { SheetChangeDelta, SheetChangeVersion } from "@openexcel/core";
 import type { WorkbookFull } from "@/api/workbooks";
+import type { SheetChangeSet } from "./sheetChangeSet";
 import type { SheetSnapshotForSave } from "./sheetChunkSnapshot";
 
 export type SheetEditorChange =
   | {
       kind: "patch";
       sheetId: number;
-      mutation: Extract<SheetChangeDelta, { type: "patch" }>;
+      changeSet: SheetChangeSet;
     }
   | {
       kind: "snapshot";

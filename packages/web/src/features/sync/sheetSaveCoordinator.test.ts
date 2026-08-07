@@ -15,7 +15,12 @@ const snapshot = (celldata: FortuneCell[]) => ({
 });
 const patch = (cells: PatchCell[]) => ({
   kind: "patch" as const,
-  mutation: { type: "patch" as const, cells },
+  changeSet: {
+    valueChanges: cells,
+    formulaCacheChanges: [],
+    formatChanges: [],
+    configChanges: [],
+  },
 });
 
 function createCoordinator(
@@ -28,12 +33,20 @@ function createCoordinator(
   });
 }
 
+function synchronize(
+  coordinator: SheetSaveCoordinator,
+  snapshot: { celldata: FortuneCell[]; config: null },
+  workbookId = 1,
+): void {
+  coordinator.synchronizeSheet(60, { workbookId, lifecycleKey: "60:loaded" }, snapshot);
+}
+
 describe("SheetSaveCoordinator", () => {
   it("saves only the latest snapshot after debounce", async () => {
     vi.useFakeTimers();
     try {
       const coordinator = createCoordinator(() => ({ revision: 4, celldata: [], config: null }));
-      coordinator.reset(60, { celldata: [], config: null });
+      synchronize(coordinator, { celldata: [], config: null });
       const save = vi.fn().mockResolvedValue({ revision: 5 });
       coordinator.schedule(60, snapshot([{ r: 0, c: 0, v: { v: 1, m: "1" } }]), save);
       coordinator.schedule(60, snapshot([{ r: 0, c: 0, v: { v: 2, m: "2" } }]), save);
@@ -58,7 +71,7 @@ describe("SheetSaveCoordinator", () => {
         celldata: [],
         config: null,
       }));
-      coordinator.reset(60, { celldata: [], config: null });
+      synchronize(coordinator, { celldata: [], config: null });
       let resolveFirst: ((value: { revision: number }) => void) | undefined;
       const firstResult = new Promise<{ revision: number }>((resolve) => {
         resolveFirst = resolve;
@@ -83,7 +96,7 @@ describe("SheetSaveCoordinator", () => {
     vi.useFakeTimers();
     try {
       const coordinator = createCoordinator(() => ({ revision: 4, celldata: [], config: null }));
-      coordinator.reset(60, { celldata: [], config: null });
+      synchronize(coordinator, { celldata: [], config: null });
       let resolveFirst: ((value: { revision: number }) => void) | undefined;
       const firstResult = new Promise<{ revision: number }>((resolve) => {
         resolveFirst = resolve;
@@ -95,7 +108,12 @@ describe("SheetSaveCoordinator", () => {
         60,
         {
           kind: "patch",
-          mutation: { type: "patch", cells: [{ row: 1, col: 1, cell: { v: 1, m: "1" } }] },
+          changeSet: {
+            valueChanges: [{ row: 1, col: 1, cell: { v: 1, m: "1" } }],
+            formulaCacheChanges: [],
+            formatChanges: [],
+            configChanges: [],
+          },
           documentVersion: 1,
         },
         save,
@@ -106,7 +124,12 @@ describe("SheetSaveCoordinator", () => {
         60,
         {
           kind: "patch",
-          mutation: { type: "patch", cells: [{ row: 1, col: 2, cell: { v: 2, m: "2" } }] },
+          changeSet: {
+            valueChanges: [{ row: 1, col: 2, cell: { v: 2, m: "2" } }],
+            formulaCacheChanges: [],
+            formatChanges: [],
+            configChanges: [],
+          },
           documentVersion: 2,
         },
         save,
@@ -127,29 +150,42 @@ describe("SheetSaveCoordinator", () => {
     try {
       const coordinator = createCoordinator(() => ({
         revision: 4,
-        celldata: [{ r: 0, c: 0, v: { v: 90, m: "90" } }],
+        celldata: [
+          { r: 0, c: 0, v: { v: 90, m: "90" } },
+          { r: 0, c: 1, v: { v: 8, m: "8", f: "=A1" } },
+        ],
         config: null,
       }));
-      coordinator.reset(60, { celldata: [{ r: 0, c: 0, v: { v: 90, m: "90" } }], config: null });
+      synchronize(coordinator, {
+        celldata: [
+          { r: 0, c: 0, v: { v: 90, m: "90" } },
+          { r: 0, c: 1, v: { v: 8, m: "8", f: "=A1" } },
+        ],
+        config: null,
+      });
       const save = vi.fn().mockResolvedValue({ revision: 5 });
       coordinator.schedule(
         60,
-        patch([
-          { row: 1, col: 1, cell: { v: 9, m: "9" } },
-          { row: 1, col: 2, cell: { v: 9, m: "9", f: "=SUM(A1:A1)" } },
-        ]),
+        {
+          kind: "patch",
+          changeSet: {
+            valueChanges: [{ row: 1, col: 1, cell: { v: 9, m: "9" } }],
+            formulaCacheChanges: [{ row: 1, col: 2, cell: { v: 9, m: "9" } }],
+            formatChanges: [],
+            configChanges: [],
+          },
+        },
         save,
       );
       await vi.advanceTimersByTimeAsync(500);
       expect(save).toHaveBeenCalledWith({
-        kind: "mutation",
+        kind: "changeSet",
         baseRevision: 4,
-        mutation: {
-          type: "patch",
-          cells: [
-            { row: 1, col: 1, cell: { v: 9, m: "9" } },
-            { row: 1, col: 2, cell: { v: 9, m: "9", f: "=SUM(A1:A1)" } },
-          ],
+        changeSet: {
+          valueChanges: [{ row: 1, col: 1, cell: { v: 9, m: "9" } }],
+          formulaCacheChanges: [{ row: 1, col: 2, cell: { v: 9, m: "9" } }],
+          formatChanges: [],
+          configChanges: [],
         },
       });
       coordinator.dispose();
@@ -169,7 +205,7 @@ describe("SheetSaveCoordinator", () => {
         ],
         config: null,
       }));
-      coordinator.reset(60, {
+      synchronize(coordinator, {
         celldata: [
           { r: 0, c: 0, v: { v: 90, m: "90" } },
           { r: 300, c: 300, v: { v: 10, m: "10" } },
@@ -187,13 +223,15 @@ describe("SheetSaveCoordinator", () => {
       );
       await vi.advanceTimersByTimeAsync(500);
       expect(save.mock.calls[0]?.[0]).toMatchObject({
-        kind: "mutation",
-        mutation: {
-          type: "patch",
-          cells: [
-            { row: 1, col: 1 },
-            { row: 301, col: 301 },
+        kind: "changeSet",
+        changeSet: {
+          valueChanges: [
+            { row: 1, col: 1, cell: { v: 9, m: "9" } },
+            { row: 301, col: 301, cell: { v: 11, m: "11" } },
           ],
+          formulaCacheChanges: [],
+          formatChanges: [],
+          configChanges: [],
         },
       });
       coordinator.dispose();
@@ -210,21 +248,35 @@ describe("SheetSaveCoordinator", () => {
         celldata: [{ r: 0, c: 0, v: { v: 1, m: "1", bg: "#FFFF00" } }],
         config: null,
       }));
-      coordinator.reset(60, {
+      synchronize(coordinator, {
         celldata: [{ r: 0, c: 0, v: { v: 1, m: "1", bg: "#FFFF00" } }],
         config: null,
       });
       const save = vi.fn().mockResolvedValue({ revision: 5 });
 
-      coordinator.schedule(60, patch([{ row: 1, col: 1, cell: {}, removed: ["bg"] }]), save);
+      coordinator.schedule(
+        60,
+        {
+          kind: "patch",
+          changeSet: {
+            valueChanges: [],
+            formulaCacheChanges: [],
+            formatChanges: [{ row: 1, col: 1, cell: {}, removed: ["bg"] }],
+            configChanges: [],
+          },
+        },
+        save,
+      );
       await vi.advanceTimersByTimeAsync(500);
 
       expect(save).toHaveBeenCalledWith({
-        kind: "mutation",
+        kind: "changeSet",
         baseRevision: 4,
-        mutation: {
-          type: "patch",
-          cells: [{ row: 1, col: 1, cell: {}, removed: ["bg"] }],
+        changeSet: {
+          valueChanges: [],
+          formulaCacheChanges: [],
+          formatChanges: [{ row: 1, col: 1, cell: {}, removed: ["bg"] }],
+          configChanges: [],
         },
       });
       coordinator.dispose();
@@ -242,7 +294,7 @@ describe("SheetSaveCoordinator", () => {
       ],
       config: null,
     }));
-    coordinator.reset(60, {
+    synchronize(coordinator, {
       celldata: [
         { r: 0, c: 0, v: { v: 1, m: "1" } },
         { r: 0, c: 1, v: { v: 2, m: "2" } },
@@ -268,7 +320,7 @@ describe("SheetSaveCoordinator", () => {
     vi.useFakeTimers();
     try {
       const coordinator = createCoordinator(() => ({ revision: 4, celldata: [], config: null }));
-      coordinator.reset(60, { celldata: [], config: null });
+      synchronize(coordinator, { celldata: [], config: null });
       const save = vi
         .fn()
         .mockRejectedValueOnce(new Error("network failure"))
@@ -293,7 +345,7 @@ describe("SheetSaveCoordinator", () => {
         celldata: [],
         config: null,
       }));
-      coordinator.reset(60, { celldata: [], config: null });
+      synchronize(coordinator, { celldata: [], config: null });
       const save = vi.fn().mockImplementation(async () => {
         serverRevision += 1;
         return { revision: serverRevision };
@@ -312,6 +364,46 @@ describe("SheetSaveCoordinator", () => {
       await vi.advanceTimersByTimeAsync(500);
       expect(save.mock.calls[1]?.[0]).toMatchObject({ baseRevision: 5 });
 
+      coordinator.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps pending edits when the same Sheet lifecycle is synchronized twice", async () => {
+    vi.useFakeTimers();
+    try {
+      const coordinator = createCoordinator(() => ({ revision: 4, celldata: [], config: null }));
+      synchronize(coordinator, { celldata: [], config: null });
+      const save = vi.fn().mockResolvedValue({ revision: 5 });
+      coordinator.schedule(60, patch([{ row: 1, col: 1, cell: { v: 1, m: "1" } }]), save);
+      synchronize(coordinator, { celldata: [], config: null });
+
+      await vi.advanceTimersByTimeAsync(500);
+
+      expect(save).toHaveBeenCalledOnce();
+      expect(save.mock.calls[0]?.[0]).toMatchObject({
+        kind: "changeSet",
+        changeSet: { valueChanges: [{ row: 1, col: 1, cell: { v: 1, m: "1" } }] },
+      });
+      coordinator.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("cancels the previous workbook state when a new workbook is synchronized", async () => {
+    vi.useFakeTimers();
+    try {
+      const coordinator = createCoordinator(() => ({ revision: 4, celldata: [], config: null }));
+      synchronize(coordinator, { celldata: [], config: null }, 1);
+      const save = vi.fn().mockResolvedValue({ revision: 5 });
+      coordinator.schedule(60, patch([{ row: 1, col: 1, cell: { v: 1, m: "1" } }]), save);
+      synchronize(coordinator, { celldata: [], config: null }, 2);
+
+      await vi.advanceTimersByTimeAsync(500);
+
+      expect(save).not.toHaveBeenCalled();
       coordinator.dispose();
     } finally {
       vi.useRealTimers();

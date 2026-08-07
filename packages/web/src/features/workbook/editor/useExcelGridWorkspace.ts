@@ -3,6 +3,7 @@ import type { FortuneCell, SheetChangeDelta, SheetChangeVersion } from "@openexc
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { WorkbookFull } from "@/api/workbooks";
 import { deleteSheet, deleteWorkbook, fetchSheet, updateSheetName } from "@/api/workbooks";
+import type { SheetSnapshotForSave } from "@/features/sync/sheetChunkSnapshot";
 import type {
   CommittedSheetContentChangeHandler,
   CommittedSheetMutationHandler,
@@ -45,6 +46,25 @@ type UseExcelGridWorkspaceProps = {
   sheetLoaded: boolean;
 };
 
+type EditorSheet = WorkbookFull["sheets"][number];
+
+function sheetLifecycleKey(sheet: EditorSheet): string {
+  return `${sheet.id}:${sheet.loaded === false ? "unloaded" : "loaded"}`;
+}
+
+function getSheetSaveSnapshot(
+  sheet: EditorSheet,
+  manualEditor: ManualSheetEditor,
+): SheetSnapshotForSave | null {
+  if (sheet.loaded !== false && Array.isArray(sheet.uploadedData)) {
+    return {
+      celldata: sheet.uploadedData as FortuneCell[],
+      config: sheet.config,
+    };
+  }
+  return manualEditor.getBaseline(sheet.id);
+}
+
 export function useExcelGridWorkspace({
   workspaceId,
   workbook,
@@ -68,12 +88,7 @@ export function useExcelGridWorkspace({
   const { registerActivateSheet } = useSheetActivation();
   const manualEditorRef = useRef<ManualSheetEditor | null>(null);
   const aiEditorRef = useRef<AiSheetEditor | null>(null);
-  const manualEventsSuppressedRef = useRef(false);
   const editorSessionReadyRef = useRef<string | null>(null);
-  const saveLifecycleRef = useRef<{
-    workbookId: number | null;
-    bySheetId: Map<number, string>;
-  }>({ workbookId: null, bySheetId: new Map() });
   if (!manualEditorRef.current) manualEditorRef.current = new ManualSheetEditor();
   const applyDocumentChange = useCallback(
     (change: SheetEditorChange) => {
@@ -89,8 +104,9 @@ export function useExcelGridWorkspace({
   );
   const {
     saveStatus,
-    reset: resetSave,
     schedule: scheduleSave,
+    synchronizeServerSnapshot,
+    synchronizeSheet: synchronizeSaveSheet,
   } = useSheetSaveController({
     workspaceId,
     sheetLoaded,
@@ -141,20 +157,20 @@ export function useExcelGridWorkspace({
       applyCommittedDocument: (change, revision) => {
         onCommittedSheetContentChanged?.(change, revision);
       },
-      setManualEventsSuppressed: (suppressed) => {
-        manualEventsSuppressedRef.current = suppressed;
-      },
       replaceManualBaselineFromServer: async (sheetId) => {
         if (workspaceId == null) throw new Error("The workspace is not ready");
         const serverSheet = await fetchSheet(workspaceId, sheetId);
-        manualEditorRef.current?.replaceFromServerSnapshot(sheetId, {
+        const snapshot = {
           celldata: (serverSheet.uploadedData ?? []) as FortuneCell[],
           config: serverSheet.config,
-        });
+        };
+        manualEditorRef.current?.replaceFromServerSnapshot(sheetId, snapshot);
+        synchronizeServerSnapshot(sheetId, snapshot);
       },
       replaceManualBaselineFromServerSnapshot: (sheetId, snapshot) => {
         manualEditorRef.current?.replaceFromServerSnapshot(sheetId, snapshot);
       },
+      synchronizeSaveBaselineFromServerSnapshot: synchronizeServerSnapshot,
       updateCommittedRevision: (sheetId, revision) => {
         onSheetRevisionChanged?.(sheetId, revision);
       },
@@ -171,38 +187,30 @@ export function useExcelGridWorkspace({
     return () => clearTimeout(timer);
   }, [sessionKey]);
 
-  const saveLifecycleKey = workbook
-    ? `${workbook.id}:${workbook.sheets
-        .map((sheet) => `${sheet.id}:${sheet.loaded === false ? "unloaded" : "loaded"}`)
-        .join(",")}`
+  const sheetLifecycleKeyValue = workbook
+    ? workbook.sheets.map(sheetLifecycleKey).join(",")
     : "none";
 
   useEffect(() => {
-    if (!workbook) {
-      saveLifecycleRef.current = { workbookId: null, bySheetId: new Map() };
-      return;
-    }
-
-    const previous = saveLifecycleRef.current;
-    const workbookChanged = previous.workbookId !== workbook.id;
-    const nextBySheetId = new Map<number, string>();
+    if (!workbook || !manualEditorRef.current) return;
     for (const sheet of workbook.sheets) {
-      const lifecycle = `${sheet.id}:${sheet.loaded === false ? "unloaded" : "loaded"}`;
-      nextBySheetId.set(sheet.id, lifecycle);
-      if (workbookChanged || previous.bySheetId.get(sheet.id) !== lifecycle) {
-        const snapshot =
-          sheet.loaded !== false && sheet.uploadedData
-            ? {
-                celldata: sheet.uploadedData as FortuneCell[],
-                config: sheet.config,
-              }
-            : manualEditorRef.current?.getBaseline(sheet.id);
-        if (snapshot) manualEditorRef.current?.replaceFromServerSnapshot(sheet.id, snapshot);
-        if (snapshot) resetSave(sheet.id, snapshot);
-      }
+      const snapshot = getSheetSaveSnapshot(sheet, manualEditorRef.current);
+      if (snapshot) manualEditorRef.current.replaceFromServerSnapshot(sheet.id, snapshot);
     }
-    saveLifecycleRef.current = { workbookId: workbook.id, bySheetId: nextBySheetId };
-  }, [resetSave, saveLifecycleKey]);
+  }, [sheetLifecycleKeyValue, workbook?.id]);
+
+  useEffect(() => {
+    if (!workbook || !manualEditorRef.current) return;
+    for (const sheet of workbook.sheets) {
+      const snapshot = getSheetSaveSnapshot(sheet, manualEditorRef.current);
+      if (!snapshot) continue;
+      synchronizeSaveSheet(
+        sheet.id,
+        { workbookId: workbook.id, lifecycleKey: sheetLifecycleKey(sheet) },
+        snapshot,
+      );
+    }
+  }, [sheetLifecycleKeyValue, synchronizeSaveSheet, workbook?.id]);
 
   useEffect(() => {
     setLayoutState({ sessionKey: layoutSessionKey, bySheetId: initialLayouts });
@@ -224,7 +232,6 @@ export function useExcelGridWorkspace({
 
   const handleChange = useCallback(
     (data: any[]) => {
-      if (manualEventsSuppressedRef.current) return;
       if (editorSessionReadyRef.current !== sessionKey) return;
       const currentWorkbook = workbookStateRef.current;
       const currentSheetIndex = activeSheetIndexRef.current;
@@ -247,7 +254,7 @@ export function useExcelGridWorkspace({
       const layoutChanged = results.some(
         ({ change }) =>
           change?.kind === "snapshot" ||
-          (change?.kind === "patch" && change.mutation.config !== undefined),
+          (change?.kind === "patch" && change.changeSet.configChanges.length > 0),
       );
       if (layoutChanged) {
         setLayoutState((current) => {

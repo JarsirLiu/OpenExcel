@@ -1,15 +1,17 @@
-import type { FortuneCell, SheetCommand } from "@openexcel/core";
+import type { FortuneCell } from "@openexcel/core";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { executeSheetCommand, fetchSheet, SheetRevisionConflictError } from "@/api/workbooks";
+import { fetchSheet, SheetRevisionConflictError } from "@/api/workbooks";
 import type { FortuneSheetData } from "@/features/workbook/editor/fortuneSheet";
 import type { SheetSnapshotForSave } from "./sheetChunkSnapshot";
 import type { SheetEditorChange } from "./sheetEditorChange";
 import {
   SheetSaveCoordinator,
   type SheetSaveErrorAction,
+  type SheetSaveIdentity,
   type SheetSaveRequest,
   type SheetSaveResult,
 } from "./sheetSaveCoordinator";
+import { createSheetSaveTask } from "./sheetSaveTask";
 
 type SheetState = {
   revision: number;
@@ -27,12 +29,6 @@ type Props = {
   onRebasedChange?: (change: SheetEditorChange) => void;
 };
 
-function createMutationId(): string {
-  return (
-    globalThis.crypto?.randomUUID?.() ?? `web-${Date.now()}-${Math.random().toString(36).slice(2)}`
-  );
-}
-
 export function useSheetSaveController({
   workspaceId,
   sheetLoaded,
@@ -45,81 +41,66 @@ export function useSheetSaveController({
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const saveStatusResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const coordinatorRef = useRef<SheetSaveCoordinator | null>(null);
+  const getSheetStateRef = useRef(getSheetState);
+  getSheetStateRef.current = getSheetState;
   const generationBySheetRef = useRef<Map<number, number>>(new Map());
-  if (!coordinatorRef.current) {
-    coordinatorRef.current = new SheetSaveCoordinator({
-      getSheetState,
-    });
-  }
+
+  const ensureCoordinator = useCallback(() => {
+    if (!coordinatorRef.current) {
+      coordinatorRef.current = new SheetSaveCoordinator({
+        getSheetState: (sheetId) => getSheetStateRef.current(sheetId),
+      });
+    }
+    return coordinatorRef.current;
+  }, []);
 
   useEffect(() => {
+    ensureCoordinator();
     return () => {
       coordinatorRef.current?.dispose();
+      coordinatorRef.current = null;
       if (saveStatusResetRef.current) clearTimeout(saveStatusResetRef.current);
     };
-  }, []);
+  }, [ensureCoordinator]);
 
   const syncSheetToServer = useCallback(
     async (sheetId: number, generation: number, request: SheetSaveRequest) => {
-      if (workspaceId == null) return { revision: request.baseRevision };
-      if (generationBySheetRef.current.get(sheetId) !== generation) {
-        return { revision: request.baseRevision };
-      }
-
-      const command: SheetCommand =
-        request.kind === "mutation"
-          ? {
-              kind: "mutation",
-              mutationId: createMutationId(),
-              sheetId,
-              baseRevision: request.baseRevision,
-              mutation: request.mutation,
-            }
-          : {
-              kind: "replaceChunks",
-              mutationId: createMutationId(),
-              sheetId,
-              baseRevision: request.baseRevision,
-              config: request.config as Record<string, unknown> | null,
-              chunks: request.chunks,
-            };
-
-      setSaveStatus("saving");
-      try {
-        const result = await executeSheetCommand(workspaceId, command);
-        if (generationBySheetRef.current.get(sheetId) !== generation) {
-          return { revision: request.baseRevision };
-        }
-        const serverSheet = await fetchSheet(workspaceId, sheetId);
-        if (generationBySheetRef.current.get(sheetId) !== generation) {
-          return { revision: request.baseRevision };
-        }
-        return {
-          ...result,
-          snapshot: {
-            celldata: (serverSheet.uploadedData ?? []) as FortuneCell[],
-            config: serverSheet.config,
-          },
-        };
-      } catch (error) {
-        setSaveStatus("idle");
-        throw error;
-      }
+      return createSheetSaveTask({
+        workspaceId,
+        sheetId,
+        generation,
+        isCurrent: () => generationBySheetRef.current.get(sheetId) === generation,
+        setSaving: () => setSaveStatus("saving"),
+        setIdle: () => setSaveStatus("idle"),
+      })(request);
     },
     [workspaceId],
   );
 
-  const reset = useCallback((sheetId: number, snapshot: SheetSnapshotForSave) => {
-    generationBySheetRef.current.set(sheetId, (generationBySheetRef.current.get(sheetId) ?? 0) + 1);
-    coordinatorRef.current?.reset(sheetId, snapshot);
-  }, []);
+  const synchronizeSheet = useCallback(
+    (sheetId: number, identity: SheetSaveIdentity, snapshot: SheetSnapshotForSave) => {
+      if (ensureCoordinator().synchronizeSheet(sheetId, identity, snapshot)) {
+        generationBySheetRef.current.set(
+          sheetId,
+          (generationBySheetRef.current.get(sheetId) ?? 0) + 1,
+        );
+      }
+    },
+    [ensureCoordinator],
+  );
+
+  const synchronizeServerSnapshot = useCallback(
+    (sheetId: number, snapshot: SheetSnapshotForSave) => {
+      ensureCoordinator().acknowledgeRemoteSnapshot(sheetId, snapshot);
+    },
+    [ensureCoordinator],
+  );
 
   const schedule = useCallback(
     (change: SheetEditorChange, documentVersion?: number) => {
       if (!sheetLoaded) return;
 
-      const coordinator = coordinatorRef.current;
-      if (!coordinator) return;
+      const coordinator = ensureCoordinator();
       const generation = generationBySheetRef.current.get(change.sheetId) ?? 0;
       const isCurrentGeneration = () =>
         generationBySheetRef.current.get(change.sheetId) === generation;
@@ -187,7 +168,7 @@ export function useSheetSaveController({
         change.kind === "patch"
           ? {
               kind: "patch",
-              mutation: change.mutation,
+              changeSet: change.changeSet,
               documentVersion: scheduledDocumentVersion,
             }
           : {
@@ -201,6 +182,7 @@ export function useSheetSaveController({
     },
     [
       getDocumentVersion,
+      ensureCoordinator,
       onRebasedChange,
       onRevisionChanged,
       onServerSnapshot,
@@ -210,5 +192,5 @@ export function useSheetSaveController({
     ],
   );
 
-  return { saveStatus, reset, schedule };
+  return { saveStatus, schedule, synchronizeServerSnapshot, synchronizeSheet };
 }

@@ -24,10 +24,11 @@ describe("ManualSheetEditor", () => {
     expect(result?.change).toEqual({
       kind: "patch",
       sheetId: 60,
-      mutation: {
-        type: "patch",
-        cells: [{ row: 1, col: 1, cell: { v: "manual", m: "manual" } }],
-        config: {},
+      changeSet: {
+        valueChanges: [{ row: 1, col: 1, cell: { v: "manual", m: "manual" } }],
+        formulaCacheChanges: [],
+        formatChanges: [],
+        configChanges: [{ config: {} }],
       },
     });
   });

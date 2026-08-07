@@ -88,30 +88,30 @@ dependencies from a mutation.
 
 - The Web workbook document is the browser's authoritative state for the current workbook.
 - Sheet saves are debounced per Sheet; the current scheduler defaults to 500 ms.
-- Normal Web edits are submitted as `mutation` commands containing the cell
-  changes found by comparing the post-calculation `onChange` snapshot with the
-  previous editor snapshot. The active Sheet's `onChange` is the manual edit
-  signal; `onOp` supplies changed-cell
-  coordinates and identifies structural or non-cell operations; it is not
-  authoritative for values because FortuneSheet may omit formula-dependent
-  cells from the operation list. The adapter therefore observes the direct
-  cells plus the existing formula cells, so recalculated formula caches are
-  included without scanning or materializing the complete Sheet for ordinary
-  edits. Unloaded Sheet placeholders are excluded from change and layout
-  processing. Each changed cell patch carries only fields that changed and an
-  explicit `removed` list for fields intentionally deleted. Core, the browser
-  document, and the save queue merge those fields with the current cell, so a
-  content or formula-cache update cannot replace unrelated borders, number
-  formats, or other styles. Sheet-level configuration changes are included in
-  the same patch when possible. The browser retains the
-  complete current Sheet so FortuneSheet and charts always read one document,
-  while the Server applies those cell patches transactionally to the affected
-  persisted chunks. Bulk or structural operations use `replaceChunks` with
-  only changed 256×256 chunks and the current Sheet config.
+- Normal Web edits are classified by comparing the post-calculation `onChange`
+  snapshot with the previous editor snapshot. The active Sheet's `onChange` is
+  the manual edit signal; `onOp` supplies changed-cell coordinates and
+  identifies structural or non-cell operations; it is not authoritative for
+  values because FortuneSheet may omit formula-dependent cells from the
+  operation list. The adapter therefore observes the direct cells plus the
+  existing formula cells, so recalculated formula caches are included without
+  scanning or materializing the complete Sheet for ordinary edits. Unloaded
+  Sheet placeholders are excluded from change and layout processing. The
+  adapter emits a `SheetChangeSet` with separate value, formula-cache, format,
+  and config collections. The document Store and save coordinator consume
+  those collections directly; only `sheetSaveTransport` serializes them into
+  the backend sparse `SheetChangeDelta` at the HTTP boundary. Each changed
+  cell carries only fields that changed and an explicit `removed` list for
+  fields intentionally deleted. Core and the browser document merge those
+  fields with the current cell, so a content or formula-cache update cannot
+  replace unrelated borders, number formats, or other styles. The browser
+  retains the complete current Sheet so FortuneSheet and charts always read one
+  document. Bulk or structural operations use `replaceChunks` with only
+  changed 256×256 chunks and the current Sheet config.
 - FortuneSheet is the interactive calculation authority in the browser. Its
   recalculated formula cells, including cached `v`/`m` values and the `f`
   expression, are copied into the browser workbook document before the sparse
-  mutation is scheduled. Charts read that current document data and therefore
+  change set is scheduled. Charts read that current document data and therefore
   update without waiting for the Server.
 - When a committed AI Sheet mutation arrives and the workbook still contains
   unloaded Sheets, the Web loads the complete workbook into the existing
@@ -135,15 +135,23 @@ dependencies from a mutation.
 - Failed saves retain their pending batch and retry with bounded exponential
   backoff. A save callback may explicitly mark a revision conflict as handled
   while it fetches and rebases the remote Sheet.
-- `ManualSheetEditor` owns the only content diff baseline for the current
+- `ManualSheetEditor` owns the only editor observation baseline for the current
   workbook editor session, keyed by Sheet ID. It is initialized from a server
   Sheet snapshot and replaced only by a server snapshot after a successful
   save, AI commit, or Sheet load. Manual changes never advance this baseline;
-  they produce mutations against it. The save coordinator receives already-
-  diffed manual mutations and retains only unsent mutations, desired content
-  for chunk replacement, retry state, and the in-flight request.
-- Workbook or Sheet lifecycle changes initialize the affected editor and save
-  state; refreshing content for an existing Sheet does not reset either one.
+  they produce incremental ChangeSets against it. The save coordinator keeps
+  one persisted snapshot and one desired snapshot per Sheet. Debounce, retry,
+  and conflict rebase update the desired snapshot; the final ChangeSet is
+  regenerated from the two snapshots at flush time. Its four collections are
+  classified output, not independent pending queues. It never serializes a
+  backend mutation.
+- Workbook or Sheet lifecycle changes synchronize the affected editor and save
+  state through an idempotent coordinator-owned identity. The coordinator is
+  the only owner of Sheet save state; the editor does not keep a second
+  lifecycle registry. Repeating the same synchronization preserves pending
+  edits, while a workbook or loaded-Sheet identity change creates a new save
+  baseline. Refreshing content for an existing Sheet uses the remote snapshot
+  acknowledgement path and does not reset local pending fields.
   The document Store holds only the current workbook. Remote snapshots replace
   that current document, while the save coordinator replays its unsent manual
   mutations on a conflict. AI mutations never enter the manual save queue and
@@ -159,4 +167,5 @@ dependencies from a mutation.
 - Server receipt: `packages/server/src/modules/sheets/infrastructure/sheetMutationReceiptRepository.ts`
 - Web document/chunk serializer: `packages/web/src/features/sync/sheetChunkSnapshot.ts`
 - Web save coordinator: `packages/web/src/features/sync/sheetSaveCoordinator.ts`
+- Web save transport: `packages/web/src/features/sync/sheetSaveTransport.ts`
 - Historical formula repair: `pnpm --filter @openexcel/server db:repair-formulas`
