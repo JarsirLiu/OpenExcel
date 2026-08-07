@@ -195,7 +195,11 @@ describe("SheetChunk persistence (SQLite)", () => {
       snapshot: {
         celldata: [
           { r: 0, c: 0, v: { v: "imported", m: "imported" } },
-          { r: 256, c: 256, v: { v: "imported-boundary", m: "imported-boundary" } },
+          {
+            r: 256,
+            c: 256,
+            v: { v: "imported-boundary", m: "imported-boundary", fc: "#000000" },
+          },
         ],
         config: null,
       },
@@ -267,7 +271,7 @@ describe("SheetChunk persistence (SQLite)", () => {
     const remainingChunks = await database.prisma.sheetChunk.findMany({ where: { sheetId } });
     expect(remainingChunks).toHaveLength(1);
     expect(JSON.parse(remainingChunks[0]!.payload).celldata).toEqual([
-      { r: 256, c: 256, v: { v: null, m: "", fc: "#000000" } },
+      { r: 256, c: 256, v: { fc: "#000000" } },
     ]);
   });
 });
