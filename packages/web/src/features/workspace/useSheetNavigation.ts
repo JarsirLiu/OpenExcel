@@ -63,7 +63,7 @@ export function useSheetNavigation(
       const current = workbook;
       if (!current || workspaceId == null) return;
       const sheet = current.sheets[sheetIndex];
-      if (!sheet || sheet.loaded !== false) {
+      if (sheet?.loaded !== false) {
         if (!quiet) {
           setSheetLoading(false);
           setSheetLoadError(null);

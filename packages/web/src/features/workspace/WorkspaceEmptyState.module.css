@@ -68,8 +68,8 @@
   line-height: 1;
 }
 
-.primaryAction {
-  border-color: var(--accent-primary) !important;
+.actions button.primaryAction {
+  border-color: var(--accent-primary);
   color: var(--text-on-accent);
   background: var(--accent-primary);
 }
